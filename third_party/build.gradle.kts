@@ -2,6 +2,19 @@ import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 
+dependencies {
+    implementation(fileTree("lib") { include("*.jar") })
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir("thirdPartySrc/analysisServer")
+            srcDir("thirdPartySrc/vmServiceDrivers")
+        }
+    }
+}
+
 plugins {
     id("java") // Java support
     id("org.jetbrains.kotlin.jvm") version "2.1.21-RC2" // Kotlin support
