@@ -99,8 +99,7 @@ public final class FlutterUtil {
     });
 
     try {
-      //noinspection unchecked
-      return yaml.load(yamlContents);
+        return yaml.load(yamlContents);
     }
     catch (Exception e) {
       return null;

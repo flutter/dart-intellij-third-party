@@ -14,7 +14,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.ui.PopupHandler;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
-import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -12,7 +12,6 @@ import com.intellij.psi.PsiElement;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
-import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

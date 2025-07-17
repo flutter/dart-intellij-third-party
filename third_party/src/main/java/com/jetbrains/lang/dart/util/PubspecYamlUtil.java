@@ -173,8 +173,7 @@ public final class PubspecYamlUtil {
     });
 
     try {
-      //noinspection unchecked
-      return yaml.load(pubspecYamlFileContents);
+        return yaml.load(pubspecYamlFileContents);
     }
     catch (Exception e) {
       return null; // malformed yaml, e.g. because of typing in it

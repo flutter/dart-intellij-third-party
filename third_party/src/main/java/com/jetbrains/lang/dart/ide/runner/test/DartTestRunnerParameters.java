@@ -26,8 +26,7 @@ public class DartTestRunnerParameters extends DartCommandLineRunnerParameters im
 
   public void setScope(final Scope scope) {
     if (scope != null) { // null in case of corrupted storage
-      //noinspection deprecation
-      if (scope == Scope.GROUP || scope == Scope.METHOD) {
+        if (scope == Scope.GROUP || scope == Scope.METHOD) {
         myScope = Scope.GROUP_OR_TEST_BY_NAME;
       }
       else {

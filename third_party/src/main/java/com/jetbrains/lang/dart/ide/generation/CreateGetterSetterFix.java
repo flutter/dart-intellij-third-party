@@ -12,7 +12,6 @@ import com.jetbrains.lang.dart.psi.DartComponent;
 import com.jetbrains.lang.dart.psi.DartReturnType;
 import com.jetbrains.lang.dart.psi.DartType;
 import com.jetbrains.lang.dart.util.DartPresentableUtil;
-import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
