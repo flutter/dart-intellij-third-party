@@ -1,0 +1,31 @@
+name: presubmit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
+        with:
+          distribution: 'temurin' # Recommended distribution
+          java-version: '21' # Match version in build.gradle.kts
+          cache: 'gradle' # Cache Gradle dependencies
+
+      - name: Build Plugin
+        run: ./gradlew buildPlugin
+
+      - name: Verify Plugin
+        run: ./gradlew verifyPlugin && ./gradlew verifyPluginProjectConfiguration && ./gradlew verifyPluginSignature && ./gradlew verifyPluginStructure
