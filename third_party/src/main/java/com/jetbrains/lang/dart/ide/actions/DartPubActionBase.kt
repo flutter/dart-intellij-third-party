@@ -78,7 +78,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
     e.presentation.isEnabled = visible && !isInProgress
   }
 
-  protected abstract fun getTitle(project: Project, pubspecYamlFile: VirtualFile): @Nls String
+  protected abstract fun getTitle(project: Project, pubspecYamlFile: VirtualFile): String
 
   protected abstract fun calculatePubParameters(project: Project, pubspecYamlFile: VirtualFile): Array<String>?
 
@@ -291,7 +291,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       command: GeneralCommandLine,
       processHandler: OSProcessHandler,
       pubspecYamlFile: VirtualFile,
-      actionTitle: @Nls String,
+      actionTitle: String,
     ) {
       val project = module.project
       val messageView = MessageView.getInstance(project)

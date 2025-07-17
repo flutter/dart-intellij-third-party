@@ -263,7 +263,11 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
                 @Override
                 protected void hyperlinkActivated(@NotNull Notification notification, @NotNull HyperlinkEvent e) {
                   notification.expire();
-                  ActionCenter.activateLog(myProject);
+                  // 2025.1, 251 change in platform, see
+                  // https://github.com/JetBrains/intellij-plugins/commit/762b22a5626c1b47f133cefb483bbc16178caee3
+                  final ToolWindow toolWindow = ActionCenter.getToolWindow(myProject);
+                  if (toolWindow != null) toolWindow.activate(null);
+                  // ActionCenter.activateLog(myProject);
                 }
               }).notify(myProject);
 

@@ -19,7 +19,7 @@ public final class DartBundle {
     return INSTANCE.containsKey(key) ? INSTANCE.getMessage(key, params) : DartDeprecatedMessageBundle.message(key, params);
   }
 
-  public static @NotNull Supplier<@Nls String> messagePointer(@NotNull @PropertyKey(resourceBundle = BUNDLE) String key, Object @NotNull ... params) {
+  public static @NotNull Supplier<String> messagePointer(@NotNull @PropertyKey(resourceBundle = BUNDLE) String key, Object @NotNull ... params) {
     return INSTANCE.containsKey(key) ? INSTANCE.getLazyMessage(key, params) : DartDeprecatedMessageBundle.messagePointer(key, params);
   }
 }

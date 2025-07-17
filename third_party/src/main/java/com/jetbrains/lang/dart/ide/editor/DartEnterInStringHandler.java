@@ -22,6 +22,11 @@ import static com.jetbrains.lang.dart.DartTokenTypes.*;
 public final class DartEnterInStringHandler implements EnterHandlerDelegate {
 
   @Override
+  public boolean invokeInsideIndent(int newLineCharOffset, @NotNull Editor editor, @NotNull DataContext dataContext) {
+    return EnterHandlerDelegate.super.invokeInsideIndent(newLineCharOffset, editor, dataContext);
+  }
+
+  @Override
   public Result preprocessEnter(final @NotNull PsiFile file,
                                 final @NotNull Editor editor,
                                 final @NotNull Ref<Integer> caretOffsetRef,
@@ -73,6 +78,11 @@ public final class DartEnterInStringHandler implements EnterHandlerDelegate {
     }
 
     return Result.Continue;
+  }
+
+  @Override
+  public Result postProcessEnter(@NotNull PsiFile psiFile, @NotNull Editor editor, @NotNull DataContext dataContext) {
+    return null;
   }
 
   private static @Nullable String getOpeningQuoteText(final @NotNull ASTNode node) {

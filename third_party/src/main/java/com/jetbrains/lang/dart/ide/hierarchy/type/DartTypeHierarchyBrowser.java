@@ -33,7 +33,7 @@ public class DartTypeHierarchyBrowser extends TypeHierarchyBrowserBase {
   }
 
   @Override
-  protected void createTrees(@NotNull Map<? super @Nls String, ? super JTree> trees) {
+  protected void createTrees(@NotNull Map<? super String, ? super JTree> trees) {
     createTreeAndSetupCommonActions(trees, IdeActions.GROUP_TYPE_HIERARCHY_POPUP);
   }
 

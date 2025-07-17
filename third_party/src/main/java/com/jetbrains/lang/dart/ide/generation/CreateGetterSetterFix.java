@@ -50,9 +50,9 @@ public class CreateGetterSetterFix extends BaseCreateMethodsFix<DartComponent> {
       }
     };
 
-    private final Supplier<@Nls String> myNothingFoundMessageSupplier;
+    private final Supplier<String> myNothingFoundMessageSupplier;
 
-    Strategy(Supplier<@Nls String> nothingFoundMessageSupplier) {
+    Strategy(Supplier<String> nothingFoundMessageSupplier) {
       myNothingFoundMessageSupplier = nothingFoundMessageSupplier;
     }
 

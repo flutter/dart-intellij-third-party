@@ -21,6 +21,11 @@ import org.jetbrains.annotations.NotNull;
 
 public final class DartEnterInDocLineCommentHandler implements EnterHandlerDelegate {
 
+  @Override
+  public boolean invokeInsideIndent(int newLineCharOffset, @NotNull Editor editor, @NotNull DataContext dataContext) {
+    return EnterHandlerDelegate.super.invokeInsideIndent(newLineCharOffset, editor, dataContext);
+  }
+
   // EnterInLineCommentHandler doesn't work well enough for Dart doc comments
   @Override
   public Result preprocessEnter(final @NotNull PsiFile file,
@@ -58,4 +63,10 @@ public final class DartEnterInDocLineCommentHandler implements EnterHandlerDeleg
 
     return Result.Continue;
   }
+
+  @Override
+  public Result postProcessEnter(@NotNull PsiFile psiFile, @NotNull Editor editor, @NotNull DataContext dataContext) {
+    return null;
+  }
+
 }

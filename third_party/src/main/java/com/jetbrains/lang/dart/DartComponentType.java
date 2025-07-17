@@ -55,9 +55,9 @@ public enum DartComponentType {
   LABEL(AllIcons.Nodes.Variable, DartBundle.messagePointer("find.usages.type.label"));
 
   private final Icon myIcon;
-  private final Supplier<@Nls String> myUsageTypeSupplier;
+  private final Supplier<String> myUsageTypeSupplier;
 
-  DartComponentType(final Icon icon, Supplier<@Nls String> supplier) {
+  DartComponentType(final Icon icon, Supplier<String> supplier) {
     myIcon = icon;
     myUsageTypeSupplier = supplier;
   }
