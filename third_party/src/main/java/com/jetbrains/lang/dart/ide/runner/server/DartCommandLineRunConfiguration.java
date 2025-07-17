@@ -45,7 +45,11 @@ public class DartCommandLineRunConfiguration extends DartRunConfigurationBase {
   @Override
   public DartCommandLineRunConfiguration clone() {
     final DartCommandLineRunConfiguration clone = (DartCommandLineRunConfiguration)super.clone();
-    clone.myRunnerParameters = myRunnerParameters.clone();
-    return clone;
+      try {
+          clone.myRunnerParameters = myRunnerParameters.clone();
+      } catch (CloneNotSupportedException e) {
+          throw new RuntimeException(e);
+      }
+      return clone;
   }
 }

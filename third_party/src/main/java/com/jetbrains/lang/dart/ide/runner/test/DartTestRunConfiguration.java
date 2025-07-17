@@ -73,7 +73,11 @@ public class DartTestRunConfiguration extends DartRunConfigurationBase {
   @Override
   public RunConfiguration clone() {
     final DartTestRunConfiguration clone = (DartTestRunConfiguration)super.clone();
-    clone.myRunnerParameters = myRunnerParameters.clone();
-    return clone;
+      try {
+          clone.myRunnerParameters = myRunnerParameters.clone();
+      } catch (CloneNotSupportedException e) {
+          throw new RuntimeException(e);
+      }
+      return clone;
   }
 }

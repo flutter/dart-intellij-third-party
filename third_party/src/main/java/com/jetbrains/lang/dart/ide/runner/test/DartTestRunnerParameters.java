@@ -72,7 +72,7 @@ public class DartTestRunnerParameters extends DartCommandLineRunnerParameters im
   }
 
   @Override
-  protected final DartTestRunnerParameters clone() {
+  protected final DartTestRunnerParameters clone() throws CloneNotSupportedException {
     return (DartTestRunnerParameters)super.clone();
   }
 

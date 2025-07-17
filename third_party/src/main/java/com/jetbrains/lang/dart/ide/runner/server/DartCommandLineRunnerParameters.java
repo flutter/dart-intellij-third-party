@@ -168,7 +168,7 @@ public class DartCommandLineRunnerParameters implements Cloneable {
   }
 
   @Override
-  protected DartCommandLineRunnerParameters clone() {
+  protected DartCommandLineRunnerParameters clone() throws CloneNotSupportedException {
     try {
       final DartCommandLineRunnerParameters clone = (DartCommandLineRunnerParameters)super.clone();
       clone.myEnvs = new LinkedHashMap<>();

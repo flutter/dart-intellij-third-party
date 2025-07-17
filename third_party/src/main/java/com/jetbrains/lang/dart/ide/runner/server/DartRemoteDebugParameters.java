@@ -15,7 +15,7 @@ public class DartRemoteDebugParameters implements Cloneable {
   }
 
   @Override
-  protected DartRemoteDebugParameters clone() {
+  protected DartRemoteDebugParameters clone() throws CloneNotSupportedException {
     try {
       return (DartRemoteDebugParameters)super.clone();
     }

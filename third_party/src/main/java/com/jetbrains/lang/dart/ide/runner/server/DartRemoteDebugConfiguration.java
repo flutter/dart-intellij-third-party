@@ -58,8 +58,12 @@ public class DartRemoteDebugConfiguration extends RunConfigurationBase<Element> 
   @Override
   public DartRemoteDebugConfiguration clone() {
     final DartRemoteDebugConfiguration clone = (DartRemoteDebugConfiguration)super.clone();
-    clone.myParameters = myParameters.clone();
-    return clone;
+      try {
+          clone.myParameters = myParameters.clone();
+      } catch (CloneNotSupportedException e) {
+          throw new RuntimeException(e);
+      }
+      return clone;
   }
 
   @Override
