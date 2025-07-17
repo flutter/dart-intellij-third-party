@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
+  # Job 1: Build Plugin
+  build-plugin:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -24,10 +25,28 @@ jobs:
           java-version: '21' # Match version in build.gradle.kts
           cache: 'gradle' # Cache Gradle dependencies
 
-      - name: Build Plugin
+      - name: Build Plugin Action
         run: ./gradlew buildPlugin
         working-directory: third_party
 
-      - name: Verify Plugin
-        run: ./gradlew verifyPlugin && ./gradlew verifyPluginProjectConfiguration && ./gradlew verifyPluginSignature && ./gradlew verifyPluginStructure
+  # Job 2: Verify Plugin
+  verify-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
+        with:
+          distribution: 'temurin' # Recommended distribution
+          java-version: '21' # Match version in build.gradle.kts
+          cache: 'gradle' # Cache Gradle dependencies
+
+      - name: Verify Plugin Actions
+        run: |
+          ./gradlew verifyPlugin
+          ./gradlew verifyPluginProjectConfiguration
+          ./gradlew verifyPluginSignature
+          ./gradlew verifyPluginStructure
         working-directory: third_party
