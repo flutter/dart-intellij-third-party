@@ -25,7 +25,6 @@
   <depends>com.intellij.modules.spellchecker</depends>
   <depends optional="true" config-file="dart-yaml.xml">org.jetbrains.plugins.yaml</depends>
   <depends optional="true" config-file="dart-copyright.xml">com.intellij.copyright</depends>
-  <depends optional="true" config-file="dart-coverage.xml">com.intellij.modules.coverage</depends>
 
   <resource-bundle>messages.DartBundle</resource-bundle>
 

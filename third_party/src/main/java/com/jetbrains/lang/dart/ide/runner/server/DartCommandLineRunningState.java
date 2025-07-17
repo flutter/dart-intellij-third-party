@@ -25,7 +25,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.Consumer;
 import com.intellij.util.net.NetUtils;
 import com.jetbrains.lang.dart.DartBundle;
-import com.jetbrains.lang.dart.coverage.DartCoverageProgramRunner;
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService;
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
 import com.jetbrains.lang.dart.ide.runner.DartConsoleFilter;
@@ -213,10 +212,6 @@ public class DartCommandLineRunningState extends CommandLineState {
       }
       catch (IOException e) {
         throw new ExecutionException(e);
-      }
-
-      if (getEnvironment().getRunner() instanceof DartCoverageProgramRunner) {
-        addVmOption(sdk, commandLine, "--pause-isolates-on-exit");
       }
     }
 
