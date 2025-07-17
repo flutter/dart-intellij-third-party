@@ -22,7 +22,6 @@
   <vendor>JetBrains</vendor>
   <category>Languages</category>
   <depends>com.intellij.modules.xml</depends>
-  <depends>com.intellij.modules.spellchecker</depends>
   <depends optional="true" config-file="dart-yaml.xml">org.jetbrains.plugins.yaml</depends>
   <depends optional="true" config-file="dart-copyright.xml">com.intellij.copyright</depends>
 
