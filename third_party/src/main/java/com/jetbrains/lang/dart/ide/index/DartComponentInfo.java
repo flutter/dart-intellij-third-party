@@ -4,6 +4,8 @@ package com.jetbrains.lang.dart.ide.index;
 import com.jetbrains.lang.dart.DartComponentType;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
+
 public class DartComponentInfo {
   private final @Nullable DartComponentType myComponentType;
   private final @Nullable String myLibraryName;
@@ -29,7 +31,7 @@ public class DartComponentInfo {
     DartComponentInfo info = (DartComponentInfo)o;
 
     if (myComponentType != info.myComponentType) return false;
-    if (myLibraryName != null ? !myLibraryName.equals(info.myLibraryName) : info.myLibraryName != null) return false;
+    if (!Objects.equals(myLibraryName, info.myLibraryName)) return false;
 
     return true;
   }

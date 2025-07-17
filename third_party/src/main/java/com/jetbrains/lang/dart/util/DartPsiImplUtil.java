@@ -106,7 +106,7 @@ public final class DartPsiImplUtil {
     }
 
     final DartUriElement uriElement = partOfStatement.getUriElement();
-    assert uriElement != null : "[" + partOfStatement.toString() + "]";
+    assert uriElement != null : "[" + partOfStatement + "]";
 
     final String uri = uriElement.getUriStringAndItsRange().first;
     final VirtualFile file = DartResolveUtil.getRealVirtualFile(partOfStatement.getContainingFile());
@@ -121,7 +121,7 @@ public final class DartPsiImplUtil {
     }
 
     final DartUriElement uriElement = partOfStatement.getUriElement();
-    assert uriElement != null : "[" + partOfStatement.toString() + "]";
+    assert uriElement != null : "[" + partOfStatement + "]";
 
     final String uri = uriElement.getUriStringAndItsRange().first;
     final VirtualFile file = DartResolveUtil.getRealVirtualFile(partOfStatement.getContainingFile());

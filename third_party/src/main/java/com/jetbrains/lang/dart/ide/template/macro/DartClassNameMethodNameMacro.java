@@ -18,7 +18,7 @@ public final class DartClassNameMethodNameMacro extends DartMacroBase {
     final Result methodNameResult = (new DartMethodNameMacro()).calculateResult(params, context);
 
     if (classNameResult != null && methodNameResult != null) {
-      return new TextResult(classNameResult.toString() + "." + methodNameResult.toString());
+      return new TextResult(classNameResult + "." + methodNameResult);
     }
     else if (classNameResult == null && methodNameResult != null) {
       return new TextResult(methodNameResult.toString());

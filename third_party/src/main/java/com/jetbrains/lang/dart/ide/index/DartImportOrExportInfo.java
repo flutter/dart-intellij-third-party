@@ -4,6 +4,7 @@ package com.jetbrains.lang.dart.ide.index;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.Set;
 
 public class DartImportOrExportInfo implements DartShowHideInfo {
@@ -58,7 +59,7 @@ public class DartImportOrExportInfo implements DartShowHideInfo {
 
     if (myKind != info.myKind) return false;
     if (!myUri.equals(info.myUri)) return false;
-    if (myImportPrefix != null ? !myImportPrefix.equals(info.myImportPrefix) : info.myImportPrefix != null) return false;
+    if (!Objects.equals(myImportPrefix, info.myImportPrefix)) return false;
     if (!myShowComponents.equals(info.myShowComponents)) return false;
     if (!myHideComponents.equals(info.myHideComponents)) return false;
 

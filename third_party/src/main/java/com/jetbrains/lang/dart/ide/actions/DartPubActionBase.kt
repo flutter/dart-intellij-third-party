@@ -162,7 +162,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
     private var myProcessHandler: OSProcessHandler? = null
 
     init {
-      registerCustomShortcutSet(CommonShortcuts.getRerun(), info.console.getComponent())
+      registerCustomShortcutSet(CommonShortcuts.getRerun(), info.console.component)
     }
 
     fun setProcessHandler(processHandler: OSProcessHandler) {

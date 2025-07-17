@@ -140,7 +140,7 @@ public final class DartPresentableUtil {
         }
         else {
           if (displayFinalKeyword && simpleFormalParameter.isFinal()) {
-            result.append(DartTokenTypes.FINAL.toString());
+            result.append(DartTokenTypes.FINAL);
             result.append(SPACE);
           }
           final DartType type = simpleFormalParameter.getType();
@@ -153,7 +153,7 @@ public final class DartPresentableUtil {
       }
       else {
         if (displayFinalKeyword && simpleFormalParameter.isFinal()) {
-          result.append(DartTokenTypes.FINAL.toString());
+          result.append(DartTokenTypes.FINAL);
           result.append(SPACE);
         }
         final DartType type = simpleFormalParameter.getType();
