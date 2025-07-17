@@ -26,6 +26,8 @@ jobs:
 
       - name: Build Plugin
         run: ./gradlew buildPlugin
+        working-directory: third_party
 
       - name: Verify Plugin
         run: ./gradlew verifyPlugin && ./gradlew verifyPluginProjectConfiguration && ./gradlew verifyPluginSignature && ./gradlew verifyPluginStructure
+        working-directory: third_party
