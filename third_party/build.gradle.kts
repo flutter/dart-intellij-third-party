@@ -36,6 +36,11 @@ intellijPlatform {
             untilBuild = "251.*"
         }
     }
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
 }
 
 sourceSets {
