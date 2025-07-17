@@ -41,7 +41,7 @@ public final class DartTestUtils {
       return FileUtil.toSystemIndependentName(PathManager.getHomePath() + "/contrib/Dart/testData");
     }
 
-    final File f = new File("testData");
+    final File f = new File("src/test/testData");
     if (f.isDirectory()) {
       // started from 'Dart-plugin' project
       return FileUtil.toSystemIndependentName(f.getAbsolutePath());
@@ -49,9 +49,9 @@ public final class DartTestUtils {
 
     final String parentPath = PathUtil.getParentPath(PathManager.getHomePath());
 
-    if (new File(parentPath + "/intellij-plugins").isDirectory()) {
+    if (new File(parentPath + "/dart-intellij-third-party").isDirectory()) {
       // started from IntelliJ IDEA Community Edition + Dart Plugin project
-      return FileUtil.toSystemIndependentName(parentPath + "/intellij-plugins/Dart/testData");
+      return FileUtil.toSystemIndependentName(parentPath + "/dart-intellij-third-party/third_party/src/test/testData");
     }
 
     if (new File(parentPath + "/contrib").isDirectory()) {

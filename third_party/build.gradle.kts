@@ -110,6 +110,11 @@ tasks {
     wrapper {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
+    test {
+        // TODO figure out how to not need the sdk path hard coded:
+        // Replace the [Dart SDK Path] to run the Dart Analysis Server tests
+        jvmArgs("-Ddart.sdk=[Dart SDK path]]")
+    }
 }
 
 // https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-faq.html#how-to-check-the-latest-available-eap-release
