@@ -29,7 +29,25 @@ jobs:
         run: ./gradlew buildPlugin
         working-directory: third_party
 
-  # Job 2: Verify Plugin
+  # Job 2: Unit Tests
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
+        with:
+          distribution: 'temurin' # Recommended distribution
+          java-version: '21' # Match version in build.gradle.kts
+          cache: 'gradle' # Cache Gradle dependencies
+
+      - name: Unit Test Action
+        run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
+        working-directory: third_party
+
+  # Job 3: Verify Plugin
   verify-plugin:
     runs-on: ubuntu-latest
     steps:
