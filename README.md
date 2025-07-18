@@ -8,4 +8,4 @@ Before the move to this repository, the project had 4 working and active branche
 - `252` - 2025.2
 - `master` - the current master for intellij-community, targeting the next version 2025.3
 
-In its original location the project was built with Bazel, in github.com/flutter, the project is built using Gradle, see https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html.
+In its original location the project was built with Bazel; however, in github.com/flutter, the project is built using Gradle (see https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html).
