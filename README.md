@@ -1,6 +1,6 @@
 ## Project and repository history
 
-This repository was originally copy of the Dart Plugin from IntelliJ from JetBrains, https://github.com/JetBrains/intellij-plugins/tree/master/Dart through the commit https://github.com/JetBrains/intellij-plugins/commit/c912b13b1dd8acccd6259dedc4063848a8f87b2b.
+This repository was originally a copy of the [Dart Plugin for IntelliJ from JetBrains](https://github.com/JetBrains/intellij-plugins/tree/master/Dart) through the commit https://github.com/JetBrains/intellij-plugins/commit/c912b13b1dd8acccd6259dedc4063848a8f87b2b.
 
 Before the move to this repository, the project had 4 working and active branches which were used to build different IntelliJ versions:
 - `243` - 2024.3
