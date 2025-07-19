@@ -115,9 +115,12 @@ tasks {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
     test {
-        // TODO figure out how to not need the sdk path hard coded:
-        // Replace the [Dart SDK Path] to run the Dart Analysis Server tests
-        jvmArgs("-Ddart.sdk=[Dart SDK path]")
+        val dartSdkPath = System.getenv("DART_HOME")
+        if (dartSdkPath != null) {
+            jvmArgs("-Ddart.sdk=${dartSdkPath}")
+        } else {
+            logger.error("DART_HOME environment variable is not set. Dart Analysis Server tests will fail.")
+        }
     }
 }
 

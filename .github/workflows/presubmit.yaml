@@ -50,7 +50,43 @@ jobs:
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
         working-directory: third_party
 
-  # Job 3: Verify Plugin
+  # Job 3: Dart Analysis Server Tests
+  dart-analysis-server-tests:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        # https://github.com/dart-lang/setup-dart
+        # Define the Dart SDK versions to test against.
+        # 'stable' and 'beta' will fetch the latest respective versions.
+        # You can also specify exact versions like '3.0.0', '3.8.1'.
+        dart-version: ['3.0.0', 'stable', 'beta', 'dev' ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Set up Dart SDK ${{ matrix.dart-version }}
+        # This action installs the specified Dart SDK version.
+        # It sets the DART_SDK environment variable to the SDK root.
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.dart-version }}
+
+      - name: Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
+        if: always() # Run even if one SDK version fails
+        # Pass the Dart SDK path with DART_HOME
+        run: |
+          ${DART_HOME}/bin/dart --version
+          ./gradlew :test --tests "com.jetbrains.dart.analysisServer.*"
+        working-directory: third_party
+
+  # Job 4: Verify Plugin
   verify-plugin:
     strategy:
       matrix:

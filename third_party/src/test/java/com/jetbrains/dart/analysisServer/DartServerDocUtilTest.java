@@ -384,7 +384,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
 
   public void testSetterSig() {
     doTest(
-      "<code><b>test.dart</b><br>void&nbsp;set&nbsp;x(int&nbsp;x)<br><br><b>Containing class:</b> Z<br><br></code>",
+      "<code><b>test.dart</b><br>set&nbsp;x(int&nbsp;x)<br><br><b>Containing class:</b> Z<br><br></code>",
       "class Z { void set <caret>x(int x) { } }");
   }
 

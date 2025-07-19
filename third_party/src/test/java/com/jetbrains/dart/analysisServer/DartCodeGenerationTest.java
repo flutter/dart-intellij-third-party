@@ -48,8 +48,8 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
                                 @override
                                 bool operator ==(Object other) =>
                                     identical(this, other) ||
-                                    other is Foo && runtimeType == other.runtimeType;
-
+                                        other is Foo && runtimeType == other.runtimeType;
+                              
                                 @override
                                 int get hashCode => 0;
                               }
@@ -75,10 +75,10 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
                                 @override
                                 bool operator ==(Object other) =>
                                     identical(this, other) ||
-                                    super == other && other is Foo && runtimeType == other.runtimeType;
-
+                                        other is Foo && runtimeType == other.runtimeType;
+                              
                                 @override
-                                int get hashCode => super.hashCode;
+                                int get hashCode => 0;
                               }""");
   }
 
@@ -94,25 +94,24 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
                               <caret>}""",
 
                             """
-                              class Interface {
-                                bool operator ==(Object other) => super == other;
-                                int get hashCode => super.hashCode;
-                              }
-                              class Foo extends Object implements Interface {
-                                Error e;
-                                bool b;
-
-                                @override
-                                bool operator ==(Object other) =>
-                                    identical(this, other) ||
-                                    other is Foo &&
-                                        runtimeType == other.runtimeType &&
-                                        e == other.e &&
-                                        b == other.b;
-
-                                @override
-                                int get hashCode => e.hashCode ^ b.hashCode;
-                              }""");
+                                class Interface {
+                                  bool operator ==(Object other) => super == other;
+                                  int get hashCode => super.hashCode;
+                                }
+                                class Foo extends Object implements Interface {
+                                  Error e;
+                                  bool b;
+                                
+                                  @override
+                                  bool operator ==(Object other) =>
+                                      identical(this, other) ||
+                                          other is Foo && runtimeType == other.runtimeType && e == other.e &&
+                                              b == other.b;
+                                
+                                  @override
+                                  int get hashCode => Object.hash(e, b);
+                                
+                                }""");
   }
 
   public void testEqualsAndHashcodeWithFieldsAndSuper() {
@@ -128,26 +127,24 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
                               }""",
 
                             """
-                              class Bar extends Baz {var qwe;}
-                              class Baz {
-                                bool operator ==(Object other) => super == other;
-                                int get hashCode => super.hashCode;
-                              }
-                              class Foo extends Bar {
-                                Error e;
-                                bool b;
-
-                                @override
-                                bool operator ==(Object other) =>
-                                    identical(this, other) ||
-                                    super == other &&
-                                        other is Foo &&
-                                        runtimeType == other.runtimeType &&
-                                        e == other.e &&
-                                        b == other.b;
-
-                                @override
-                                int get hashCode => super.hashCode ^ e.hashCode ^ b.hashCode;
-                              }""");
+                                class Bar extends Baz {var qwe;}
+                                class Baz {
+                                  bool operator ==(Object other) => super == other;
+                                  int get hashCode => super.hashCode;
+                                }
+                                class Foo extends Bar {
+                                  Error e;
+                                  bool b;
+                                
+                                  @override
+                                  bool operator ==(Object other) =>
+                                      identical(this, other) ||
+                                          other is Foo && runtimeType == other.runtimeType && e == other.e &&
+                                              b == other.b;
+                                
+                                  @override
+                                  int get hashCode => Object.hash(e, b);
+                                
+                                }""");
   }
 }
