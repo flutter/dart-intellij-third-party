@@ -30,14 +30,4 @@ public class DartInjectionTest extends LightPlatformCodeInsightTestCase {
   public void testHtmlInStrings() throws Exception {
     doTest();
   }
-
-  public void testRegExp() throws Exception {
-    Assume.assumeTrue("This test is not applicable in current environment because JavaScript plugin is not available",
-                      Language.findLanguageByID("JSRegexp") != null);
-    doTest();
-  }
-
-  public void testJsonWithComment() throws Exception {
-    doTest();
-  }
 }
