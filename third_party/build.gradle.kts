@@ -31,10 +31,14 @@ repositories {
 
 intellijPlatform {
     pluginConfiguration {
-        version = "1"
+        name = providers.gradleProperty("pluginName")
+        id = providers.gradleProperty("pluginId")
+        version = providers.gradleProperty("pluginVersion")
+        // TODO(https://github.com/flutter/dart-intellij-third-party/issues/23) Add a changelog:
+        // val changelog = ...
         ideaVersion {
-            sinceBuild = "251"
-            untilBuild = "251.*"
+            sinceBuild = providers.gradleProperty("pluginSinceBuild")
+            untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
     }
     pluginVerification {
@@ -113,7 +117,7 @@ tasks {
     test {
         // TODO figure out how to not need the sdk path hard coded:
         // Replace the [Dart SDK Path] to run the Dart Analysis Server tests
-        jvmArgs("-Ddart.sdk=[Dart SDK path]]")
+        jvmArgs("-Ddart.sdk=[Dart SDK path]")
     }
 }
 

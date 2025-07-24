@@ -15,11 +15,9 @@
     </ul>
 
     <h2>Getting started</h2>
-    <p>For information on getting started, head over to the <a href="https://www.jetbrains.com/help/">documentation</a> for your IDE.
-      For IntelliJ IDEA, you can check out this section in the
-      <a href="https://www.jetbrains.com/help/idea/dart.html">documentation</a>.
+    <p>For information on getting started, head over to the <a href="https://dart.dev/tools/jetbrains-plugin">documentation</a>.
   ]]></description>
-  <vendor>JetBrains</vendor>
+  <vendor url="https://google.com">Google</vendor>
   <category>Languages</category>
   <depends>com.intellij.modules.xml</depends>
   <depends optional="true" config-file="dart-yaml.xml">org.jetbrains.plugins.yaml</depends>
