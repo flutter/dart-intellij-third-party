@@ -189,7 +189,7 @@ final class DartRenameDialog extends ServerRefactoringDialog<ServerRenameRefacto
         final PsiElement usageElement = DartServerFindUsagesHandler.getUsagePsiElement(psiFile, range);
         if (usageElement != null) {
           if (DartComponentType.typeOf(usageElement) != null) {
-            usageTargets.add(new PsiElement2UsageTargetAdapter(usageElement));
+            usageTargets.add(new PsiElement2UsageTargetAdapter(usageElement, true));
           }
           else {
             final UsageInfo usageInfo = DartServerFindUsagesHandler.getUsageInfo(usageElement, range, potentialUsage);
