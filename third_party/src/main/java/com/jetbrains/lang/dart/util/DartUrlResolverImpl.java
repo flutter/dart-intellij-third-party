@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.util;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtilCore;
 import com.intellij.openapi.project.Project;
@@ -17,7 +16,6 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.ex.temp.TempFileSystem;
 import com.intellij.util.PairConsumer;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.index.DartLibraryIndex;
@@ -81,9 +79,7 @@ public final class DartUrlResolverImpl extends DartUrlResolver {
       VirtualFile notNullPackageDir = null;
 
       for (String dirPath : dirPaths) {
-        final VirtualFile packageDir = ApplicationManager.getApplication().isUnitTestMode()
-                                       ? TempFileSystem.getInstance().findFileByPath(dirPath)
-                                       : LocalFileSystem.getInstance().findFileByPath(dirPath);
+        final VirtualFile packageDir = LocalFileSystem.getInstance().findFileByPath(dirPath);
         if (notNullPackageDir == null && packageDir != null) {
           notNullPackageDir = packageDir;
         }
@@ -132,10 +128,6 @@ public final class DartUrlResolverImpl extends DartUrlResolver {
     if (url.startsWith(FILE_PREFIX)) {
       final String path = StringUtil.trimLeading(url.substring(FILE_PREFIX.length()), '/');
       return LocalFileSystem.getInstance().findFileByPath(SystemInfo.isWindows ? path : ("/" + path));
-    }
-
-    if (ApplicationManager.getApplication().isUnitTestMode() && url.startsWith(TEMP_PREFIX)) {
-      return TempFileSystem.getInstance().findFileByPath(url.substring((TEMP_PREFIX).length()));
     }
 
     return null;
