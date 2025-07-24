@@ -12,8 +12,6 @@ import com.google.dart.server.internal.remote.StdioServerSocket;
 import com.google.dart.server.utilities.logging.Logging;
 import com.google.gson.JsonObject;
 import com.intellij.codeInsight.CodeInsightSettings;
-import com.intellij.coverage.CoverageLoadErrorReporter;
-import com.intellij.coverage.DummyCoverageLoadErrorReporter;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationInfo;
 import com.intellij.openapi.application.ApplicationManager;
@@ -1954,15 +1952,10 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public @Nullable String execution_createContext(@NotNull String filePath) {
-    return execution_createContext(filePath, new DummyCoverageLoadErrorReporter());
-  }
-
-  public @Nullable String execution_createContext(@NotNull String filePath, @NotNull CoverageLoadErrorReporter reporter) {
     final AnalysisServer server = myServer;
     if (server == null) {
       String message = "Dart Analysis Server is not available.";
       LOG.warn(message);
-      reporter.reportWarning(message, null);
       return null;
     }
 
@@ -1980,7 +1973,6 @@ public final class DartAnalysisServerService implements Disposable {
       public void onError(final RequestError error) {
         logError("execution_createContext()", fileUri, error);
         String message = getShortErrorMessage("execution_createContext()", fileUri, error);
-        reporter.reportError("Execution context creation failed: " + message);
         latch.countDown();
       }
     });
@@ -1989,8 +1981,6 @@ public final class DartAnalysisServerService implements Disposable {
 
     if (latch.getCount() > 0) {
       logTookTooLongMessage("execution_createContext", EXECUTION_CREATE_CONTEXT_TIMEOUT, fileUri);
-      String message = "Execution context creation timed out.";
-      reporter.reportWarning(message, null);
     }
     return resultRef.get();
   }
