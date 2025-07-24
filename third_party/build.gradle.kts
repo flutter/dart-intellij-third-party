@@ -46,7 +46,7 @@ intellijPlatform {
             VerifyPluginTask.FailureLevel.COMPATIBILITY_WARNINGS,
             VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
             //            VerifyPluginTask.FailureLevel.DEPRECATED_API_USAGES,
-            //            VerifyPluginTask.FailureLevel.SCHEDULED_FOR_REMOVAL_API_USAGES,
+            VerifyPluginTask.FailureLevel.SCHEDULED_FOR_REMOVAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.EXPERIMENTAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
             VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES,
