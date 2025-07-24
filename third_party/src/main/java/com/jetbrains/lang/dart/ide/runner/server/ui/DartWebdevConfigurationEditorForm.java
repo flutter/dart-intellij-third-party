@@ -26,7 +26,7 @@ public class DartWebdevConfigurationEditorForm extends SettingsEditor<DartWebdev
   private PortField myWebdevPortField;
 
   public DartWebdevConfigurationEditorForm(final Project project) {
-    myHtmlFileField.getButton().addActionListener(e -> {
+    myHtmlFileField.addActionListener(e -> {
       final String initialPath = FileUtil.toSystemIndependentName(myHtmlFileField.getText().trim());
       final VirtualFile initialFile = initialPath.isEmpty() ? null : LocalFileSystem.getInstance().findFileByPath(initialPath);
       final PsiFile initialPsiFile = initialFile == null ? null : PsiManager.getInstance(project).findFile(initialFile);

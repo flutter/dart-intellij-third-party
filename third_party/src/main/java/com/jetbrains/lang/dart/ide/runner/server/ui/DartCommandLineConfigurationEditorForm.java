@@ -57,7 +57,7 @@ public class DartCommandLineConfigurationEditorForm extends SettingsEditor<DartC
 
   public static void initDartFileTextWithBrowse(final @NotNull Project project,
                                                 final @NotNull TextFieldWithBrowseButton textWithBrowse) {
-    textWithBrowse.getButton().addActionListener(e -> {
+    textWithBrowse.addActionListener(e -> {
       final String initialPath = FileUtil.toSystemIndependentName(textWithBrowse.getText().trim());
       final VirtualFile initialFile = initialPath.isEmpty() ? null : LocalFileSystem.getInstance().findFileByPath(initialPath);
       final PsiFile initialPsiFile = initialFile == null ? null : PsiManager.getInstance(project).findFile(initialFile);
