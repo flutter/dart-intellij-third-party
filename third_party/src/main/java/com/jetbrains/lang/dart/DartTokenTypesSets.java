@@ -240,11 +240,6 @@ public interface DartTokenTypesSets {
     }
 
     @Override
-    public boolean isParsable(final @NotNull CharSequence buffer, final @NotNull Language fileLanguage, final @NotNull Project project) {
-      return PsiBuilderUtil.hasProperBraceBalance(buffer, new DartLexer(), LBRACE, RBRACE);
-    }
-
-    @Override
     public @Nullable ASTNode createNode(final @NotNull CharSequence text) {
       return new DartLazyParseableBlockImpl(this, text);
     }
