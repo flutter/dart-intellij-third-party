@@ -20,6 +20,7 @@ import com.intellij.openapi.roots.libraries.LibraryTable;
 import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar;
 import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.registry.Registry;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -295,7 +296,7 @@ public final class DartFileListener implements AsyncFileListener {
       return true;
     }
 
-    while (!path.isEmpty()) {
+    while (Strings.isNotEmpty(path)) {
       final VirtualFile file = LocalFileSystem.getInstance().findFileByPath(path);
       if (file == null) {
         path = PathUtil.getParentPath(path);

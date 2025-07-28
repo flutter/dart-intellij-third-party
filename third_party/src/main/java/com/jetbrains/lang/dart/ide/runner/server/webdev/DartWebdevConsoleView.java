@@ -8,6 +8,7 @@ import com.intellij.execution.impl.ConsoleViewImpl;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.annotations.NotNull;
 
@@ -42,7 +43,7 @@ public class DartWebdevConsoleView extends ConsoleViewImpl {
       super.print(text, contentType);
     }
     final String logMessage = DartDaemonParserUtil.getLogMessage(text.trim());
-    if (logMessage != null && !logMessage.isEmpty()) {
+    if (Strings.isNotEmpty(logMessage)) {
       super.print(logMessage + "\n", contentType);
     }
   }

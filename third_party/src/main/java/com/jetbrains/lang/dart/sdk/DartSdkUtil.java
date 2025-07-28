@@ -11,6 +11,7 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.ui.ComboboxWithBrowseButton;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBLabel;
@@ -68,7 +69,7 @@ public final class DartSdkUtil {
 
   @Contract("null->false")
   public static boolean isDartSdkHome(final @Nullable String path) {
-    return path != null && !path.isEmpty() && new File(path + "/lib/core/core.dart").isFile();
+    return Strings.isNotEmpty(path) && new File(path + "/lib/core/core.dart").isFile();
   }
 
   public static void initDartSdkControls(final @Nullable Project project,

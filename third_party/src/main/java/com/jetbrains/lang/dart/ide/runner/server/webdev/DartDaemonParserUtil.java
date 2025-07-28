@@ -2,6 +2,7 @@
 package com.jetbrains.lang.dart.ide.runner.server.webdev;
 
 import com.google.gson.*;
+import com.intellij.openapi.util.text.Strings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -106,7 +107,7 @@ public final class DartDaemonParserUtil {
     final JsonPrimitive primLog = params.getAsJsonPrimitive("log");
     if (primLog != null) {
       String primLogAsString = primLog.getAsString();
-      if (primLogAsString != null && !primLogAsString.isEmpty()) {
+      if (Strings.isNotEmpty(primLogAsString)) {
         return primLogAsString.trim();
       }
     }

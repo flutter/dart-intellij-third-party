@@ -27,6 +27,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.ide.actions.DartPubActionBase;
@@ -115,14 +116,14 @@ public class DartTestRunningState extends DartCommandLineRunningState {
         targetName != null &&
         !targetName.isEmpty()) {
       builder.append(" ").append(":").append(targetName).append(" ").append(EXPANDED_REPORTER_OPTION);
-      if (testRunnerOptions != null && !testRunnerOptions.isEmpty()) {
+      if (Strings.isNotEmpty(testRunnerOptions)) {
         builder.append(" ").append(testRunnerOptions);
       }
     }
     else {
       builder.append(' ').append(TEST_PACKAGE_SPEC);
       builder.append(' ').append(EXPANDED_REPORTER_OPTION);
-      if (testRunnerOptions != null && !testRunnerOptions.isEmpty()) {
+      if (Strings.isNotEmpty(testRunnerOptions)) {
         builder.append(" ").append(testRunnerOptions);
       }
 

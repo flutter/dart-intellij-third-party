@@ -40,6 +40,7 @@ import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
@@ -2450,7 +2451,7 @@ public final class DartAnalysisServerService implements Disposable {
     }
 
     final String trace = error.getStackTrace();
-    final String partialTrace = trace == null || trace.isEmpty() ? "" : trace.substring(0, Math.min(trace.length(), 1000));
+    final String partialTrace = Strings.isEmpty(trace) ? "" : trace.substring(0, Math.min(trace.length(), 1000));
     final String message = getShortErrorMessage(methodName, filePath, error) + "\n" + partialTrace + "...";
     LOG.error(message);
   }

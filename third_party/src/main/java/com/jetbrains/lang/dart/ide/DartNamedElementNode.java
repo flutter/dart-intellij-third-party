@@ -6,6 +6,7 @@ import com.intellij.codeInsight.generation.MemberChooserObject;
 import com.intellij.codeInsight.generation.PsiElementMemberChooserObject;
 import com.intellij.navigation.ItemPresentation;
 import com.intellij.openapi.util.Iconable;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.psi.DartComponent;
@@ -24,7 +25,7 @@ public class DartNamedElementNode extends PsiElementMemberChooserObject implemen
     }
     if (dartComponent instanceof DartClass) {
       final String location = presentation.getLocationString();
-      if (location != null && !location.isEmpty()) {
+      if (Strings.isNotEmpty(location)) {
         return dartComponent.getName() + " " + location;
       }
       return dartComponent.getName();

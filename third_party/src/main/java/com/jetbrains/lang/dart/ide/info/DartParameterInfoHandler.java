@@ -7,6 +7,7 @@ import com.intellij.lang.parameterInfo.ParameterInfoHandler;
 import com.intellij.lang.parameterInfo.ParameterInfoUIContext;
 import com.intellij.lang.parameterInfo.UpdateParameterInfoContext;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.containers.ContainerUtil;
@@ -104,7 +105,7 @@ public final class DartParameterInfoHandler implements ParameterInfoHandler<PsiE
       return;
     }
     myParametersListPresentableText = p.getParametersListPresentableText();
-    if (myParametersListPresentableText != null && myParametersListPresentableText.isEmpty()) {
+    if (Strings.isEmpty(myParametersListPresentableText)) {
       myParametersListPresentableText = CodeInsightBundle.message("parameter.info.no.parameters");
     }
     context.setupUIComponentPresentation(

@@ -12,6 +12,7 @@ import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
+import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.impl.source.resolve.ResolveCache;
 import com.intellij.psi.search.SearchScope;
@@ -251,7 +252,7 @@ public final class DartServerData {
 
     ApplicationManager.getApplication().executeOnPooledThread(() -> {
       String contents = myService.lspMessage_dart_textDocumentContent(fileUri);
-      if (contents == null || contents.isEmpty()) {
+      if (Strings.isEmpty(contents)) {
         myNotLocalFileUriToVirtualFileMap.remove(fileUri);
         return;
       }
