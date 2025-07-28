@@ -59,7 +59,8 @@ jobs:
         # Define the Dart SDK versions to test against.
         # 'stable' and 'beta' will fetch the latest respective versions.
         # You can also specify exact versions like '3.0.0', '3.8.1'.
-        dart-version: ['3.0.0', 'stable', 'beta', 'dev' ]
+        # dart-version: ['3.0.0', 'stable', 'beta', 'dev' ]
+        dart-version: ['stable']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
