@@ -2001,7 +2001,7 @@ public final class DartAnalysisServerService implements Disposable {
                                                                                                                 @NotNull List<RuntimeCompletionExpression> expressions) {
     final AnalysisServer server = myServer;
     if (server == null) {
-      return new Pair<>(new ArrayList<>(), new ArrayList<>());
+      return new Pair<>(new SmartList<>(), new SmartList<>());
     }
 
     final String contextFileUri = getFileUri(contextFile);

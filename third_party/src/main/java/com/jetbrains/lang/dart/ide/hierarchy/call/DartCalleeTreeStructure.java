@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.SmartList;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.psi.DartComponent;
 import com.jetbrains.lang.dart.psi.DartComponentName;
@@ -81,7 +82,7 @@ public class DartCalleeTreeStructure extends DartCallHierarchyTreeStructure {
         return region.getTargets();
       }
     }
-    return new ArrayList<>(0);
+    return new SmartList<>();
   }
 
   @Override

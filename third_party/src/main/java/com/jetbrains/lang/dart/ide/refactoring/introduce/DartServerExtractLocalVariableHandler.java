@@ -18,6 +18,7 @@ import com.intellij.refactoring.introduce.inplace.OccurrencesChooser;
 import com.intellij.refactoring.ui.NameSuggestionsField;
 import com.intellij.refactoring.util.CommonRefactoringUtil;
 import com.intellij.util.ArrayUtil;
+import com.intellij.util.SmartList;
 import com.intellij.util.ui.JBUI;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartFileType;
@@ -35,7 +36,6 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.ArrayList;
 import java.util.List;
 
 public class DartServerExtractLocalVariableHandler implements RefactoringActionHandler {
@@ -89,9 +89,6 @@ class ExtractLocalVariableProcessor {
       final int[] offsets = refactoring.getCoveringExpressionOffsets();
       final int[] lengths = refactoring.getCoveringExpressionLengths();
       expressions = getDartExpressions(offsets, lengths);
-      if (expressions == null) {
-        return;
-      }
     }
     // select the expression to extract
     if (expressions.size() == 1 || ApplicationManager.getApplication().isUnitTestMode()) {
@@ -119,12 +116,13 @@ class ExtractLocalVariableProcessor {
     return PsiTreeUtil.findElementOfClassAtRange(file, offset, offset + length, DartExpression.class);
   }
 
-  private @Nullable List<DartExpression> getDartExpressions(int[] offsets, int[] lengths) {
-    final List<DartExpression> expressions = new ArrayList<>();
+  @NotNull
+  private List<DartExpression> getDartExpressions(int[] offsets, int[] lengths) {
+    final List<DartExpression> expressions = new SmartList<>();
     for (int i = 0; i < offsets.length; i++) {
       final DartExpression expression = findExpressionWithRange(offsets[i], lengths[i]);
       if (expression == null) {
-        return null;
+        return expressions;
       }
       expressions.add(expression);
     }

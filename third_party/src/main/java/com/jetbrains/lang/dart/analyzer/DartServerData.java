@@ -290,7 +290,7 @@ public final class DartServerData {
 
   @NotNull
   List<DartError> getErrors(final @NotNull SearchScope scope) {
-    final List<DartError> errors = new ArrayList<>();
+    final List<DartError> errors = new SmartList<>();
 
     synchronized (myErrorData) {
       for (Map.Entry<DartFileInfo, List<DartError>> entry : myErrorData.entrySet()) {
