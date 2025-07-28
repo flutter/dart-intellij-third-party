@@ -31,7 +31,10 @@ jobs:
 
   # Job 2: Unit Tests
   unit-tests:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+    runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
@@ -49,7 +52,10 @@ jobs:
 
   # Job 3: Verify Plugin
   verify-plugin:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+    runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
