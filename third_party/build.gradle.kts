@@ -34,11 +34,12 @@ intellijPlatform {
         name = providers.gradleProperty("pluginName")
         id = providers.gradleProperty("pluginId")
         version = providers.gradleProperty("pluginVersion")
-        // TODO(https://github.com/flutter/dart-intellij-third-party/issues/23) Add a changelog:
-        // val changelog = ...
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             untilBuild = providers.gradleProperty("pluginUntilBuild")
+        }
+        changeNotes = provider {
+            file("CHANGELOG.md").readText(Charsets.UTF_8)
         }
     }
     pluginVerification {
