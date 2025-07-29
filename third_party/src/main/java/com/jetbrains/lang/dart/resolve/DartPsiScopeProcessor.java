@@ -76,7 +76,6 @@ public abstract class DartPsiScopeProcessor implements PsiScopeProcessor {
 
   private static boolean isFilteredOut(final @Nullable String name, final @NotNull DartShowHideInfo showHideInfo) {
     if (showHideInfo.getHideComponents().contains(name)) return true;
-    if (!showHideInfo.getShowComponents().isEmpty() && !showHideInfo.getShowComponents().contains(name)) return true;
-    return false;
+      return !showHideInfo.getShowComponents().isEmpty() && !showHideInfo.getShowComponents().contains(name);
   }
 }

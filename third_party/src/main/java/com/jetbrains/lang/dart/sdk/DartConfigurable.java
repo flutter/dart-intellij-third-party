@@ -249,7 +249,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
       }
     }
     else {
-      if (myDartSupportEnabledInitial != myEnableDartSupportCheckBox.isSelected()) return true;
+        return myDartSupportEnabledInitial != myEnableDartSupportCheckBox.isSelected();
     }
 
     return false;

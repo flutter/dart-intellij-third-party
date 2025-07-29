@@ -41,9 +41,7 @@ public final class DartLineWrapPositionStrategy extends DefaultLineWrapPositionS
 
     if (charAtOffset == '.') {
       // Do not split the cascade token, but allow wrapping in front of it.
-      if (offset > 0 && chars.charAt(offset - 1) == '.') {
-        return false;
-      }
+        return offset <= 0 || chars.charAt(offset - 1) != '.';
     }
     return true;
   }

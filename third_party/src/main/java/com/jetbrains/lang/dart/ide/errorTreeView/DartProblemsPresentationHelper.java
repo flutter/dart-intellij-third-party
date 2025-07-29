@@ -74,9 +74,7 @@ public class DartProblemsPresentationHelper {
     if (mySettings.showErrors != DartProblemsViewSettings.SHOW_ERRORS_DEFAULT) return true;
     if (mySettings.showWarnings != DartProblemsViewSettings.SHOW_WARNINGS_DEFAULT) return true;
     if (mySettings.showHints != DartProblemsViewSettings.SHOW_HINTS_DEFAULT) return true;
-    if (mySettings.fileFilterMode != DartProblemsViewSettings.FILE_FILTER_MODE_DEFAULT) return true;
-
-    return false;
+      return mySettings.fileFilterMode != DartProblemsViewSettings.FILE_FILTER_MODE_DEFAULT;
   }
 
   boolean setCurrentFile(@Nullable VirtualFile file) {
@@ -160,9 +158,7 @@ public class DartProblemsPresentationHelper {
 
     if (getFileFilterMode() == DartProblemsViewSettings.FileFilterMode.ContentRoot) {
       ensureContentRootUpToDate();
-      if (myCurrentContentRoot == null || !myCurrentContentRoot.equals(problem.getContentRoot())) {
-        return false;
-      }
+        return myCurrentContentRoot != null && myCurrentContentRoot.equals(problem.getContentRoot());
     }
 
     return true;

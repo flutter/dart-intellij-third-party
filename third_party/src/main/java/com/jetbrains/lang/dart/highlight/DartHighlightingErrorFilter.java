@@ -15,10 +15,6 @@ public final class DartHighlightingErrorFilter extends HighlightErrorFilter {
     if (!(element.getLanguage() == DartLanguage.INSTANCE)) return true;
 
     final VirtualFile file = DartResolveUtil.getRealVirtualFile(element.getContainingFile());
-    if (file != null && file.isInLocalFileSystem() && ProjectFileIndex.getInstance(element.getProject()).isInContent(file)) {
-      return false;
-    }
-
-    return true;
+      return file == null || !file.isInLocalFileSystem() || !ProjectFileIndex.getInstance(element.getProject()).isInContent(file);
   }
 }

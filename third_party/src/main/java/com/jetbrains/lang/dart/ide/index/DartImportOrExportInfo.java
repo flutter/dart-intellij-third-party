@@ -61,9 +61,7 @@ public class DartImportOrExportInfo implements DartShowHideInfo {
     if (!myUri.equals(info.myUri)) return false;
     if (!Objects.equals(myImportPrefix, info.myImportPrefix)) return false;
     if (!myShowComponents.equals(info.myShowComponents)) return false;
-    if (!myHideComponents.equals(info.myHideComponents)) return false;
-
-    return true;
+      return myHideComponents.equals(info.myHideComponents);
   }
 
   @Override

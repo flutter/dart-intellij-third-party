@@ -18,12 +18,8 @@ public final class DartQuoteHandler extends SimpleTokenSetQuoteHandler {
 
     if (type == DartTokenTypes.OPEN_QUOTE) return true;
 
-    if (type == DartTokenTypes.RAW_SINGLE_QUOTED_STRING && offset == iterator.getStart() + 1) {
       // start of the raw string like r'
-      return true;
-    }
-
-    return false;
+      return type == DartTokenTypes.RAW_SINGLE_QUOTED_STRING && offset == iterator.getStart() + 1;
   }
 
   @Override

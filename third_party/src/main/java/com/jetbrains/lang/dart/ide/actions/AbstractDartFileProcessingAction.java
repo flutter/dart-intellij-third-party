@@ -164,9 +164,7 @@ public abstract class AbstractDartFileProcessingAction extends AnAction implemen
 
     final Module module = ModuleUtilCore.findModuleForFile(file, project);
     if (module == null) return false;
-    if (!DartSdkLibUtil.isDartSdkEnabled(module)) return false;
-
-    return true;
+      return DartSdkLibUtil.isDartSdkEnabled(module);
   }
 
   private static boolean mayHaveApplicableDartFiles(final @NotNull Project project,
