@@ -82,20 +82,6 @@ public class DartServerRootsHandler {
     final List<String> newIncludedRootPaths = new SmartList<>();
     final List<String> newExcludedRootPaths = new SmartList<>();
 
-    final boolean isPackageScopedAnalysis =
-      DartProblemsView.getScopeAnalysisMode(myProject) == DartProblemsViewSettings.ScopedAnalysisMode.DartPackage;
-
-    if (isPackageScopedAnalysis) {
-      final VirtualFile currentFile = DartProblemsView.getInstance(myProject).getCurrentFile();
-      if (currentFile == null ||
-          ProjectFileIndex.getInstance(myProject).isInLibraryClasses(currentFile) ||
-          !currentFile.isInLocalFileSystem()) {
-        return null; // keep server roots as is until another file is open
-      }
-
-      newIncludedRootPaths.add(getEnclosingDartPackageDirectoryPath(currentFile));
-    }
-
     final String dotIdeaPath = PathUtil.getParentPath(StringUtil.notNullize(myProject.getProjectFilePath()));
     if (dotIdeaPath.endsWith("/.idea")) {
       newExcludedRootPaths.add(dotIdeaPath);
@@ -105,9 +91,7 @@ public class DartServerRootsHandler {
       for (ContentEntry contentEntry : ModuleRootManager.getInstance(module).getContentEntries()) {
         final String contentEntryUrl = contentEntry.getUrl();
         if (contentEntryUrl.startsWith(URLUtil.FILE_PROTOCOL + URLUtil.SCHEME_SEPARATOR)) {
-          if (!isPackageScopedAnalysis) {
-            newIncludedRootPaths.add(VfsUtilCore.urlToPath(contentEntryUrl));
-          }
+          newIncludedRootPaths.add(VfsUtilCore.urlToPath(contentEntryUrl));
           for (String excludedUrl : contentEntry.getExcludeFolderUrls()) {
             // Analysis Server knows about special 'packages' folders, IDE doesn't need to explicitly list them as excluded.
             if (excludedUrl.startsWith(contentEntryUrl) && !excludedUrl.endsWith("/packages")) {
@@ -138,26 +122,15 @@ public class DartServerRootsHandler {
   boolean isInIncludedRoots(@Nullable VirtualFile vFile) {
     if (vFile == null) return false;
 
-    final DartProblemsViewSettings.ScopedAnalysisMode scopedAnalysisMode = DartProblemsView.getScopeAnalysisMode(myProject);
-    if (scopedAnalysisMode == DartProblemsViewSettings.ScopedAnalysisMode.All) {
-      final ProjectFileIndex fileIndex = ProjectRootManager.getInstance(myProject).getFileIndex();
-      if (fileIndex.isInLibraryClasses(vFile)) return true;
+    final ProjectFileIndex fileIndex = ProjectRootManager.getInstance(myProject).getFileIndex();
+    if (fileIndex.isInLibraryClasses(vFile)) return true;
 
-      final Module module = fileIndex.getModuleForFile(vFile);
-      if (module != null && DartSdkLibUtil.isDartSdkEnabled(module)) {
-        return true;
-      }
-      else if (vFile.getName().equals("AndroidManifest.xml")) {
-        // These types of files can be part of an android module, not dart sdk enabled,
-        // but should still be considered in the root for Dart Analysis errors and warnings.
-        for (String root : myIncludedRootPaths) {
-          if (vFile.getPath().startsWith(root + "/")) {
-            return true;
-          }
-        }
-      }
-    }
-    else if (scopedAnalysisMode == DartProblemsViewSettings.ScopedAnalysisMode.DartPackage) {
+    final Module module = fileIndex.getModuleForFile(vFile);
+    if (module != null && DartSdkLibUtil.isDartSdkEnabled(module)) {
+      return true;
+    } else if (vFile.getName().equals("AndroidManifest.xml")) {
+      // These types of files can be part of an android module, not dart sdk enabled,
+      // but should still be considered in the root for Dart Analysis errors and warnings.
       for (String root : myIncludedRootPaths) {
         if (vFile.getPath().startsWith(root + "/")) {
           return true;

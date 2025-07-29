@@ -25,10 +25,7 @@ public final class DartBuildFileUtil {
     final ProjectFileIndex fileIndex = ProjectRootManager.getInstance(project).getFileIndex();
     VirtualFile parent = contextFile.isDirectory() ? contextFile : contextFile.getParent();
 
-    boolean isPackageScopedAnalysis =
-      DartProblemsView.getScopeAnalysisMode(project) == DartProblemsViewSettings.ScopedAnalysisMode.DartPackage;
-
-    while (parent != null && (isPackageScopedAnalysis || fileIndex.isInContent(parent))) {
+    while (parent != null && (fileIndex.isInContent(parent))) {
       final VirtualFile file = parent.findChild(BUILD_FILE_NAME);
       if (file != null && !file.isDirectory()) {
         final VirtualFile parent2 = parent.getParent();

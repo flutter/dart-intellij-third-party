@@ -4,7 +4,6 @@ package com.jetbrains.lang.dart.ide.errorTreeView;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.HoverHyperlinkLabel;
 import com.intellij.ui.HyperlinkAdapter;
-import com.intellij.ui.components.JBCheckBox;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.jetbrains.annotations.NotNull;
@@ -23,7 +22,6 @@ public class DartAnalysisServerSettingsForm {
   private JPanel myMainPanel;
   private HoverHyperlinkLabel myDartSettingsHyperlink;
   private HoverHyperlinkLabel myAnalysisDiagnosticsHyperlink;
-  private JBCheckBox packageScopedAnalysisCheckbox;
 
   DartAnalysisServerSettingsForm(final @NotNull Project project) {
     myProject = project;
@@ -46,22 +44,7 @@ public class DartAnalysisServerSettingsForm {
     });
   }
 
-  public void reset(final @NotNull DartProblemsPresentationHelper presentationHelper) {
-      packageScopedAnalysisCheckbox.setSelected(presentationHelper.getScopedAnalysisMode() == DartProblemsViewSettings.ScopedAnalysisMode.DartPackage);
-  }
-
-  public void addListener(final @NotNull ServerSettingsListener serverSettingsListener) {
-    packageScopedAnalysisCheckbox.addActionListener(e -> serverSettingsListener.settingsChanged());
-  }
-
   public JPanel getMainPanel() {
     return myMainPanel;
-  }
-
-  public @NotNull DartProblemsViewSettings.ScopedAnalysisMode getScopeAnalysisMode() {
-    if (packageScopedAnalysisCheckbox.isSelected()) {
-      return DartProblemsViewSettings.ScopedAnalysisMode.DartPackage;
-    }
-    return DartProblemsViewSettings.ScopedAnalysisMode.All;
   }
 }
