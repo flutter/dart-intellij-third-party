@@ -40,8 +40,6 @@ final class DartPostFormatProcessor implements PostFormatProcessor {
     final Module module = ModuleUtilCore.findModuleForPsiElement(psiFile);
     if (module == null || !DartSdkLibUtil.isDartSdkEnabled(module)) return false;
     if (!ProjectFileIndex.getInstance(project).isInContent(vFile)) return false;
-    if (!DartAnalysisServerService.getInstance(project).serverReadyForRequest()) return false;
-
-    return true;
+      return DartAnalysisServerService.getInstance(project).serverReadyForRequest();
   }
 }

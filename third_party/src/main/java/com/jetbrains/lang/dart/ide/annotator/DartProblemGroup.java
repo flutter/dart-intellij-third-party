@@ -193,9 +193,7 @@ public class DartProblemGroup implements SuppressableProblemGroup {
           case '/' -> {
             if (prevLine.length() > index + 1 && prevLine.charAt(index + 1) == '/') {
               final String comment = prevLine.subSequence(index + 2, prevLine.length()).toString();
-              if (StringUtil.trimLeading(comment, ' ').startsWith(IGNORE_PREFIX)) {
-                return true;
-              }
+                return StringUtil.trimLeading(comment, ' ').startsWith(IGNORE_PREFIX);
             }
             return false;
           }

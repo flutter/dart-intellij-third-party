@@ -13,10 +13,7 @@ import org.jetbrains.annotations.Nullable;
 public final class DartSelectionFilter implements Condition<PsiElement> {
   @Override
   public boolean value(final @NotNull PsiElement psiElement) {
-    if (getSiblingSemicolonIfExpression(psiElement) != null) {
-      return false; // DartWordSelectionHandler will select this expression with the following semicolon
-    }
-    return true;
+      return getSiblingSemicolonIfExpression(psiElement) == null; // DartWordSelectionHandler will select this expression with the following semicolon
   }
 
   public static @Nullable PsiElement getSiblingSemicolonIfExpression(final @NotNull PsiElement psiElement) {

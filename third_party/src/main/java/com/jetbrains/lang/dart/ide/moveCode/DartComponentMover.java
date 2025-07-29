@@ -327,8 +327,7 @@ public final class DartComponentMover extends LineMover {
       // Having two library statements is not legal but could happen while editing.
       if (baseType instanceof DartLibraryStatement && sibType instanceof DartLibraryStatement) return false;
       // Having mixed library and import is also possible but not allowed in this context.
-      if (baseType instanceof DartLibraryStatement || sibType instanceof DartLibraryStatement) return true;
-      return false; // both uri-based -- allow moving part & import
+        return baseType instanceof DartLibraryStatement || sibType instanceof DartLibraryStatement;// both uri-based -- allow moving part & import
     }
 
     private static PsiElement getHeaderParent(PsiElement element) {

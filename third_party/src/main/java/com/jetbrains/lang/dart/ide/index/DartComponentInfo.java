@@ -31,9 +31,7 @@ public class DartComponentInfo {
     DartComponentInfo info = (DartComponentInfo)o;
 
     if (myComponentType != info.myComponentType) return false;
-    if (!Objects.equals(myLibraryName, info.myLibraryName)) return false;
-
-    return true;
+      return Objects.equals(myLibraryName, info.myLibraryName);
   }
 
   @Override

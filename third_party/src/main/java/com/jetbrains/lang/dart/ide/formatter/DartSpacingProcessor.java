@@ -1027,9 +1027,7 @@ public class DartSpacingProcessor {
         String name1 = getImmediateCallName(call1);
         if (name1 != null) {
           String name2 = getImmediateCallName(call2);
-          if (name1.equals(name2)) {
-            return true;
-          }
+            return name1.equals(name2);
         }
       }
     }
@@ -1150,9 +1148,7 @@ public class DartSpacingProcessor {
           next = FormatterUtil.getPreviousNonWhitespaceSibling(next);
           if (next != null && DartIndentProcessor.EXPRESSIONS.contains(next.getElementType())) {
             ASTNode arrow = FormatterUtil.getPreviousNonWhitespaceSibling(next);
-            if (arrow != null && arrow.getElementType() == EXPRESSION_BODY_DEF) {
-              return true;
-            }
+              return arrow != null && arrow.getElementType() == EXPRESSION_BODY_DEF;
           }
           return false;
         }

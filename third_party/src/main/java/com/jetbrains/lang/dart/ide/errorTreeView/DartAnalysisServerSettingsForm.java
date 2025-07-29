@@ -47,12 +47,7 @@ public class DartAnalysisServerSettingsForm {
   }
 
   public void reset(final @NotNull DartProblemsPresentationHelper presentationHelper) {
-    if (presentationHelper.getScopedAnalysisMode() == DartProblemsViewSettings.ScopedAnalysisMode.DartPackage) {
-      packageScopedAnalysisCheckbox.setSelected(true);
-    }
-    else {
-      packageScopedAnalysisCheckbox.setSelected(false);
-    }
+      packageScopedAnalysisCheckbox.setSelected(presentationHelper.getScopedAnalysisMode() == DartProblemsViewSettings.ScopedAnalysisMode.DartPackage);
   }
 
   public void addListener(final @NotNull ServerSettingsListener serverSettingsListener) {

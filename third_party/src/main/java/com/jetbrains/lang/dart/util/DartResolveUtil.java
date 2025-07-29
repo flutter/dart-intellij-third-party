@@ -262,9 +262,7 @@ public final class DartResolveUtil {
           processTopLevelDeclarationsImpl(context, processor, dartCoreLib, filesOfInterest, alreadyProcessed, false);
         processor.importedFileProcessingFinished(dartCoreLib);
 
-        if (!continueProcessing) {
-          return false;
-        }
+          return continueProcessing;
       }
     }
 

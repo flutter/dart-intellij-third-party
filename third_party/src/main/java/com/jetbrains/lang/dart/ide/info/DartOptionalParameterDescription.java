@@ -73,9 +73,7 @@ public class DartOptionalParameterDescription {
 
     DartOptionalParameterDescription that = (DartOptionalParameterDescription)o;
 
-    if (myText.equals(that.myText)) return false;
-
-    return true;
+      return !myText.equals(that.myText);
   }
 
   @Override

@@ -86,7 +86,7 @@ public final class DartRefactoringUtil {
     }
 
     final DartStatements statements = PsiTreeUtil.getParentOfType(element1, DartStatements.class);
-    if (statements == null || element2 == null || !PsiTreeUtil.isAncestor(statements, element2, true)) {
+    if (element2 == null || !PsiTreeUtil.isAncestor(statements, element2, true)) {
       return PsiElement.EMPTY_ARRAY;
     }
 

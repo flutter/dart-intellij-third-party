@@ -24,7 +24,7 @@ public final class DartBraceMatcher implements PairedBraceMatcher {
 
   @Override
   public boolean isPairedBracesAllowedBeforeType(@NotNull IElementType lbraceType, @Nullable IElementType contextType) {
-    return contextType == null || !DartTokenTypesSets.STRINGS.contains(contextType);
+    return !DartTokenTypesSets.STRINGS.contains(contextType);
   }
 
   @Override
