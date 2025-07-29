@@ -2,7 +2,6 @@
 package com.jetbrains.lang.dart;
 
 import com.intellij.lang.*;
-import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.psi.ParsingDiagnostics;
 import com.intellij.psi.PsiElement;
@@ -12,7 +11,6 @@ import com.intellij.psi.text.BlockSupport;
 import com.intellij.psi.tree.*;
 import com.intellij.util.diff.FlyweightCapableTreeStructure;
 import com.jetbrains.lang.dart.lexer.DartDocLexer;
-import com.jetbrains.lang.dart.lexer.DartLexer;
 import com.jetbrains.lang.dart.psi.impl.DartLazyParseableBlockImpl;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
