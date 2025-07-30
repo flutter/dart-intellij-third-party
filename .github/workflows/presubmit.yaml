@@ -33,6 +33,7 @@ jobs:
   unit-tests:
     strategy:
       matrix:
+        # TODO(https://github.com/flutter/dart-intellij-third-party/pull/33) Fix and enable execution on Windows
         os: [ ubuntu-latest, macos-latest ]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
@@ -52,7 +53,6 @@ jobs:
 
   # Job 3: Dart Analysis Server Tests
   dart-analysis-server-tests:
-    runs-on: macos-latest
     strategy:
       matrix:
         # https://github.com/dart-lang/setup-dart
@@ -60,7 +60,13 @@ jobs:
         # 'stable' and 'beta' will fetch the latest respective versions.
         # You can also specify exact versions like '3.0.0', '3.8.1'.
         # dart-version: ['3.0.0', 'stable', 'beta', 'dev' ]
+
+        # TODO(https://github.com/flutter/dart-intellij-third-party/issues/47)
+        # Fix tests to run over additional operating systems as well as Dart SDK versions:
+
         dart-version: ['stable']
+        os: [ macos-latest ]
+    runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
