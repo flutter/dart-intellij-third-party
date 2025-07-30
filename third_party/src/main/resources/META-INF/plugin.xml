@@ -71,8 +71,6 @@
     <postFormatProcessor implementation="com.jetbrains.lang.dart.ide.formatter.DartPostFormatProcessor"/>
     <readerModeMatcher implementation="com.jetbrains.lang.dart.ide.DartReaderModeMatcher"/>
     <lang.psiStructureViewFactory language="Dart" implementationClass="com.jetbrains.lang.dart.ide.structure.DartStructureViewFactory"/>
-    <psi.referenceContributor language="HTML" implementation="com.jetbrains.lang.dart.psi.DartPackagePathReferenceContributor"
-                              order="last"/>
     <psi.referenceContributor language="Dart" implementation="com.jetbrains.lang.dart.psi.DartReferenceContributor"/>
     <psi.referenceContributor language="XML" implementation="com.jetbrains.lang.dart.psi.DartReferenceContributor"/>
     <xml.xmlTypedHandlersAdditionalSupport implementation="com.jetbrains.lang.dart.xml.DartXmlTypedHandlersAdditionalSupport" />
@@ -181,7 +179,6 @@
                               implementationClass="com.jetbrains.lang.dart.ide.completion.DartServerStatementCompletionProcessor"/>
 
     <annotator language="Dart" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>
-    <annotator language="HTML" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>
     <annotator language="XML" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>
 
     <lang.findUsagesProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.findUsages.DartFindUsagesProvider"/>

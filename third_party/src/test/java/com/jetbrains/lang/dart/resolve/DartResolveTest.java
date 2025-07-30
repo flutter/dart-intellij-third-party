@@ -84,43 +84,4 @@ public class DartResolveTest extends DartCodeInsightFixtureTestCase {
       assertFalse("Expected to be out of scope: " + file.getPath(), scope.contains(file));
     }
   }
-
-  public void testPackageReferencesInHtml() {
-    myFixture.addFileToProject("pubspec.yaml", """
-      name: ProjectName
-      dependencies:
-        PathPackage:
-          path: local_package
-      """);
-    myFixture.addFileToProject("lib/projectFile.dart", "");
-    myFixture.addFileToProject("local_package/lib/localPackageFile.html", "");
-    myFixture.addFileToProject("packages/browser/dart.js", "");
-    final PsiFile psiFile = myFixture.addFileToProject("web/file.html",
-                                                       """
-                                                         <script src='<caret expected='packages'>packages/<caret expected='lib'>ProjectName/<caret expected='lib/projectFile.dart'>projectFile.dart'/>
-                                                         <script src='packages<caret expected='packages'>/PathPackage<caret expected='local_package/lib'>/localPackageFile.html<caret expected='local_package/lib/localPackageFile.html'>'/>
-                                                         <script src='<caret expected='packages'>packages/<caret expected='packages/browser'>browser/<caret expected='packages/browser/dart.js'>dart.js'/>
-                                                         """);
-    myFixture.openFileInEditor(psiFile.getVirtualFile());
-    doTest(myFixture);
-  }
-
-  public void testPackageReferencesInHtmlViaDotPackages() {
-    myFixture.addFileToProject("pubspec.yaml", "name: ProjectName");
-    myFixture.addFileToProject("lib/projectFile.dart", "");
-    myFixture.addFileToProject("local_package/lib/localPackageFile.html", "");
-    myFixture.addFileToProject("global_package/browser/dart.js", "");
-    myFixture.addFileToProject(".packages", """
-      browser:global_package/browser/
-      ProjectName:lib/
-      PathPackage:local_package/lib/""");
-    final PsiFile psiFile = myFixture.addFileToProject("web/file.html",
-                                                       """
-                                                         <script src='<caret expected='.packages'>packages/<caret expected='lib'>ProjectName/<caret expected='lib/projectFile.dart'>projectFile.dart'/>
-                                                         <script src='packages<caret expected='.packages'>/PathPackage<caret expected='local_package/lib'>/localPackageFile.html<caret expected='local_package/lib/localPackageFile.html'>'/>
-                                                         <script src='<caret expected='.packages'>packages/<caret expected='global_package/browser'>browser/<caret expected='global_package/browser/dart.js'>dart.js'/>
-                                                         """);
-    myFixture.openFileInEditor(psiFile.getVirtualFile());
-    doTest(myFixture);
-  }
 }
