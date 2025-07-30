@@ -204,11 +204,7 @@ public final class DartPsiImplUtil {
     // find type parameter
     if (result.isEmpty()) {
       PsiTreeUtil.treeWalkUp(dartResolveProcessor, dartType, null, ResolveState.initial());
-      for (Iterator<DartComponentName> iterator = result.iterator(); iterator.hasNext(); ) {
-        if (!(iterator.next().getParent() instanceof DartTypeParameter)) {
-          iterator.remove();
-        }
-      }
+        result.removeIf(dartComponentName -> !(dartComponentName.getParent() instanceof DartTypeParameter));
     }
 
     // global

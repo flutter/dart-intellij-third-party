@@ -269,14 +269,14 @@ public class DartServerHighlightingTest extends CodeInsightFixtureTestCase {
       TextRange.create(15, 16),
       TextRange.create(19, 20)};
     checkRegions(regions, ranges);
-    assertEquals(4, regions.get(4).getTargets().get(0).getOffset(getProject(), file));
+    assertEquals(4, regions.get(4).getTargets().getFirst().getOffset(getProject(), file));
 
     getEditor().getCaretModel().moveToOffset(0);
     myFixture.type("foo \b");
     // Disable for pre-3.7.0 Dart SDK versions:
     if(StringUtil.compareVersionNumbers(service.getSdkVersion(), "3.7.0") >= 0) {
       checkRegions(regions, ContainerUtil.map2Array(ranges, TextRange.class, range -> range.shiftRight(3)));
-      assertEquals(4 + 3, regions.get(4).getTargets().get(0).getOffset(getProject(), file));
+      assertEquals(4 + 3, regions.get(4).getTargets().getFirst().getOffset(getProject(), file));
     }
   }
 

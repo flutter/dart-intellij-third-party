@@ -372,7 +372,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
   public void uiDataSnapshot(@NotNull DataSink sink) {
     super.uiDataSnapshot(sink);
     sink.set(PlatformDataKeys.COPY_PROVIDER, this);
-    sink.lazy(CommonDataKeys.NAVIGATABLE, () -> createNavigatable());
+    sink.lazy(CommonDataKeys.NAVIGATABLE, this::createNavigatable);
   }
 
   private @Nullable Navigatable createNavigatable() {

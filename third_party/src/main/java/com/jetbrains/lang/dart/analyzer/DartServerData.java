@@ -277,9 +277,7 @@ public final class DartServerData {
       file.setWritable(false);
 
       VirtualFile finalFile = file;
-      ApplicationManager.getApplication().invokeLater(() -> {
-        FileDocumentManager.getInstance().reloadFiles(finalFile);
-      }, ModalityState.nonModal(), myService.getDisposedCondition());
+      ApplicationManager.getApplication().invokeLater(() -> FileDocumentManager.getInstance().reloadFiles(finalFile), ModalityState.nonModal(), myService.getDisposedCondition());
     });
   }
 
@@ -405,9 +403,7 @@ public final class DartServerData {
       // but it will cache RemoteAnalysisServerImpl$ServerResponseReaderThread in FileStatusMap.threads and as a result,
       // DartAnalysisServerService.myProject will be leaked in tests
       ApplicationManager.getApplication()
-        .invokeLater(() -> {
-                       DaemonCodeAnalyzer.getInstance(project).restart();
-                     },
+        .invokeLater(() -> DaemonCodeAnalyzer.getInstance(project).restart(),
                      ModalityState.nonModal(),
                      myService.getDisposedCondition());
     }

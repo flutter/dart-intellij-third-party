@@ -60,9 +60,7 @@ class DartComponentUsageGroup implements UsageGroup, UiDataProvider {
 
   @Override
   public void uiDataSnapshot(@NotNull DataSink sink) {
-    sink.lazy(CommonDataKeys.PSI_ELEMENT, () -> {
-      return getNameElement();
-    });
+    sink.lazy(CommonDataKeys.PSI_ELEMENT, this::getNameElement);
     sink.lazy(UsageView.USAGE_INFO_KEY, () -> {
       final DartComponentName nameElement = getNameElement();
       return nameElement != null ? new UsageInfo(nameElement) : null;
