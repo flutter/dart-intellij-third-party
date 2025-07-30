@@ -51,7 +51,7 @@ public class DartServerIntentionsTest extends CodeInsightFixtureTestCase {
         <selection><caret>var x = 3;</selection>
       }
       """);
-    final List<String> intentions = ContainerUtil.map(myFixture.getAvailableIntentions(), intention -> intention.getText());
+    final List<String> intentions = ContainerUtil.map(myFixture.getAvailableIntentions(), IntentionAction::getText);
     assertOrderedEquals(intentions,
                         "Surround with block",
                         "Edit intention settings",

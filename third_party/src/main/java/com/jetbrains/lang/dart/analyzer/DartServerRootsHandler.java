@@ -57,7 +57,7 @@ public class DartServerRootsHandler {
   }
 
   void scheduleDartRootsUpdate(@Nullable Runnable onSuccess) {
-    ReadAction.nonBlocking(() -> calcIncludedAndExcludedDartRootPaths())
+    ReadAction.nonBlocking(this::calcIncludedAndExcludedDartRootPaths)
       .coalesceBy(this)
       .expireWith(DartAnalysisServerService.getInstance(myProject))
       .finishOnUiThread(ModalityState.nonModal(), includedAndExcludedRootPaths -> {

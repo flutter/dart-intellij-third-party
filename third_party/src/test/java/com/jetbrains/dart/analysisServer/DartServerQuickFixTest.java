@@ -169,7 +169,7 @@ public class DartServerQuickFixTest extends CodeInsightFixtureTestCase {
 
   public void testQuickFixOrder() {
     myFixture.configureByText("foo.dart", "<caret>ServerSocket f;\nclass ServerSockets{}");
-    final List<String> intentions = ContainerUtil.map(myFixture.getAvailableIntentions(), intention -> intention.getText());
+    final List<String> intentions = ContainerUtil.map(myFixture.getAvailableIntentions(), IntentionAction::getText);
     assertOrderedEquals(intentions,
                         "Import library 'dart:io'",
                         "Import library 'dart:io' with 'show'",

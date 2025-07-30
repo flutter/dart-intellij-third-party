@@ -106,7 +106,7 @@ public class DartCallHierarchyTest extends DartHierarchyTestBase {
                     List<PsiElement> results = new ArrayList<>();
                     DartCallHierarchyTreeStructure.collectDeclarations(reference.resolve(), results);
                     if (!results.isEmpty()) {
-                      result[0] = results.get(0);
+                      result[0] = results.getFirst();
                       throw new ExitVisitor();
                     }
                   }

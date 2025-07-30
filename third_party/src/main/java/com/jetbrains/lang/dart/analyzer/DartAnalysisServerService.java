@@ -1220,12 +1220,9 @@ public final class DartAnalysisServerService implements Disposable {
     final Ref<Boolean> resultRef = Ref.create(false);
     final CountDownLatch latch = new CountDownLatch(1);
     final int offset = getOriginalOffset(file, _offset);
-    server.edit_isPostfixCompletionApplicable(fileUri, key, offset, new IsPostfixCompletionApplicableConsumer() {
-      @Override
-      public void isPostfixCompletionApplicable(Boolean value) {
-        resultRef.set(value);
-        latch.countDown();
-      }
+    server.edit_isPostfixCompletionApplicable(fileUri, key, offset, value -> {
+      resultRef.set(value);
+      latch.countDown();
     });
 
     awaitForLatchCheckingCanceled(server, latch, POSTFIX_COMPLETION_TIMEOUT);

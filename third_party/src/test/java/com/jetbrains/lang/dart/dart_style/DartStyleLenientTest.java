@@ -14,7 +14,7 @@ public class DartStyleLenientTest extends DartStyleTest {
    */
   @Override
   protected void runTestInDirectory(String dirName) throws Exception {
-    runTestInDirectory(dirName, new HashSet<String>(KNOWN_TO_FAIL));
+    runTestInDirectory(dirName, new HashSet<>(KNOWN_TO_FAIL));
   }
 
   @Override

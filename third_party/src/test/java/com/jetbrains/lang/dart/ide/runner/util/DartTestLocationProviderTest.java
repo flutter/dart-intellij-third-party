@@ -25,7 +25,7 @@ public class DartTestLocationProviderTest extends DartCodeInsightFixtureTestCase
     final List<Location> locations = DartTestLocationProvider.INSTANCE.getLocationForTest(file, locationHint);
     assertEquals(1, locations.size());
 
-    final Location location = locations.get(0);
+    final Location location = locations.getFirst();
     final PsiElement element = location.getPsiElement();
 
     final DartId foundId = PsiTreeUtil.findChildOfType(element, DartId.class);
