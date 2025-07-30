@@ -66,15 +66,11 @@ public class DartProblemsPresentationHelper {
     mySettings.fileFilterMode = form.getFileFilterMode();
   }
 
-  void updateFromServerSettingsUI(@NotNull DartAnalysisServerSettingsForm form) {
-    mySettings.scopedAnalysisMode = form.getScopeAnalysisMode();
-  }
-
   boolean areFiltersApplied() {
     if (mySettings.showErrors != DartProblemsViewSettings.SHOW_ERRORS_DEFAULT) return true;
     if (mySettings.showWarnings != DartProblemsViewSettings.SHOW_WARNINGS_DEFAULT) return true;
     if (mySettings.showHints != DartProblemsViewSettings.SHOW_HINTS_DEFAULT) return true;
-      return mySettings.fileFilterMode != DartProblemsViewSettings.FILE_FILTER_MODE_DEFAULT;
+    return mySettings.fileFilterMode != DartProblemsViewSettings.FILE_FILTER_MODE_DEFAULT;
   }
 
   boolean setCurrentFile(@Nullable VirtualFile file) {
@@ -119,10 +115,6 @@ public class DartProblemsPresentationHelper {
 
   DartProblemsViewSettings.FileFilterMode getFileFilterMode() {
     return mySettings.fileFilterMode;
-  }
-
-  DartProblemsViewSettings.ScopedAnalysisMode getScopedAnalysisMode() {
-    return mySettings.scopedAnalysisMode;
   }
 
   @Nullable VirtualFile getCurrentFile() {

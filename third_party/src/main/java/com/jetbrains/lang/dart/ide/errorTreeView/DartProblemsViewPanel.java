@@ -322,13 +322,6 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
 
   private void showAnalysisServerSettingsPopup() {
     DartAnalysisServerSettingsForm serverSettingsForm = new DartAnalysisServerSettingsForm(myProject);
-    serverSettingsForm.reset(myPresentationHelper);
-
-    serverSettingsForm.addListener(() -> {
-      myPresentationHelper.updateFromServerSettingsUI(serverSettingsForm);
-      DartAnalysisServerService.getInstance(myProject).ensureAnalysisRootsUpToDate();
-    });
-
     createAndShowPopup(DartBundle.message("dart.problems.view.popup.title.analysis.server.settings"), serverSettingsForm.getMainPanel());
   }
 
@@ -453,8 +446,6 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
 
     @Override
     public void update(@NotNull AnActionEvent e) {
-      boolean asByDefault = myPresentationHelper.getScopedAnalysisMode() == DartProblemsViewSettings.SCOPED_ANALYSIS_MODE_DEFAULT;
-      Toggleable.setSelected(e.getPresentation(), !asByDefault);
     }
 
     @Override

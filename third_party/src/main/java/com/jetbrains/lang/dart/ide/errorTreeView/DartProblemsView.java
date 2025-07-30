@@ -90,8 +90,6 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
       }
 
       ReadAction.nonBlocking(() -> {
-          DartProblemsViewSettings.ScopedAnalysisMode scopedAnalysisMode =
-            getInstance(myProject).myPresentationHelper.getScopedAnalysisMode();
           Map<String, List<DartProblem>> filePathToDartProblems = new HashMap<>();
 
           for (Map.Entry<String, List<? extends AnalysisError>> entry : filePathToErrors.entrySet()) {
@@ -99,8 +97,7 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
             List<? extends AnalysisError> analysisErrors = entry.getValue();
 
             VirtualFile vFile = LocalFileSystem.getInstance().findFileByPath(filePath);
-            boolean fileOk = vFile != null && (scopedAnalysisMode != DartProblemsViewSettings.ScopedAnalysisMode.All ||
-                                               ProjectFileIndex.getInstance(myProject).isInContent(vFile));
+            boolean fileOk = vFile != null && ProjectFileIndex.getInstance(myProject).isInContent(vFile);
             List<DartProblem> dartProblems = fileOk
                                              ? ContainerUtil.map(analysisErrors, analysisError -> new DartProblem(myProject, analysisError))
                                              : Collections.emptyList();
@@ -110,9 +107,7 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
           return filePathToDartProblems;
         })
         .expireWith(getInstance(myProject))
-        .finishOnUiThread(ModalityState.nonModal(), filePathToDartProblems -> {
-          panel.setErrors(filePathToDartProblems);
-        })
+        .finishOnUiThread(ModalityState.nonModal(), panel::setErrors)
         .submit(AppExecutorUtil.getAppExecutorService());
     }
   };
@@ -181,13 +176,6 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
 
   public static @NotNull DartProblemsView getInstance(final @NotNull Project project) {
     return project.getService(DartProblemsView.class);
-  }
-
-  public static DartProblemsViewSettings.ScopedAnalysisMode getScopeAnalysisMode(final @NotNull Project project) {
-    if (!DartAnalysisServerService.getInstance(project).isServerProcessActive()) {
-      return DartProblemsViewSettings.SCOPED_ANALYSIS_MODE_DEFAULT;
-    }
-    return getInstance(project).myPresentationHelper.getScopedAnalysisMode();
   }
 
   public VirtualFile getCurrentFile() {
@@ -309,10 +297,6 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
         myPresentationHelper.setCurrentFile(file) &&
         myPresentationHelper.getFileFilterMode() != DartProblemsViewSettings.FileFilterMode.All) {
       panel.fireGroupingOrFilterChanged();
-    }
-
-    if (myPresentationHelper.getScopedAnalysisMode() == DartProblemsViewSettings.ScopedAnalysisMode.DartPackage) {
-      DartAnalysisServerService.getInstance(myProject).ensureAnalysisRootsUpToDate();
     }
   }
 
