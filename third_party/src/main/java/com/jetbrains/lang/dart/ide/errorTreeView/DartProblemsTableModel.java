@@ -350,7 +350,7 @@ class DartProblemsTableModel extends ListTableModel<DartProblem> {
 
     @Nls String statusText;
     if (statusParts.size() == 1) {
-      statusText = statusParts.get(0);
+      statusText = statusParts.getFirst();
     }
     else if (statusParts.size() == 2) {
       statusText = DartBundle.message("dart.problems.view.status.0.and.1", statusParts.get(0), statusParts.get(1));

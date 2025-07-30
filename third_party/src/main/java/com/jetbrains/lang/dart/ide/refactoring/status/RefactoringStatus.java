@@ -96,7 +96,7 @@ public class RefactoringStatus {
     if (entries.isEmpty()) {
       return null;
     }
-    RefactoringStatusEntry result = entries.get(0);
+    RefactoringStatusEntry result = entries.getFirst();
     for (RefactoringStatusEntry entry : entries) {
       if (result.getSeverity().ordinal() < entry.getSeverity().ordinal()) {
         result = entry;

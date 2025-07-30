@@ -112,7 +112,7 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
     }
 
     final String inputText = document.getText();
-    final String formattedText = StringUtil.convertLineSeparators(edits.get(0).getReplacement());
+    final String formattedText = StringUtil.convertLineSeparators(edits.getFirst().getReplacement());
     if (!wholeFile && countNonSpaceChars(inputText) != countNonSpaceChars(formattedText)) {
       LOG.error("dartfmt changed non-space characters for file " + file.getPath());
       return inputRange;
@@ -189,7 +189,7 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
         final DartAnalysisServerService.FormatResult formatResult =
           DartAnalysisServerService.getInstance(project).edit_format(virtualFile, 0, 0, lineLength);
         if (formatResult != null && formatResult.getEdits() != null && formatResult.getEdits().size() == 1) {
-          final String replacement = StringUtil.convertLineSeparators(formatResult.getEdits().get(0).getReplacement());
+          final String replacement = StringUtil.convertLineSeparators(formatResult.getEdits().getFirst().getReplacement());
           fileToNewContentMap.put(virtualFile, replacement);
         }
       }

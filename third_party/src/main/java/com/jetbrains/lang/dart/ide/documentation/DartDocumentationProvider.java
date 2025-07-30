@@ -109,7 +109,7 @@ public final class DartDocumentationProvider implements DocumentationProvider {
     if (hoverList.isEmpty()) {
       return null;
     }
-    return hoverList.get(0);
+    return hoverList.getFirst();
   }
 
   private static @Nullable String constructDocUrl(final @NotNull DartComponent component) {

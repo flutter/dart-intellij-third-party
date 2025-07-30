@@ -90,7 +90,7 @@ public final class DartServerOverrideMarkerProvider implements LineMarkerProvide
     }
     else {
       overrides = false;
-      superComponent = interfaceComponents.iterator().next();
+      superComponent = interfaceComponents.getFirst();
     }
     final Icon icon = overrides ? AllIcons.Gutter.OverridingMethod : AllIcons.Gutter.ImplementingMethod;
     PsiElement anchor = PsiTreeUtil.getDeepestFirst(componentName);

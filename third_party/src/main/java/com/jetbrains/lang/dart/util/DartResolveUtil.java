@@ -125,7 +125,7 @@ public final class DartResolveUtil {
     final VirtualFile dartCoreLib = DartLibraryIndex.getSdkLibByUri(context.getProject(), DART_CORE_URI);
     final List<DartComponentName> result = new ArrayList<>();
     processTopLevelDeclarations(context, new DartResolveProcessor(result, className), dartCoreLib, className);
-    final PsiElement parent = result.isEmpty() ? null : result.iterator().next().getParent();
+    final PsiElement parent = result.isEmpty() ? null : result.getFirst().getParent();
     return DartClassResolveResult.create(parent instanceof DartClass ? (DartClass)parent : null);
   }
 
@@ -367,7 +367,7 @@ public final class DartResolveUtil {
         parent = parent.getParent();
         if (parent instanceof DartValueExpression) {
           final List<DartExpression> expressionList = ((DartValueExpression)parent).getExpressionList();
-          final DartExpression firstExpression = expressionList.isEmpty() ? null : expressionList.get(0);
+          final DartExpression firstExpression = expressionList.isEmpty() ? null : expressionList.getFirst();
           if (firstExpression instanceof DartReference) {
             return (DartReference)firstExpression;
           }

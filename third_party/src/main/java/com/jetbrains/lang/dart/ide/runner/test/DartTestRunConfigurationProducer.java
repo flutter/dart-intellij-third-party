@@ -140,7 +140,7 @@ public final class DartTestRunConfigurationProducer extends LazyRunConfiguration
 
       runnerParams.setTestName(testName);
       runnerParams.setScope(DartTestRunnerParameters.Scope.GROUP_OR_TEST_BY_NAME);
-      final VirtualFile dartFile = virtualFiles.iterator().next();
+      final VirtualFile dartFile = virtualFiles.getFirst();
       final String dartFilePath = dartFile.getPath();
       runnerParams.setFilePath(dartFilePath);
       return true;

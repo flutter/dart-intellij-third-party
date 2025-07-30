@@ -142,7 +142,7 @@ public class DartReferenceImpl extends DartExpressionImpl implements DartReferen
       PsiElement parent = this.getParent();
       if (parent instanceof DartValueExpression) {
         final List<DartExpression> expressionList = ((DartValueExpression)parent).getExpressionList();
-        final DartExpression firstExpression = expressionList.isEmpty() ? null : expressionList.get(0);
+        final DartExpression firstExpression = expressionList.isEmpty() ? null : expressionList.getFirst();
         if (firstExpression instanceof DartReference) {
           return ((DartReference)firstExpression).resolveDartClass();
         }

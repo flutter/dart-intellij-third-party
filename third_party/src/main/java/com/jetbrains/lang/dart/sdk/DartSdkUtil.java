@@ -133,8 +133,8 @@ public final class DartSdkUtil {
 
   public static @Nullable String getFirstKnownDartSdkPath() {
     List<String> knownPaths = PropertiesComponent.getInstance().getList(DART_SDK_KNOWN_PATHS);
-    if (knownPaths != null && !knownPaths.isEmpty() && isDartSdkHome(knownPaths.get(0))) {
-      return knownPaths.get(0);
+    if (knownPaths != null && !knownPaths.isEmpty() && isDartSdkHome(knownPaths.getFirst())) {
+      return knownPaths.getFirst();
     }
     return null;
   }
@@ -173,11 +173,11 @@ public final class DartSdkUtil {
 
     if (oldSdk != null) {
       knownPaths.remove(oldSdk.getHomePath());
-      knownPaths.add(0, oldSdk.getHomePath());
+      knownPaths.addFirst(oldSdk.getHomePath());
     }
 
     knownPaths.remove(newSdkPath);
-    knownPaths.add(0, newSdkPath);
+    knownPaths.addFirst(newSdkPath);
 
     PropertiesComponent.getInstance().setList(DART_SDK_KNOWN_PATHS, knownPaths);
   }

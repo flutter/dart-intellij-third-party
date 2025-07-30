@@ -78,6 +78,6 @@ public class OpenDartObservatoryUrlAction extends DumbAwareAction {
     final List<WebBrowser> chromeBrowsers = WebBrowserManager.getInstance().getBrowsers(
       browser -> browser.getFamily() == BrowserFamily.CHROME, true);
 
-    BrowserLauncher.getInstance().browse(url, chromeBrowsers.isEmpty() ? null : chromeBrowsers.get(0));
+    BrowserLauncher.getInstance().browse(url, chromeBrowsers.isEmpty() ? null : chromeBrowsers.getFirst());
   }
 }

@@ -92,7 +92,7 @@ class ExtractLocalVariableProcessor {
     }
     // select the expression to extract
     if (expressions.size() == 1 || ApplicationManager.getApplication().isUnitTestMode()) {
-      performOnExpression(expressions.get(0));
+      performOnExpression(expressions.getFirst());
     }
     else if (expressions.size() > 1) {
       IntroduceTargetChooser.showChooser(editor, expressions, new Pass<>() {

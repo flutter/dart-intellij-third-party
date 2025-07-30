@@ -30,7 +30,7 @@ public abstract class DartFilterByClassMacro extends DartMacroBase {
       final DartClass dartClass = result.getDartClass();
       return dartClass != null && filter(dartClass);
     });
-    return filtered.isEmpty() ? null : new PsiElementResult(filtered.iterator().next());
+    return filtered.isEmpty() ? null : new PsiElementResult(filtered.getFirst());
   }
 
   protected abstract boolean filter(@NotNull DartClass dartClass);

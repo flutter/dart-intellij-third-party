@@ -179,7 +179,7 @@ public final class AssistUtils {
       }
     }
     if (map.isEmpty() && !fileEdits.isEmpty()) {
-      String filePathOrUri = fileEdits.get(0).getFile();
+      String filePathOrUri = fileEdits.getFirst().getFile();
       throw new DartSourceEditException(DartBundle.message("error.none.of.the.files.were.in.this.project.content.0", filePathOrUri));
     }
     return map;
@@ -189,7 +189,7 @@ public final class AssistUtils {
     for (LinkedEditGroup group : sourceChange.getLinkedEditGroups()) {
       final List<Position> positions = group.getPositions();
       if (!positions.isEmpty()) {
-        Position position = positions.get(0);
+        Position position = positions.getFirst();
         String filePathOrUri = position.getFile();
         DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(project, filePathOrUri);
         VirtualFile virtualFile = fileInfo.findFile();

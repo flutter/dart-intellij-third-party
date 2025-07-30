@@ -129,7 +129,7 @@ public final class DartInlineHandler extends InlineActionHandler {
     for (DartNavigationRegion region : navigationRegions) {
       if (region.getOffset() <= offset && offset <= region.getOffset() + region.getLength()) {
         final List<DartNavigationTarget> targets = region.getTargets();
-        final String kind = targets.get(0).getKind();
+        final String kind = targets.getFirst().getKind();
         return new InlineRefactoringContext(virtualFile, offset, kind);
       }
     }

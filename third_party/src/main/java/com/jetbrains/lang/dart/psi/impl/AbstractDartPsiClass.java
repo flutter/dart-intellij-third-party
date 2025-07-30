@@ -143,7 +143,7 @@ public abstract class AbstractDartPsiClass extends AbstractDartComponentImpl imp
   @Override
   public DartComponent findMemberByName(@NotNull String name) {
     final List<DartComponent> membersByName = findMembersByName(name);
-    return membersByName.isEmpty() ? null : membersByName.iterator().next();
+    return membersByName.isEmpty() ? null : membersByName.getFirst();
   }
 
   @Override

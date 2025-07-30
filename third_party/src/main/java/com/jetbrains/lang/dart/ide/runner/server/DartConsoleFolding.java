@@ -68,19 +68,19 @@ public final class DartConsoleFolding extends ConsoleFolding {
     // depending on the Moon phase (well, on initialization speed) we may get lines.size() == 2 where first line is Dart VM startup and 2nd line is Observatory URL)
     // but more frequently we get these 2 lines one by one
 
-    if (lines.size() == 1 && lines.get(0).startsWith(DartConsoleFilter.OBSERVATORY_LISTENING_ON)) {
-      return " [Debug service available at " + lines.get(0).substring(DartConsoleFilter.OBSERVATORY_LISTENING_ON.length()) + "]";
+    if (lines.size() == 1 && lines.getFirst().startsWith(DartConsoleFilter.OBSERVATORY_LISTENING_ON)) {
+      return " [Debug service available at " + lines.getFirst().substring(DartConsoleFilter.OBSERVATORY_LISTENING_ON.length()) + "]";
     }
-    else if (lines.size() == 1 && lines.get(0).startsWith(DartConsoleFilter.DART_VM_LISTENING_ON)) {
-      return " [Debug service available at " + lines.get(0).substring(DartConsoleFilter.DART_VM_LISTENING_ON.length()) + "]";
-    }
-
-    if (lines.size() == 1 && lines.get(0).contains(TEST_RUNNER_MARKER)) {
-      return foldTestRunnerCommand(lines.get(0));
+    else if (lines.size() == 1 && lines.getFirst().startsWith(DartConsoleFilter.DART_VM_LISTENING_ON)) {
+      return " [Debug service available at " + lines.getFirst().substring(DartConsoleFilter.DART_VM_LISTENING_ON.length()) + "]";
     }
 
-    if (lines.size() == 1 && lines.get(0).contains(WEBDEV_RUNNER_MARKER)) {
-      return foldWebdevCommand(lines.get(0));
+    if (lines.size() == 1 && lines.getFirst().contains(TEST_RUNNER_MARKER)) {
+      return foldTestRunnerCommand(lines.getFirst());
+    }
+
+    if (lines.size() == 1 && lines.getFirst().contains(WEBDEV_RUNNER_MARKER)) {
+      return foldWebdevCommand(lines.getFirst());
     }
 
     // exception folding

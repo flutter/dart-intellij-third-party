@@ -45,7 +45,7 @@ public final class DartServerGotoSuperHandler implements LanguageCodeInsightActi
     // build list of DartComponent(s)
     final List<DartComponent> supers = new ArrayList<>();
     if (!items.isEmpty()) {
-      TypeHierarchyItem seed = items.get(0);
+      TypeHierarchyItem seed = items.getFirst();
       {
         final Integer superIndex = seed.getSuperclass();
         if (superIndex != null) {

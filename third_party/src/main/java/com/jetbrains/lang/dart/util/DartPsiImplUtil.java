@@ -217,7 +217,7 @@ public final class DartPsiImplUtil {
       DartResolveUtil.processTopLevelDeclarations(dartType, dartResolveProcessor, libraryFiles, typeName);
     }
 
-    return result.isEmpty() ? null : result.iterator().next();
+    return result.isEmpty() ? null : result.getFirst();
   }
 
   public static @Nullable DartComponentName findComponentName(final @NotNull DartNormalFormalParameter normalFormalParameter) {

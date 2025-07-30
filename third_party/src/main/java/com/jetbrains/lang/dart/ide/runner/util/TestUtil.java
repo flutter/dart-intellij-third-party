@@ -20,7 +20,7 @@ public final class TestUtil {
     if (dartArgumentList == null || dartArgumentList.getExpressionList().isEmpty()) {
       return null;
     }
-    final DartExpression dartExpression = dartArgumentList.getExpressionList().get(0);
+    final DartExpression dartExpression = dartArgumentList.getExpressionList().getFirst();
     testName = dartExpression == null ? "" : StringUtil.unquoteString(dartExpression.getText());
     return testName;
   }

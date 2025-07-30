@@ -94,7 +94,7 @@ public final class DartQuickFix implements IntentionAction, Comparable<Intention
                               @NotNull PsiFile file,
                               @NotNull SourceChange sourceChange,
                               @Nullable DartQuickFix dartQuickFix) {
-    SourceFileEdit fileEdit = sourceChange.getEdits().get(0);
+    SourceFileEdit fileEdit = sourceChange.getEdits().getFirst();
     String filePathOrUri = fileEdit.getFile();
     DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(project, filePathOrUri);
     if (!(fileInfo instanceof DartLocalFileInfo localFileInfo)) return;
@@ -191,7 +191,7 @@ public final class DartQuickFix implements IntentionAction, Comparable<Intention
       return false;
     }
 
-    String filePathOrUri = sourceChange.getEdits().get(0).getFile();
+    String filePathOrUri = sourceChange.getEdits().getFirst().getFile();
     DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(target.getProject(), filePathOrUri);
 
     VirtualFile vFile = target.getOriginalFile().getVirtualFile();
@@ -205,7 +205,7 @@ public final class DartQuickFix implements IntentionAction, Comparable<Intention
 
     // #isPreviewAvailable() has checked that sourceChange.getEdits().get(0) modifies _this_ PsiFile, not some other
     Document document = psiFile.getViewProvider().getDocument();
-    for (SourceEdit edit : sourceChange.getEdits().get(0).getEdits()) {
+    for (SourceEdit edit : sourceChange.getEdits().getFirst().getEdits()) {
       String replacement = StringUtil.convertLineSeparators(edit.getReplacement());
       int startOffset = edit.getOffset();
       int endOffset = edit.getOffset() + edit.getLength();

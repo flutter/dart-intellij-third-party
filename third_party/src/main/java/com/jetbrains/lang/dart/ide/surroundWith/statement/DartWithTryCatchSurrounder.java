@@ -21,6 +21,6 @@ public class DartWithTryCatchSurrounder extends DartBlockStatementSurrounderBase
   @Override
   protected @Nullable PsiElement findElementToDelete(PsiElement surrounder) {
     //noinspection ConstantConditions
-    return ((DartTryStatement)surrounder).getOnPartList().get(0).getBlock().getStatements().getFirstChild(); // todo preselect print(e);
+    return ((DartTryStatement)surrounder).getOnPartList().getFirst().getBlock().getStatements().getFirstChild(); // todo preselect print(e);
   }
 }

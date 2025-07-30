@@ -106,7 +106,7 @@ public class DartBlock extends AbstractBlock implements BlockWithParent {
     if (previousType == SWITCH_CASE || previousType == DEFAULT_CASE) {
       final List<DartBlock> subBlocks = previousBlock.getSubDartBlocks();
       if (!subBlocks.isEmpty()) {
-        final DartBlock lastChildInPrevBlock = subBlocks.get(subBlocks.size() - 1);
+        final DartBlock lastChildInPrevBlock = subBlocks.getLast();
         final List<DartBlock> subSubBlocks = lastChildInPrevBlock.getSubDartBlocks();
         if (isLastTokenInSwitchCase(subSubBlocks)) {
           return new ChildAttributes(Indent.getNormalIndent(), null);  // e.g. Enter after BREAK_STATEMENT

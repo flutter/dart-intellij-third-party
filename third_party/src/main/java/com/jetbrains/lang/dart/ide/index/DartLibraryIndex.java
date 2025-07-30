@@ -75,7 +75,7 @@ public final class DartLibraryIndex extends ScalarIndexExtension<String> {
     final DartSdk sdk = DartSdk.getDartSdk(project);
     final List<String> libNames = sdk == null ? null
                                               : getSdkLibUriToRelativePathMap(project, sdk.getHomePath()).getKeysByValue(relativePath);
-    return libNames == null || libNames.isEmpty() ? null : libNames.get(0);
+    return libNames == null || libNames.isEmpty() ? null : libNames.getFirst();
   }
 
   public static @Nullable VirtualFile getSdkLibByUri(final @NotNull Project project, final @NotNull String sdkLibUri) {
@@ -157,7 +157,7 @@ const Map<String, LibraryInfo> LIBRARIES = const {
         final DartArguments arguments = newExpression.getArguments();
         final DartArgumentList argumentList = arguments != null ? arguments.getArgumentList() : null;
         final List<DartExpression> expressionList = argumentList != null ? argumentList.getExpressionList() : null;
-        final DartExpression firstExpression = expressionList == null || expressionList.isEmpty() ? null : expressionList.get(0);
+        final DartExpression firstExpression = expressionList == null || expressionList.isEmpty() ? null : expressionList.getFirst();
         final String libraryRelativePath = firstExpression instanceof DartStringLiteralExpression
                                            ? StringUtil.unquoteString(firstExpression.getText())
                                            : null;

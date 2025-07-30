@@ -394,7 +394,7 @@ public final class VmServiceWrapper implements Disposable {
 
           List<String> uris = response.getUris();
 
-          if (uris == null || uris.get(0) == null) {
+          if (uris == null || uris.getFirst() == null) {
             LOG.info("Uri was not found");
             JsonObject error = new JsonObject();
             error.addProperty("error", "Breakpoint could not be mapped to package URI");
@@ -404,7 +404,7 @@ public final class VmServiceWrapper implements Disposable {
             return;
           }
 
-          String scriptUri = uris.get(0);
+          String scriptUri = uris.getFirst();
           LOG.info("in received of lookupPackageUris. scriptUri: " + scriptUri);
           myVmService.addBreakpointWithScriptUri(isolateId, scriptUri, line, new AddBreakpointWithScriptUriConsumer() {
             @Override

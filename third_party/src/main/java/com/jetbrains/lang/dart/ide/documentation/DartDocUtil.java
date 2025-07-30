@@ -326,7 +326,7 @@ public final class DartDocUtil {
       if (previous instanceof DartDocComment) {
         return getMultilineDocCommentText((DartDocComment)previous);
       }
-      siblingComments.add(0, (PsiComment)previous);
+      siblingComments.addFirst((PsiComment)previous);
     }
 
     if (!siblingComments.isEmpty()) {

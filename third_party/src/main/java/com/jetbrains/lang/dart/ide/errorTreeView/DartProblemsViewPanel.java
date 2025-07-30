@@ -100,7 +100,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
     table.getRowSorter().addRowSorterListener(e -> {
       List<? extends RowSorter.SortKey> sortKeys = myTable.getRowSorter().getSortKeys();
       assert sortKeys.size() == 1 : sortKeys;
-      ((DartProblemsTableModel)myTable.getModel()).setSortKey(sortKeys.get(0));
+      ((DartProblemsTableModel)myTable.getModel()).setSortKey(sortKeys.getFirst());
     });
 
     TableSpeedSearch.installOn(table, object -> object instanceof DartProblem
@@ -125,7 +125,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
     group.add(ActionManager.getInstance().getAction(IdeActions.ACTION_COPY));
 
     List<DartProblem> selectedProblems = myTable.getSelectedObjects();
-    DartProblem selectedProblem = selectedProblems.size() == 1 ? selectedProblems.get(0) : null;
+    DartProblem selectedProblem = selectedProblems.size() == 1 ? selectedProblems.getFirst() : null;
 
     addQuickFixActions(group, selectedProblem);
     addDiagnosticMessageActions(group, selectedProblem);

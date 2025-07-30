@@ -155,7 +155,7 @@ public class DartFileReference implements PsiPolyVariantReference {
       if (region != null) {
         final List<DartNavigationTarget> targets = region.getTargets();
         if (!targets.isEmpty()) {
-          final DartNavigationTarget target = targets.get(0);
+          final DartNavigationTarget target = targets.getFirst();
           final VirtualFile targetVirtualFile = target.findFile();
           if (targetVirtualFile != null) {
             final PsiFile targetFile = reference.getElement().getManager().findFile(targetVirtualFile);

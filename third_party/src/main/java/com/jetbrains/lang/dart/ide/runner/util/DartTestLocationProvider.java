@@ -109,7 +109,7 @@ public class DartTestLocationProvider implements SMTestLocator, DumbAware {
         public boolean execute(final @NotNull PsiElement element) {
           if (element instanceof DartCallExpression expression) {
             if (TestUtil.isTest(expression) || TestUtil.isGroup(expression)) {
-              if (nodes.get(nodes.size() - 1).equals(getTestLabel(expression))) {
+              if (nodes.getLast().equals(getTestLabel(expression))) {
                 boolean matches = true;
                 for (int i = nodes.size() - 2; i >= 0 && matches; --i) {
                   expression = getGroup(expression);
@@ -145,8 +145,8 @@ public class DartTestLocationProvider implements SMTestLocator, DumbAware {
     final DartArguments arguments = testCallExpression.getArguments();
     final DartArgumentList argumentList = arguments == null ? null : arguments.getArgumentList();
     final List<DartExpression> argExpressions = argumentList == null ? null : argumentList.getExpressionList();
-    return argExpressions != null && !argExpressions.isEmpty() && argExpressions.get(0) instanceof DartStringLiteralExpression
-           ? StringUtil.unquoteString(argExpressions.get(0).getText())
+    return argExpressions != null && !argExpressions.isEmpty() && argExpressions.getFirst() instanceof DartStringLiteralExpression
+           ? StringUtil.unquoteString(argExpressions.getFirst().getText())
            : null;
   }
 }
