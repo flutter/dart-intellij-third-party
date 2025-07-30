@@ -5,6 +5,7 @@
  - Vendor change from "JetBrains" to "Google"
  - Build system change from Basel to Gradle
  - Removal of the old Code Coverage support, all references to com.intellij.coverage.*
+ - Removal of the Dart embedded in HTML support
  - Remove the "Scope analysis to the current package" feature from the Dart problem view
  - New Dart language feature: Dot Shorthands (https://youtrack.jetbrains.com/issue/IDEA-370100)
  - Support new 'Null-Aware Elements’ syntax (https://youtrack.jetbrains.com/issue/IDEA-374053)
