@@ -118,7 +118,13 @@ tasks {
     test {
         val dartSdkPath = System.getenv("DART_HOME")
         if (dartSdkPath != null) {
-            jvmArgs("-Ddart.sdk=${dartSdkPath}")
+            val versionFile = file("${dartSdkPath}/version")
+            if (versionFile.exists() && versionFile.isFile()) {
+                jvmArgs("-Ddart.sdk=${dartSdkPath}")
+            } else {
+                logger.error("This directory, ${dartSdkPath}, doesn't appear to be Dart SDK path, " +
+                        "no version file found at ${versionFile.absolutePath}")
+            }
         } else {
             logger.error("DART_HOME environment variable is not set. Dart Analysis Server tests will fail.")
         }
