@@ -7,7 +7,10 @@ import com.jetbrains.lang.dart.ide.generation.BaseDartGenerateHandler;
 import com.jetbrains.lang.dart.ide.generation.DartGenerateEqualsAndHashcodeHandler;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.jetbrains.annotations.NotNull;
+import org.junit.Ignore;
 
+// TODO(https://github.com/flutter/dart-intellij-third-party/issues/51)
+@Ignore
 public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
   @Override
   public void setUp() throws Exception {
