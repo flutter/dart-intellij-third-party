@@ -26,6 +26,13 @@ public class DartLiveTemplatesTest extends BasePlatformTestCase {
     return FileUtil.toSystemDependentName("/liveTemplates/");
   }
 
+  // Added setUp to make sure the files that the test needs are available during tests
+  //
+  @Override
+  protected void setUp() throws Exception {
+    super.setUp();
+    DartTestUtils.configureDartSdk(getModule(), myFixture.getProjectDisposable(), false);
+  }
   public void expandTemplate(final Editor editor) {
     final Project project = editor.getProject();
     assertNotNull(project);
