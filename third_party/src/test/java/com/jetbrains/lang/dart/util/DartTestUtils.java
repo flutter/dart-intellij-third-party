@@ -27,6 +27,7 @@ import org.junit.Assert;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -65,8 +66,22 @@ public final class DartTestUtils {
   @TestOnly
   public static void configureDartSdk(@NotNull final Module module, @NotNull final Disposable disposable, final boolean realSdk) {
     final String sdkHome;
+    String tempSdk;
+
     if (realSdk) {
-      sdkHome = System.getProperty("dart.sdk");
+      tempSdk = System.getProperty("dart.sdk");
+
+      // getting the dart.sdk from System.getProperty() was failing in many cases on Windows,
+      // inexplicably? However, since the dart.sdk is an environment variable it makes sense that
+      // getenv works here
+      //
+      if (tempSdk == null) {
+        // try to get from System.getEnv
+       tempSdk = System.getenv("dart.sdk");
+      }
+
+      sdkHome = tempSdk;
+
       if (sdkHome == null) {
         Assert.fail("To run tests that use Dart Analysis Server you need to add '-Ddart.sdk=[real SDK home]' to the VM Options field of " +
                     "the corresponding JUnit run configuration (Run | Edit Configurations)");
@@ -81,6 +96,11 @@ public final class DartTestUtils {
     }
 
     VfsRootAccess.allowRootAccess(disposable, sdkHome);
+
+    // The above root access doesn't always work properly, the line below
+    // sets access to anything from src/test/testData and below
+    //
+    VfsRootAccess.allowRootAccess(disposable, BASE_TEST_DATA_PATH);
 
     ApplicationManager.getApplication().runWriteAction(() -> {
       Disposer.register(disposable, DartSdkLibUtil.configureDartSdkAndReturnUndoingDisposable(module.getProject(), sdkHome));
