@@ -338,7 +338,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   }
 
   public void testNamedConstructorSig() {
-    doTest("<code><b>test.dart</b><br>Z&nbsp;Z.z()<br><br><b>Containing class:</b> Z<br><br></code>", "class Z { <caret>Z.z(); }");
+    doTest("<code><b>test.dart</b><br>Z.z()<br><br><b>Containing class:</b> Z<br><br></code>", "class Z { <caret>Z.z(); }");
   }
 
   public void testParamClassSig() {
@@ -403,7 +403,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   }
 
   public void testTypedefSig() {
-    doTest("<code><b>test.dart</b><br>typedef&nbsp;F&nbsp;=&nbsp;int&nbsp;Function(int&nbsp;x)<br><br></code>",
+    doTest("<code><b>test.dart</b><br>typedef&nbsp;F&nbsp;=&nbsp;int&nbsp;Function(int)<br><br></code>",
            "typedef int <caret>F(int x);");
   }
 
