@@ -173,8 +173,8 @@ public class DartServerQuickFixTest extends CodeInsightFixtureTestCase {
     assertOrderedEquals(intentions,
                         "Import library 'dart:io'",
                         "Import library 'dart:io' with 'show'",
-                        "Change to 'ServerSockets'",
                         "Create class 'ServerSocket'",
+                        "Change to 'ServerSockets'",
                         "Create mixin 'ServerSocket'");
   }
 
