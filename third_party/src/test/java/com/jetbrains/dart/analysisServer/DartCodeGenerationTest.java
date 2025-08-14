@@ -26,6 +26,12 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
     myFixture.checkResult(after);
   }
 
+  /**
+   * Note: These tests were recently updated to match the expected output, but should the code formatter used by the
+   * Dart Analysis server change, these tests will start to break again. They are updated to match with the assumption
+   * that the equals and hashcode tests include testing features of Intellij and the Dart plugin, not just the
+   * formatting returned from the server.
+   */
   public void testEqualsAndHashcodeNoSuper() {
     doEqualsAndHashcodeTest("""
                               class Interface {
@@ -38,22 +44,22 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
                               """,
 
                             """
-                              class Interface {
-                                bool operator ==(Object other) => super == other;
-                                int get hashCode => super.hashCode;
-                              }
-                              class Bar {}
-                              class Baz implements Interface {}
-                              class Foo extends Bar with Baz implements Interface {
-                                @override
-                                bool operator ==(Object other) =>
-                                    identical(this, other) ||
-                                        other is Foo && runtimeType == other.runtimeType;
-                              
-                                @override
-                                int get hashCode => 0;
-                              }
-                              """);
+                             class Interface {
+                               bool operator ==(Object other) => super == other;
+                               int get hashCode => super.hashCode;
+                             }
+                             class Bar {}
+                             class Baz implements Interface {}
+                             class Foo extends Bar with Baz implements Interface {
+                               @override
+                               bool operator ==(Object other) =>
+                                   identical(this, other) ||
+                                   other is Foo && runtimeType == other.runtimeType;
+                                    
+                               @override
+                               int get hashCode => 0;
+                             }
+                             """);
   }
 
   public void testEqualsAndHashcodeWithSuper() {
@@ -66,20 +72,20 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
                               class Foo extends Bar {<caret>}""",
 
                             """
-                              class Bar extends Baz {}
-                              class Baz {
-                                bool operator ==(Object other) => super == other;
-                                int get hashCode => super.hashCode;
-                              }
-                              class Foo extends Bar {
-                                @override
-                                bool operator ==(Object other) =>
-                                    identical(this, other) ||
-                                        other is Foo && runtimeType == other.runtimeType;
-                              
-                                @override
-                                int get hashCode => 0;
-                              }""");
+                             class Bar extends Baz {}
+                             class Baz {
+                               bool operator ==(Object other) => super == other;
+                               int get hashCode => super.hashCode;
+                             }
+                             class Foo extends Bar {
+                               @override
+                               bool operator ==(Object other) =>
+                                   identical(this, other) ||
+                                   other is Foo && runtimeType == other.runtimeType;
+                            
+                               @override
+                               int get hashCode => 0;
+                             }""");
   }
 
   public void testEqualsAndHashcodeWithFieldsNoSuper() {
@@ -105,12 +111,13 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
                                   @override
                                   bool operator ==(Object other) =>
                                       identical(this, other) ||
-                                          other is Foo && runtimeType == other.runtimeType && e == other.e &&
-                                              b == other.b;
+                                      other is Foo &&
+                                          runtimeType == other.runtimeType &&
+                                          e == other.e &&
+                                          b == other.b;
                                 
                                   @override
                                   int get hashCode => Object.hash(e, b);
-                                
                                 }""");
   }
 
@@ -139,12 +146,13 @@ public class DartCodeGenerationTest extends CodeInsightFixtureTestCase {
                                   @override
                                   bool operator ==(Object other) =>
                                       identical(this, other) ||
-                                          other is Foo && runtimeType == other.runtimeType && e == other.e &&
-                                              b == other.b;
+                                      other is Foo &&
+                                          runtimeType == other.runtimeType &&
+                                          e == other.e &&
+                                          b == other.b;
                                 
                                   @override
                                   int get hashCode => Object.hash(e, b);
-                                
                                 }""");
   }
 }
