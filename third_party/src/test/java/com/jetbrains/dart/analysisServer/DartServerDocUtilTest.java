@@ -7,7 +7,12 @@ import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.dartlang.analysis.server.protocol.HoverInformation;
+import org.junit.Ignore;
 
+/* Fix once the version of dart goes to 3.10
+ * https://github.com/flutter/dart-intellij-third-party/issues/51
+ */
+@Ignore
 public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   @Override
   public void setUp() throws Exception {
