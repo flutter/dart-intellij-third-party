@@ -111,7 +111,7 @@ public class ByteResponseStream implements ResponseStream {
       return null;
     }
     try {
-      return (JsonObject) new JsonParser().parse(line);
+        return (JsonObject) JsonParser.parseString(line);
     } catch (JsonSyntaxException e) {
       // Include the line in the message so that we can better diagnose the problem
       throw new JsonSyntaxException("Parse server message failed: " + line, e);

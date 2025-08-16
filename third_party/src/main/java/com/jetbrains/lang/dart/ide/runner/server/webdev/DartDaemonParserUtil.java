@@ -16,8 +16,7 @@ public final class DartDaemonParserUtil {
     if (!text.startsWith("[{")) {
       return null;
     }
-    final JsonParser jsonParser = new JsonParser();
-    final JsonElement jsonElement = jsonParser.parse(text);
+    final JsonElement jsonElement = JsonParser.parseString(text);
     if (jsonElement instanceof JsonArray && !jsonElement.getAsJsonArray().isEmpty()) {
       return jsonElement.getAsJsonArray().get(0).getAsJsonObject();
     }
