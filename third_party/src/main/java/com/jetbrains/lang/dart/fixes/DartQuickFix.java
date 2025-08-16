@@ -65,7 +65,7 @@ public final class DartQuickFix implements IntentionAction, Comparable<Intention
   }
 
   @Override
-  public int compareTo(IntentionAction o) {
+  public int compareTo(final @NotNull IntentionAction o) {
     if (o instanceof DartQuickFix) {
       return myIndex - ((DartQuickFix)o).myIndex;
     }

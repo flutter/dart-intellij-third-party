@@ -32,7 +32,7 @@ public final class PubServerManager implements Disposable {
 
   private String myServedSdkVersion;
 
-  private final LoadingCache<VirtualFile, PubServerService> myServedDirToPubService;
+  private final LoadingCache<@NotNull VirtualFile, PubServerService> myServedDirToPubService;
 
   public static @NotNull PubServerManager getInstance(@NotNull Project project) {
     return project.getService(PubServerManager.class);

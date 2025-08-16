@@ -30,7 +30,7 @@ public class DartQuickAssistIntention implements IntentionAction, Comparable<Int
   }
 
   @Override
-  public int compareTo(IntentionAction o) {
+  public int compareTo(final @NotNull IntentionAction o) {
     if (o instanceof DartQuickAssistIntention other) {
       return myIndex - other.myIndex;
     }

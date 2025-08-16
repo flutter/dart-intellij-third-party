@@ -134,7 +134,7 @@ public class DartProblemGroup implements SuppressableProblemGroup {
     }
 
     @Override
-    public int compareTo(final IntentionAction o) {
+    public int compareTo(final @NotNull IntentionAction o) {
       if (o instanceof DartSuppressAction) {
         return ((DartSuppressAction)o).myEolComment ? -1 : 1;
       }

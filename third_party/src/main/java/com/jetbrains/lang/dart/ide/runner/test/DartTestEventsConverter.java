@@ -106,7 +106,7 @@ public final class DartTestEventsConverter extends OutputToGeneralTestEventsConv
   }
 
   @Override
-  protected boolean processServiceMessages(final String text, final Key outputType, final ServiceMessageVisitor visitor)
+  protected boolean processServiceMessages(final String text, final @NotNull Key outputType, final @NotNull ServiceMessageVisitor visitor)
     throws ParseException {
     LOG.debug("<<< " + text.trim());
     myCurrentOutputType = outputType;
