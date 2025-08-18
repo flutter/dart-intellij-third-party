@@ -63,10 +63,12 @@ public final class PubspecYamlReferenceContributor extends PsiReferenceContribut
       final boolean quoted = StringUtil.isQuotedString(text);
       final int startInElement = value.getStartOffsetInParent() + (quoted ? 1 : 0);
 
-      final FileReferenceSet fileReferenceSet = new FileReferenceSet(StringUtil.unquoteString(text), element, startInElement,
-                                                                     this, element.getContainingFile().getViewProvider().getVirtualFile().isCaseSensitive(), false) {
-        @Override
-        public @NotNull Collection<PsiFileSystemItem> computeDefaultContexts() {
+        // For isCaseSensitive, element.getContainingFile().getViewProvider().getVirtualFile().isCaseSensitive(), would
+        // be preferred, however this API is experimental:
+        final FileReferenceSet fileReferenceSet = new FileReferenceSet(StringUtil.unquoteString(text), element, startInElement,
+                this, false, false) {
+            @Override
+            public @NotNull Collection<PsiFileSystemItem> computeDefaultContexts() {
           if (isAbsolutePathReference()) {
             final VirtualFile[] roots = ManagingFS.getInstance().getLocalRoots();
             final Collection<PsiFileSystemItem> result = new SmartList<>();
