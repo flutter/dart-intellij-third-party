@@ -3,7 +3,6 @@ package com.jetbrains.lang.dart;
 
 import com.intellij.lang.*;
 import com.intellij.openapi.util.Pair;
-import com.intellij.psi.ParsingDiagnostics;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.TokenType;
@@ -249,11 +248,12 @@ public interface DartTokenTypesSets {
       if (isSyncOrAsync(lazyParseableBlock)) {
         builder.putUserData(DartGeneratedParserUtilBase.INSIDE_SYNC_OR_ASYNC_FUNCTION, true);
       }
-      var startTime = System.nanoTime();
+//      var startTime = System.nanoTime();
       new DartParser().parseLight(BLOCK, builder);
-      var result = builder.getTreeBuilt().getFirstChildNode();
-      ParsingDiagnostics.registerParse(builder, getLanguage(), System.nanoTime() - startTime);
-      return result;
+      return builder.getTreeBuilt().getFirstChildNode();
+      // The following is removed as it is experimental and does not provide any functionality in the IDE for Dart developers:
+      // ParsingDiagnostics.registerParse(builder, getLanguage(), System.nanoTime() - startTime);
+      // return result; (set by builder.getTreeBuilt().getFirstChildNode()
     }
 
     private static boolean isSyncOrAsync(final @NotNull ASTNode newBlock) {
@@ -271,11 +271,12 @@ public interface DartTokenTypesSets {
     @Override
     protected ASTNode doParseContents(@NotNull ASTNode chameleon, @NotNull PsiElement psi) {
       PsiBuilder builder = PsiBuilderFactory.getInstance().createBuilder(psi.getProject(), chameleon);
-      var startTime = System.nanoTime();
+//      var startTime = System.nanoTime();
       new DartParser().parseLight(DartParserDefinition.DART_FILE, builder);
-      var result = builder.getTreeBuilt().getFirstChildNode();
-      ParsingDiagnostics.registerParse(builder, getLanguage(), System.nanoTime() - startTime);
-      return result;
+      return builder.getTreeBuilt().getFirstChildNode();
+      // The following is removed as it is experimental and does not provide any functionality in the IDE for Dart developers:
+      // ParsingDiagnostics.registerParse(builder, getLanguage(), System.nanoTime() - startTime);
+      // return result; (set by builder.getTreeBuilt().getFirstChildNode()
     }
 
     @Override

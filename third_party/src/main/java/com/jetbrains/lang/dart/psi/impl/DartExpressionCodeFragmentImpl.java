@@ -111,15 +111,16 @@ public class DartExpressionCodeFragmentImpl extends DartFile implements DartExpr
     protected ASTNode doParseContents(@NotNull ASTNode chameleon, @NotNull PsiElement psi) {
       final PsiBuilderFactory factory = PsiBuilderFactory.getInstance();
       final PsiBuilder psiBuilder = factory.createBuilder(((TreeElement)chameleon).getManager().getProject(), chameleon);
-      var startTime = System.nanoTime();
+//      var startTime = System.nanoTime();
       final PsiBuilder builder = adapt_builder_(DartTokenTypes.STATEMENTS, psiBuilder, new DartParser(), DartParser.EXTENDS_SETS_);
 
       PsiBuilder.Marker marker = enter_section_(builder, 0, _COLLAPSE_, "<code fragment>");
       boolean result = DartParser.expression(builder, 0);
       exit_section_(builder, 0, marker, DartTokenTypes.STATEMENTS, result, true, TRUE_CONDITION);
-      var treeBuilt = builder.getTreeBuilt();
-      ParsingDiagnostics.registerParse(builder, getLanguage(), System.nanoTime() - startTime);
-      return treeBuilt;
+      return builder.getTreeBuilt();
+      // The following is removed as it is experimental and does not provide any functionality in the IDE for Dart developers:
+      // ParsingDiagnostics.registerParse(builder, getLanguage(), System.nanoTime() - startTime);
+      // return treeBuilt; (set by builder.getTreeBuilt())
     }
   }
 }
