@@ -13,7 +13,7 @@ permissions:
 jobs:
   # Job 1: Build Plugin
   build-plugin:
-    runs-on: ubuntu-latest
+    runs-on: [ ubuntu-latest, macos-latest, windows-latest ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
@@ -34,7 +34,7 @@ jobs:
     strategy:
       matrix:
         # TODO(https://github.com/flutter/dart-intellij-third-party/pull/33) Fix and enable execution on Windows
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
