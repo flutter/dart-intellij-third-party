@@ -2,6 +2,8 @@
 
 ### Added
 
+- Support in the "Invalidate Caches..." dialog to remove ~/.dartServer cache
+
 ### Removed
 
 - "Scope analysis to the current package" feature from the Dart problem view
@@ -10,8 +12,8 @@
 
 ### Changed
 
- - Vendor change from "JetBrains" to "Google"
- - Build system change from Basel to Gradle
+- Vendor change from "JetBrains" to "Google"
+- Build system change from Basel to Gradle
 
 
 ## 251.27812.12
