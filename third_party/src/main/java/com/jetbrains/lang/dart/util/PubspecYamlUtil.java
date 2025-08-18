@@ -11,8 +11,6 @@ import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.PairConsumer;
-import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
-import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsViewSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.yaml.snakeyaml.DumperOptions;

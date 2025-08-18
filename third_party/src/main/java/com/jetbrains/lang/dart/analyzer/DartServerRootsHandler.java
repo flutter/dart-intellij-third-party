@@ -18,8 +18,6 @@ import com.intellij.util.PathUtil;
 import com.intellij.util.SmartList;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.io.URLUtil;
-import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
-import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsViewSettings;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil;
 import com.jetbrains.lang.dart.util.DartBuildFileUtil;
