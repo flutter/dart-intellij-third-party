@@ -14,6 +14,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiWhiteSpace;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.FunctionUtil;
+import com.intellij.util.IconUtil;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.psi.impl.AbstractDartMethodDeclarationImpl;
 import org.jetbrains.annotations.NotNull;
@@ -54,9 +55,14 @@ public final class DartMethodLineMarkerProvider implements LineMarkerProvider {
 
       PsiElement anchor = PsiTreeUtil.getDeepestFirst(markerLocation);
       // finally, create the marker
-      LineMarkerInfo info = new LineMarkerInfo<>(anchor, anchor.getTextRange(), null, FunctionUtil.<Object, String>nullConstant(), null,
-                                                 GutterIconRenderer.Alignment.RIGHT);
-      EditorColorsScheme scheme = EditorColorsManager.getInstance().getGlobalScheme();
+        LineMarkerInfo<PsiElement> info = new LineMarkerInfo<>(anchor,
+                anchor.getTextRange(),
+                IconUtil.getEmptyIcon(true),
+                FunctionUtil.<Object, String>nullConstant(),
+                null,
+                GutterIconRenderer.Alignment.RIGHT,
+                () -> "Method separator");
+        EditorColorsScheme scheme = EditorColorsManager.getInstance().getGlobalScheme();
       info.separatorColor = scheme.getColor(CodeInsightColors.METHOD_SEPARATORS_COLOR);
       info.separatorPlacement = SeparatorPlacement.TOP;
       return info;

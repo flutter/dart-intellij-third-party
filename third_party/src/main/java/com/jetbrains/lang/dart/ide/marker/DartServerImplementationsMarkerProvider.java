@@ -63,43 +63,63 @@ public final class DartServerImplementationsMarkerProvider implements LineMarker
     return null;
   }
 
-  private static @NotNull LineMarkerInfo createMarkerClass(final @NotNull DartComponentName name) {
-    final VirtualFile file = name.getContainingFile().getVirtualFile();
-    PsiElement anchor = PsiTreeUtil.getDeepestFirst(name);
-    return new LineMarkerInfo<>(anchor, anchor.getTextRange(), AllIcons.Gutter.OverridenMethod,
-                                element -> DaemonBundle.message("class.is.subclassed.too.many"), (e, __) -> {
-      DartAnalysisServerService das = DartAnalysisServerService.getInstance(name.getProject());
-      final List<TypeHierarchyItem> items = das.search_getTypeHierarchy(file, anchor.getTextRange().getStartOffset(), false);
-      if (items.isEmpty()) {
-        return;
-      }
-      // TODO(scheglov) Consider using just Element(s), not PsiElement(s) for better performance
-      final Set<DartComponent> components =
-        DartInheritorsSearcher.getSubClasses(name.getProject(), GlobalSearchScope.allScope(name.getProject()), items);
-      String popupTitle = DaemonBundle.message("navigation.title.subclass", name.getName(), components.size(), "");
-      String findUsagesTitle = DartBundle.message("tab.title.subclasses.of.0", name.getName());
-      PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(components), popupTitle, findUsagesTitle,
-                                          new DefaultPsiElementCellRenderer());
-    }, GutterIconRenderer.Alignment.RIGHT);
-  }
+    private static @NotNull LineMarkerInfo createMarkerClass(final @NotNull DartComponentName name) {
+        final VirtualFile file = name.getContainingFile().getVirtualFile();
+        PsiElement anchor = PsiTreeUtil.getDeepestFirst(name);
+        String accessibleName = DaemonBundle.message("class.is.subclassed.too.many");
 
-  private static @NotNull LineMarkerInfo createMarkerMember(final @NotNull DartComponentName name) {
-    final VirtualFile file = name.getContainingFile().getVirtualFile();
-    PsiElement anchor = PsiTreeUtil.getDeepestFirst(name);
-    return new LineMarkerInfo<>(anchor, anchor.getTextRange(), AllIcons.Gutter.OverridenMethod,
-                                element -> DaemonBundle.message("method.is.overridden.too.many"), (e, __) -> {
-      DartAnalysisServerService das = DartAnalysisServerService.getInstance(name.getProject());
-      final List<TypeHierarchyItem> items = das.search_getTypeHierarchy(file, anchor.getTextRange().getStartOffset(), false);
-      if (items.isEmpty()) {
-        return;
-      }
-      // TODO(scheglov) Consider using just Element(s), not PsiElement(s) for better performance
-      final Set<DartComponent> components =
-        DartInheritorsSearcher.getSubMembers(name.getProject(), GlobalSearchScope.allScope(name.getProject()), items);
-      String popupTitle = DaemonBundle.message("navigation.title.overrider.method", name.getName(), components.size());
-      String findUsagesTitle = DartBundle.message("tab.title.overriding.methods.of.0", name.getName());
-      PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(components), popupTitle, findUsagesTitle,
-                                          new DefaultPsiElementCellRenderer());
-    }, GutterIconRenderer.Alignment.RIGHT);
-  }
+        return new LineMarkerInfo<>(
+                anchor,
+                anchor.getTextRange(),
+                AllIcons.Gutter.OverridenMethod,
+                element -> accessibleName,
+                (e, __) -> {
+                    DartAnalysisServerService das = DartAnalysisServerService.getInstance(name.getProject());
+                    final List<TypeHierarchyItem> items = das.search_getTypeHierarchy(file, anchor.getTextRange().getStartOffset(), false);
+                    if (items.isEmpty()) {
+                        return;
+                    }
+                    // TODO(scheglov) Consider using just Element(s), not PsiElement(s) for better performance
+                    final Set<DartComponent> components =
+                            DartInheritorsSearcher.getSubClasses(name.getProject(), GlobalSearchScope.allScope(name.getProject()), items);
+                    String popupTitle = DaemonBundle.message("navigation.title.subclass", name.getName(), components.size(), "");
+                    String findUsagesTitle = DartBundle.message("tab.title.subclasses.of.0", name.getName());
+                    PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(components), popupTitle, findUsagesTitle,
+                            new DefaultPsiElementCellRenderer());
+                },
+                GutterIconRenderer.Alignment.RIGHT,
+                () -> accessibleName
+        );
+    }
+
+
+    private static @NotNull LineMarkerInfo createMarkerMember(final @NotNull DartComponentName name) {
+        final VirtualFile file = name.getContainingFile().getVirtualFile();
+        PsiElement anchor = PsiTreeUtil.getDeepestFirst(name);
+        String accessibleName = DaemonBundle.message("method.is.overridden.too.many");
+
+        return new LineMarkerInfo<>(
+                anchor,
+                anchor.getTextRange(),
+                AllIcons.Gutter.OverridenMethod,
+                element -> accessibleName,
+                (e, __) -> {
+                    DartAnalysisServerService das = DartAnalysisServerService.getInstance(name.getProject());
+                    final List<TypeHierarchyItem> items = das.search_getTypeHierarchy(file, anchor.getTextRange().getStartOffset(), false);
+                    if (items.isEmpty()) {
+                        return;
+                    }
+                    // TODO(scheglov) Consider using just Element(s), not PsiElement(s) for better performance
+                    final Set<DartComponent> components =
+                            DartInheritorsSearcher.getSubMembers(name.getProject(), GlobalSearchScope.allScope(name.getProject()), items);
+                    String popupTitle = DaemonBundle.message("navigation.title.overrider.method", name.getName(), components.size());
+                    String findUsagesTitle = DartBundle.message("tab.title.overriding.methods.of.0", name.getName());
+                    PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(components), popupTitle, findUsagesTitle,
+                            new DefaultPsiElementCellRenderer());
+                },
+                GutterIconRenderer.Alignment.RIGHT,
+                () -> accessibleName
+        );
+    }
+
 }
