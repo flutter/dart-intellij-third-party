@@ -6,7 +6,7 @@
 
 - "Scope analysis to the current package" feature from the Dart problem view
 - Code Coverage support, all references to com.intellij.coverage.*
-- Dart embedded in HTML support
+- Dart embedded and syntax highlighting in HTML support
 
 ### Changed
 

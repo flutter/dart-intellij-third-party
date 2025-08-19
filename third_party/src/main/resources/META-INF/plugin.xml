@@ -60,7 +60,6 @@
     <extendWordSelectionHandler implementation="com.jetbrains.lang.dart.ide.editor.DartWordSelectionHandler"/>
     <basicWordSelectionFilter implementation="com.jetbrains.lang.dart.ide.editor.DartSelectionFilter"/>
 
-    <html.scriptContentProvider language="Dart" implementationClass="com.jetbrains.lang.dart.DartScriptContentProvider"/>
     <nonProjectFileWritingAccessExtension implementation="com.jetbrains.lang.dart.ide.DartWritingAccessProvider"/>
     <spellchecker.support language="Dart" implementationClass="com.jetbrains.lang.dart.ide.spelling.DartSpellcheckingStrategy"/>
     <spellchecker.bundledDictionaryProvider implementation="com.jetbrains.lang.dart.ide.spelling.DartBundledDictionaryProvider"/>
@@ -246,8 +245,6 @@
 
     <search.optionContributor implementation="com.jetbrains.lang.dart.DartSearchableOptionContributor"/>
 
-    <lang.syntaxHighlighter language="Dart in Html" implementationClass="com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter"/>
-    <lang.parserDefinition language="Dart in Html" implementationClass="com.jetbrains.lang.dart.DartParserDefinition"/>
     <notificationGroup id="Dart Support" displayType="BALLOON"
                        bundle="messages.DartBundle" key="notification.group.dart.support"/>
     <notificationGroup id="Dart Analysis" displayType="TOOL_WINDOW" toolWindowId="Dart Analysis" isLogByDefault="false"
