@@ -85,13 +85,23 @@ jobs:
         with:
           sdk: ${{ matrix.dart-version }}
 
-      - name: Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
-        if: always() # Run even if one SDK version fails
+      - name: (MACOS/LINUX) Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
+        if: runner.os == "LINUX" || runner.os == "macOS" # Run even if one SDK version fails
+        # Pass the Dart SDK path with DART_HOME
+        run: |
+          ${DART_HOME}/bin/dart --version
+          ./gradlew :test --tests "com.jetbrains.dart.analysisServer.*"
+        working-directory: third_party
+
+      - name: (WINDOWS) Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
+        if: runner.os == "Windows" # Run even if one SDK version fails
         # Pass the Dart SDK path with DART_HOME
         run: |
           "${DART_HOME}/bin/dart --version
           ./gradlew :test --tests com.jetbrains.dart.analysisServer.*"
         working-directory: third_party
+
+        
 
   # Job 4: Verify Plugin
   verify-plugin:
