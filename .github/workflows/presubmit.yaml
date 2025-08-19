@@ -89,7 +89,7 @@ jobs:
         if: always() # Run even if one SDK version fails
         # Pass the Dart SDK path with DART_HOME
         run: |
-          ${DART_HOME}/bin/dart --version
+          "${DART_HOME}/bin/dart" --version
           ./gradlew :test --tests "com.jetbrains.dart.analysisServer.*"
         working-directory: third_party
 
