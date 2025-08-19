@@ -86,7 +86,7 @@ jobs:
           sdk: ${{ matrix.dart-version }}
 
       - name: (MACOS/LINUX) Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
-        if: runner.os == "LINUX" || runner.os == "macOS" # Run even if one SDK version fails
+        if: runner.os == "Linux" || runner.os == "macOS" # Run even if one SDK version fails
         # Pass the Dart SDK path with DART_HOME
         run: |
           ${DART_HOME}/bin/dart --version
