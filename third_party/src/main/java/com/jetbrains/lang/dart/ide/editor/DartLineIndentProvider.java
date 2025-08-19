@@ -16,40 +16,51 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import static com.intellij.psi.impl.source.codeStyle.lineIndent.JavaLikeLangLineIndentProvider.JavaLikeElement.*;
 
 public final class DartLineIndentProvider extends JavaLikeLangLineIndentProvider {
 
-  static HashMap<IElementType, SemanticEditorPosition.SyntaxElement> SYNTAX_MAP = new HashMap<>();
+    private static volatile Map<IElementType, SemanticEditorPosition.SyntaxElement> SYNTAX_MAP;
 
-  static {
-    SYNTAX_MAP.put(DartTokenTypesSets.WHITE_SPACE, Whitespace);
-    SYNTAX_MAP.put(DartTokenTypes.SEMICOLON, Semicolon);
-    SYNTAX_MAP.put(DartTokenTypes.LBRACE, BlockOpeningBrace);
-    SYNTAX_MAP.put(DartTokenTypes.RBRACE, BlockClosingBrace);
-    SYNTAX_MAP.put(DartTokenTypes.LBRACKET, ArrayOpeningBracket);
-    SYNTAX_MAP.put(DartTokenTypes.RBRACKET, ArrayClosingBracket);
-    SYNTAX_MAP.put(DartTokenTypes.LPAREN, LeftParenthesis);
-    SYNTAX_MAP.put(DartTokenTypes.RPAREN, RightParenthesis);
-    SYNTAX_MAP.put(DartTokenTypes.COLON, Colon);
-    SYNTAX_MAP.put(DartTokenTypes.CASE, SwitchCase);
-    SYNTAX_MAP.put(DartTokenTypes.DEFAULT, SwitchDefault);
-    SYNTAX_MAP.put(DartTokenTypes.IF, IfKeyword);
-    SYNTAX_MAP.put(DartTokenTypes.ELSE, ElseKeyword);
-    SYNTAX_MAP.put(DartTokenTypes.FOR, ForKeyword);
-    SYNTAX_MAP.put(DartTokenTypes.DO, DoKeyword);
-    SYNTAX_MAP.put(DartTokenTypesSets.MULTI_LINE_COMMENT, BlockComment);
-    SYNTAX_MAP.put(DartTokenTypesSets.MULTI_LINE_COMMENT_END, DocBlockEnd);
-    SYNTAX_MAP.put(DartTokenTypesSets.MULTI_LINE_DOC_COMMENT_START, DocBlockStart);
-    SYNTAX_MAP.put(DartTokenTypes.COMMA, Comma);
-    SYNTAX_MAP.put(DartTokenTypesSets.SINGLE_LINE_COMMENT, LineComment);
-    SYNTAX_MAP.put(DartTokenTypesSets.SINGLE_LINE_DOC_COMMENT, LineComment);
-  }
+    private static @NotNull Map<IElementType, SemanticEditorPosition.SyntaxElement> getSyntaxMap() {
+        if (SYNTAX_MAP == null) {
+            synchronized (DartLineIndentProvider.class) {
+                if (SYNTAX_MAP == null) {
+                    final Map<IElementType, SemanticEditorPosition.SyntaxElement> map = new HashMap<>(32);
+                    map.put(DartTokenTypesSets.WHITE_SPACE, Whitespace);
+                    map.put(DartTokenTypes.SEMICOLON, Semicolon);
+                    map.put(DartTokenTypes.LBRACE, BlockOpeningBrace);
+                    map.put(DartTokenTypes.RBRACE, BlockClosingBrace);
+                    map.put(DartTokenTypes.LBRACKET, ArrayOpeningBracket);
+                    map.put(DartTokenTypes.RBRACKET, ArrayClosingBracket);
+                    map.put(DartTokenTypes.LPAREN, LeftParenthesis);
+                    map.put(DartTokenTypes.RPAREN, RightParenthesis);
+                    map.put(DartTokenTypes.COLON, Colon);
+                    map.put(DartTokenTypes.CASE, SwitchCase);
+                    map.put(DartTokenTypes.DEFAULT, SwitchDefault);
+                    map.put(DartTokenTypes.IF, IfKeyword);
+                    map.put(DartTokenTypes.ELSE, ElseKeyword);
+                    map.put(DartTokenTypes.FOR, ForKeyword);
+                    map.put(DartTokenTypes.DO, DoKeyword);
+                    map.put(DartTokenTypes.TRY, TryKeyword);
+                    map.put(DartTokenTypesSets.MULTI_LINE_COMMENT, BlockComment);
+                    map.put(DartTokenTypesSets.MULTI_LINE_COMMENT_END, DocBlockEnd);
+                    map.put(DartTokenTypesSets.MULTI_LINE_DOC_COMMENT_START, DocBlockStart);
+                    map.put(DartTokenTypes.COMMA, Comma);
+                    map.put(DartTokenTypesSets.SINGLE_LINE_COMMENT, LineComment);
+                    map.put(DartTokenTypesSets.SINGLE_LINE_DOC_COMMENT, LineComment);
+                    SYNTAX_MAP = map;
+                }
+            }
+        }
+        return SYNTAX_MAP;
+    }
 
   @Override
   protected @Nullable SemanticEditorPosition.SyntaxElement mapType(@NotNull IElementType tokenType) {
-    return SYNTAX_MAP.get(tokenType);
+      return getSyntaxMap().get(tokenType);
   }
 
   @Override
