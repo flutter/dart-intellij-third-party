@@ -85,7 +85,7 @@ public final class VmServiceWrapper implements Disposable {
   private void assertSyncRequestAllowed() {
       ThreadingAssertions.assertBackgroundThread();
       ThreadingAssertions.assertNoReadAccess();
-    if (myVmServiceReceiverThreadId == Thread.currentThread().getId()) {
+    if (myVmServiceReceiverThreadId == Thread.currentThread().threadId()) {
       LOG.error("Synchronous requests must not be made in Web Socket listening thread: answer will never be received");
     }
   }
@@ -94,7 +94,7 @@ public final class VmServiceWrapper implements Disposable {
     streamListen(VmService.DEBUG_STREAM_ID, new VmServiceConsumers.SuccessConsumerWrapper() {
       @Override
       public void received(final Success success) {
-        myVmServiceReceiverThreadId = Thread.currentThread().getId();
+        myVmServiceReceiverThreadId = Thread.currentThread().threadId();
         streamListen(VmService.ISOLATE_STREAM_ID, new VmServiceConsumers.SuccessConsumerWrapper() {
           @Override
           public void received(final Success success) {
