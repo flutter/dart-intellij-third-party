@@ -49,7 +49,7 @@ public final class DartServerOverrideMarkerProvider implements LineMarkerProvide
     }
   }
 
-  private static @Nullable LineMarkerInfo createOverrideMarker(DartComponentName componentName) {
+  private static @Nullable LineMarkerInfo createOverrideMarker(final DartComponentName componentName) {
     final VirtualFile virtualFile = componentName.getContainingFile().getVirtualFile();
     if (virtualFile == null || !virtualFile.isInLocalFileSystem()) {
       return null;
@@ -75,46 +75,49 @@ public final class DartServerOverrideMarkerProvider implements LineMarkerProvide
     return tryCreateOverrideMarker(componentName, superclassComponent, interfaceComponents);
   }
 
-  private static @Nullable LineMarkerInfo tryCreateOverrideMarker(final @NotNull DartComponentName componentName,
-                                                                  final @Nullable DartComponent superclassComponent,
-                                                                  final @NotNull List<DartComponent> interfaceComponents) {
-    if (superclassComponent == null && interfaceComponents.isEmpty()) {
-      return null;
-    }
-    final String name = componentName.getName();
-    final boolean overrides;
-    final DartComponent superComponent;
-    if (superclassComponent != null) {
-      overrides = true;
-      superComponent = superclassComponent;
-    }
-    else {
-      overrides = false;
-      superComponent = interfaceComponents.getFirst();
-    }
-    final Icon icon = overrides ? AllIcons.Gutter.OverridingMethod : AllIcons.Gutter.ImplementingMethod;
-    PsiElement anchor = PsiTreeUtil.getDeepestFirst(componentName);
+    private static @Nullable LineMarkerInfo tryCreateOverrideMarker(final @NotNull DartComponentName componentName,
+                                                                    final @Nullable DartComponent superclassComponent,
+                                                                    final @NotNull List<DartComponent> interfaceComponents) {
+        if (superclassComponent == null && interfaceComponents.isEmpty()) {
+            return null;
+        }
+        final String name = componentName.getName();
+        final boolean overrides;
+        final DartComponent superComponent;
+        if (superclassComponent != null) {
+            overrides = true;
+            superComponent = superclassComponent;
+        }
+        else {
+            overrides = false;
+            superComponent = interfaceComponents.getFirst();
+        }
 
-    return new LineMarkerInfo<>(anchor, anchor.getTextRange(), icon, __ -> {
-                                      final DartClass superClass = PsiTreeUtil.getParentOfType(superComponent, DartClass.class);
-                                      if (superClass == null) return "null";
-                                      if (overrides) {
-                                        return DartBundle.message(superclassComponent.isOperator() ? "overrides.operator.in"
-                                                                                                   : "overrides.method.in",
-                                                                  name,
-                                                                  superClass.getName());
-                                      }
-                                      return DartBundle.message("implements.method.in", name, superClass.getName());
-                                    }, (e, __) -> {
-      List<DartComponent> superComponents = new ArrayList<>();
-          if (superclassComponent != null) {
-            superComponents.add(superclassComponent);
-          }
-          superComponents.addAll(interfaceComponents);
-          PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(superComponents),
-                                              DaemonBundle.message("navigation.title.super.method", name),
-                                              DaemonBundle.message("navigation.findUsages.title.super.method", name),
-                                              new DefaultPsiElementCellRenderer());
-        }, GutterIconRenderer.Alignment.LEFT);
-  }
+        // Generate the tooltip/accessible name string once
+        final String accessibleName;
+        final DartClass superClass = PsiTreeUtil.getParentOfType(superComponent, DartClass.class);
+        if (superClass == null) {
+            accessibleName = "null";
+        } else if (overrides) {
+            accessibleName = DartBundle.message(superclassComponent.isOperator() ? "overrides.operator.in" : "overrides.method.in", name, superClass.getName());
+        } else {
+            accessibleName = DartBundle.message("implements.method.in", name, superClass.getName());
+        }
+
+        final Icon icon = overrides ? AllIcons.Gutter.OverridingMethod : AllIcons.Gutter.ImplementingMethod;
+        PsiElement anchor = PsiTreeUtil.getDeepestFirst(componentName);
+
+        return new LineMarkerInfo<>(anchor, anchor.getTextRange(), icon, __ -> accessibleName, (e, __) -> {
+            List<DartComponent> superComponents = new ArrayList<>();
+            if (superclassComponent != null) {
+                superComponents.add(superclassComponent);
+            }
+            superComponents.addAll(interfaceComponents);
+            PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(superComponents),
+                    DaemonBundle.message("navigation.title.super.method", name),
+                    DaemonBundle.message("navigation.findUsages.title.super.method", name),
+                    new DefaultPsiElementCellRenderer());
+        }, GutterIconRenderer.Alignment.LEFT, () -> accessibleName);
+    }
+
 }
