@@ -51,13 +51,31 @@ jobs:
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
         working-directory: third_party
 
+      - name: Publish Test Report
+        uses: ctrf-io/github-test-reporter@v1
+        with:
+        report-path: './target/surefire-reports/*.xml'
+        integrations-config: |
+          {
+          "junit-to-ctrf": {
+            "enabled": true,
+            "action": "convert",
+            "options": {
+              "output": "./ctrf-reports/ctrf-report.json",
+              "toolname": "junit-to-ctrf",
+              "useSuiteName": false
+              }
+            }
+          }
+        if: always()
+
       - name: Generate Unit Test Reports
-        uses: step-security/test-reporter@v2
+        uses: ctrf-io/github-test-reporter@v1
+        
         if: ${{ !cancelled() }}    # run this step even if previous step failed
         with:
-          name: JEST Tests            # Name of the check run which will be created
-          path: reports/jest-*.xml    # Path to test results
-          reporter: jest-junit        # Format of test results
+          name: JUnit Tests            # Name of the check run which will be created
+          
 
   # Job 3: Dart Analysis Server Tests
   dart-analysis-server-tests:
