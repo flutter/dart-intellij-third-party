@@ -85,12 +85,21 @@ jobs:
         with:
           sdk: ${{ matrix.dart-version }}
 
-      - name: (MACOS/LINUX) Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
+      - name: Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
         if: always() #runner.os == 'Linux' || runner.os == 'macOS' # Run even if one SDK version fails
         # Pass the Dart SDK path with DART_HOME
         run: |
           ./gradlew :test --tests "com.jetbrains.dart.analysisServer.*"
         working-directory: third_party
+
+      - name: Generate Reports
+        if: always()
+        uses:  dorny/test-reporter@v1
+              with:
+              name: My Test Results
+              path: '**/TEST-*.xml' # Path to your JUnit XML files
+              reporter: java-junit # Or specify other reporter types if needed (e.g., python-junit)
+              fail-on-error: true # Optional: Fail the workflow if tests fail
 
       #- name: (WINDOWS) Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
       #  if: runner.os == 'Windows' # Run even if one SDK version fails
