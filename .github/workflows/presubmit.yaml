@@ -93,13 +93,12 @@ jobs:
         working-directory: third_party
 
       - name: Generate Reports
-        if: always()
-        uses:  dorny/test-reporter@v2
+        uses: step-security/test-reporter@v2
+        if: ${{ !cancelled() }}    # run this step even if previous step failed
         with:
-          name: My Test Results
-          path: '**/TEST-*.xml' # Path to your JUnit XML files
-          reporter: java-junit # Or specify other reporter types if needed (e.g., python-junit)
-          fail-on-error: true # Optional: Fail the workflow if tests fail
+          name: JEST Tests            # Name of the check run which will be created
+          path: reports/jest-*.xml    # Path to test results
+          reporter: jest-junit        # Format of test results
 
       #- name: (WINDOWS) Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
       #  if: runner.os == 'Windows' # Run even if one SDK version fails
