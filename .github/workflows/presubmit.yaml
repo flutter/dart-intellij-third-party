@@ -13,7 +13,7 @@ permissions:
 jobs:
   # Job 1: Build Plugin
   build-plugin:
-    runs-on: [ ubuntu-latest, macos-latest, windows-latest ]
+    runs-on: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
@@ -21,9 +21,9 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
         with:
-          distribution: 'temurin' # Recommended distribution
-          java-version: '21' # Match version in build.gradle.kts
-          cache: 'gradle' # Cache Gradle dependencies
+          distribution: "temurin" # Recommended distribution
+          java-version: "21" # Match version in build.gradle.kts
+          cache: "gradle" # Cache Gradle dependencies
 
       - name: Build Plugin Action
         run: ./gradlew buildPlugin
@@ -34,7 +34,7 @@ jobs:
     strategy:
       matrix:
         # TODO(https://github.com/flutter/dart-intellij-third-party/pull/33) Fix and enable execution on Windows
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
@@ -43,9 +43,9 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
         with:
-          distribution: 'temurin' # Recommended distribution
-          java-version: '21' # Match version in build.gradle.kts
-          cache: 'gradle' # Cache Gradle dependencies
+          distribution: "temurin" # Recommended distribution
+          java-version: "21" # Match version in build.gradle.kts
+          cache: "gradle" # Cache Gradle dependencies
 
       - name: Unit Test Action
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
@@ -54,28 +54,27 @@ jobs:
       - name: Publish Test Report
         uses: ctrf-io/github-test-reporter@v1
         with:
-        report-path: './target/surefire-reports/*.xml'
-        integrations-config: |
-          {
-          "junit-to-ctrf": {
-            "enabled": true,
-            "action": "convert",
-            "options": {
-              "output": "./ctrf-reports/ctrf-report.json",
-              "toolname": "junit-to-ctrf",
-              "useSuiteName": false
+          report-path: "./target/surefire-reports/*.xml"
+          integrations-config: |
+            {
+              "junit-to-ctrf": {
+              "enabled": true,
+              "action": "convert",
+              "options": {
+                "output": "./ctrf-reports/ctrf-report.json",
+                "toolname": "junit-to-ctrf",
+                "useSuiteName": false
+                }
               }
             }
-          }
         if: always()
 
       - name: Generate Unit Test Reports
         uses: ctrf-io/github-test-reporter@v1
-        
-        if: ${{ !cancelled() }}    # run this step even if previous step failed
+
+        if: ${{ !cancelled() }} # run this step even if previous step failed
         with:
-          name: JUnit Tests            # Name of the check run which will be created
-          
+          name: JUnit Tests # Name of the check run which will be created
 
   # Job 3: Dart Analysis Server Tests
   dart-analysis-server-tests:
@@ -90,8 +89,8 @@ jobs:
         # TODO(https://github.com/flutter/dart-intellij-third-party/issues/47)
         # Fix tests to run over additional operating systems as well as Dart SDK versions:
 
-        dart-version: ['stable']
-        os: [ macos-latest, windows-latest ]
+        dart-version: ["stable"]
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
@@ -100,9 +99,9 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
+          distribution: "temurin"
+          java-version: "21"
+          cache: "gradle"
 
       - name: Set up Dart SDK ${{ matrix.dart-version }}
         # This action installs the specified Dart SDK version.
@@ -120,11 +119,11 @@ jobs:
 
       - name: Generate Server Test Reports
         uses: step-security/test-reporter@v2
-        if: ${{ !cancelled() }}    # run this step even if previous step failed
+        if: ${{ !cancelled() }} # run this step even if previous step failed
         with:
-          name: JEST Tests            # Name of the check run which will be created
-          path: reports/jest-*.xml    # Path to test results
-          reporter: jest-junit        # Format of test results
+          name: JEST Tests # Name of the check run which will be created
+          path: reports/jest-*.xml # Path to test results
+          reporter: jest-junit # Format of test results
 
       #- name: (WINDOWS) Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
       #  if: runner.os == 'Windows' # Run even if one SDK version fails
@@ -135,13 +134,11 @@ jobs:
       #    ./gradlew :test --tests com.jetbrains.dart.analysisServer.*
       #  working-directory: third_party
 
-        
-
   # Job 4: Verify Plugin
   verify-plugin:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
@@ -150,9 +147,9 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
         with:
-          distribution: 'temurin' # Recommended distribution
-          java-version: '21' # Match version in build.gradle.kts
-          cache: 'gradle' # Cache Gradle dependencies
+          distribution: "temurin" # Recommended distribution
+          java-version: "21" # Match version in build.gradle.kts
+          cache: "gradle" # Cache Gradle dependencies
 
       - name: Verify Plugin Actions
         run: |
