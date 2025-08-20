@@ -94,7 +94,7 @@ jobs:
 
       - name: Generate Reports
         if: always()
-        uses:  dorny/test-reporter@v1
+        uses:  dorny/test-reporter@v2
         with:
           name: My Test Results
           path: '**/TEST-*.xml' # Path to your JUnit XML files
