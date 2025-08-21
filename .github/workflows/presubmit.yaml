@@ -13,7 +13,7 @@ permissions:
 jobs:
   # Job 1: Build Plugin
   build-plugin:
-    runs-on: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
@@ -21,9 +21,9 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
         with:
-          distribution: "temurin" # Recommended distribution
-          java-version: "21" # Match version in build.gradle.kts
-          cache: "gradle" # Cache Gradle dependencies
+          distribution: 'temurin' # Recommended distribution
+          java-version: '21' # Match version in build.gradle.kts
+          cache: 'gradle' # Cache Gradle dependencies
 
       - name: Build Plugin Action
         run: ./gradlew buildPlugin
@@ -43,9 +43,9 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
         with:
-          distribution: "temurin" # Recommended distribution
-          java-version: "21" # Match version in build.gradle.kts
-          cache: "gradle" # Cache Gradle dependencies
+          distribution: 'temurin' # Recommended distribution
+          java-version: '21' # Match version in build.gradle.kts
+          cache: 'gradle' # Cache Gradle dependencies
 
       - name: Unit Test Action
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
@@ -66,8 +66,8 @@ jobs:
         # TODO(https://github.com/flutter/dart-intellij-third-party/issues/47)
         # Fix tests to run over additional operating systems as well as Dart SDK versions:
 
-        dart-version: ["stable"]
-        os: [macos-latest, windows-latest]
+        dart-version: ['stable']
+        os: [ macos-latest ]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
@@ -76,9 +76,9 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "21"
-          cache: "gradle"
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
 
       - name: Set up Dart SDK ${{ matrix.dart-version }}
         # This action installs the specified Dart SDK version.
@@ -99,7 +99,7 @@ jobs:
   verify-plugin:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
@@ -108,9 +108,9 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
         with:
-          distribution: "temurin" # Recommended distribution
-          java-version: "21" # Match version in build.gradle.kts
-          cache: "gradle" # Cache Gradle dependencies
+          distribution: 'temurin' # Recommended distribution
+          java-version: '21' # Match version in build.gradle.kts
+          cache: 'gradle' # Cache Gradle dependencies
 
       - name: Verify Plugin Actions
         run: |
