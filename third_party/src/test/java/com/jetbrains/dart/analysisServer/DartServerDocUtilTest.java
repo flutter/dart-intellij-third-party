@@ -7,7 +7,12 @@ import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.dartlang.analysis.server.protocol.HoverInformation;
+import org.junit.Ignore;
 
+/* Fix once the version of dart goes to 3.10
+ * https://github.com/flutter/dart-intellij-third-party/issues/51
+ */
+@Ignore
 public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   @Override
   public void setUp() throws Exception {
@@ -98,7 +103,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
 
   public void testConstructorSig1() {
     // unnamed constructor at declaration
-    doTest("<code><b>test.dart</b><br>A&nbsp;A(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
+    doTest("<code><b>test.dart</b><br>A(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
            "<p>constructor comment</p>",
 
            "class A { /** constructor comment */ A<caret>(int one, int two); }");
@@ -107,7 +112,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   public void testConstructorSig2() {
     // named constructor at declaration
     doTest(
-      "<code><b>test.dart</b><br>A&nbsp;A.name(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
+      "<code><b>test.dart</b><br>A.name(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
       "<p>constructor comment</p>",
 
       "class A { /** constructor comment */ A.name<caret>(int one, int two); }");
@@ -115,7 +120,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
 
   public void testConstructorSig3() {
     // unnamed constructor at instantiation
-    doTest("<code><b>test.dart</b><br>A&nbsp;A(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
+    doTest("<code><b>test.dart</b><br>A(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
            "<p>constructor comment</p>",
 
            "class A { /** constructor comment */ A(int one, int two);}" +
@@ -125,7 +130,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   public void testConstructorSig4() {
     // named constructor at instantiation
     doTest(
-      "<code><b>test.dart</b><br>A&nbsp;A.name(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
+      "<code><b>test.dart</b><br>A.name(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
       "<p>constructor comment</p>",
 
       "class A { /** constructor comment */ A.name(int one, int two); }" +
@@ -135,7 +140,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   public void testConstructorSig5() {
     // unnamed constructor at instantiation, implicit new
     doTest(
-      "<code><b>test.dart</b><br>(new)&nbsp;A&nbsp;A(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
+      "<code><b>test.dart</b><br>(new)&nbsp;A(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
       "<p>constructor comment</p>",
 
       "class A { /** constructor comment */ A(int one, int two); }" +
@@ -145,7 +150,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   public void testConstructorSig6() {
     // named constructor at instantiation, implicit new
     doTest(
-      "<code><b>test.dart</b><br>(new)&nbsp;A&nbsp;A.name(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
+      "<code><b>test.dart</b><br>(new)&nbsp;A.name(int&nbsp;one,&nbsp;int&nbsp;two)<br><br><b>Containing class:</b> A<br><br></code>\n" +
       "<p>constructor comment</p>",
 
       "class A { /** constructor comment */ A.name(int one, int two); }" +
@@ -338,7 +343,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   }
 
   public void testNamedConstructorSig() {
-    doTest("<code><b>test.dart</b><br>Z&nbsp;Z.z()<br><br><b>Containing class:</b> Z<br><br></code>", "class Z { <caret>Z.z(); }");
+    doTest("<code><b>test.dart</b><br>Z.z()<br><br><b>Containing class:</b> Z<br><br></code>", "class Z { <caret>Z.z(); }");
   }
 
   public void testParamClassSig() {
@@ -403,7 +408,7 @@ public class DartServerDocUtilTest extends CodeInsightFixtureTestCase {
   }
 
   public void testTypedefSig() {
-    doTest("<code><b>test.dart</b><br>typedef&nbsp;F&nbsp;=&nbsp;int&nbsp;Function(int&nbsp;x)<br><br></code>",
+    doTest("<code><b>test.dart</b><br>typedef&nbsp;F&nbsp;=&nbsp;int&nbsp;Function(int)<br><br></code>",
            "typedef int <caret>F(int x);");
   }
 
