@@ -13,13 +13,20 @@ import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.DartLanguage;
 import org.jetbrains.annotations.NotNull;
+import com.jetbrains.lang.dart.util.DartTestUtils;
 
 public class DartTypingTest extends DartCodeInsightFixtureTestCase {
   @Override
   protected String getBasePath() {
     return "/typing";
   }
-
+  // Added setUp to make sure the files that the test needs are available during tests
+  //
+  @Override
+  protected void setUp() throws Exception {
+    super.setUp();
+    DartTestUtils.configureDartSdk(getModule(), myFixture.getProjectDisposable(), false);
+  }
   protected void doTest(char charToType) {
     myFixture.configureByFiles(getTestName(false) + ".dart");
     myFixture.type(charToType);
