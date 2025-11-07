@@ -114,12 +114,11 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
 
   private fun setUpEditorService() {
     registerServiceMethod("Editor", "getActiveLocation", JsonObject()) {
-        val result = JsonObject()
-        val activeLocation = ReadAction.nonBlocking<JsonObject> {
+        val result = ReadAction.nonBlocking<JsonObject> {
             getActiveLocation(project, this)
         }.executeSynchronously()
-        result.add("activeLocation", activeLocation)
-        result.addProperty("type", "activeLocation")
+//        result.add("activeLocation", activeLocation)
+        result.addProperty("type", "ActiveLocation")
 
         val params = JsonObject()
         params.add("result", result)
@@ -381,7 +380,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
         eventDispatcher.multicaster.received(streamId, json)
       }
       else if (serviceConsumer != null) {
-        val params = json["params"].asJsonObject
+        val params = json["params"]?.asJsonObject ?: JsonObject()
         val id = json["id"].asString
         ApplicationManager.getApplication().executeOnPooledThread {
           val response = serviceConsumer.handleRequest(params)
