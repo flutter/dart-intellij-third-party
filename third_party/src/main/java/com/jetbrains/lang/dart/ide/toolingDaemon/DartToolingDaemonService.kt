@@ -109,6 +109,25 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
       connectToDtdWebSocket(it)
       DartAnalysisServerService.getInstance(project).connectToDtd(uri)
     }
+    setUpEditorService()
+  }
+
+  private fun setUpEditorService() {
+    registerServiceMethod("Editor", "getActiveLocation", JsonObject()) {
+        val result = JsonObject()
+        val activeLocation = ReadAction.nonBlocking<JsonObject> {
+            getActiveLocation(project, this)
+        }.executeSynchronously()
+        result.add("activeLocation", activeLocation)
+        result.addProperty("type", "activeLocation")
+
+        val params = JsonObject()
+        params.add("result", result)
+
+        logger.info("params for getActiveLocation: $params")
+
+        DartToolingDaemonResponse(params, null)
+    }
   }
 
   private fun connectToDtdWebSocket(uri: String) {

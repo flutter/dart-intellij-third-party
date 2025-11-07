@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets
 @Service(Service.Level.PROJECT)
 class DartDevToolsService(private val myProject: Project) : Disposable {
 
-  private lateinit var processHandler: KillableProcessHandler
+    private lateinit var processHandler: KillableProcessHandler
   private var serviceRunning = false
 
   var devToolsHostAndPort: String? = null
