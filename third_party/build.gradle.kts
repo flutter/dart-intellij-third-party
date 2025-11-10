@@ -16,7 +16,7 @@ allprojects {
 // Plugins - must be first
 plugins {
     id("java") // Java support
-    id("org.jetbrains.kotlin.jvm") version "2.2.0" // Kotlin support
+    id("org.jetbrains.kotlin.jvm") version "2.2.21" // Kotlin support
     id("org.jetbrains.intellij.platform") version "2.7.2" // IntelliJ Platform Gradle Plugin
 }
 
