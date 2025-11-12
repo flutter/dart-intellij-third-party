@@ -21,10 +21,7 @@ import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VfsUtilCore
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.*
 import com.intellij.util.EventDispatcher
 import com.intellij.util.PathUtil
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -32,6 +29,7 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
+import com.intellij.xdebugger.impl.XSourcePositionImpl
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
@@ -42,7 +40,9 @@ import de.roderick.weberknecht.WebSocketEventHandler
 import de.roderick.weberknecht.WebSocketException
 import de.roderick.weberknecht.WebSocketMessage
 import kotlinx.coroutines.CoroutineScope
+import java.net.MalformedURLException
 import java.net.URI
+import java.net.URISyntaxException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicInteger
@@ -120,6 +120,43 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
         result.addProperty("type", "ActiveLocation")
 
         DartToolingDaemonResponse(result, null)
+    }
+
+    registerServiceMethod("Editor", "navigateToCode", JsonObject()) handler@{ request ->
+      val fileUri: String? = request.get("uri").asString
+      if (fileUri == null) {
+        val params = JsonObject()
+        params.addProperty("message", "No uri provided")
+        return@handler DartToolingDaemonResponse(null, params)
+      }
+
+      var path: String? = null
+      try {
+        path = URI(fileUri).toURL().file
+      } catch (e: MalformedURLException) {
+        // A null path will cause an early return.
+      } catch (e: URISyntaxException) {
+      }
+      if (path == null) {
+        val params = JsonObject()
+        params.addProperty("message", "Path could not be found from fileUri: $fileUri")
+        return@handler DartToolingDaemonResponse(null, params)
+      }
+
+      val file = LocalFileSystem.getInstance().findFileByPath(path)
+      val line: Int = request.get("line").asInt
+      val column: Int = request.get("column").asInt
+
+      ApplicationManager.getApplication().invokeLater(Runnable {
+        if (file != null && line >= 0 && column >= 0) {
+          val position = XSourcePositionImpl.create(file, line - 1, column - 1)
+          position.createNavigatable(project).navigate(false)
+        }
+      })
+
+      val params = JsonObject()
+      params.addProperty("success", true)
+      DartToolingDaemonResponse(params, null)
     }
   }
 
