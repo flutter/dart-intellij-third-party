@@ -64,7 +64,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   private var lastSentRootUris: List<String> = emptyList()
 
   private val nextRequestId = AtomicInteger()
-  private val consumerMap: MutableMap<String, DartToolingDaemonConsumer> = mutableMapOf()
+  private val consumerMap: MutableMap<Int, DartToolingDaemonConsumer> = mutableMapOf()
   private val servicesMap: MutableMap<String, DartToolingDaemonRequestHandler> = mutableMapOf()
 
   private val eventDispatcher: EventDispatcher<DartToolingDaemonListener> = EventDispatcher.create(DartToolingDaemonListener::class.java)
@@ -117,15 +117,9 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
         val result = ReadAction.nonBlocking<JsonObject> {
             getActiveLocation(project, this)
         }.executeSynchronously()
-//        result.add("activeLocation", activeLocation)
         result.addProperty("type", "ActiveLocation")
 
-        val params = JsonObject()
-        params.add("result", result)
-
-        logger.info("params for getActiveLocation: $params")
-
-        DartToolingDaemonResponse(params, null)
+        DartToolingDaemonResponse(result, null)
     }
   }
 
@@ -174,7 +168,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     request.addProperty("jsonrpc", "2.0")
     request.addProperty("method", method)
 
-    val id = nextRequestId.incrementAndGet().toString()
+    val id = nextRequestId.incrementAndGet()
     request.addProperty("id", id)
     secret?.takeIf { includeSecret }?.let { params.addProperty("secret", it) }
     request.add("params", params)
@@ -186,7 +180,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     webSocket.send(requestString)
   }
 
-  private fun sendResponse(id: String, result: JsonObject?, error: JsonObject? = null) {
+  private fun sendResponse(id: Int, result: JsonObject?, error: JsonObject? = null) {
     if (!webSocketReady) {
       logger.warn("sendResponse(\"$id\", $result) called when the socket is not ready")
       return
@@ -381,14 +375,14 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
       }
       else if (serviceConsumer != null) {
         val params = json["params"]?.asJsonObject ?: JsonObject()
-        val id = json["id"].asString
+        val id = json["id"].asInt
         ApplicationManager.getApplication().executeOnPooledThread {
           val response = serviceConsumer.handleRequest(params)
           sendResponse(id, response.result, response.error)
         }
       }
       else {
-        val id = json["id"].asString
+        val id = json["id"].asInt
         val consumer = consumerMap.remove(id)
         consumer?.received(json)
       }
