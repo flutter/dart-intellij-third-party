@@ -30,4 +30,4 @@ If applicable, add screenshots to help explain your problem.
  - Flutter version: [Run `flutter --version`]
 
 **Error messages / Logs / Other context**
-Add error messages, relevant logs (Help > Show log in finder > idea.log), error messages, or any other context about the problem here.
+Add error messages, relevant logs (Help > Show log in finder > idea.log), or any other context about the problem here.
