@@ -1,4 +1,4 @@
-## Unreleased
+## 500.0.0
 
 ### Added
 
@@ -13,8 +13,7 @@
 ### Changed
 
 - Vendor change from "JetBrains" to "Google"
-- Build system change from Basel to Gradle
-
+- Build system change from Bazel to Gradle
 
 ## 251.27812.12
 

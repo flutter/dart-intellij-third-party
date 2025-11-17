@@ -1,3 +1,4 @@
+import org.jetbrains.changelog.Changelog
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
@@ -18,6 +19,7 @@ plugins {
     id("java") // Java support
     id("org.jetbrains.kotlin.jvm") version "2.2.21" // Kotlin support
     id("org.jetbrains.intellij.platform") version "2.10.3" // IntelliJ Platform Gradle Plugin
+    id("org.jetbrains.changelog") version "2.2.0" // Gradle Changelog Plugin
 }
 
 // Configure project's dependencies
@@ -39,7 +41,7 @@ intellijPlatform {
             untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
         changeNotes = provider {
-            file("CHANGELOG.md").readText(Charsets.UTF_8)
+            project.changelog.render(Changelog.OutputType.HTML)
         }
     }
     pluginVerification {
