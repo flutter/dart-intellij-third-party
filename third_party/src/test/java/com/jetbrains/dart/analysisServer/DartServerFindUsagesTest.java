@@ -70,7 +70,8 @@ public class DartServerFindUsagesTest extends CodeInsightFixtureTestCase {
     assertSameElements(actualResult, expected);
   }
 
-  public void testBoolUsagesWithScope() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/86
+  public void ignore_testBoolUsagesWithScope() {
     final PsiFile psiFile1 = myFixture.configureByText("file.dart", """
       /// [bool]
       <caret>bool foo() {
