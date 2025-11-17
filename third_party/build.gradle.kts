@@ -41,7 +41,7 @@ intellijPlatform {
             untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
         changeNotes = provider {
-            project.changelog.render(Changelog.OutputType.HTML)
+            project.changelog.renderItem(project.changelog.getLatest(), Changelog.OutputType.HTML)
         }
     }
     pluginVerification {
