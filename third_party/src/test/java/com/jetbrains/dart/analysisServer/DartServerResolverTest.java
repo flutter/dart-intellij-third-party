@@ -317,7 +317,8 @@ public class DartServerResolverTest extends CodeInsightFixtureTestCase {
              }""");
   }
 
-  public void testObjectMembers() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/86
+  public void ignore_testObjectMembers() {
     doTest(myFixture,
            """
              class Bar{}
@@ -331,7 +332,8 @@ public class DartServerResolverTest extends CodeInsightFixtureTestCase {
              }""");
   }
 
-  public void testCommentsInsideCallExpression() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/86
+  public void ignore_testCommentsInsideCallExpression() {
     doTest(myFixture,
            """
              main(){
@@ -340,8 +342,9 @@ public class DartServerResolverTest extends CodeInsightFixtureTestCase {
              }""");
   }
 
-  // fails, tracked as https://github.com/dart-lang/sdk/issues/32316
-  public void testEnum() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/86
+  // Also, (once) tracked as https://github.com/dart-lang/sdk/issues/32316
+  public void ignore_testEnum() {
     doTest(myFixture,
            """
              enum Foo {FooA, FooB, }
@@ -411,7 +414,8 @@ public class DartServerResolverTest extends CodeInsightFixtureTestCase {
 //    doTest(myFixture);
 //  }
 
-  public void testDartInternalLibrary() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/86
+  public void ignore_testDartInternalLibrary() {
     doTest(myFixture,
            "import 'dart:_internal';\n" +
            "class A extends <caret expected='[Dart SDK]/lib/internal/list.dart -> UnmodifiableListBase'>UnmodifiableListBase<E>{}"
@@ -428,7 +432,8 @@ public class DartServerResolverTest extends CodeInsightFixtureTestCase {
 //    doTest(myFixture);
 //  }
 
-  public void testDuplicatedImportPrefix() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/86
+  public void ignore_testDuplicatedImportPrefix() {
     myFixture.addFileToProject("file1.dart", "var inFile1;");
     myFixture.addFileToProject("file2.dart", "var inFile2;");
     doTest(myFixture,
@@ -515,7 +520,8 @@ public class DartServerResolverTest extends CodeInsightFixtureTestCase {
 //    doTest(myFixture);
 //  }
 
-  public void testElvisRes() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/86
+  public void ignore_testElvisRes() {
     doTest(myFixture,
            """
              class Bar{}

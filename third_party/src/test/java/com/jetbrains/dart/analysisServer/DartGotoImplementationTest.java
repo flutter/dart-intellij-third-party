@@ -75,7 +75,8 @@ public class DartGotoImplementationTest extends CodeInsightFixtureTestCase {
         doTest(3);
     }
 
-    public void testIterableSubclasses() throws Throwable {
+    // See: https://github.com/flutter/dart-intellij-third-party/issues/86
+    public void ignore_testIterableSubclasses() throws Throwable {
         myFixture.configureByText("foo.dart", "Iterable i;");
         myFixture.doHighlighting();
         final DartSdk sdk = DartSdk.getDartSdk(getProject());
