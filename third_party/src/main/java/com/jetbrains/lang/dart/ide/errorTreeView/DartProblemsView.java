@@ -149,6 +149,12 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
     return content != null ? (DartProblemsViewPanel)content.getComponent() : null;
   }
 
+  // Inlined from `ActionCenter` (where it was removed).
+  // see: https://github.com/flutter/dart-intellij-third-party/issues/80
+  private static @Nullable ToolWindow getToolWindow(@Nullable Project project) {
+    return project == null ? null : ToolWindowManager.getInstance(project).getToolWindow("Notifications");
+  }
+
   void setTabTitle(@TabTitle @NotNull String tabTitle) {
     ToolWindow toolWindow = getDartAnalysisToolWindow();
     Content content = toolWindow != null ? toolWindow.getContentManager().getContent(0) : null;
@@ -251,9 +257,7 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
                 @Override
                 protected void hyperlinkActivated(@NotNull Notification notification, @NotNull HyperlinkEvent e) {
                   notification.expire();
-                  // 2025.1, 251 change in platform, see
-                  // https://github.com/JetBrains/intellij-plugins/commit/762b22a5626c1b47f133cefb483bbc16178caee3
-                  final ToolWindow toolWindow = ActionCenter.getToolWindow(myProject);
+                  final ToolWindow toolWindow = getToolWindow(myProject);
                   if (toolWindow != null) toolWindow.activate(null);
                   // ActionCenter.activateLog(myProject);
                 }
