@@ -132,7 +132,7 @@ public class DartServerQuickFixTest extends CodeInsightFixtureTestCase {
       \s
 
       class A{
-        List<caret> bar(int i, bool bool, String s) {}
+        List<dynamic><caret> bar(int i, bool bool, String s) {}
       }
       foo() {
         List a = new A().bar(1, true, '');
@@ -162,7 +162,7 @@ public class DartServerQuickFixTest extends CodeInsightFixtureTestCase {
         List a = new A().bar(1, true, '');
       }
       class A{
-        List<caret> bar(int i, bool bool, String s) {}
+        List<dynamic><caret> bar(int i, bool bool, String s) {}
       }""";
     doCrLfAwareTest(content, "Create method", after);
   }
