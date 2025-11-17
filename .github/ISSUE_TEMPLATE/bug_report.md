@@ -24,7 +24,7 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Version information**
- - Dart plugin version: [Find in Settings > Plugin]
+ - Dart plugin version: [Find in Settings > Plugins]
  - IDE platform version: [e.g. Android Studio Otter, IntelliJ IDEA 2025.2]
  - OS: [e.g. Mac, Windows, Linux]
  - Flutter version: [Run `flutter --version`]
