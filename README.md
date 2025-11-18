@@ -1,5 +1,7 @@
 # Dart IntelliJ Plugin
 
+[![presubmit](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml/badge.svg)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml)
+
 ## Development setup
 
 1. Clone this repository with
