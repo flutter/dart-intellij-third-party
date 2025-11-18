@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class DartPubCacheRepairAction extends DartPubActionBase {
   @Override
-  protected @NotNull @NlsContexts.DialogTitle String getTitle(final @NotNull Project project, final @NotNull VirtualFile pubspecYamlFile) {
+  protected @NotNull @NlsContexts.DialogTitle String getTitle(final @NotNull VirtualFile pubspecYamlFile) {
     return DartBundle.message("dart.pub.cache.repair.title");
   }
 

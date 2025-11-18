@@ -15,20 +15,16 @@ import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.io.OSAgnosticPathUtil;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.io.URLUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-public final class DotPackagesFileUtil {
-
-  public static final String DOT_PACKAGES = ".packages";
+public final class PackageConfigFileUtil {
 
   public static final String DART_TOOL_DIR = ".dart_tool";
   public static final String PACKAGE_CONFIG_JSON = "package_config.json";
@@ -85,17 +81,6 @@ public final class DotPackagesFileUtil {
     return null;
   }
 
-  public static @Nullable VirtualFile findDotPackagesFile(@Nullable VirtualFile dir) {
-    while (dir != null) {
-      final VirtualFile file = dir.findChild(DOT_PACKAGES);
-      if (file != null && !file.isDirectory()) {
-        return file;
-      }
-      dir = dir.getParent();
-    }
-    return null;
-  }
-
   public static @Nullable Map<String, String> getPackagesMapFromPackageConfigJsonFile(final @NotNull VirtualFile packageConfigJsonFile) {
     Pair<Long, Map<String, String>> data = packageConfigJsonFile.getUserData(MOD_STAMP_TO_PACKAGES_MAP);
 
@@ -142,8 +127,11 @@ public final class DotPackagesFileUtil {
    * ```
    */
   private static @Nullable Map<String, String> loadPackagesMapFromJson(@NotNull VirtualFile packageConfigJsonFile) {
-    String fileContentsStr = FileUtil.loadFileOrNull(packageConfigJsonFile.getPath());
-    if (fileContentsStr == null) {
+    final String fileContentsStr;
+    try {
+      fileContentsStr = StringUtil.convertLineSeparators(VfsUtilCore.loadText(packageConfigJsonFile));
+    }
+    catch (Exception e) {
       return null;
     }
 
@@ -152,7 +140,7 @@ public final class DotPackagesFileUtil {
       jsonElement = JsonParser.parseString(fileContentsStr);
     }
     catch (Exception e) {
-      Logger.getInstance(DotPackagesFileUtil.class).info(e);
+      Logger.getInstance(PackageConfigFileUtil.class).info(e);
       return null;
     }
 
@@ -182,62 +170,6 @@ public final class DotPackagesFileUtil {
       return result;
     }
     return null;
-  }
-
-  public static @Nullable Map<String, String> getPackagesMap(final @NotNull VirtualFile dotPackagesFile) {
-    Pair<Long, Map<String, String>> data = dotPackagesFile.getUserData(MOD_STAMP_TO_PACKAGES_MAP);
-
-    final Long currentTimestamp = dotPackagesFile.getModificationCount();
-    final Long cachedTimestamp = Pair.getFirst(data);
-
-    if (cachedTimestamp == null || !cachedTimestamp.equals(currentTimestamp)) {
-      data = null;
-      dotPackagesFile.putUserData(MOD_STAMP_TO_PACKAGES_MAP, null);
-      final Map<String, String> packagesMap = loadPackagesMap(dotPackagesFile);
-
-      if (packagesMap != null) {
-        data = Pair.create(currentTimestamp, packagesMap);
-        dotPackagesFile.putUserData(MOD_STAMP_TO_PACKAGES_MAP, data);
-      }
-    }
-
-    return Pair.getSecond(data);
-  }
-
-  private static @Nullable Map<String, String> loadPackagesMap(@NotNull VirtualFile dotPackagesFile) {
-    try {
-      final List<String> lines;
-      if (ApplicationManager.getApplication().isUnitTestMode()) {
-        lines = StringUtil.split(new String(dotPackagesFile.contentsToByteArray(), StandardCharsets.UTF_8), "\n");
-      }
-      else {
-        lines = FileUtil.loadLines(dotPackagesFile.getPath(), "UTF-8");
-      }
-
-      final Map<String, String> result = new HashMap<>();
-
-      for (String line : lines) {
-        if (line.trim().isEmpty() || line.startsWith("#")) continue;
-
-        final int colonIndex = line.indexOf(':');
-        if (colonIndex > 0 && colonIndex < line.length() - 1) {
-          final String packageName = line.substring(0, colonIndex).trim();
-          final String encodedUri = line.substring(colonIndex + 1).trim();
-          // need to protect '+' chars because URLDecoder.decode replaces '+' with space
-          final String encodedUriWithoutPluses = StringUtil.replace(encodedUri, "+", "%2B");
-          final String uri = URLUtil.decode(encodedUriWithoutPluses);
-          final String packageUri = getAbsolutePackageRootPath(dotPackagesFile.getParent(), uri);
-          if (!packageName.isEmpty() && packageUri != null) {
-            result.put(packageName, packageUri);
-          }
-        }
-      }
-
-      return result;
-    }
-    catch (IOException e) {
-      return null;
-    }
   }
 
   private static @Nullable String getAbsolutePackageRootPath(@NotNull VirtualFile baseDir, @NotNull String uri) {

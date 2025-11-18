@@ -197,13 +197,8 @@ public class DartCommandLineRunningState extends CommandLineState {
       }
     }
 
-    if (myRunnerParameters.isCheckedModeOrEnableAsserts()) {
-      if (StringUtil.compareVersionNumbers(sdk.getVersion(), "2") < 0) {
-        addVmOption(sdk, commandLine, "--checked");
-      }
-      else {
-        addVmOption(sdk, commandLine, "--enable-asserts");
-      }
+    if (myRunnerParameters.areAssertsEnabled()) {
+      addVmOption(sdk, commandLine, "--enable-asserts");
     }
 
     if (DefaultDebugExecutor.EXECUTOR_ID.equals(getEnvironment().getExecutor().getId())) {

@@ -36,7 +36,6 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.io.FileUtil
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowId
@@ -77,7 +76,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
     e.presentation.isEnabled = visible && !isInProgress
   }
 
-  protected abstract fun getTitle(project: Project, pubspecYamlFile: VirtualFile): String
+  protected abstract fun getTitle(pubspecYamlFile: VirtualFile): String
 
   protected abstract fun calculatePubParameters(project: Project, pubspecYamlFile: VirtualFile): Array<String>?
 
@@ -92,7 +91,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
     if (sdk == null && allowModalDialogs) {
       val answer = Messages.showDialog(module.project,
                                        DartBundle.message("dart.sdk.is.not.configured"),
-                                       getTitle(module.project, pubspecYamlFile),
+                                       getTitle(pubspecYamlFile),
                                        arrayOf(DartBundle.message("setup.dart.sdk"), CommonBundle.getCancelButtonText()),
                                        Messages.OK,
                                        Messages.getErrorIcon())
@@ -104,14 +103,13 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
     if (sdk == null) return
 
-    val useDartPub = StringUtil.compareVersionNumbers(sdk.version, DART_PUB_MIN_SDK_VERSION) >= 0
-    val exeFile = if (useDartPub) File(DartSdkUtil.getDartExePath(sdk)) else File(DartSdkUtil.getPubPath(sdk))
+    val exeFile = File(DartSdkUtil.getDartExePath(sdk))
 
     if (!exeFile.isFile) {
       if (allowModalDialogs) {
         val answer = Messages.showDialog(module.project,
                                          DartBundle.message("dart.sdk.bad.dartpub.path", exeFile.path),
-                                         getTitle(module.project, pubspecYamlFile),
+                                         getTitle(pubspecYamlFile),
                                          arrayOf(DartBundle.message("setup.dart.sdk"), CommonBundle.getCancelButtonText()),
                                          Messages.OK,
                                          Messages.getErrorIcon())
@@ -135,7 +133,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       setupPubExePath(command, sdk)
       command.addParameters(*pubParameters)
 
-      doPerformPubAction(module, pubspecYamlFile, command, getTitle(module.project, pubspecYamlFile))
+      doPerformPubAction(module, pubspecYamlFile, command, getTitle(pubspecYamlFile))
     }
   }
 
@@ -185,25 +183,12 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
     private const val GROUP_DISPLAY_ID: @NonNls String = "Dart Pub Tool"
     private val PUB_TOOL_WINDOW_CONTENT_INFO_KEY = Key.create<PubToolWindowContentInfo>("PUB_TOOL_WINDOW_CONTENT_INFO_KEY")
 
-    private const val DART_PUB_MIN_SDK_VERSION = "2.10"
-    private const val DART_RUN_TEST_MIN_SDK_VERSION = "2.11"
-
     private val ourInProgress = AtomicBoolean(false)
 
     @JvmStatic
-    fun isUseDartRunTestInsteadOfPubRunTest(dartSdk: DartSdk): Boolean =
-      StringUtil.compareVersionNumbers(dartSdk.version, DART_RUN_TEST_MIN_SDK_VERSION) >= 0
-
-    @JvmStatic
     fun setupPubExePath(commandLine: GeneralCommandLine, dartSdk: DartSdk) {
-      val useDartPub = StringUtil.compareVersionNumbers(dartSdk.version, DART_PUB_MIN_SDK_VERSION) >= 0
-      if (useDartPub) {
-        commandLine.withExePath(FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(dartSdk)))
-        commandLine.addParameter("pub")
-      }
-      else {
-        commandLine.withExePath(FileUtil.toSystemDependentName(DartSdkUtil.getPubPath(dartSdk)))
-      }
+      commandLine.withExePath(FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(dartSdk)))
+      commandLine.addParameter("pub")
     }
 
     @JvmStatic

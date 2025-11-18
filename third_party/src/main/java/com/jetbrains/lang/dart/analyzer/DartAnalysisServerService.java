@@ -81,18 +81,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public final class DartAnalysisServerService implements Disposable {
-  public static final String MIN_SDK_VERSION = "1.12";
-  private static final String MIN_MOVE_FILE_SDK_VERSION = "2.3.2";
+  public static final String MIN_SDK_VERSION = "2.12";
   private static final String COMPLETION_2_SERVER_VERSION = "1.33";
-
-  // Webdev works going back to 2.6.0, future minimum version listed in the pubspec.yaml, link below, won't mean that 2.6.0 aren't
-  // supported.
-  // https://github.com/dart-lang/webdev/blob/master/webdev/pubspec.yaml#L11
-  public static final String MIN_WEBDEV_SDK_VERSION = "2.6.0";
-
-  // As of the Dart SDK version 2.8.0, the file .dart_tool/package_config.json is preferred over the .packages file.
-  // https://github.com/dart-lang/sdk/issues/48272
-  public static final String MIN_PACKAGE_CONFIG_JSON_SDK_VERSION = "2.8.0";
 
   // The dart cli command provides a language server command, `dart language-server`, which
   // should be used going forward instead of `dart .../analysis_server.dart.snapshot`.
@@ -486,18 +476,6 @@ public final class DartAnalysisServerService implements Disposable {
 
   public static boolean isDartSdkVersionSufficient(final @NotNull DartSdk sdk) {
     return StringUtil.compareVersionNumbers(sdk.getVersion(), MIN_SDK_VERSION) >= 0;
-  }
-
-  public static boolean isDartSdkVersionSufficientForMoveFileRefactoring(final @NotNull DartSdk sdk) {
-    return StringUtil.compareVersionNumbers(sdk.getVersion(), MIN_MOVE_FILE_SDK_VERSION) >= 0;
-  }
-
-  public static boolean isDartSdkVersionSufficientForWebdev(final @NotNull DartSdk sdk) {
-    return StringUtil.compareVersionNumbers(sdk.getVersion(), MIN_WEBDEV_SDK_VERSION) >= 0;
-  }
-
-  public static boolean isDartSdkVersionSufficientForPackageConfigJson(final @NotNull DartSdk sdk) {
-    return StringUtil.compareVersionNumbers(sdk.getVersion(), MIN_PACKAGE_CONFIG_JSON_SDK_VERSION) >= 0;
   }
 
   public static boolean isDartSdkVersionSufficientForDartLangServer(final @NotNull DartSdk sdk) {
@@ -1239,10 +1217,6 @@ public final class DartAnalysisServerService implements Disposable {
       return null;
     }
 
-    if (StringUtil.compareVersionNumbers(mySdkVersion, "1.25") < 0) {
-      return PostfixTemplateDescriptor.EMPTY_ARRAY;
-    }
-
     final Ref<PostfixTemplateDescriptor[]> resultRef = Ref.create();
     final CountDownLatch latch = new CountDownLatch(1);
     server.edit_listPostfixCompletionTemplates(new ListPostfixCompletionTemplatesConsumer() {
@@ -1730,7 +1704,7 @@ public final class DartAnalysisServerService implements Disposable {
                                                                        final int _selectionOffset,
                                                                        final int _selectionLength) {
     final AnalysisServer server = myServer;
-    if (server == null || StringUtil.compareVersionNumbers(mySdkVersion, "1.25") < 0) {
+    if (server == null) {
       return null;
     }
 
@@ -1769,7 +1743,7 @@ public final class DartAnalysisServerService implements Disposable {
                                                       final @NotNull List<ImportedElements> importedElements,
                                                       final int _offset) {
     final AnalysisServer server = myServer;
-    if (server == null || StringUtil.compareVersionNumbers(mySdkVersion, "1.25") < 0) {
+    if (server == null) {
       return null;
     }
 
@@ -1934,12 +1908,8 @@ public final class DartAnalysisServerService implements Disposable {
       subscriptions.put(AnalysisService.NAVIGATION, myVisibleFileUris);
       subscriptions.put(AnalysisService.OVERRIDES, myVisibleFileUris);
       subscriptions.put(AnalysisService.OUTLINE, myVisibleFileUris);
-      if (StringUtil.compareVersionNumbers(mySdkVersion, "1.13") >= 0) {
-        subscriptions.put(AnalysisService.IMPLEMENTED, myVisibleFileUris);
-      }
-      if (StringUtil.compareVersionNumbers(mySdkVersion, "1.25.0") >= 0) {
-        subscriptions.put(AnalysisService.CLOSING_LABELS, myVisibleFileUris);
-      }
+      subscriptions.put(AnalysisService.IMPLEMENTED, myVisibleFileUris);
+      subscriptions.put(AnalysisService.CLOSING_LABELS, myVisibleFileUris);
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("analysis_setSubscriptions, subscriptions:\n" + subscriptions);
@@ -2187,15 +2157,7 @@ public final class DartAnalysisServerService implements Disposable {
         vmArgsRaw = "";
       }
 
-      @NonNls String serverArgsRaw;
-      if (useDartLangServerCall) {
-        serverArgsRaw = "--protocol=analyzer";
-      }
-      else {
-        // Note that as of Dart 2.12.0 the '--useAnalysisHighlight2' flag is ignored (and is the
-        // default highlighting mode). We still want to pass it in for earlier SDKs.
-        serverArgsRaw = "--useAnalysisHighlight2";
-      }
+      String serverArgsRaw = useDartLangServerCall ? "--protocol=analyzer" : "";
 
       try {
         serverArgsRaw += " " + Registry.stringValue("dart.server.additional.arguments");

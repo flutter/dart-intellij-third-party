@@ -140,15 +140,34 @@ public class DartWorkflowTest extends DartCodeInsightFixtureTestCase {
       name: NestedProject
       dependencies:
         RootProject:
-          path: ../""").getVirtualFile();
+          path: ../
+        SomePackage: any""").getVirtualFile();
     myFixture.addFileToProject("example/lib/src/nestedlib.dart", "");
     myFixture.addFileToProject("example/packages/NestedProject/nestedlib.dart", "");
     myFixture.addFileToProject("example/packages/RootProject/rootlib.dart", "");
     myFixture.addFileToProject("pub/global/cache/SomePackage/lib/somepack.dart", "");
-    myFixture.saveText(myFixture.addFileToProject("example/.packages", "").getVirtualFile(),
-                       "RootProject:../lib/\n" +
-                       "NestedProject:lib/\n" +
-                       "SomePackage:" + rootUrl + "/pub/global/cache/SomePackage/lib/");
+    myFixture.saveText(myFixture.addFileToProject("example/.dart_tool/package_config.json", "").getVirtualFile(),
+        String.format("""
+            {
+              "configVersion": 2,
+              "packages": [
+                {
+                  "name": "SomePackage",
+                  "rootUri": "%s",
+                  "packageUri": "lib/"
+                },
+                {
+                  "name": "RootProject",
+                  "rootUri": "../../",
+                  "packageUri": "lib/"
+                },
+                {
+                  "name": "NestedProject",
+                  "rootUri": "../",
+                  "packageUri": "lib/"
+                }
+              ]
+            }""", rootUrl + "/pub/global/cache/SomePackage"));
 
     DartUrlResolver resolver = DartUrlResolver.getInstance(getProject(), nestedPubspec);
     VirtualFile file;

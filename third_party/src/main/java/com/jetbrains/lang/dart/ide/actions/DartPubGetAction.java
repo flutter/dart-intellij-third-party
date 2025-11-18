@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class DartPubGetAction extends DartPubActionBase {
   @Override
-  protected @NotNull @NlsContexts.DialogTitle String getTitle(final @NotNull Project project, final @NotNull VirtualFile pubspecYamlFile) {
+  protected @NotNull @NlsContexts.DialogTitle String getTitle(final @NotNull VirtualFile pubspecYamlFile) {
     final String projectName = PubspecYamlUtil.getDartProjectName(pubspecYamlFile);
     final String prefix = projectName == null ? "" : ("[" + projectName + "] ");
     return prefix + DartBundle.message("dart.pub.get.title");

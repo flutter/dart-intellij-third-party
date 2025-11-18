@@ -1,3 +1,9 @@
+## 501.0.0
+
+### Removed
+
+- Dropped support for Dart SDK versions older than 2.12.
+
 ## 500.0.0
 
 ### Added
