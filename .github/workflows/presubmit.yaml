@@ -143,3 +143,27 @@ jobs:
           name: gradle-test-report-${{ matrix.dart-version }}-${{ matrix.os }}
           path: third_party/build/reports/tests/test/index.html
           retention-days: 7
+  # Job 6: Upload Test Report       
+  upload-problems:
+    needs: dart-analysis-server-tests
+    strategy:
+      matrix:
+        # https://github.com/dart-lang/setup-dart
+        # Define the Dart SDK versions to test against.
+        # 'stable' and 'beta' will fetch the latest respective versions.
+        # You can also specify exact versions like '3.0.0', '3.8.1'.
+        # dart-version: ['3.0.0', 'stable', 'beta', 'dev' ]
+
+        # TODO(https://github.com/flutter/dart-intellij-third-party/issues/47)
+        # Fix tests to run over additional operating systems as well as Dart SDK versions:
+        dart-version: ['stable']
+        os: [ macos-latest ]
+    runs-on: ${{ matrix.os }} # Use the OS from the matrix
+    steps:
+      - name: Upload Problem Report Artifact
+        uses: actions/upload-artifact@v4
+        if: always() # IMPORTANT: Upload reports even if the tests fail
+        with:
+          name: gradle-problem-report-${{ matrix.dart-version }}-${{ matrix.os }}
+          path: third_party/build/reports/problems/problems-report.html
+          retention-days: 7
