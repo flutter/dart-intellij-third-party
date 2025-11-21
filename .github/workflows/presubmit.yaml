@@ -141,5 +141,5 @@ jobs:
         if: always() # IMPORTANT: Upload reports even if the tests fail
         with:
           name: gradle-test-report-${{ matrix.dart-version }}-${{ matrix.os }}
-          path: third_party/build/reports/tests/test
+          path: third_party/build/reports/tests/test/index.html
           retention-days: 7
