@@ -273,6 +273,8 @@ public class DartServerHighlightingTest extends CodeInsightFixtureTestCase {
 
     getEditor().getCaretModel().moveToOffset(0);
     myFixture.type("foo \b");
+    myFixture.doHighlighting();
+
     // Disable for pre-3.7.0 Dart SDK versions:
     if(StringUtil.compareVersionNumbers(service.getSdkVersion(), "3.7.0") >= 0) {
       checkRegions(regions, ContainerUtil.map2Array(ranges, TextRange.class, range -> range.shiftRight(3)));
