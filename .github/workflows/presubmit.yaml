@@ -120,7 +120,7 @@ jobs:
           ./gradlew verifyPluginStructure
         working-directory: third_party
   # Job 5: Upload Test Report       
-  upload-report:
+  upload-test-report:
     needs: dart-analysis-server-tests
     strategy:
       matrix:
@@ -141,7 +141,7 @@ jobs:
         if: always() # IMPORTANT: Upload reports even if the tests fail
         with:
           name: gradle-test-report-${{ matrix.dart-version }}-${{ matrix.os }}
-          path: third_party/build/reports/tests/test/index.html
+          path: Users/runner/work/dart-intellij-third-party/dart-intellij-third-party/third_party/build/reports/tests/test/index.html
           retention-days: 7
   # Job 6: Upload Test Report       
   upload-problems:
@@ -165,5 +165,5 @@ jobs:
         if: always() # IMPORTANT: Upload reports even if the tests fail
         with:
           name: gradle-problem-report-${{ matrix.dart-version }}-${{ matrix.os }}
-          path: third_party/build/reports/problems/problems-report.html
+          path: ///Users/runner/work/dart-intellij-third-party/dart-intellij-third-party/third_party/build/reports/problems/problems-report.html
           retention-days: 7
