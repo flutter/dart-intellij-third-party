@@ -139,5 +139,5 @@ jobs:
         with:
          name: build
          path: |
-           **/build/reports/
-           **/build/test-results/
+           ${{ github.workspace }}/build/reports/
+           ${{ github.workspace }}/build/test-results/
