@@ -99,8 +99,8 @@ jobs:
         with:
          name: build
          path: |
-           ${{ github.workspace }}/build/reports/
-           ${{ github.workspace }}/build/test-results/   
+           **/build/reports/
+           **/build/test-results/
   # Job 4: Verify Plugin
   verify-plugin:
     needs: build-plugin
@@ -132,4 +132,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pluginVerifier-results
-          path: ${{ github.workspace }}/build/reports/pluginVerifier
+          path: build/reports/pluginVerifier
