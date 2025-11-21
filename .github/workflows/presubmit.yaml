@@ -118,6 +118,13 @@ jobs:
           ./gradlew verifyPluginSignature
           ./gradlew verifyPluginStructure
         working-directory: third_party
+      # Collect Plugin Verifier Results
+      - name: Collect Plugin Verifier Results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pluginVerifier-results
+          path: ${{ github.workspace }}/build/reports/pluginVerifier
   # Job 5: Upload Build artifacts   
   upload-artifacts:
     needs: dart-analysis-server-tests
