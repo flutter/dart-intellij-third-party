@@ -27,7 +27,6 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,30 +39,21 @@ public final class DartSdkUtil {
 
   public static @Nullable @NlsSafe String getSdkVersion(final @NotNull String sdkHomePath) {
     final File versionFile = new File(sdkHomePath + "/version");
-    if (versionFile.isFile()) {
-      final String cachedVersion = ourVersions.get(Pair.create(versionFile, versionFile.lastModified()));
-      if (cachedVersion != null) return cachedVersion;
+    if (!versionFile.isFile()) {
+      return null;
     }
 
-    final String version = readVersionFile(sdkHomePath);
+    final Pair<File, Long> versionPair = Pair.create(versionFile, versionFile.lastModified());
+    final String cachedVersion = ourVersions.get(versionPair);
+    if (cachedVersion != null) {
+      return cachedVersion;
+    }
+
+    final String version = FileUtil.loadFileOrNull(versionFile);
     if (version != null) {
-      ourVersions.put(Pair.create(versionFile, versionFile.lastModified()), version);
-      return version;
+      return ourVersions.put(versionPair, version);
     }
 
-    return null;
-  }
-
-  private static String readVersionFile(final String sdkHomePath) {
-    final File versionFile = new File(sdkHomePath + "/version");
-    if (versionFile.isFile() && versionFile.length() < 100) {
-      try {
-        return FileUtil.loadFile(versionFile).trim();
-      }
-      catch (IOException e) {
-        /* ignore */
-      }
-    }
     return null;
   }
 
