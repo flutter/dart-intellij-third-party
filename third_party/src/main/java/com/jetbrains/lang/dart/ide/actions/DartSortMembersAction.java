@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.actions;
 
-import com.google.common.collect.Maps;
 import com.intellij.CommonBundle;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ex.ApplicationManagerEx;
@@ -26,6 +25,7 @@ import org.dartlang.analysis.server.protocol.SourceFileEdit;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -88,7 +88,7 @@ public class DartSortMembersAction extends AbstractDartFileProcessingAction {
       return;
     }
 
-    final Map<VirtualFile, SourceFileEdit> fileToFileEditMap = Maps.newHashMap();
+    final Map<VirtualFile, SourceFileEdit> fileToFileEditMap = new HashMap<>();
 
     final Runnable runnable = () -> {
       double fraction = 0.0;
