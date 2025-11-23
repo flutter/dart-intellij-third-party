@@ -1,6 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.sdk;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.notification.NotificationType;
@@ -16,7 +18,6 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.json.JSONObject;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -155,8 +156,9 @@ public final class DartSdkUpdateChecker {
       //   "version"  : "1.11.0-dev.3.0",
       //   "revision" : "6072062d4185614c32bf96c3ba833dcc18ab4348" }
       final String versionFileContents = HttpRequests.request(updateCheckUrl).readString(null);
-      final String version = new JSONObject(versionFileContents).optString("version", null);
-      if (version != null) {
+      final JsonObject versionObject = JsonParser.parseString(versionFileContents).getAsJsonObject();
+      if (versionObject.has("version")) {
+        final String version = versionObject.get("version").getAsString();
         return new SdkUpdateInfo(sdkDownloadUrl, version);
       }
     }
