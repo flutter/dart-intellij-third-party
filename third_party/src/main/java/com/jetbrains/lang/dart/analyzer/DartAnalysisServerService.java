@@ -2,7 +2,6 @@
 package com.jetbrains.lang.dart.analyzer;
 
 import com.google.common.collect.EvictingQueue;
-import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.dart.server.*;
 import com.google.dart.server.generated.AnalysisServer;
@@ -512,7 +511,7 @@ public final class DartAnalysisServerService implements Disposable {
             consumer.consumeCompletionSuggestion(convertedReplacementOffset, completionInfo.myReplacementLength, completion);
           }
 
-          final Set<String> includedKinds = Sets.newHashSet(completionInfo.myIncludedElementKinds);
+          final Set<String> includedKinds = new HashSet<>(completionInfo.myIncludedElementKinds);
           final Map<String, IncludedSuggestionRelevanceTag> includedRelevanceTags = new HashMap<>();
           for (IncludedSuggestionRelevanceTag includedRelevanceTag : completionInfo.myIncludedSuggestionRelevanceTags) {
             includedRelevanceTags.put(includedRelevanceTag.getTag(), includedRelevanceTag);

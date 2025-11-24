@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.refactoring;
 
-import com.google.common.collect.ImmutableList;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -18,7 +17,7 @@ import java.util.List;
  */
 public class ServerExtractMethodRefactoring extends ServerRefactoring {
   private final ExtractMethodOptions options =
-    new ExtractMethodOptions("returnType", false, "name", ImmutableList.of(), false);
+    new ExtractMethodOptions("returnType", false, "name", List.of(), false);
   private ExtractMethodFeedback feedback;
 
   public ServerExtractMethodRefactoring(final @NotNull Project project,

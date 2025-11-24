@@ -1,6 +1,10 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.projectWizard;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.CapturingProcessHandler;
@@ -13,9 +17,6 @@ import com.jetbrains.lang.dart.sdk.DartSdkUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -85,22 +86,22 @@ public class Stagehand {
       }
 
       // [{"name":"consoleapp", "label":"Console App", "description":"A minimal command-line application."}, {"name": ..., }]
-      JSONArray arr = new JSONArray(output.getStdout());
-      List<StagehandDescriptor> result = new ArrayList<>();
-
-      for (int i = 0; i < arr.length(); i++) {
-        JSONObject obj = arr.getJSONObject(i);
+      final JsonArray templatesArray = JsonParser.parseString(output.getStdout()).getAsJsonArray();
+      final List<StagehandDescriptor> result = new ArrayList<>();
+      for (final JsonElement templateElement : templatesArray) {
+        final JsonObject templateObject = templateElement.getAsJsonObject();
 
         result.add(new StagehandDescriptor(
-          obj.getString("name"),
-          obj.getString("label"),
-          obj.getString("description"),
-          obj.optString("entrypoint")));
+            templateObject.get("name").getAsString(),
+            templateObject.get("label").getAsString(),
+            templateObject.get("description").getAsString(),
+            templateObject.has("entrypoint") ?
+                templateObject.get("entrypoint").getAsString() : null));
       }
 
       return result;
     }
-    catch (ExecutionException | JSONException e) {
+    catch (Exception e) {
       LOG.info(e);
     }
 

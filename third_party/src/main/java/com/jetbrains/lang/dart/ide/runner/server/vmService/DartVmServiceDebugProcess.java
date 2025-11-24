@@ -1,7 +1,6 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.lang.dart.ide.runner.server.vmService;
 
-import com.google.common.base.Charsets;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.ExecutionResult;
 import com.intellij.execution.process.ProcessEvent;
@@ -61,6 +60,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -524,7 +524,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
   }
 
   public void handleWriteEvent(String base64Data) {
-    String message = new String(Base64.getDecoder().decode(base64Data), Charsets.UTF_8);
+    String message = new String(Base64.getDecoder().decode(base64Data), StandardCharsets.UTF_8);
     getSession().getConsoleView().print(message, ConsoleViewContentType.NORMAL_OUTPUT);
   }
 
