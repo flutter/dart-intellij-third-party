@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.assists;
 
-import com.google.common.collect.Maps;
 import com.intellij.codeInsight.FileModificationService;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.codeInsight.lookup.LookupElementBuilder;
@@ -153,7 +152,7 @@ public final class AssistUtils {
                                                                                   final @NotNull Set<String> excludedIds)
     throws DartSourceEditException {
 
-    final Map<VirtualFile, SourceFileEdit> map = Maps.newHashMap();
+    final Map<VirtualFile, SourceFileEdit> map = new HashMap<>();
     final List<SourceFileEdit> fileEdits = sourceChange.getEdits();
     for (SourceFileEdit fileEdit : fileEdits) {
       boolean allEditsExcluded = true;

@@ -160,11 +160,10 @@ public final class DartQuickFix implements IntentionAction, Comparable<Intention
       return false;
     }
 
-    for (SourceFileEdit fileEdit : fileEdits) {
-      final VirtualFile virtualFile = AssistUtils.findVirtualFile(project, fileEdit);
-      final ProjectFileIndex fileIndex = ProjectRootManager.getInstance(project).getFileIndex();
-
+    final ProjectFileIndex fileIndex = ProjectRootManager.getInstance(project).getFileIndex();
+    for (final SourceFileEdit fileEdit : fileEdits) {
       if (fileEdit.getFileStamp() != -1) {
+        final VirtualFile virtualFile = AssistUtils.findVirtualFile(project, fileEdit);
         if (virtualFile == null || !fileIndex.isInContent(virtualFile)) return false;
       }
     }

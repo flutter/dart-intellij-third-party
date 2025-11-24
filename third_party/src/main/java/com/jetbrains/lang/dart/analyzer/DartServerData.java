@@ -1,7 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.analyzer;
 
-import com.google.common.collect.Sets;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.codeInsight.hints.declarative.impl.DeclarativeInlayHintsPassFactory;
 import com.intellij.openapi.application.ApplicationManager;
@@ -24,6 +23,7 @@ import org.dartlang.analysis.server.protocol.*;
 import org.jetbrains.annotations.*;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class DartServerData {
   public interface OutlineListener extends EventListener {
@@ -46,10 +46,10 @@ public final class DartServerData {
   private final Map<Integer, AvailableSuggestionSet> myAvailableSuggestionSetMap = Collections.synchronizedMap(new HashMap<>());
   private final Map<String, Map<String, Map<String, Set<String>>>> myExistingImports = Collections.synchronizedMap(new HashMap<>());
 
-  private final Set<DartLocalFileInfo> myLocalFilesWithUnsentChanges = Sets.newConcurrentHashSet();
+  private final Set<DartLocalFileInfo> myLocalFilesWithUnsentChanges = ConcurrentHashMap.newKeySet();
 
   // keeps track of files in which error regions have been updated by DocumentListener
-  private final Set<DartLocalFileInfo> myLocalFilesWithOutdatedErrorInfo = Sets.newConcurrentHashSet();
+  private final Set<DartLocalFileInfo> myLocalFilesWithOutdatedErrorInfo =  ConcurrentHashMap.newKeySet();
 
   private final Map<String, LightVirtualFile> myNotLocalFileUriToVirtualFileMap = Collections.synchronizedMap(new HashMap<>());
 
