@@ -81,6 +81,9 @@ import java.util.concurrent.TimeUnit;
 
 public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_SDK_VERSION = "2.12";
+
+  // This refers to the Analysis Server API version (from `getVersion`),
+  // not a Dart SDK version.
   private static final String COMPLETION_2_SERVER_VERSION = "1.33";
 
   // The dart cli command provides a language server command, `dart language-server`, which
