@@ -31,11 +31,6 @@ private class PubServerPathHandler : WebServerPathHandler {
     authHeaders: HttpHeaders,
     isCustomHost: Boolean,
   ): Boolean {
-    val sdk = DartSdk.getDartSdk(project)
-    if (sdk == null || StringUtil.compareVersionNumbers(sdk.version, "1.6") < 0) {
-      return false
-    }
-
     val servedDirAndPathForPubServer = getServedDirAndPathForPubServer(project, path) ?: return false
     PubServerManager.getInstance(project).send(context.channel(), request, authHeaders, servedDirAndPathForPubServer.first,
                                                servedDirAndPathForPubServer.second)
