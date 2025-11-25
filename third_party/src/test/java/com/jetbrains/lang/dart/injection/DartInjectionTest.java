@@ -10,6 +10,11 @@ import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assume;
 
+/**
+ * Test the Dart language injection functionality.
+ * <p>
+ * This class tests the Dart language injection functionality, which is used to inject other languages, such as HTML, into Dart string literals.
+ */
 public class DartInjectionTest extends LightPlatformCodeInsightTestCase {
   @NotNull
   @Override

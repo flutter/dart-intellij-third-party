@@ -4,6 +4,11 @@ package com.jetbrains.lang.dart.ide.testIntegration;
 import com.intellij.psi.PsiFile;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 
+/**
+ * Test the Dart test finder.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.ide.testIntegration.DartTestFinder} class, which is responsible for finding tests and test subjects.
+ */
 public class DartTestFinderTest extends DartCodeInsightFixtureTestCase {
 
   public void testIsTest() {

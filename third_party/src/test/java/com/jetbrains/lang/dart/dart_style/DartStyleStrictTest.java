@@ -5,7 +5,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Run the dart_style test suite.
+ * Run the dart_style test suite in strict mode.
+ * <p>
+ * This test class runs the dart_style test suite using the original source code as input.
+ * It is used to ensure that the Dart code formatter in the IDE is consistent with the official Dart code formatter.
  */
 public class DartStyleStrictTest extends DartStyleTest {
 

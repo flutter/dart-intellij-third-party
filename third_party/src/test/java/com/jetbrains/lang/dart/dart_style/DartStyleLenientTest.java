@@ -4,9 +4,10 @@ package com.jetbrains.lang.dart.dart_style;
 import java.util.HashSet;
 
 /**
- * Run the dart_style test suite using the expected output as the input.
- * This quickly identifies those areas that the formatter changes
- * properly formatted code into improperly formatted code.
+ * Run the dart_style test suite in lenient mode.
+ * <p>
+ * This test class runs the dart_style test suite using the expected output as the input.
+ * It is used to quickly identify cases where the formatter changes properly formatted code into improperly formatted code.
  */
 public class DartStyleLenientTest extends DartStyleTest {
   /**

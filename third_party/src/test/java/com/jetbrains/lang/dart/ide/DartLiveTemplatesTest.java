@@ -15,6 +15,11 @@ import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
+/**
+ * Test the Dart live templates.
+ * <p>
+ * This class tests the Dart live templates, which are used to insert common code snippets into the editor.
+ */
 public class DartLiveTemplatesTest extends BasePlatformTestCase {
   @Override
   protected String getTestDataPath() {

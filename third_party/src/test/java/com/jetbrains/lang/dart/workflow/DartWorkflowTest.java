@@ -12,6 +12,11 @@ import com.jetbrains.lang.dart.DartStartupActivityKt;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
 
+/**
+ * Test the Dart workflow.
+ * <p>
+ * This class tests the Dart workflow, such as the exclusion of special folders and the Dart URL resolver.
+ */
 public class DartWorkflowTest extends DartCodeInsightFixtureTestCase {
   @Override
   protected void tearDown() throws Exception {

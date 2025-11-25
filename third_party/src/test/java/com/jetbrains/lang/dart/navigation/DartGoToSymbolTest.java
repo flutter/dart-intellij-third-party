@@ -10,6 +10,11 @@ import com.jetbrains.lang.dart.ide.DartSymbolContributor;
 import java.util.ArrayList;
 import java.util.Collection;
 
+/**
+ * Test the Dart "go to symbol" functionality.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.ide.DartSymbolContributor} class, which is responsible for providing the symbols that are displayed in the "go to symbol" list.
+ */
 public class DartGoToSymbolTest extends DartCodeInsightFixtureTestCase {
 
   private void assertNamesFound(ChooseByNameContributor contributor, String... names) {

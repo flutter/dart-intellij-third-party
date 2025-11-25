@@ -17,7 +17,21 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Define the dart_style test suite.
+ * The base class for the dart_style test suite.
+ * <p>
+ * This class provides the core testing infrastructure for the dart_style code formatter.
+ * It includes a list of known-to-fail tests that are not expected to pass in any mode.
+ * <p>
+ * Subclasses should override the {@code runTestInDirectory} and {@code extractSourceSelection} methods
+ * to provide the specific behavior for their test mode.
+ * <p>
+ * This test suite is based on the dart_style test suite from the Dart SDK.
+ * see: https://github.com/dart-lang/dart_style/tree/master/test
+ * <p>
+ * It is used to ensure that the Dart code formatter in the IDE is consistent with the official Dart code formatter.
+ *
+ * @see DartStyleStrictTest
+ * @see DartStyleLenientTest
  */
 public abstract class DartStyleTest extends FormatterTestCase {
 

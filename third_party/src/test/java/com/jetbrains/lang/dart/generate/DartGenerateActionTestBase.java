@@ -4,6 +4,11 @@ import com.intellij.testFramework.LightPlatformCodeInsightTestCase;
 import com.jetbrains.lang.dart.ide.generation.*;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * The base class for the Dart code generation tests.
+ * <p>
+ * This class provides the core testing infrastructure for the Dart code generation actions.
+ */
 abstract public class DartGenerateActionTestBase extends LightPlatformCodeInsightTestCase {
   protected void doOverrideTest() {
     doTest(new DartOverrideMethodHandler());

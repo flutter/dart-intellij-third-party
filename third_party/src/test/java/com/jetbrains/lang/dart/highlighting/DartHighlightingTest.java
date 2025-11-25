@@ -12,6 +12,11 @@ import com.jetbrains.lang.dart.util.DartResolveUtil;
 
 import java.util.function.Consumer;
 
+/**
+ * Test the Dart code highlighting functionality.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.highlighting.DartSyntaxHighlighter} class, which is responsible for providing syntax highlighting for Dart code.
+ */
 public class DartHighlightingTest extends DartCodeInsightFixtureTestCase {
   @Override
   protected String getBasePath() {

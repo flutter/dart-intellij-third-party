@@ -15,6 +15,11 @@ import com.jetbrains.lang.dart.DartLanguage;
 import org.jetbrains.annotations.NotNull;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
+/**
+ * Test the Dart typing functionality.
+ * <p>
+ * This class tests the Dart typing functionality, which is used to provide auto-completion and other typing assistance in the editor.
+ */
 public class DartTypingTest extends DartCodeInsightFixtureTestCase {
   @Override
   protected String getBasePath() {

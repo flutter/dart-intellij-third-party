@@ -8,6 +8,11 @@ import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Test the Dart code folding functionality.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.folding.DartFoldingBuilder} class, which is responsible for providing code folding regions for Dart code.
+ */
 public class DartFoldingTest extends DartCodeInsightFixtureTestCase {
 
   private void doTest() {

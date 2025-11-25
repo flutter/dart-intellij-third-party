@@ -7,6 +7,11 @@ import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.DartLanguage;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
+/**
+ * Test the Dart code formatter.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.formatter.DartFormattingModelBuilder} class, which is responsible for formatting Dart code.
+ */
 public class DartFormatterTest extends FormatterTestCase {
 
   @Override

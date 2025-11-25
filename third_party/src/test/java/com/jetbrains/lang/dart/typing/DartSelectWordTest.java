@@ -7,6 +7,11 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import org.jetbrains.annotations.NotNull;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
+/**
+ * Test the Dart word selection functionality.
+ * <p>
+ * This class tests the Dart word selection functionality, which is used to select words and blocks of code in the editor.
+ */
 public class DartSelectWordTest extends BasePlatformTestCase {
 
     // Added setUp to make sure the files that the test needs are available during tests

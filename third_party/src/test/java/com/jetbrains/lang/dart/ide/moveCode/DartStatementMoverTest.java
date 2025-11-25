@@ -1,6 +1,11 @@
 // Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.lang.dart.ide.moveCode;
 
+/**
+ * Test the Dart statement mover.
+ * <p>
+ * This class tests the {@link com.intellij.codeInsight.editorActions.moveUpDown.StatementUpDownMover} class for Dart, which is responsible for moving Dart statements, such as if statements, for loops, and while loops.
+ */
 public class DartStatementMoverTest extends DartCodeMoverTest {
 
   @Override

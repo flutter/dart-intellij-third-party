@@ -5,6 +5,11 @@ import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
+/**
+ * The base class for the Dart code mover tests.
+ * <p>
+ * This class provides the core testing infrastructure for the Dart code mover actions.
+ */
 abstract public class DartCodeMoverTest extends DartCodeInsightFixtureTestCase {
 
   // Added setUp to make sure the files that the test needs are available during tests

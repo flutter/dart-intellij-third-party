@@ -4,6 +4,11 @@ package com.jetbrains.lang.dart.markers;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzerSettings;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 
+/**
+ * Test the Dart method separators.
+ * <p>
+ * This class tests the Dart method separators, which are the lines that are drawn between methods in the editor.
+ */
 public class DartMethodSeparatorsTest extends BasePlatformTestCase {
 
   protected void doTest(String fileText) {

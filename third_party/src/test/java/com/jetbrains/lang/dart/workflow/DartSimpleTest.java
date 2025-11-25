@@ -9,6 +9,11 @@ import com.jetbrains.lang.dart.util.DartPsiImplUtil;
 import junit.framework.TestCase;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Test simple Dart functionality.
+ * <p>
+ * This class tests simple Dart functionality, such as unquoting strings and parsing debugger error text.
+ */
 public class DartSimpleTest extends TestCase {
   private static void doTestUnquoteDartString(@NotNull final String inputString,
                                               @NotNull final String expectedUnquoted,

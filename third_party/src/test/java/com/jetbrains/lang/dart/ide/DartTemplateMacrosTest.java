@@ -12,6 +12,11 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Test the Dart template macros.
+ * <p>
+ * This class tests the Dart template macros, which are used to insert dynamic information into live templates, such as the current class name or the current method name.
+ */
 public class DartTemplateMacrosTest extends DartCodeInsightFixtureTestCase {
 
   @NotNull

@@ -6,6 +6,11 @@ import com.intellij.openapi.command.CommandProcessor;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.ide.annotator.DartProblemGroup;
 
+/**
+ * Test the Dart "suppress" functionality.
+ * <p>
+ * This class tests the Dart "suppress" functionality, which is used to suppress warnings and errors in the editor.
+ */
 public class DartSuppressTest extends DartCodeInsightFixtureTestCase {
 
   private boolean isSuppressActionAvailable(final boolean eolComment) {

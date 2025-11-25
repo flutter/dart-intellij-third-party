@@ -10,6 +10,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
+/**
+ * Test the Dart test location provider.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.ide.runner.util.DartTestLocationProvider} class, which is responsible for providing the location of a test from a location hint.
+ */
 public class DartTestLocationProviderTest extends DartCodeInsightFixtureTestCase {
 
   private void doTest(@NotNull final String locationHint, @NotNull final String fileContents) {

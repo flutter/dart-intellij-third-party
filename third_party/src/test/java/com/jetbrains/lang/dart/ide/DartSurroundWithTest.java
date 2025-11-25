@@ -11,6 +11,11 @@ import com.jetbrains.lang.dart.ide.surroundWith.statement.*;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Test the Dart "surround with" functionality.
+ * <p>
+ * This class tests the Dart "surround with" functionality, which is used to surround a block of code with a template, such as an if statement or a try/catch block.
+ */
 public class DartSurroundWithTest extends LightPlatformCodeInsightTestCase {
   @NotNull
   @Override

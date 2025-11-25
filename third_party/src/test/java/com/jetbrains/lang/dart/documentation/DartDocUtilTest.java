@@ -9,6 +9,11 @@ import com.jetbrains.lang.dart.psi.DartComponent;
 
 import static com.jetbrains.lang.dart.util.DartPresentableUtil.RIGHT_ARROW;
 
+/**
+ * Test the generation of Dart documentation from source code.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.ide.documentation.DartDocUtil} class, which is responsible for generating the documentation that is displayed in the IDE.
+ */
 public class DartDocUtilTest extends DartCodeInsightFixtureTestCase {
 
   private void doTest(String expectedDoc, String fileContents) {

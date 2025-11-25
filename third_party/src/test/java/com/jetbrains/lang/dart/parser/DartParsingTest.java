@@ -6,6 +6,11 @@ import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.DartParserDefinition;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
+/**
+ * Test the Dart parser.
+ * <p>
+ * This class tests the Dart parser, which is responsible for parsing Dart code and building a PSI tree.
+ */
 public class DartParsingTest extends ParsingTestCase {
   public DartParsingTest() {
     super("parsing", DartFileType.DEFAULT_EXTENSION, new DartParserDefinition());

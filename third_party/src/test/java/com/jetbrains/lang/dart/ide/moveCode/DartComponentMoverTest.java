@@ -1,5 +1,10 @@
 package com.jetbrains.lang.dart.ide.moveCode;
 
+/**
+ * Test the Dart component mover.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.ide.moveCode.DartComponentMover} class, which is responsible for moving Dart components, such as classes, methods, and variables.
+ */
 public class DartComponentMoverTest extends DartCodeMoverTest {
 
   @Override

@@ -8,6 +8,11 @@ import org.jetbrains.annotations.NotNull;
 
 import static com.jetbrains.lang.dart.ide.runner.DartPositionInfo.Type;
 
+/**
+ * Test the Dart console filter.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.ide.runner.DartConsoleFilter} class, which is responsible for parsing console output and creating hyperlinks to source code.
+ */
 public class DartConsoleFilterTest extends TestCase {
 
   private static void doNegativeTest(final String text) {

@@ -4,6 +4,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
+/**
+ * Store information about a caret position.
+ * <p>
+ * This class is used to store information about a caret position in a test file, such as the expected completion list.
+ */
 public class CaretPositionInfo {
 
   public final int caretOffset;

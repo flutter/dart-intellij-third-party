@@ -6,6 +6,11 @@ import com.intellij.codeInsight.hint.ImplementationViewComponent;
 import com.intellij.psi.PsiElement;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 
+/**
+ * Test the Dart implementations view.
+ * <p>
+ * This class tests the Dart implementations view, which is used to display the implementations of a class or a method.
+ */
 public class DartImplementationsViewTest extends DartCodeInsightFixtureTestCase {
   private void doTest(String fileText, String expected) {
     myFixture.configureByText("foo.dart", fileText);

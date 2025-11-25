@@ -4,6 +4,11 @@ import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiElement;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 
+/**
+ * Test the identification of comment ranges.
+ * <p>
+ * This class tests the {@link com.jetbrains.lang.dart.ide.moveCode.DartComponentMover#findCommentRange(PsiElement)} method, which is responsible for identifying the range of a comment.
+ */
 public class DartCommentIdentifierTest extends DartCodeInsightFixtureTestCase {
 
   @Override

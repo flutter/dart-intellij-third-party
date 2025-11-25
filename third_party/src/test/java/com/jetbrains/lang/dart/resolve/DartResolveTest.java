@@ -9,6 +9,11 @@ import com.jetbrains.lang.dart.ide.runner.DartExecutionHelper;
 
 import static com.jetbrains.dart.analysisServer.DartServerResolverTest.doTest;
 
+/**
+ * Test the Dart resolve functionality.
+ * <p>
+ * This class tests the Dart resolve functionality, which is used to resolve references to Dart elements, such as classes, methods, and variables.
+ */
 public class DartResolveTest extends DartCodeInsightFixtureTestCase {
 
   public void testResolveAndUseScope() {

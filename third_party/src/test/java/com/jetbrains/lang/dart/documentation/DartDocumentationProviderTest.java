@@ -18,6 +18,11 @@ import java.util.Collections;
 
 import static com.jetbrains.lang.dart.util.DartPresentableUtil.RIGHT_ARROW;
 
+/**
+ * Test the {@link com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider} class.
+ * <p>
+ * This class is responsible for providing documentation to the IDE, such as the quick navigation info and the documentation URLs.
+ */
 public class DartDocumentationProviderTest extends DartCodeInsightFixtureTestCase {
 
   private final DartDocumentationProvider myProvider = new DartDocumentationProvider();

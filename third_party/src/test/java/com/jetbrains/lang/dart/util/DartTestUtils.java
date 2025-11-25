@@ -31,6 +31,11 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Utility methods for Dart tests.
+ * <p>
+ * This class provides utility methods for Dart tests, such as configuring the Dart SDK and extracting position markers from test files.
+ */
 public final class DartTestUtils {
 
   public static final String BASE_TEST_DATA_PATH = findTestDataPath();
