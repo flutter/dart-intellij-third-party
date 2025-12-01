@@ -182,10 +182,6 @@ class InlineMethodDialog extends InlineOptionsDialog {
     close(DialogWrapper.OK_EXIT_CODE);
   }
 
-  @Override
-  protected String getBorderTitle() {
-    return RefactoringBundle.message("inline.method.border.title"); // not used actually
-  }
 
   @Override
   protected String getInlineAllText() {
