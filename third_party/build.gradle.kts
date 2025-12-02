@@ -68,8 +68,6 @@ intellijPlatform {
                     IntelliJPlatformType.IntellijIdeaCommunity,
                     IntelliJPlatformType.IntellijIdeaUltimate,
                     IntelliJPlatformType.AndroidStudio,
-                    IntelliJPlatformType.WebStorm,
-                    IntelliJPlatformType.GoLand
                 )
                 channels = listOf(ProductRelease.Channel.RELEASE)
             }
