@@ -5,7 +5,7 @@ This plugin provides support for the [Dart programming language](https://dart.de
 ## Installing and Getting Started
 
 See the
-[plugin documentation](https://www.jetbrains.com/help/idea/dart.html)
+[plugin documentation](https://dart.dev/tools/jetbrains-plugin)
 for help to get started with Dart development and the IntelliJ IDEA plugin. 
 
 ## Reporting Issues
