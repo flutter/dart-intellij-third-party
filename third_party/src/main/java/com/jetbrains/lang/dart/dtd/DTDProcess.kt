@@ -58,7 +58,7 @@ class DTDProcess {
     EventDispatcher.create(DartToolingDaemonListener::class.java)
 
   var listener: DTDProcessListener? = null
-    set
+
   private fun connectToWebSocket(uri: String) {
     try {
       webSocket = WebSocket(URI(uri))
@@ -233,9 +233,9 @@ class DTDProcess {
 }
 
 interface DTDProcessListener {
-  fun onWebSocketMessage(text: String)
-  fun onWebSocketClose()
-  fun onWebSocketOpen()
-  fun onProcessStarted(uri: String?)
+  fun onWebSocketMessage(text: String) {}
+  fun onWebSocketClose() {}
+  fun onWebSocketOpen() {}
+  fun onProcessStarted(uri: String?) {}
 }
 
