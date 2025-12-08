@@ -16,6 +16,7 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.io.BaseOutputReader
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import java.nio.charset.StandardCharsets
@@ -101,6 +102,6 @@ class DartDevToolsService(private val myProject: Project) : Disposable {
     fun getInstance(project: Project): DartDevToolsService = project.service()
 
     private const val MIN_SDK_VERSION: String = "2.15"
-    private val logger = logger<DartDevToolsService>()
+    private val logger = PluginLogger.createLogger(DartDevToolsService::class.java)
   }
 }
