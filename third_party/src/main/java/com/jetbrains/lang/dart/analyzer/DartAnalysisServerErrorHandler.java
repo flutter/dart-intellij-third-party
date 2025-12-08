@@ -104,7 +104,7 @@ public class DartAnalysisServerErrorHandler {
 
     // version info
     final ApplicationInfo platform = ApplicationInfo.getInstance();
-    final IdeaPluginDescriptor plugin = PluginManagerCore.getPlugin(PluginId.findId("Dart"));
+    final IdeaPluginDescriptor plugin = PluginManagerCore.getPlugin(PluginId.getId("Dart"));
 
     text.println("## Version information");
     text.println("");
