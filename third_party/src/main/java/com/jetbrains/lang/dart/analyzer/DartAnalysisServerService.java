@@ -51,6 +51,8 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.URLUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartFileType;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.assists.DartQuickAssistIntention;
 import com.jetbrains.lang.dart.assists.DartQuickAssistIntentionListener;
 import com.jetbrains.lang.dart.fixes.DartQuickFix;
@@ -2100,7 +2102,7 @@ public final class DartAnalysisServerService implements Disposable {
     return resultRef.get();
   }
 
-  private void startServer(final @NotNull DartSdk sdk) {
+  private void startServer(final @NotNull DartSdk sdk, boolean suppressAnalytics) {
     if (DartPubActionBase.isInProgress()) return; // DartPubActionBase will start the server itself when finished
 
     synchronized (myLock) {
@@ -2160,6 +2162,9 @@ public final class DartAnalysisServerService implements Disposable {
       }
 
       String serverArgsRaw = useDartLangServerCall ? "--protocol=analyzer" : "";
+      if (suppressAnalytics) {
+        serverArgsRaw += " --suppress-analytics";
+      }
 
       try {
         serverArgsRaw += " " + Registry.stringValue("dart.server.additional.arguments");
@@ -2280,7 +2285,12 @@ public final class DartAnalysisServerService implements Disposable {
           !myServer.isSocketOpen()) {
         stopServer();
         DartProblemsView.getInstance(myProject).setInitialCurrentFileBeforeServerStart(getCurrentOpenFile());
-        startServer(sdk);
+
+//        AnalyticsData analyticsData = Analytics.getReportingData(sdk, myProject);
+//        startServer(sdk, analyticsData.getSuppressAnalytics());
+
+        // TODO (pq): pass in suppressAnalytics
+        startServer(sdk, false);
 
         if (myServer != null) {
           myRootsHandler.onServerStarted();
