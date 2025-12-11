@@ -45,8 +45,6 @@ import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManager
 import com.intellij.ui.content.MessageView
 import com.jetbrains.lang.dart.DartBundle
-import com.jetbrains.lang.dart.analytics.Analytics
-import com.jetbrains.lang.dart.analytics.AnalyticsData
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.excludeBuildAndToolCacheFolders
 import com.jetbrains.lang.dart.flutter.FlutterUtil
