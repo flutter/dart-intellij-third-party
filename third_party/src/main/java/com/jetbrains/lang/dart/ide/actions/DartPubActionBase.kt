@@ -84,7 +84,6 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
   override fun actionPerformed(e: AnActionEvent) {
     val (module, pubspecYamlFile) = getModuleAndPubspecYamlFile(e) ?: return
-
     performPubAction(module, pubspecYamlFile, true)
   }
 
