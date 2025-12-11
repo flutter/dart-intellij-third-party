@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.psi.impl;
 
+import com.intellij.icons.AllIcons;
 import com.intellij.lang.ASTNode;
 import com.intellij.navigation.ItemPresentation;
 import com.intellij.openapi.util.text.StringUtil;
@@ -57,19 +58,19 @@ public abstract class AbstractDartComponentImpl extends DartPsiCompositeElementI
 
     icon = doOverlays(icon);
 
-    return IconManager.getInstance().createRowIcon(icon, isPublic() ? PlatformIcons.PUBLIC_ICON : IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.Private));
+    return IconManager.getInstance().createRowIcon(icon, isPublic() ? PlatformIcons.PUBLIC_ICON : PlatformIcons.PRIVATE_ICON);
   }
 
   private Icon doOverlays(Icon icon) {
     if (isStatic() && !isGetter() && !isSetter()) {
-      icon = IconManager.getInstance().createLayered(icon, IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.StaticMark));
+      icon = IconManager.getInstance().createLayered(icon, AllIcons.Nodes.StaticMark);
     }
     if (isFinal()) {
-      icon = IconManager.getInstance().createLayered(icon, IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.FinalMark));
+      icon = AllIcons.Nodes.FinalMark;
     }
     if (isConst()) {
       //TODO: find a distinct const icon
-      icon = IconManager.getInstance().createLayered(icon, IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.FinalMark));
+      icon = AllIcons.Nodes.FinalMark;
     }
 
     return icon;

@@ -502,10 +502,10 @@ public final class DartServerCompletionContributor extends CompletionContributor
           icon = iconManager.createRowIcon(icon, AllIcons.Gutter.OverridingMethod);
         }
         else {
-          icon = iconManager.createRowIcon(icon, element.isPrivate() ? iconManager.getPlatformIcon(com.intellij.ui.PlatformIcons.Private)
+          icon = iconManager.createRowIcon(icon, element.isPrivate() ? PlatformIcons.PRIVATE_ICON
                                                                   : PlatformIcons.PUBLIC_ICON);
-          icon = applyOverlay(icon, element.isFinal(), iconManager.getPlatformIcon(com.intellij.ui.PlatformIcons.FinalMark));
-          icon = applyOverlay(icon, element.isConst(), iconManager.getPlatformIcon(com.intellij.ui.PlatformIcons.FinalMark));
+          icon = applyOverlay(icon, element.isFinal(), AllIcons.Nodes.FinalMark);
+          icon = applyOverlay(icon, element.isConst(), AllIcons.Nodes.FinalMark);
         }
 
         lookup = lookup.withIcon(icon);
