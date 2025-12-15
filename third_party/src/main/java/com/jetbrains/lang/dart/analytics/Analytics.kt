@@ -8,9 +8,9 @@ package com.jetbrains.lang.dart.analytics
 
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import com.intellij.CommonBundle
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
-import com.intellij.CommonBundle
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationInfo
@@ -19,6 +19,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
+import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.PrintingLogger
 import de.roderick.weberknecht.WebSocketException
@@ -30,7 +31,7 @@ import kotlin.time.Duration.Companion.seconds
 
 
 /// Sends logging to the console.
-private const val DEBUGGING_LOCALLY = true
+private const val DEBUGGING_LOCALLY = false
 private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 
 private val DEFAULT_RESPONSE_TIMEOUT = 1.seconds
@@ -103,7 +104,7 @@ private object UnifiedAnalytics {
     callServiceWithJsonResponse(dtdProcess, name)?.asBoolean ?: false
 }
 
-class AnalyticsData {
+class AnalyticsConfiguration {
   var shouldShowMessage: Boolean = false
     internal set
   var consentMessage: String? = null
@@ -115,21 +116,17 @@ class AnalyticsData {
     get() = shouldShowMessage || !telemetryEnabled
 }
 
-object Analytics {
-  private val logger: Logger =
-    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else Logger.getInstance(Analytics::class.java)
+private object AnalyticsConfigurationManager {
+  internal var data: AnalyticsConfiguration? = null
 
-  private var data: AnalyticsData? = null
-
-  @JvmStatic
-  fun getReportingData(sdk: DartSdk, project: Project): AnalyticsData {
-    logger.debug("Analytics.initialize")
+  fun getConfiguration(sdk: DartSdk, project: Project, logger: Logger): AnalyticsConfiguration {
+    logger.debug("Analytics.getConfiguration")
 
     data?.let { return it }
 
     // TODO (pq): capture timing info and report (if analytics are enabled)
 
-    data = AnalyticsData()
+    data = AnalyticsConfiguration()
 
     val dtdProcess = DTDProcess()
     dtdProcess.listener = object : DTDProcessListener {
@@ -169,7 +166,6 @@ object Analytics {
     return data!!
   }
 
-
   private fun scheduleConsentPromptNotification(project: Project, dtdProcess: DTDProcess) {
     ApplicationManager.getApplication().invokeLater {
       NotificationGroupManager.getInstance()
@@ -187,6 +183,184 @@ object Analytics {
           })
           notification.notify(project)
         }
+    }
+  }
+}
+
+object Analytics {
+  private val logger: Logger =
+    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else Logger.getInstance(Analytics::class.java)
+
+  private val reporter: AnalyticsReporter
+    get() = if (DEBUGGING_LOCALLY) PrintingReporter else AnalyticsReporter.forConfiguration(
+      AnalyticsConfigurationManager.data)
+
+
+  @JvmStatic
+  fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
+    AnalyticsConfigurationManager.getConfiguration(sdk, project, logger)
+
+  @JvmStatic
+  fun report(data: AnalyticsData) = data.reportTo(reporter)
+}
+
+
+class ActionData(private val id: String?, private val place: String, project: Project?) : AnalyticsData("action", project) {
+
+  init {
+    id?.let { add(AnalyticsConstants.ID, it) }
+    add(AnalyticsConstants.PLACE, place)
+  }
+
+  override fun reportTo(reporter: AnalyticsReporter) {
+    // We only report if we have an id for the event.
+    if (id == null) return
+    super.reportTo(reporter)
+  }
+}
+
+
+abstract class AnalyticsData(type: String, val project: Project? = null) {
+  val data = mutableMapOf<String, Any>()
+
+  init {
+    add(AnalyticsConstants.TYPE, type)
+  }
+
+  fun <T> add(key: DataValue<T>, value: T) = key.addTo(this, value)
+
+  internal operator fun set(key: String, value: Boolean) {
+    data[key] = value
+  }
+
+  internal operator fun set(key: String, value: Int) {
+    data[key] = value
+  }
+
+  internal operator fun set(key: String, value: String) {
+    data[key] = value
+  }
+
+  open fun reportTo(reporter: AnalyticsReporter) = reporter.process(this)
+
+  companion object {
+    @JvmStatic
+    fun forAction(action: AnAction, event: AnActionEvent): ActionData = ActionData(
+      event.actionManager.getId(action),
+      event.place,
+      event.project
+    )
+  }
+}
+
+object AnalyticsConstants {
+  /**
+   * The unique identifier for an action or event.
+   */
+  @JvmField
+  val ID = StringValue("id")
+
+  /**
+   * The UI location where an action was invoked, as provided by
+   * [com.intellij.openapi.actionSystem.PlaceProvider.getPlace] (for example, "MainMenu",
+   * "MainToolbar", "EditorPopup", "GoToAction", etc).
+   */
+  @JvmField
+  val PLACE = StringValue("place")
+
+  /**
+   * The type of the analytics event (e.g., "action", ...).
+   */
+  @JvmField
+  val TYPE = StringValue("type")
+}
+
+
+sealed class DataValue<T>(val name: String) {
+  abstract fun addTo(data: AnalyticsData, value: T)
+}
+
+class StringValue(name: String) : DataValue<String>(name) {
+  override fun addTo(data: AnalyticsData, value: String) {
+    data[name] = value
+  }
+}
+
+class IntValue(name: String) : DataValue<Int>(name) {
+  override fun addTo(data: AnalyticsData, value: Int) {
+    data[name] = value
+  }
+}
+
+class BooleanValue(name: String) : DataValue<Boolean>(name) {
+  override fun addTo(data: AnalyticsData, value: Boolean) {
+    data[name] = value
+  }
+}
+
+abstract class AnalyticsReporter {
+  internal abstract fun process(data: AnalyticsData)
+
+  companion object {
+    fun forConfiguration(config: AnalyticsConfiguration?): AnalyticsReporter  = config?.let { c ->
+      if (c.suppressAnalytics || !c.telemetryEnabled) {
+        NoOpReporter
+      } else {
+        UnifiedAnalyticsReporter
+      }
+    } ?: NoOpReporter
+  }
+}
+
+internal object PrintingReporter : AnalyticsReporter() {
+  override fun process(data: AnalyticsData) = println(data.data)
+}
+
+internal object NoOpReporter : AnalyticsReporter() {
+  override fun process(data: AnalyticsData) = Unit
+}
+
+internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
+  object UAProperty {
+    const val EVENT = "event"
+    const val EVENT_DATA = "eventData"
+    const val EVENT_NAME = "ide_event"
+    const val TOOL = "tool"
+  }
+
+  const val IDE_EVENT = "ide_event"
+
+  override fun process(data: AnalyticsData) {
+    val project = data.project ?: return
+
+    val params = JsonObject()
+    params.addProperty(UAProperty.TOOL, getToolName())
+
+    val event = JsonObject()
+    event.addProperty(UAProperty.EVENT_NAME, IDE_EVENT)
+
+    val evenData = JsonObject()
+    for (entry in data.data) {
+      when (val value = entry.value) {
+        is String -> evenData.addProperty(entry.key, value)
+        is Boolean -> evenData.addProperty(entry.key, value)
+        is Int -> evenData.addProperty(entry.key, value)
+        else -> {
+          // TODO (pq): consider logging
+        }
+      }
+    }
+    event.add(UAProperty.EVENT_DATA, evenData)
+
+    // Note: encoded as a string.
+    params.addProperty(UAProperty.EVENT, event.toString())
+
+    // TODO (pq): temporary
+    // print(params.toString())
+
+    DartToolingDaemonService.getInstance(project).sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
+      // TODO (pq): temporary
+      // print(response)
     }
   }
 }
