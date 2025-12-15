@@ -24,6 +24,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.ui.IconManager;
+import com.intellij.util.PlatformIcons;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
@@ -353,16 +354,16 @@ public final class AssistUtils {
 
   private static Icon getIcon(String suggestionKind) {
     if (LinkedEditSuggestionKind.METHOD.equals(suggestionKind)) {
-      return IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.Method);
+      return PlatformIcons.METHOD_ICON;
     }
     if (LinkedEditSuggestionKind.PARAMETER.equals(suggestionKind)) {
-      return IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.Parameter);
+      return PlatformIcons.PARAMETER_ICON;
     }
     if (LinkedEditSuggestionKind.TYPE.equals(suggestionKind)) {
-      return IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.Class);
+      return PlatformIcons.CLASS_ICON;
     }
     if (LinkedEditSuggestionKind.VARIABLE.equals(suggestionKind)) {
-      return IconManager.getInstance().getPlatformIcon(com.intellij.ui.PlatformIcons.Variable);
+      return PlatformIcons.VARIABLE_ICON;
     }
     return null;
   }
