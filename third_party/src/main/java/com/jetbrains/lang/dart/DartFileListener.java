@@ -35,6 +35,7 @@ import com.intellij.util.SmartList;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.sdk.DartPackagesLibraryProperties;
 import com.jetbrains.lang.dart.sdk.DartPackagesLibraryType;
 import com.jetbrains.lang.dart.sdk.DartSdk;
@@ -56,7 +57,7 @@ import static com.jetbrains.lang.dart.util.PubspecYamlUtil.PUBSPEC_YAML;
  * @see DartWorkspaceModelChangeListener
  */
 public final class DartFileListener implements AsyncFileListener {
-  private static final Logger LOG = Logger.getInstance(DartFileListener.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartFileListener.class);
   private static final Object DART_PACKAGE_ROOTS_UPDATE_COALESCE = new Object();
 
   @Override
