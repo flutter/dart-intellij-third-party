@@ -6,6 +6,7 @@
 package com.jetbrains.lang.dart.logging
 
 import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.diagnostic.Logger as IJLogger
 import java.io.File
 import java.io.IOException
 import java.util.logging.FileHandler
@@ -35,7 +36,7 @@ object PluginLogger {
     rootLogger.addHandler(fileHandler)
   }
 
-  fun createLogger(logClass: Class<*>): com.intellij.openapi.diagnostic.Logger {
-    return com.intellij.openapi.diagnostic.Logger.getInstance(logClass.getName())
+  fun createLogger(logClass: Class<*>): IJLogger {
+    return IJLogger.getInstance(logClass.getName())
   }
 }
