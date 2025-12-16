@@ -62,6 +62,7 @@ import com.jetbrains.lang.dart.ide.completion.DartCompletionTimerExtension;
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
 import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
@@ -125,7 +126,7 @@ public final class DartAnalysisServerService implements Disposable {
   private static final long LSP_MESSAGE_TEXT_DOCUMENT_CONTENT_TIMEOUT = TimeUnit.SECONDS.toMillis(50);
   private static final long TESTS_TIMEOUT_COEFF = 10;
 
-  private static final Logger LOG = Logger.getInstance(DartAnalysisServerService.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartAnalysisServerService.class);
 
   private static final int DEBUG_LOG_CAPACITY = 30;
   private static final int MAX_DEBUG_LOG_LINE_LENGTH = 200; // Saw one line while testing that was > 50k
