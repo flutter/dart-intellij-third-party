@@ -141,6 +141,9 @@ private object AnalyticsConfigurationManager {
 
     data = AnalyticsConfiguration()
 
+    // Return a default configuration (that suppresses analytics) when running tests.
+    if (ApplicationManager.getApplication().isUnitTestMode) return data!!
+
     val dtdProcess = DTDProcess()
     dtdProcess.listener = object : DTDProcessListener {
       override fun onProcessStarted(uri: String?) {
