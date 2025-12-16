@@ -11,6 +11,8 @@ import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.DartComponentType;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.psi.DartComponent;
 import com.jetbrains.lang.dart.psi.DartGetterDeclaration;
@@ -32,6 +34,7 @@ public abstract class BaseDartGenerateAction extends AnAction {
   public void actionPerformed(final @NotNull AnActionEvent e) {
     final Project project = e.getData(CommonDataKeys.PROJECT);
     assert project != null;
+    Analytics.report(AnalyticsData.forAction(this, e));
     final Pair<Editor, PsiFile> editorAndPsiFile = getEditorAndPsiFile(e);
     getGenerateHandler().invoke(project, editorAndPsiFile.first, editorAndPsiFile.second);
   }
