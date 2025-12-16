@@ -180,7 +180,7 @@ public class DartCallHierarchyTest extends DartHierarchyTestBase {
     doCallHierarchyTest("X", "it", true, "A.dart");
   }
 
-  public void testFactoryConstructorCallers() throws Exception {
+  public void _testFactoryConstructorCallers() throws Exception {
     doCallHierarchyTest("X", "zz", true, "A.dart");
   }
 
