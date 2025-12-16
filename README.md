@@ -13,7 +13,7 @@
    
 2. Download the latest stable [IntelliJ Ultimate](https://www.jetbrains.com/idea/buy) or [IntelliJ Community](https://www.jetbrains.com/idea/download)
 3. From the "Welcome to IntelliJ IDEA" dialog, select "Open" and then select `third_party` directory in this repository.
-4. View > Tool Windows > Gradle, and click the button "Sync All Gradle Projects"
+4. View > Tool Windows > Gradle, and click the button "Sync All Gradle Projects".
 5. The Java source code should now be compiled. To launch an IDE with this plugin, execute the following on the command line (from the `third_party` directory):
 
     ```shell
