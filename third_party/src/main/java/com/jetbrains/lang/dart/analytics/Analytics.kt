@@ -37,6 +37,15 @@ private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 private val DEFAULT_RESPONSE_TIMEOUT = 1.seconds
 
 private object UnifiedAnalytics {
+  object Property {
+    const val EVENT = "event"
+    const val EVENT_DATA = "eventData"
+    const val EVENT_NAME = "eventName"
+    const val RESULT = "result"
+    const val TOOL = "tool"
+    const val VALUE = "value"
+  }
+
   private val logger: Logger =
     if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else Logger.getInstance(UnifiedAnalytics::class.java)
 
@@ -63,9 +72,13 @@ private object UnifiedAnalytics {
   /// telemetry is enabled.
   const val TELEMETRY_ENABLED = "telemetryEnabled"
 
-  fun callServiceWithJsonResponse(dtdProcess: DTDProcess, name: String, timeout: Duration = DEFAULT_RESPONSE_TIMEOUT): JsonElement? {
+  fun callServiceWithJsonResponse(
+    dtdProcess: DTDProcess,
+    name: String,
+    timeout: Duration = DEFAULT_RESPONSE_TIMEOUT
+  ): JsonElement? {
     val params = JsonObject()
-    params.addProperty("tool", getToolName())
+    params.addProperty(Property.TOOL, getToolName())
     var value: JsonElement? = null
     try {
       val latch = CountDownLatch(1)
@@ -75,9 +88,9 @@ private object UnifiedAnalytics {
         true
       ) { response ->
         logger.debug("$SERVICE_NAME.$name.received: ")
-        val result = response["result"]
+        val result = response[Property.RESULT]
         if (result is JsonObject) {
-          value = result["value"]
+          value = result[Property.VALUE]
         }
         logger.debug("\t$response")
         latch.countDown()
@@ -134,7 +147,7 @@ private object AnalyticsConfigurationManager {
         logger.debug("DartAnalysisServerService.onProcessStarted")
 
         val params = JsonObject()
-        params.addProperty("tool", getToolName())
+        params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
         try {
           data!!.shouldShowMessage =
@@ -193,7 +206,8 @@ object Analytics {
 
   private val reporter: AnalyticsReporter
     get() = if (DEBUGGING_LOCALLY) PrintingReporter else AnalyticsReporter.forConfiguration(
-      AnalyticsConfigurationManager.data)
+      AnalyticsConfigurationManager.data
+    )
 
 
   @JvmStatic
@@ -205,7 +219,8 @@ object Analytics {
 }
 
 
-class ActionData(private val id: String?, private val place: String, project: Project?) : AnalyticsData("action", project) {
+class ActionData(private val id: String?, private val place: String, project: Project?) :
+  AnalyticsData("action", project) {
 
   init {
     id?.let { add(AnalyticsConstants.ID, it) }
@@ -218,7 +233,6 @@ class ActionData(private val id: String?, private val place: String, project: Pr
     super.reportTo(reporter)
   }
 }
-
 
 abstract class AnalyticsData(type: String, val project: Project? = null) {
   val data = mutableMapOf<String, Any>()
@@ -302,7 +316,7 @@ abstract class AnalyticsReporter {
   internal abstract fun process(data: AnalyticsData)
 
   companion object {
-    fun forConfiguration(config: AnalyticsConfiguration?): AnalyticsReporter  = config?.let { c ->
+    fun forConfiguration(config: AnalyticsConfiguration?): AnalyticsReporter = config?.let { c ->
       if (c.suppressAnalytics || !c.telemetryEnabled) {
         NoOpReporter
       } else {
@@ -321,23 +335,16 @@ internal object NoOpReporter : AnalyticsReporter() {
 }
 
 internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
-  object UAProperty {
-    const val EVENT = "event"
-    const val EVENT_DATA = "eventData"
-    const val EVENT_NAME = "ide_event"
-    const val TOOL = "tool"
-  }
-
   const val IDE_EVENT = "ide_event"
 
   override fun process(data: AnalyticsData) {
     val project = data.project ?: return
 
     val params = JsonObject()
-    params.addProperty(UAProperty.TOOL, getToolName())
+    params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
     val event = JsonObject()
-    event.addProperty(UAProperty.EVENT_NAME, IDE_EVENT)
+    event.addProperty(UnifiedAnalytics.Property.EVENT_NAME, IDE_EVENT)
 
     val evenData = JsonObject()
     for (entry in data.data) {
@@ -350,18 +357,19 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
         }
       }
     }
-    event.add(UAProperty.EVENT_DATA, evenData)
+    event.add(UnifiedAnalytics.Property.EVENT_DATA, evenData)
 
     // Note: encoded as a string.
-    params.addProperty(UAProperty.EVENT, event.toString())
+    params.addProperty(UnifiedAnalytics.Property.EVENT, event.toString())
 
     // TODO (pq): temporary
     // print(params.toString())
 
-    DartToolingDaemonService.getInstance(project).sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
-      // TODO (pq): temporary
-      // print(response)
-    }
+    DartToolingDaemonService.getInstance(project)
+      .sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
+        // TODO (pq): temporary
+        // print(response)
+      }
   }
 }
 

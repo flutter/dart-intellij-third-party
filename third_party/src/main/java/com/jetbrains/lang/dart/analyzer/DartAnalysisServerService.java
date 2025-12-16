@@ -2286,11 +2286,8 @@ public final class DartAnalysisServerService implements Disposable {
         stopServer();
         DartProblemsView.getInstance(myProject).setInitialCurrentFileBeforeServerStart(getCurrentOpenFile());
 
-//        AnalyticsConfiguration analyticsConfig = Analytics.getConfiguration(sdk, myProject);
-//        startServer(sdk, analyticsConfig.getSuppressAnalytics());
-
-        // TODO (pq): pass in suppressAnalytics
-        startServer(sdk, false);
+        AnalyticsConfiguration analyticsConfig = Analytics.getConfiguration(sdk, myProject);
+        startServer(sdk, analyticsConfig.getSuppressAnalytics());
 
         if (myServer != null) {
           myRootsHandler.onServerStarted();
