@@ -14,6 +14,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,7 +29,7 @@ import java.io.StringWriter;
  * to users on demand.
  */
 public class DartAnalysisServerErrorHandler {
-  private static final Logger LOG = Logger.getInstance(DartAnalysisServerErrorHandler.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartAnalysisServerErrorHandler.class);
 
   private static final int MAX_REPORTS_PER_SESSION = 100;
 
