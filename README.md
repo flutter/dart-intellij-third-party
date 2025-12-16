@@ -1,5 +1,6 @@
 # Dart IntelliJ Plugin
 
+![Latest Plugin Version](https://img.shields.io/jetbrains/plugin/v/Dart)
 [![presubmit](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml/badge.svg)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml)
 
 ## Development setup
