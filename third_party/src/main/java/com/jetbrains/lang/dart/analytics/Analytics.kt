@@ -130,19 +130,19 @@ class AnalyticsConfiguration {
 }
 
 private object AnalyticsConfigurationManager {
-  internal var data: AnalyticsConfiguration? = null
+  lateinit var data: AnalyticsConfiguration
 
   fun getConfiguration(sdk: DartSdk, project: Project, logger: Logger): AnalyticsConfiguration {
     logger.debug("Analytics.getConfiguration")
 
-    data?.let { return it }
+    if (::data.isInitialized) return data
 
     // TODO (pq): capture timing info and report (if analytics are enabled)
 
     data = AnalyticsConfiguration()
 
     // Return a default configuration (that suppresses analytics) when running tests.
-    if (ApplicationManager.getApplication().isUnitTestMode) return data!!
+    if (ApplicationManager.getApplication().isUnitTestMode) return data
 
     val dtdProcess = DTDProcess()
     dtdProcess.listener = object : DTDProcessListener {
@@ -153,18 +153,18 @@ private object AnalyticsConfigurationManager {
         params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
         try {
-          data!!.shouldShowMessage =
+          data.shouldShowMessage =
             UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.SHOULD_SHOW_MESSAGE)
-          if (data!!.shouldShowMessage) {
-            data!!.consentMessage =
+          if (data.shouldShowMessage) {
+            data.consentMessage =
               UnifiedAnalytics.callServiceWithStringResponse(dtdProcess, UnifiedAnalytics.GET_CONSENT_MESSAGE)
-            data!!.telemetryEnabled = false // No need to ask
+            data.telemetryEnabled = false // No need to ask
           } else {
-            data!!.telemetryEnabled =
+            data.telemetryEnabled =
               UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.TELEMETRY_ENABLED)
           }
 
-          if (data!!.shouldShowMessage) {
+          if (data.shouldShowMessage) {
             // Process termination happens after the prompt.
             scheduleConsentPromptNotification(project, dtdProcess)
           } else {
@@ -179,7 +179,7 @@ private object AnalyticsConfigurationManager {
     dtdProcess.start(sdk)
 
     // TODO (pq): fix race condition if we get here before the first countdown latch is started
-    return data!!
+    return data
   }
 
   private fun scheduleConsentPromptNotification(project: Project, dtdProcess: DTDProcess) {
