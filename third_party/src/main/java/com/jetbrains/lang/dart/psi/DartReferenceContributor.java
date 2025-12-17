@@ -4,6 +4,7 @@ package com.jetbrains.lang.dart.psi;
 import com.intellij.lang.html.HTMLLanguage;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -28,7 +29,7 @@ import static com.intellij.patterns.PlatformPatterns.psiFile;
 import static com.intellij.patterns.StandardPatterns.or;
 
 final class DartReferenceContributor extends PsiReferenceContributor {
-  private static final Logger LOG = Logger.getInstance(DartReferenceContributor.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartReferenceContributor.class);
 
   @Override
   public void registerReferenceProviders(final @NotNull PsiReferenceRegistrar registrar) {

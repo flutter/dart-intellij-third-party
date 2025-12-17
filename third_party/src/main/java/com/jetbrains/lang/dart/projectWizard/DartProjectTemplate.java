@@ -6,6 +6,7 @@ import com.intellij.execution.RunnerAndConfigurationSettings;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.Consumer;
@@ -32,7 +33,7 @@ public abstract class DartProjectTemplate {
   private static final Stagehand STAGEHAND = new Stagehand();
   private static List<DartProjectTemplate> ourDartCreateTemplateCache;
 
-  private static final Logger LOG = Logger.getInstance(DartProjectTemplate.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartProjectTemplate.class);
 
   private final @NotNull @Nls String myName;
   private final @NotNull @Nls String myDescription;

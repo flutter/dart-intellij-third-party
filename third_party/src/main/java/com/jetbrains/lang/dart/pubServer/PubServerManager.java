@@ -6,6 +6,7 @@ import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.*;
@@ -25,7 +26,7 @@ import java.util.Map;
 
 @Service(Service.Level.PROJECT)
 public final class PubServerManager implements Disposable {
-  private static final Logger LOG = Logger.getInstance(PubServerManager.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(PubServerManager.class);
 
   private final Project project;
   private final ConsoleManager consoleManager = new ConsoleManager();

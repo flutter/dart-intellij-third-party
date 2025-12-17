@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -39,7 +40,7 @@ import java.util.Map;
 import static com.intellij.openapi.util.text.StringUtil.isWhiteSpace;
 
 public class DartStyleAction extends AbstractDartFileProcessingAction {
-  private static final Logger LOG = Logger.getInstance(DartStyleAction.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartStyleAction.class);
 
   @Override
   protected @NotNull String getActionTextForEditor() {

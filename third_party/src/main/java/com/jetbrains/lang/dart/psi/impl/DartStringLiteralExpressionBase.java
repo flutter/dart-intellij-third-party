@@ -4,6 +4,7 @@ package com.jetbrains.lang.dart.psi.impl;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.*;
@@ -21,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public abstract class DartStringLiteralExpressionBase extends DartClassReferenceImpl implements DartStringLiteralExpression {
-  private static final Logger LOG = Logger.getInstance(DartStringLiteralExpressionBase.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartStringLiteralExpressionBase.class);
 
   public DartStringLiteralExpressionBase(ASTNode node) {
     super(node);

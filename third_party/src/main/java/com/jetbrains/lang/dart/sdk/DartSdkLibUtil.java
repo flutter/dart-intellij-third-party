@@ -5,6 +5,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.project.Project;
@@ -30,7 +31,7 @@ import java.io.File;
 import java.util.*;
 
 public final class DartSdkLibUtil {
-  private static final Logger LOG = Logger.getInstance(DartSdkLibUtil.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartSdkLibUtil.class);
 
   private static final String[] SDK_LIB_SUBFOLDERS_BLACKLIST = {
     "analysis_server",

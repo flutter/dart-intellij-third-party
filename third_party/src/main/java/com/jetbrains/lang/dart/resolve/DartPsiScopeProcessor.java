@@ -2,6 +2,7 @@
 package com.jetbrains.lang.dart.resolve;
 
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -20,7 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public abstract class DartPsiScopeProcessor implements PsiScopeProcessor {
-  private static final Logger LOG = Logger.getInstance(DartResolveProcessor.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartResolveProcessor.class);
 
   private final Stack<Pair<VirtualFile, DartShowHideInfo>> myShowHideFilters = new Stack<>();
   private final Map<VirtualFile, Collection<PsiElement>> myFilteredOutElements = new HashMap<>();

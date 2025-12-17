@@ -16,6 +16,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.Balloon;
 import com.intellij.openapi.util.Key;
@@ -62,7 +63,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 final class PubServerService extends NetService {
-  private static final Logger LOG = Logger.getInstance(PubServerService.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(PubServerService.class);
 
   private static final String DART_WEBDEV = "Dart Webdev";
   private static final NotificationGroup NOTIFICATION_GROUP = NotificationGroupManager.getInstance().getNotificationGroup("Dart Webdev");

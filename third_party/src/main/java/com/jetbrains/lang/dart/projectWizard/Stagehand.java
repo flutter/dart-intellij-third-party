@@ -10,6 +10,7 @@ import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.CapturingProcessHandler;
 import com.intellij.execution.process.ProcessOutput;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -47,7 +48,7 @@ public class Stagehand {
     }
   }
 
-  private static final Logger LOG = Logger.getInstance(Stagehand.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(Stagehand.class);
   private static final List<StagehandDescriptor> EMPTY = new ArrayList<>();
 
   private static ProcessOutput runDartCreate(@NotNull String sdkRoot,
