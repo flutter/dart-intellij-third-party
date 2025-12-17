@@ -187,7 +187,7 @@ private object AnalyticsConfigurationManager {
     ApplicationManager.getApplication().invokeLater {
       NotificationGroupManager.getInstance()
         .getNotificationGroup(DAS_NOTIFICATION_GROUP)
-        .createNotification(data!!.consentMessage!!, NotificationType.INFORMATION).also { notification ->
+        .createNotification(data.consentMessage!!, NotificationType.INFORMATION).also { notification ->
           notification.addAction(object : AnAction(CommonBundle.getOkButtonText()) {
             override fun actionPerformed(e: AnActionEvent) {
               try {
@@ -298,14 +298,14 @@ object AnalyticsConstants {
 
   /**
    * The UI location where an action was invoked, as provided by
-   * [com.intellij.openapi.actionSystem.PlaceProvider.getPlace] (for example, "MainMenu",
-   * "MainToolbar", "EditorPopup", "GoToAction", etc).
+   * [com.intellij.ui.PlaceProvider.getPlace] (for example, "MainMenu",
+   * "MainToolbar", "EditorPopup", "GoToAction", etc.).
    */
   @JvmField
   val PLACE = StringValue("place")
 
   /**
-   * The type of the analytics event (e.g., "action", ...).
+   * The type of the analytics event (e.g., "action", "assist", "fix", ...).
    */
   @JvmField
   val TYPE = StringValue("type")
@@ -314,7 +314,6 @@ object AnalyticsConstants {
   internal const val ASSIST_TYPE = "assist"
   internal const val FIX_TYPE = "fix"
 }
-
 
 sealed class DataValue<T>(val name: String) {
   abstract fun addTo(data: AnalyticsData, value: T)
