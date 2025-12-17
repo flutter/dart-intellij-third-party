@@ -12,6 +12,8 @@ import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +42,8 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
     if (project == null) return;
 
     run(project);
+
+    Analytics.report(AnalyticsData.forAction(this, e));
   }
 
   void run(final @NotNull Project project) {

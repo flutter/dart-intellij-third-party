@@ -5,6 +5,8 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.ide.CopyPasteManager
+import com.jetbrains.lang.dart.analytics.Analytics
+import com.jetbrains.lang.dart.analytics.AnalyticsData
 
 class DartCopyDtdUriAction : AnAction() {
   override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
@@ -17,5 +19,6 @@ class DartCopyDtdUriAction : AnAction() {
     e.project
       ?.let { project -> DartToolingDaemonService.getInstance(project).uri }
       ?.let { uri -> CopyPasteManager.copyTextToClipboard(uri) }
+    Analytics.report(AnalyticsData.forAction(this, e))
   }
 }

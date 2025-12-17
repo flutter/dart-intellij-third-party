@@ -4,6 +4,8 @@ package com.jetbrains.lang.dart.pubServer;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.DumbAwareAction;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import org.jetbrains.annotations.NotNull;
 
 public class StopDartWebdevServerAction extends DumbAwareAction {
@@ -22,5 +24,7 @@ public class StopDartWebdevServerAction extends DumbAwareAction {
     if (e.getProject() != null) {
       PubServerManager.getInstance(e.getProject()).stopAllPubServerProcesses();
     }
+
+    Analytics.report(AnalyticsData.forAction(this, e));
   }
 }
