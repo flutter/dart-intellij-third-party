@@ -12,6 +12,8 @@ import com.intellij.psi.PsiFile;
 import com.intellij.refactoring.util.CommonRefactoringUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.fixes.DartQuickFix;
 import com.jetbrains.lang.dart.psi.DartFile;
@@ -66,6 +68,7 @@ public class DartQuickAssistIntention implements IntentionAction, Comparable<Int
       DartAnalysisServerService.getInstance(project).fireBeforeQuickAssistIntentionInvoked(this, editor, psiFile);
       try {
         AssistUtils.applySourceChange(project, sourceChange, true);
+        Analytics.report(AnalyticsData.forAssist(sourceChange.getId(), project));
       }
       catch (DartSourceEditException e) {
         CommonRefactoringUtil.showErrorHint(project, editor, e.getMessage(), CommonBundle.getErrorTitle(), null);

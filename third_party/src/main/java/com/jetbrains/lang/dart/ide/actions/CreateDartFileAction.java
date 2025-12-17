@@ -42,6 +42,6 @@ public class CreateDartFileAction extends CreateFileFromTemplateAction {
     // expected `actionPerformed` is marked final in super.
 
     // TODO (pq): see if there's some way to find this action's place (w/o event data).
-    Analytics.report(new ActionData(ActionManager.getInstance().getId(this), ActionPlaces.UNKNOWN, project));
+    Analytics.report(AnalyticsData.forAction(ActionManager.getInstance().getId(this), project));
   }
 }

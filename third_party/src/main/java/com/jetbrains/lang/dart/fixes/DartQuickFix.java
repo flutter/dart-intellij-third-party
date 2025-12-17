@@ -22,6 +22,8 @@ import com.intellij.refactoring.util.CommonRefactoringUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.PathUtil;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.analyzer.DartFileInfo;
 import com.jetbrains.lang.dart.analyzer.DartFileInfoKt;
@@ -86,6 +88,7 @@ public final class DartQuickFix implements IntentionAction, Comparable<Intention
       }
 
       doInvoke(project, editor, psiFile, mySourceChange, this);
+      Analytics.report(AnalyticsData.forFix(mySourceChange.getId(), project));
     }
   }
 
