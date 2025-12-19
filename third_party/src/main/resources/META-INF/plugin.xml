@@ -32,7 +32,6 @@
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
-    <languageServerFactory language="Dart" implementationClass="com.jetbrains.lang.dart.lsp.DartLspServerFactory"/>
     <moveFileHandler implementation="com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler"/>
     <fileType name="Dart" extensions="dart" language="Dart" implementationClass="com.jetbrains.lang.dart.DartFileType" fieldName="INSTANCE"/>
     <lang.syntaxHighlighter language="Dart" implementationClass="com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter"/>
@@ -62,7 +61,7 @@
     <basicWordSelectionFilter implementation="com.jetbrains.lang.dart.ide.editor.DartSelectionFilter"/>
 
     <nonProjectFileWritingAccessExtension implementation="com.jetbrains.lang.dart.ide.DartWritingAccessProvider"/>
-    <spellchecker.support language="Dart" implementationClass="com.jetbrains.lang.dart.ide.spelling.DartSpellcheckingStrategy"/>
+<!--    <spellchecker.support language="Dart" implementationClass="com.jetbrains.lang.dart.ide.spelling.DartSpellcheckingStrategy"/>-->
     <spellchecker.bundledDictionaryProvider implementation="com.jetbrains.lang.dart.ide.spelling.DartBundledDictionaryProvider"/>
     <lang.documentationProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider"/>
     <lang.implementationTextSelectioner language="Dart"
@@ -178,7 +177,7 @@
     <lang.smartEnterProcessor language="Dart"
                               implementationClass="com.jetbrains.lang.dart.ide.completion.DartServerStatementCompletionProcessor"/>
 
-    <annotator language="Dart" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>
+<!--    <annotator language="Dart" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>-->
     <annotator language="XML" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>
 
     <lang.findUsagesProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.findUsages.DartFindUsagesProvider"/>
@@ -269,7 +268,20 @@
     <webServerPathHandler implementation="com.jetbrains.lang.dart.pubServer.PubServerPathHandler"/>
   </extensions>
 
-  <projectListeners>
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="myLanguageServerId"
+                name="My Language Server"
+                factoryClass="com.jetbrains.lang.dart.lsp.DartLspServerFactory">
+            <description><![CDATA[
+        helinx: Some description written in HTML to display it in the LSP consoles view and Language Servers settings.
+        ]]>
+            </description>
+        </server>
+        <languageMapping language="Dart" serverId="myLanguageServerId" />
+    </extensions>
+
+
+    <projectListeners>
     <listener class="com.jetbrains.lang.dart.DartWorkspaceModelChangeListener" topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
     <listener class="com.jetbrains.lang.dart.ide.errorTreeView.DartAnalysisToolWindowFactory$DartToolWindowManagerListener"
               topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
@@ -282,13 +294,13 @@
             icon="DartIcons.Dart_file">
       <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFromTemplate"/>
     </action>
-    <action id="Dart.Reanalyze" class="com.jetbrains.lang.dart.ide.errorTreeView.ReanalyzeDartSourcesAction"
-            icon="AllIcons.Actions.Restart">
-    </action>
+<!--    <action id="Dart.Reanalyze" class="com.jetbrains.lang.dart.ide.errorTreeView.ReanalyzeDartSourcesAction"-->
+<!--            icon="AllIcons.Actions.Restart">-->
+<!--    </action>-->
     <!--suppress PluginXmlCapitalization -->
-    <action id="Dart.Restart.Analysis.Server" class="com.jetbrains.lang.dart.ide.errorTreeView.RestartDartAnalysisServerAction"
-            icon="AllIcons.Actions.ForceRefresh">
-    </action>
+<!--    <action id="Dart.Restart.Analysis.Server" class="com.jetbrains.lang.dart.ide.errorTreeView.RestartDartAnalysisServerAction"-->
+<!--            icon="AllIcons.Actions.ForceRefresh">-->
+<!--    </action>-->
     <action id="Dart.Analyzer.Diagnostics" class="com.jetbrains.lang.dart.ide.errorTreeView.AnalysisServerDiagnosticsAction">
     </action>
     <action id="Dart.DartStyle" class="com.jetbrains.lang.dart.ide.actions.DartStyleAction">
