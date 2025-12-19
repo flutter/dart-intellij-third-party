@@ -20,6 +20,7 @@
   <vendor url="https://google.com">Google</vendor>
   <category>Languages</category>
   <depends>com.intellij.modules.xml</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
   <depends optional="true" config-file="dart-yaml.xml">org.jetbrains.plugins.yaml</depends>
   <depends optional="true" config-file="dart-copyright.xml">com.intellij.copyright</depends>
 
@@ -31,6 +32,7 @@
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
+    <languageServerFactory language="Dart" implementationClass="com.jetbrains.lang.dart.lsp.DartLspServerFactory"/>
     <moveFileHandler implementation="com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler"/>
     <fileType name="Dart" extensions="dart" language="Dart" implementationClass="com.jetbrains.lang.dart.DartFileType" fieldName="INSTANCE"/>
     <lang.syntaxHighlighter language="Dart" implementationClass="com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter"/>
