@@ -71,7 +71,6 @@ public abstract class DartProjectTemplate {
     }
     finally {
       if (templates.isEmpty()) {
-        templates.add(new WebAppTemplate());
         templates.add(new CmdLineAppTemplate());
       }
 
