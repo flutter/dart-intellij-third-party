@@ -11,7 +11,7 @@ import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.GenericProgramRunner
 import com.intellij.execution.ui.RunContentDescriptor
-import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -148,7 +148,7 @@ class DartRunner : GenericProgramRunner<RunnerSettings>() {
   )
 
   companion object {
-    private val LOG = Logger.getInstance(DartRunner::class.java)
+    private val LOG = logger<DartRunner>()
     private const val VM_SERVICE_TIMEOUT_IN_MS = 5000
   }
 }
