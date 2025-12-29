@@ -22,20 +22,24 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-// TODO: Rename this and related classes away from "stagehand",
-//   as templates are now retrieved and bootstrapped with `dart create`.
-public class Stagehand {
+/**
+ * Handles running `dart create` to generate new Dart projects from templates.
+ */
+public class DartCreate {
 
-  public static class StagehandDescriptor {
+  /**
+   * Describes a `dart create` template.
+   */
+  public static class DartCreateTemplate {
     public final @NotNull @NonNls String myId;
     public final @NotNull @NlsSafe String myLabel;
     public final @NotNull @NlsSafe String myDescription;
     public final @Nullable @NonNls String myEntrypoint;
 
-    public StagehandDescriptor(@NotNull @NonNls String id,
-                               @NotNull @NlsSafe String label,
-                               @NotNull @NlsSafe String description,
-                               @Nullable @NonNls String entrypoint) {
+    public DartCreateTemplate(@NotNull @NonNls String id,
+                              @NotNull @NlsSafe String label,
+                              @NotNull @NlsSafe String description,
+                              @Nullable @NonNls String entrypoint) {
       myId = id;
       myLabel = label;
       myDescription = description;
@@ -48,8 +52,8 @@ public class Stagehand {
     }
   }
 
-  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(Stagehand.class);
-  private static final List<StagehandDescriptor> EMPTY = new ArrayList<>();
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartCreate.class);
+  private static final List<DartCreateTemplate> EMPTY = new ArrayList<>();
 
   private static ProcessOutput runDartCreate(@NotNull String sdkRoot,
                                              @Nullable String workingDirectory,
@@ -76,7 +80,7 @@ public class Stagehand {
     }
   }
 
-  public List<StagehandDescriptor> getAvailableTemplates(final @NotNull String sdkRoot) {
+  public List<DartCreateTemplate> getAvailableTemplates(final @NotNull String sdkRoot) {
     try {
       ProcessOutput output = runDartCreate(sdkRoot, null, 10, "--list-templates");
 
@@ -88,11 +92,11 @@ public class Stagehand {
 
       // [{"name":"consoleapp", "label":"Console App", "description":"A minimal command-line application."}, {"name": ..., }]
       final JsonArray templatesArray = JsonParser.parseString(output.getStdout()).getAsJsonArray();
-      final List<StagehandDescriptor> result = new ArrayList<>();
+      final List<DartCreateTemplate> result = new ArrayList<>();
       for (final JsonElement templateElement : templatesArray) {
         final JsonObject templateObject = templateElement.getAsJsonObject();
 
-        result.add(new StagehandDescriptor(
+        result.add(new DartCreateTemplate(
             templateObject.get("name").getAsString(),
             templateObject.get("label").getAsString(),
             templateObject.get("description").getAsString(),
