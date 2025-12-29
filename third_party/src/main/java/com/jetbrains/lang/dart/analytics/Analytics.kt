@@ -108,8 +108,9 @@ private object UnifiedAnalytics {
     return value
   }
 
-  fun callServiceWithNoResponse(dtdProcess: DTDProcess, name: String) =
+  fun callServiceWithNoResponse(dtdProcess: DTDProcess, name: String) {
     callServiceWithJsonResponse(dtdProcess, name)
+  }
 
   fun callServiceWithStringResponse(dtdProcess: DTDProcess, name: String): String? =
     callServiceWithJsonResponse(dtdProcess, name)?.asString

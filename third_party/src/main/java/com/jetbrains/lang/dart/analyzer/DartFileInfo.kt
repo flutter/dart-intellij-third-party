@@ -35,7 +35,7 @@ fun getDartFileInfo(project: Project, filePathOrUri: String): DartFileInfo = whe
     }
     DartLocalFileInfo(path)
   }
-  catch (e: URISyntaxException) {
+  catch (_: URISyntaxException) {
     logger<DartFileInfo>().warn("Malformed URI: $filePathOrUri")
     DartNotLocalFileInfo(project, filePathOrUri)
   }

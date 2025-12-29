@@ -29,7 +29,6 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
-import com.intellij.xdebugger.impl.XSourcePositionImpl
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
@@ -40,9 +39,7 @@ import de.roderick.weberknecht.WebSocketEventHandler
 import de.roderick.weberknecht.WebSocketException
 import de.roderick.weberknecht.WebSocketMessage
 import kotlinx.coroutines.CoroutineScope
-import java.net.MalformedURLException
 import java.net.URI
-import java.net.URISyntaxException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicInteger

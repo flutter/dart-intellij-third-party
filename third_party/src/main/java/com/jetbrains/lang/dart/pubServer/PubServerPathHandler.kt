@@ -9,7 +9,6 @@ import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.DartUrlResolver
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import io.netty.channel.ChannelHandlerContext
