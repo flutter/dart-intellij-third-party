@@ -52,7 +52,6 @@
     <copyPastePostProcessor implementation="com.jetbrains.lang.dart.ide.editor.DartCopyPasteProcessor"/>
     <autoImportOptionsProvider instance="com.jetbrains.lang.dart.ide.editor.DartAutoImportOptionsProvider"/>
 
-    <languageInjector implementation="com.jetbrains.lang.dart.psi.DartLanguageInjector"/>
     <multiHostInjector implementation="com.jetbrains.lang.dart.injection.DartMultiHostInjector"/>
 
     <colorSettingsPage implementation="com.jetbrains.lang.dart.highlight.DartColorsAndFontsPage"/>

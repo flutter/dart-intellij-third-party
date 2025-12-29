@@ -34,7 +34,7 @@ public class DartIndentProcessor {
     final ASTNode superParent = parent == null ? null : parent.getTreeParent();
     final IElementType superParentType = superParent == null ? null : superParent.getElementType();
 
-    if (parent == null || parent.getTreeParent() == null || parentType == EMBEDDED_CONTENT) {
+    if (parent == null || parent.getTreeParent() == null) {
       return Indent.getNoneIndent();
     }
 
