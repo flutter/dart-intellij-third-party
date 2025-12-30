@@ -68,7 +68,7 @@ class DartStartupActivity : ProjectActivity {
     if (ModuleManager.getInstance(project).modules.find { DartSdkLibUtil.isDartSdkEnabled(it) } == null) return
 
     readActionBlocking {
-      DartAnalysisServerService.getInstance(project).serverReadyForRequest()
+//      DartAnalysisServerService.getInstance(project).serverReadyForRequest()
     }
 
     if (Registry.`is`("dart.launch.dtd.and.devtools", false)) {
