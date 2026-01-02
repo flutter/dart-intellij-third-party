@@ -18,7 +18,7 @@ import com.jetbrains.lang.dart.ide.runner.server.webdev.DartWebdevConfigurationT
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunConfiguration;
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunConfigurationType;
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunnerParameters;
-import com.jetbrains.lang.dart.projectWizard.Stagehand.StagehandDescriptor;
+import com.jetbrains.lang.dart.projectWizard.DartCreate.DartCreateTemplate;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -30,7 +30,7 @@ import java.util.List;
 
 public abstract class DartProjectTemplate {
 
-  private static final Stagehand STAGEHAND = new Stagehand();
+  private static final DartCreate DART_CREATE = new DartCreate();
   private static List<DartProjectTemplate> ourDartCreateTemplateCache;
 
   private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartProjectTemplate.class);
@@ -67,7 +67,7 @@ public abstract class DartProjectTemplate {
 
     final List<DartProjectTemplate> templates = new ArrayList<>();
     try {
-      templates.addAll(getStagehandTemplates(sdkRoot));
+      templates.addAll(getDartCreateTemplates(sdkRoot));
     }
     finally {
       if (templates.isEmpty()) {
@@ -78,16 +78,16 @@ public abstract class DartProjectTemplate {
     }
   }
 
-  private static @NotNull List<DartProjectTemplate> getStagehandTemplates(@NotNull String sdkRoot) {
+  private static @NotNull List<DartProjectTemplate> getDartCreateTemplates(@NotNull String sdkRoot) {
     if (ourDartCreateTemplateCache != null) {
       return ourDartCreateTemplateCache;
     }
 
-    final List<StagehandDescriptor> templates = STAGEHAND.getAvailableTemplates(sdkRoot);
+    final List<DartCreateTemplate> templates = DART_CREATE.getAvailableTemplates(sdkRoot);
 
     ourDartCreateTemplateCache = new ArrayList<>();
-    for (StagehandDescriptor template : templates) {
-      ourDartCreateTemplateCache.add(new StagehandTemplate(STAGEHAND, template));
+    for (DartCreateTemplate template : templates) {
+      ourDartCreateTemplateCache.add(new DartCreateProjectTemplate(DART_CREATE, template));
     }
     return ourDartCreateTemplateCache;
   }
