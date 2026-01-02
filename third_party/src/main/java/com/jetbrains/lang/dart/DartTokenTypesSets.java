@@ -4,17 +4,14 @@ package com.jetbrains.lang.dart;
 import com.intellij.lang.*;
 import com.intellij.openapi.util.Pair;
 import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
 import com.intellij.psi.TokenType;
 import com.intellij.psi.text.BlockSupport;
 import com.intellij.psi.tree.*;
-import com.intellij.util.diff.FlyweightCapableTreeStructure;
 import com.jetbrains.lang.dart.lexer.DartDocLexer;
 import com.jetbrains.lang.dart.psi.impl.DartLazyParseableBlockImpl;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import static com.intellij.lang.parser.GeneratedParserUtilBase.*;
 import static com.jetbrains.lang.dart.DartTokenTypes.*;
 
 public interface DartTokenTypesSets {
@@ -179,8 +176,6 @@ public interface DartTokenTypesSets {
   TokenSet DOC_COMMENT_CONTENTS =
     TokenSet.create(MULTI_LINE_DOC_COMMENT_START, MULTI_LINE_COMMENT_BODY, DOC_COMMENT_LEADING_ASTERISK, MULTI_LINE_COMMENT_END);
 
-  IElementType EMBEDDED_CONTENT = new DartEmbeddedContentElementType();
-
   TokenSet BLOCKS = TokenSet.create(
     BLOCK,
     LAZY_PARSEABLE_BLOCK
@@ -190,8 +185,7 @@ public interface DartTokenTypesSets {
     BLOCK,
     LAZY_PARSEABLE_BLOCK,
     CLASS_MEMBERS,
-    DartParserDefinition.DART_FILE,
-    EMBEDDED_CONTENT
+    DartParserDefinition.DART_FILE
   );
 
   TokenSet DECLARATIONS = TokenSet.create(
@@ -260,38 +254,6 @@ public interface DartTokenTypesSets {
       final ASTNode oldBlock = Pair.getFirst(newBlock.getUserData(BlockSupport.TREE_TO_BE_REPARSED));
       final IElementType type = (oldBlock != null ? oldBlock : newBlock).getTreeParent().getFirstChildNode().getElementType();
       return type == SYNC || type == ASYNC;
-    }
-  }
-
-  class DartEmbeddedContentElementType extends ILazyParseableElementType implements ILightLazyParseableElementType {
-    public DartEmbeddedContentElementType() {
-      super("DART_EMBEDDED_CONTENT", DartInHtmlLanguage.INSTANCE);
-    }
-
-    @Override
-    protected ASTNode doParseContents(@NotNull ASTNode chameleon, @NotNull PsiElement psi) {
-      PsiBuilder builder = PsiBuilderFactory.getInstance().createBuilder(psi.getProject(), chameleon);
-//      var startTime = System.nanoTime();
-      new DartParser().parseLight(DartParserDefinition.DART_FILE, builder);
-      return builder.getTreeBuilt().getFirstChildNode();
-      // The following is removed as it is experimental and does not provide any functionality in the IDE for Dart developers:
-      // ParsingDiagnostics.registerParse(builder, getLanguage(), System.nanoTime() - startTime);
-      // return result; (set by builder.getTreeBuilt().getFirstChildNode()
-    }
-
-    @Override
-    public @NotNull FlyweightCapableTreeStructure<LighterASTNode> parseContents(@NotNull LighterLazyParseableNode chameleon) {
-      PsiFile file = chameleon.getContainingFile();
-      assert file != null : chameleon;
-
-      final PsiBuilder psiBuilder = PsiBuilderFactory.getInstance().createBuilder(file.getProject(), chameleon);
-
-      final PsiBuilder builder = adapt_builder_(EMBEDDED_CONTENT, psiBuilder, new DartParser(), DartParser.EXTENDS_SETS_);
-
-      PsiBuilder.Marker marker = enter_section_(builder, 0, _COLLAPSE_, "<dart embedded content>");
-      boolean result = DartParser.dartUnit(builder, 0);
-      exit_section_(builder, 0, marker, EMBEDDED_CONTENT, result, true, TRUE_CONDITION);
-      return builder.getLightTree();
     }
   }
 }
