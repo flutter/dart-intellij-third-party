@@ -17,6 +17,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
@@ -48,7 +49,7 @@ private object UnifiedAnalytics {
   }
 
   private val logger: Logger =
-    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else Logger.getInstance(UnifiedAnalytics::class.java)
+    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else logger<UnifiedAnalytics>()
 
   /// Service name for the DTD-hosted unified analytics service.
   const val SERVICE_NAME = "UnifiedAnalytics"
@@ -207,7 +208,7 @@ private object AnalyticsConfigurationManager {
 
 object Analytics {
   private val logger: Logger =
-    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else Logger.getInstance(Analytics::class.java)
+    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else logger<Analytics>()
 
   private val reporter: AnalyticsReporter
     get() = if (DEBUGGING_LOCALLY) PrintingReporter else AnalyticsReporter.forConfiguration(
