@@ -3,6 +3,9 @@ import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
+import org.jetbrains.grammarkit.tasks.GenerateLexerTask
+import org.jetbrains.grammarkit.tasks.GenerateParserTask
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 // Specify UTF-8 for all compilations so we avoid Windows-1252.
 allprojects {
@@ -12,6 +15,8 @@ allprojects {
     tasks.withType<Test> {
         systemProperty("file.encoding", "UTF-8")
     }
+    tasks.withType<KotlinCompile> {
+    }
 }
 
 // Plugins - must be first
@@ -20,7 +25,10 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "2.3.0" // Kotlin support
     id("org.jetbrains.intellij.platform") version "2.10.5" // IntelliJ Platform Gradle Plugin
     id("org.jetbrains.changelog") version "2.2.0" // Gradle Changelog Plugin
+    id("org.jetbrains.grammarkit") version "2023.3.0.1"
 }
+
+
 
 // Configure project's dependencies
 repositories {
@@ -155,4 +163,31 @@ tasks.register("printCompileClasspath") {
         }
         println("--- End Compile Classpath ---")
     }
+}
+
+tasks.register("generateDartParser", GenerateParserTask::class) {
+    sourceFile.set(file("src/main/java/com/jetbrains/lang/dart/Dart.bnf"))
+    targetRootOutputDir.set(file("build/gen_temp"))
+    pathToParser.set("com/jetbrains/lang/dart/DartParser.java")
+    pathToPsiRoot.set("com/jetbrains/lang/dart/psi")
+    purgeOldFiles.set(true)
+    classpath = sourceSets["main"].output + sourceSets["main"].compileClasspath
+}
+
+tasks.register("generateDartLexer", GenerateLexerTask::class) {
+    sourceFile.set(file("src/main/java/com/jetbrains/lang/dart/lexer/Dart.flex"))
+    targetOutputDir.set(file("build/gen_temp/com/jetbrains/lang/dart/lexer"))
+    purgeOldFiles.set(true)
+}
+
+tasks.register("generateDartDocLexer", GenerateLexerTask::class) {
+    sourceFile.set(file("src/main/java/com/jetbrains/lang/dart/lexer/DartDoc.flex"))
+    targetOutputDir.set(file("build/gen_temp/com/jetbrains/lang/dart/lexer"))
+    purgeOldFiles.set(true)
+}
+
+tasks.register("generateDart", Copy::class) {
+    dependsOn("generateDartParser", "generateDartLexer", "generateDartDocLexer")
+    from("build/gen_temp")
+    into("gen")
 }

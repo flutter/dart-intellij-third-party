@@ -126,3 +126,29 @@ jobs:
           ./gradlew verifyPluginSignature
           ./gradlew verifyPluginStructure
         working-directory: third_party
+
+  # Job 5: Verify Parser
+  verify-parser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Verify BNF Parser Generation
+        run: |
+          ./gradlew classes
+          ./gradlew generateDart
+          if [[ -n $(git status --porcelain gen) ]]; then
+            echo "Error: Parser generation resulted in changes. Please run './gradlew generateDart' and commit the changes."
+            git status gen
+            exit 1
+          fi
+          echo "BNF grammar verification passed." 
+        working-directory: third_party
