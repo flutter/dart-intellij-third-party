@@ -147,7 +147,7 @@ public final class DartAnalysisServerService implements Disposable {
 
   private final DartServerRootsHandler myRootsHandler;
   private final Map<String, Long> myFilePathWithOverlaidContentToTimestamp = Collections.synchronizedMap(new HashMap<>());
-  private final List<String> myVisibleFileUris = new ArrayList<>();
+  private final List<String> myVisibleFileUris = new SmartList<>();
   private final Set<Document> myChangedDocuments = new HashSet<>();
   private final Alarm myUpdateFilesAlarm;
 

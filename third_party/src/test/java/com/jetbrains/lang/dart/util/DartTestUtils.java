@@ -117,7 +117,7 @@ public final class DartTestUtils {
   public static List<CaretPositionInfo> extractPositionMarkers(@NotNull final Project project, @NotNull final Document document) {
     final Pattern caretPattern = Pattern.compile(
       "<caret(?: expected='([^']*)')?(?: completionEquals='([^']*)')?(?: completionIncludes='([^']*)')?(?: completionExcludes='([^']*)')?>");
-    final List<CaretPositionInfo> result = new ArrayList<>();
+    final List<CaretPositionInfo> result = new SmartList<>();
 
     WriteCommandAction.runWriteCommandAction(null, () -> {
       while (true) {
