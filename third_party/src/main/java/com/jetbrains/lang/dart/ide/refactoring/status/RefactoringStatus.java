@@ -66,29 +66,6 @@ public class RefactoringStatus {
   }
 
   /**
-   * @return the copy of this {@link RefactoringStatus} with {@link RefactoringStatusSeverity#ERROR}
-   * replaced with {@link RefactoringStatusSeverity#FATAL}.
-   */
-  public @NotNull RefactoringStatus escalateErrorToFatal() {
-    RefactoringStatus result = new RefactoringStatus();
-    for (RefactoringStatusEntry entry : entries) {
-      RefactoringStatusSeverity severity = entry.getSeverity();
-      if (severity == RefactoringStatusSeverity.ERROR) {
-        severity = RefactoringStatusSeverity.FATAL;
-      }
-      result.addEntry(new RefactoringStatusEntry(severity, entry.getMessage(), entry.getContext()));
-    }
-    return result;
-  }
-
-  /**
-   * @return the {@link RefactoringStatusEntry}s.
-   */
-  public @NotNull List<RefactoringStatusEntry> getEntries() {
-    return entries;
-  }
-
-  /**
    * @return the RefactoringStatusEntry with the highest severity, or {@code null} if no
    * entries are present.
    */

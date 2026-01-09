@@ -183,11 +183,6 @@ class InlineMethodDialog extends InlineOptionsDialog {
   }
 
   @Override
-  protected String getBorderTitle() {
-    return RefactoringBundle.message("inline.method.border.title"); // not used actually
-  }
-
-  @Override
   protected String getInlineAllText() {
     return DartBundle.message("radio.inline.all.references.remove.method");
   }
