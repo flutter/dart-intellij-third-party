@@ -74,7 +74,8 @@ public final class DartFoldingBuilder extends CustomFoldingBuilder implements Du
       DartForStatement.class,
       DartWhileStatement.class,
       DartDoWhileStatement.class,
-      DartFormalParameterList.class);
+        DartFormalParameterList.class,
+        DartRecord.class);
     foldComments(descriptors, psiElements, fileHeaderRange);                           // 4. Comments and comment sequences
     foldClassBodies(descriptors, dartFile);                                            // 5. Class bodies
     foldFunctionBodies(descriptors, psiElements);                                      // 6. Function bodies
@@ -88,6 +89,10 @@ public final class DartFoldingBuilder extends CustomFoldingBuilder implements Du
                  DartTokenTypes.LBRACKET,
                  DartTokenTypes.RBRACKET,
                  DartListLiteralExpression.class);
+    foldLiterals(descriptors, psiElements, // 9.3. Records
+        DartTokenTypes.LPAREN,
+        DartTokenTypes.RPAREN,
+        DartRecord.class);
     foldConstructorInvocationExpressions(descriptors, psiElements);                    // 10. Constructor invocations
     foldAssertExpressions(descriptors, psiElements);                                   // 11. Assert statements
     foldIfStatements(descriptors, psiElements);                                        // 12.1. If statements
@@ -138,6 +143,8 @@ public final class DartFoldingBuilder extends CustomFoldingBuilder implements Du
     if (psiElement instanceof DartAssertStatement) return DOT_DOT_DOT;                           // 11.  Assert statements
     if (psiElement instanceof DartBlock) return BRACE_DOTS;                                      // 12.  Block statements
     if (psiElement instanceof DartFormalParameterList) return PAREN_DOTS;                        // 13.  Parameter list
+    if (psiElement instanceof DartRecord)
+      return PAREN_DOTS; // 14. Records
 
     return DOT_DOT_DOT;
   }

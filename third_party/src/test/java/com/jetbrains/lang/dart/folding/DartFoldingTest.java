@@ -2,6 +2,8 @@
 package com.jetbrains.lang.dart.folding;
 
 import com.intellij.codeInsight.folding.CodeFoldingSettings;
+import com.intellij.lang.folding.FoldingDescriptor;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.util.Consumer;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
@@ -11,7 +13,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Test the Dart code folding functionality.
  * <p>
- * This class tests the {@link com.jetbrains.lang.dart.folding.DartFoldingBuilder} class, which is responsible for providing code folding regions for Dart code.
+ * This class tests the
+ * {@link com.jetbrains.lang.dart.folding.DartFoldingBuilder} class, which is
+ * responsible for providing code folding regions for Dart code.
  */
 public class DartFoldingTest extends DartCodeInsightFixtureTestCase {
 
@@ -24,7 +28,7 @@ public class DartFoldingTest extends DartCodeInsightFixtureTestCase {
   }
 
   private void doTestWithSpecificSettings(@Nullable final Consumer<CodeFoldingSettings> commonSettingsConsumer,
-                                          @Nullable final Consumer<DartCodeFoldingSettings> dartCodeFoldingSettingsConsumer) {
+      @Nullable final Consumer<DartCodeFoldingSettings> dartCodeFoldingSettingsConsumer) {
     CodeFoldingSettings commonSettings = null;
     CodeFoldingSettings commonOriginalSettings = null;
 
@@ -51,8 +55,7 @@ public class DartFoldingTest extends DartCodeInsightFixtureTestCase {
       }
 
       doTest();
-    }
-    finally {
+    } finally {
       if (commonSettingsConsumer != null) {
         XmlSerializerUtil.copyBean(commonOriginalSettings, commonSettings);
       }
@@ -163,5 +166,16 @@ public class DartFoldingTest extends DartCodeInsightFixtureTestCase {
     doTest();
   }
 
-  public void testDartFormalParameterList() { doTest(); }
+  public void testDartFormalParameterList() {
+    doTest();
+  }
+
+  public void testRecordFolding() {
+    doTest();
+  }
+
+  @org.junit.Ignore("Parser bug: Function treated as identifier after Record Type (int,) in field declaration, see https://github.com/flutter/dart-intellij-third-party/issues/150")
+  public void testRecordTypeMethodFolding() {
+    doTest();
+  }
 }
