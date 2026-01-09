@@ -14,7 +14,6 @@ import org.jetbrains.annotations.NotNull;
  * LTK wrapper around Analysis Server 'Inline Local' refactoring.
  */
 public class ServerInlineLocalRefactoring extends ServerRefactoring {
-  private String variableName;
   private int occurrences;
 
   public ServerInlineLocalRefactoring(final @NotNull Project project, final @NotNull VirtualFile file, final int offset, final int length) {
@@ -25,10 +24,6 @@ public class ServerInlineLocalRefactoring extends ServerRefactoring {
     return occurrences;
   }
 
-  public String getVariableName() {
-    return variableName;
-  }
-
   @Override
   protected RefactoringOptions getOptions() {
     return null;
@@ -37,7 +32,6 @@ public class ServerInlineLocalRefactoring extends ServerRefactoring {
   @Override
   protected void setFeedback(@NotNull RefactoringFeedback _feedback) {
     InlineLocalVariableFeedback feedback = (InlineLocalVariableFeedback)_feedback;
-    variableName = feedback.getName();
     occurrences = feedback.getOccurrences();
   }
 }
