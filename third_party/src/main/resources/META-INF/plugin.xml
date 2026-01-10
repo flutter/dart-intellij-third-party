@@ -34,9 +34,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <moveFileHandler implementation="com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler"/>
     <fileType name="Dart" extensions="dart" language="Dart" implementationClass="com.jetbrains.lang.dart.DartFileType" fieldName="INSTANCE"/>
-    <lang.syntaxHighlighter language="Dart" implementationClass="com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter"/>
     <highlightErrorFilter implementation="com.jetbrains.lang.dart.highlight.DartHighlightingErrorFilter"/>
-    <embeddedTokenHighlighter implementation="com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter"/>
 
     <lang.braceMatcher language="Dart" implementationClass="com.jetbrains.lang.dart.ide.DartBraceMatcher"/>
     <typedHandler implementation="com.jetbrains.lang.dart.ide.editor.DartTypeHandler" id="Dart"/>
