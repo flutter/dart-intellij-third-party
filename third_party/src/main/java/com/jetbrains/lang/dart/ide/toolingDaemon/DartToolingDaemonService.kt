@@ -162,7 +162,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     consumerMap[id] = consumer
 
     val requestString = request.toString()
-    logger.debug("--> $requestString")
+    logger.warn("--> $requestString")
     webSocket.send(requestString)
   }
 
@@ -286,6 +286,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     }
 
     override fun processTerminated(event: ProcessEvent) {
+      println("*** DTD process terminated")
       serviceRunning = false
       webSocketReady = false
       uri = null
@@ -342,7 +343,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
 
     override fun onMessage(message: WebSocketMessage) {
       val text = message.text
-      logger.debug("<-- $text")
+      logger.warn("<-- $text")
 
       val json: JsonObject = try {
         JsonParser.parseString(text) as JsonObject
@@ -378,6 +379,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     override fun onPong() {}
 
     override fun onClose() {
+      println("*** socket closed")
       webSocketReady = false
       secret = null
       lastSentRootUris = emptyList()

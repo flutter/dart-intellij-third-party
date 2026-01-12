@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.seconds
 
 
 /// Sends logging to the console.
-private const val DEBUGGING_LOCALLY = false
+private const val DEBUGGING_LOCALLY = true
 private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 
 private val DEFAULT_RESPONSE_TIMEOUT = 1.seconds
@@ -389,12 +389,12 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     params.addProperty(UnifiedAnalytics.Property.EVENT, event.toString())
 
     // TODO (pq): temporary
-    // print(params.toString())
+    println(params.toString())
 
     DartToolingDaemonService.getInstance(project)
       .sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
         // TODO (pq): temporary
-        // print(response)
+        println(response)
       }
   }
 }
