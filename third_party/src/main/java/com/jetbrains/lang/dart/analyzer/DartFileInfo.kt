@@ -27,8 +27,8 @@ data class DartNotLocalFileInfo(private val project: Project, val fileUri: Strin
 
 
 fun getDartFileInfo(project: Project, filePathOrUri: String): DartFileInfo = when {
-  !filePathOrUri.contains("://") -> DartLocalFileInfo(FileUtil.toSystemIndependentName(filePathOrUri))
-  !filePathOrUri.startsWith("file://") -> DartNotLocalFileInfo(project, filePathOrUri)
+  !filePathOrUri.contains("://") -> DartLocalFileInfo(FileUtil.toSystemIndependentName(getIDEFileName(project, filePathOrUri)))
+  !filePathOrUri.startsWith("file://") -> DartNotLocalFileInfo(project, getIDEFileName(project, filePathOrUri))
   else -> try {
     var path = URI(filePathOrUri).path
     path = getIDEFileName(project, path)
