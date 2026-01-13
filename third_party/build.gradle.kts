@@ -20,7 +20,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "2.3.0" // Kotlin support
     id("org.jetbrains.intellij.platform") version "2.10.5" // IntelliJ Platform Gradle Plugin
     id("org.jetbrains.changelog") version "2.2.0" // Gradle Changelog Plugin
-    id("org.jetbrains.kotlinx.kover") version "0.9.4" // 
+    id("org.jetbrains.kotlinx.kover") version "0.9.4" // Code coverage
 }
 
 // Configure project's dependencies
@@ -90,9 +90,9 @@ java {
 
 dependencies {
     intellijPlatform {
-        // intellijIdeaCommunity can be found here:
+        // intellijIdea can be found here:
         // https://www.jetbrains.com/idea/download/other.html
-        intellijIdeaCommunity("2025.1.1")
+        intellijIdea("2025.3.1.1")
 
         testFramework(TestFrameworkType.Platform)
 
@@ -122,7 +122,7 @@ tasks {
         val dartSdkPath = System.getenv("DART_HOME")
         if (dartSdkPath != null) {
             val versionFile = file("${dartSdkPath}/version")
-            if (versionFile.exists() && versionFile.isFile()) {
+            if (versionFile.exists() && versionFile.isFile) {
                 jvmArgs("-Ddart.sdk=${dartSdkPath}")
             } else {
                 logger.error("This directory, ${dartSdkPath}, doesn't appear to be Dart SDK path, " +
