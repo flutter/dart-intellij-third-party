@@ -36,6 +36,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.wm.ToolWindowId
@@ -55,7 +56,6 @@ import com.jetbrains.lang.dart.ide.runner.DartRelativePathsConsoleFilter
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
-import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -107,7 +107,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
     if (sdk == null) return
 
-    val exeFile = File(DartSdkUtil.getDartExePath(sdk))
+    val exeFile = File(sdk.fullDartExePath)
 
     if (!exeFile.isFile) {
       if (allowModalDialogs) {
@@ -191,7 +191,12 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
     @JvmStatic
     fun setupPubExePath(commandLine: GeneralCommandLine, dartSdk: DartSdk) {
-      commandLine.withExePath(FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(dartSdk)))
+      if (dartSdk.isWsl) {
+        commandLine.setExePath(dartSdk.dartExePath)
+      }
+      else {
+        commandLine.setExePath(FileUtil.toSystemDependentName(dartSdk.dartExePath))
+      }
       commandLine.addParameter("pub")
     }
 
@@ -234,6 +239,9 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       try {
         if (ourInProgress.compareAndSet(false, true)) {
           command.withEnvironment(PUB_ENV_VAR_NAME, pubEnvValue)
+
+          val sdk = DartSdk.getDartSdk(module.getProject())
+          sdk?.patchCommandLineIfRequired(command)
 
           val processHandler = OSProcessHandler(command)
 

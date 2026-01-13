@@ -19,6 +19,7 @@ import com.jetbrains.lang.dart.ide.runner.test.DartTestRunConfiguration;
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunConfigurationType;
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunnerParameters;
 import com.jetbrains.lang.dart.projectWizard.DartCreate.DartCreateTemplate;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -52,7 +53,7 @@ public abstract class DartProjectTemplate {
     return myDescription;
   }
 
-  public abstract Collection<VirtualFile> generateProject(@NotNull String sdkRoot,
+  public abstract Collection<VirtualFile> generateProject(@NotNull DartSdk sdk,
                                                           @NotNull Module module,
                                                           @NotNull VirtualFile baseDir)
     throws IOException;
@@ -61,14 +62,14 @@ public abstract class DartProjectTemplate {
   /**
    * Must be called in pooled thread without read action; {@code templatesConsumer} will be invoked in EDT
    */
-  public static void loadTemplatesAsync(@NotNull String sdkRoot, @NotNull Consumer<? super List<DartProjectTemplate>> templatesConsumer) {
+  public static void loadTemplatesAsync(@NotNull DartSdk sdk, @NotNull Consumer<? super List<DartProjectTemplate>> templatesConsumer) {
     if (ApplicationManager.getApplication().isReadAccessAllowed()) {
       LOG.error("DartProjectTemplate.loadTemplatesAsync() must be called in pooled thread without read action");
     }
 
     final List<DartProjectTemplate> templates = new ArrayList<>();
     try {
-      templates.addAll(getDartCreateTemplates(sdkRoot));
+      templates.addAll(getDartCreateTemplates(sdk));
     }
     finally {
       if (templates.isEmpty()) {
@@ -79,12 +80,14 @@ public abstract class DartProjectTemplate {
     }
   }
 
-  private static @NotNull List<DartProjectTemplate> getDartCreateTemplates(@NotNull String sdkRoot) {
+  private static @NotNull List<DartProjectTemplate> getDartCreateTemplates(@NotNull DartSdk sdk) {
+      // Todo: Check this
+      String sdkRoot = sdk.getDartExePath();
     if (ourDartCreateTemplateCache != null && sdkRoot.equals(ourDartCreateTemplateCacheSdkPath)) {
       return ourDartCreateTemplateCache;
     }
 
-    final List<DartCreateTemplate> templates = DART_CREATE.getAvailableTemplates(sdkRoot);
+    final List<DartCreateTemplate> templates = DART_CREATE.getAvailableTemplates(sdk);
 
     ourDartCreateTemplateCache = new ArrayList<>();
     ourDartCreateTemplateCacheSdkPath = sdkRoot;
