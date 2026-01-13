@@ -25,6 +25,7 @@ import com.intellij.ui.components.JBList;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.util.ui.AsyncProcessIcon;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -144,7 +145,14 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     ApplicationManager.getApplication().executeOnPooledThread(() -> {
       final String sdkPath =
         FileUtil.toSystemIndependentName(mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim());
-      DartProjectTemplate.loadTemplatesAsync(sdkPath, templates -> {
+      final DartSdk sdk = DartSdk.forPath(sdkPath);
+      if (sdk == null) {
+        asyncProcessIcon.suspend();
+        myLoadingTemplatesPanel.remove(asyncProcessIcon);
+        Disposer.dispose(asyncProcessIcon);
+        return;
+      }
+      DartProjectTemplate.loadTemplatesAsync(sdk, templates -> {
         asyncProcessIcon.suspend();
         myLoadingTemplatesPanel.remove(asyncProcessIcon);
         Disposer.dispose(asyncProcessIcon);

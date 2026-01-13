@@ -13,8 +13,9 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.jetbrains.lang.dart.sdk.DartSdkUtil;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -55,24 +56,27 @@ public class DartCreate {
   private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartCreate.class);
   private static final List<DartCreateTemplate> EMPTY = new ArrayList<>();
 
-  private static ProcessOutput runDartCreate(@NotNull String sdkRoot,
+  private static ProcessOutput runDartCreate(@NotNull DartSdk sdk,
                                              @Nullable String workingDirectory,
                                              int timeoutInSeconds,
                                              String... parameters) throws ExecutionException {
+    final String exePath = sdk.isWsl() ? sdk.getDartExePath() : FileUtil.toSystemDependentName(sdk.getDartExePath());
     final GeneralCommandLine command = new GeneralCommandLine()
-      .withExePath(DartSdkUtil.getDartExePath(sdkRoot))
+      .withExePath(exePath)
       .withWorkDirectory(workingDirectory);
 
     command.addParameter("create");
     command.addParameters(parameters);
 
+    sdk.patchCommandLineIfRequired(command);
+
     return new CapturingProcessHandler(command).runProcess(timeoutInSeconds * 1000, false);
   }
 
-  public void generateInto(final @NotNull String sdkRoot,
+  public void generateInto(final @NotNull DartSdk sdk,
                            final @NotNull VirtualFile projectDirectory,
                            final @NotNull String templateId) throws ExecutionException {
-    ProcessOutput output = runDartCreate(sdkRoot, projectDirectory.getParent().getPath(), 30, "--force", "--no-pub", "--template",
+    ProcessOutput output = runDartCreate(sdk, projectDirectory.getParent().getPath(), 30, "--force", "--no-pub", "--template",
                                            templateId, projectDirectory.getName());
 
     if (output.getExitCode() != 0) {
@@ -80,9 +84,9 @@ public class DartCreate {
     }
   }
 
-  public List<DartCreateTemplate> getAvailableTemplates(final @NotNull String sdkRoot) {
+  public List<DartCreateTemplate> getAvailableTemplates(final @NotNull DartSdk sdk) {
     try {
-      ProcessOutput output = runDartCreate(sdkRoot, null, 10, "--list-templates");
+      ProcessOutput output = runDartCreate(sdk, null, 10, "--list-templates");
 
       int exitCode = output.getExitCode();
 

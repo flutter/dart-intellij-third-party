@@ -51,7 +51,8 @@ public final class DartSdkUtil {
 
     final String version = FileUtil.loadFileOrNull(versionFile);
     if (version != null) {
-      return ourVersions.put(versionPair, version);
+      ourVersions.put(versionPair, version);
+      return version;
     }
 
     return null;
@@ -181,13 +182,5 @@ public final class DartSdkUtil {
     if (!isDartSdkHome(sdkRootPath)) return DartBundle.message("error.sdk.not.found.in.specified.location");
 
     return null;
-  }
-
-  public static @NotNull String getDartExePath(@NotNull DartSdk sdk) {
-    return getDartExePath(sdk.getHomePath());
-  }
-
-  public static @NotNull String getDartExePath(@NotNull String sdkRoot) {
-    return sdkRoot + (SystemInfo.isWindows ? "/bin/dart.exe" : "/bin/dart");
   }
 }
