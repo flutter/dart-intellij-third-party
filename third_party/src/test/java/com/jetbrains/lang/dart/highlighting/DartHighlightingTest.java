@@ -17,6 +17,7 @@ public class DartHighlightingTest extends DartCodeInsightFixtureTestCase {
     return "/highlighting";
   }
 
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/212
   public void skipped_testSpelling() {
     // [01/14/2026]: This is failing reliably and the path forward seems to be to prefer
     //  com.intellij.grazie.spellcheck.GrazieSpellCheckingInspection
