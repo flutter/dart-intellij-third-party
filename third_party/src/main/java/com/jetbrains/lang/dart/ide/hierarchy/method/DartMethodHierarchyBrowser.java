@@ -21,8 +21,10 @@ import javax.swing.*;
 import java.util.Comparator;
 import java.util.Map;
 
+import com.jetbrains.lang.dart.logging.PluginLogger;
+
 public class DartMethodHierarchyBrowser extends MethodHierarchyBrowserBase {
-  private static final Logger LOG = Logger.getInstance(DartMethodHierarchyBrowser.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartMethodHierarchyBrowser.class);
 
   public DartMethodHierarchyBrowser(Project project, PsiElement target) {
     super(project, target);

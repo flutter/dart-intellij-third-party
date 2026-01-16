@@ -21,6 +21,7 @@ import com.intellij.xdebugger.XDebugProcessStarter;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.runner.base.DartRunConfigurationBase;
 import com.jetbrains.lang.dart.ide.runner.server.DartCommandLineRunConfiguration;
@@ -36,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 
 public final class DartRunner extends GenericProgramRunner {
 
-  private static final Logger LOG = Logger.getInstance(DartRunner.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartRunner.class);
 
   // Allow 5 seconds to connect to the observatory.
   private static final int OBSERVATORY_TIMEOUT_MS = Math.toIntExact(TimeUnit.SECONDS.toMillis(5));

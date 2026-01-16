@@ -5,7 +5,6 @@ import com.intellij.ide.util.MemberChooser;
 import com.intellij.lang.LanguageCodeInsightActionHandler;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.CommandProcessor;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
@@ -16,6 +15,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.containers.ContainerUtil;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.DartComponentType;
 import com.jetbrains.lang.dart.ide.DartNamedElementNode;
 import com.jetbrains.lang.dart.psi.DartClass;
@@ -83,7 +83,7 @@ public abstract class BaseDartGenerateHandler implements LanguageCodeInsightActi
               createMethodsFix.invoke(project, editor, file);
             }
             catch (IncorrectOperationException ex) {
-              Logger.getInstance(getClass().getName()).error(ex);
+              PluginLogger.INSTANCE.createLogger(getClass()).error(ex);
             }
           }
         });
