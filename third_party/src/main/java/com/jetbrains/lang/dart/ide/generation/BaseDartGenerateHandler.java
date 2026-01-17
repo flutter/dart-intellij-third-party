@@ -32,6 +32,8 @@ import java.util.*;
 import java.util.List;
 
 public abstract class BaseDartGenerateHandler implements LanguageCodeInsightActionHandler {
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(BaseDartGenerateHandler.class);
+
   @Override
   public boolean isValidFor(final @NotNull Editor editor, final @NotNull PsiFile file) {
     return file instanceof DartFile &&
@@ -83,7 +85,7 @@ public abstract class BaseDartGenerateHandler implements LanguageCodeInsightActi
               createMethodsFix.invoke(project, editor, file);
             }
             catch (IncorrectOperationException ex) {
-              PluginLogger.INSTANCE.createLogger(getClass()).error(ex);
+              LOG.error(ex);
             }
           }
         });
