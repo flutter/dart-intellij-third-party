@@ -82,7 +82,8 @@ public final class DartSdkUtil {
     }
 
     final String sdkHomePath = getItemFromCombo(dartSdkPathComponent.getComboBox());
-    versionLabel.setText(sdkHomePath.isEmpty() ? "" : getSdkVersion(sdkHomePath));
+    final String sdkVersion = getSdkVersion(sdkHomePath);
+    versionLabel.setText(sdkVersion == null ? "" : sdkVersion);
 
     final TextComponentAccessor<JComboBox> textComponentAccessor = new TextComponentAccessor<>() {
       @Override
@@ -113,7 +114,10 @@ public final class DartSdkUtil {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
         final String sdkHomePath = getItemFromCombo(dartSdkPathComponent.getComboBox());
-        versionLabel.setText(sdkHomePath.isEmpty() ? "" : getSdkVersion(sdkHomePath));
+        if(e.getType() == DocumentEvent.EventType.INSERT){
+          final String sdkVersion = getSdkVersion(sdkHomePath);
+          versionLabel.setText(sdkVersion == null ? "" : sdkVersion);
+        }
       }
     });
   }

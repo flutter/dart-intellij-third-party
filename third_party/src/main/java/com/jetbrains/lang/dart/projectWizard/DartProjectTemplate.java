@@ -33,6 +33,7 @@ public abstract class DartProjectTemplate {
 
   private static final DartCreate DART_CREATE = new DartCreate();
   private static List<DartProjectTemplate> ourDartCreateTemplateCache;
+  private static String ourDartCreateTemplateCacheSdkPath; //used to expire the above cache if the sdk is changed, an alternative would be to use the same cache method as com.jetbrains.lang.dart.sdk.DartSdkUtil.getSdkVersion
 
   private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartProjectTemplate.class);
 
@@ -80,13 +81,14 @@ public abstract class DartProjectTemplate {
   }
 
   private static @NotNull List<DartProjectTemplate> getDartCreateTemplates(@NotNull DartSdk sdk) {
-    if (ourDartCreateTemplateCache != null) {
+    if (ourDartCreateTemplateCache != null && sdk.getFullDartExePath().equals(ourDartCreateTemplateCacheSdkPath)) {
       return ourDartCreateTemplateCache;
     }
 
     final List<DartCreateTemplate> templates = DART_CREATE.getAvailableTemplates(sdk);
 
     ourDartCreateTemplateCache = new ArrayList<>();
+    ourDartCreateTemplateCacheSdkPath = sdk.getFullDartExePath();
     for (DartCreateTemplate template : templates) {
       ourDartCreateTemplateCache.add(new DartCreateProjectTemplate(DART_CREATE, template));
     }

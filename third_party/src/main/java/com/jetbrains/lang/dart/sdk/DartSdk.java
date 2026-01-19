@@ -87,6 +87,10 @@ public final class DartSdk {
     });
   }
 
+  public static @Nullable DartSdk getDartSdkFromPath(final @NotNull String sdkPath) {
+    return new DartSdk(sdkPath, Objects.requireNonNull(DartSdkUtil.getSdkVersion(sdkPath)));
+  }
+
   private static @Nullable DartSdk findDartSdkAmongLibraries(final Library[] libs) {
     for (final Library library : libs) {
       if (DART_SDK_LIB_NAME.equals(library.getName())) {
@@ -153,7 +157,7 @@ public final class DartSdk {
    // This expects a file in Linux format e.g. /tmp/local/lib and returns in windows mapped WSL format e.g.
    // \\wsl.local\Ubuntu\tmp\local\lib
   public String getIDEFilePath(String uri) {
-    if(isWsl()){
+    if(isWsl() && uri != null){
       return distribution.getWindowsPath(uri);
     }
     return uri;
@@ -245,12 +249,29 @@ public final class DartSdk {
   public void patchCommandLineIfRequired(GeneralCommandLine commandLine) {
     if(isWsl()){
       try {
-        var workPath = commandLine.getWorkDirectory().getPath();
-        var workingDir = getIDEFilePath(workPath);
+        var workDirectory = commandLine.getWorkingDirectory();
+        // In some cases using .setLaunchWithWslExe(true) fixed errors.
+        // this has been removed so it uses the default behaviour. But it can be
+        // re-enabled if WSL file system errors arise.
         var wslCommandLineOptions = new WSLCommandLineOptions()
           .setExecuteCommandInShell(false);
-        if(workPath.startsWith("/")){
-          wslCommandLineOptions.setRemoteWorkingDirectory(workPath);
+        var workDirectoryString = "";
+        if(workDirectory == null){
+          var exePathString = getLocalFilePath(commandLine.getExePath());
+          Path exePath = Path.of(exePathString).getParent();
+          workDirectoryString = exePath.toString();
+        }else{
+          if(WslPath.isWslUncPath(workDirectory.toString())){
+            workDirectoryString = distribution.getWslPath(Path.of(workDirectory.toString()));
+          }else{
+            workDirectoryString = workDirectory.toString();
+          }
+        }
+
+        if(workDirectoryString.startsWith("/")){
+          wslCommandLineOptions.setRemoteWorkingDirectory(workDirectoryString);
+        }else{
+          wslCommandLineOptions.setRemoteWorkingDirectory(fixLinuxPath(workDirectoryString));
         }
         distribution.patchCommandLine(commandLine, null, wslCommandLineOptions);
       }
