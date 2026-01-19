@@ -60,6 +60,17 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   private String myDartCreateTemplatesSdkPath; //used to expire the above cache if the sdk is changed an alternative would be to use the same cache method as com.jetbrains.lang.dart.sdk.DartSdkUtil.getSdkVersion
 
   public DartGeneratorPeer() {
+    initialiseTemplatesPanel();
+  }
+
+  // This needs to run in a background thread to avoid blocking the UI which could
+  // happen because WSL initialization can be slow, which is required for any
+  // WSL file access like confirming an exiting Dart SDK directory.
+  private void initialiseTemplatesPanel() {
+    ApplicationManager.getApplication().executeOnPooledThread(this::initialiseTemplatesPanelAsync);
+  }
+
+  private void initialiseTemplatesPanelAsync() {
     // set initial values before initDartSdkControls() because listeners should not be triggered on initialization
     mySdkPathComboWithBrowse.getComboBox().setEditable(true);
     //mySdkPathComboWithBrowse.getComboBox().getEditor().setItem(...); initial sdk path will be correctly taken from known paths history
@@ -79,8 +90,8 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
         JLabel component = (JLabel)super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
         DartProjectTemplate template = (DartProjectTemplate)value;
         String text = template.getDescription().isEmpty()
-                      ? template.getName()
-                      : template.getName() + " - " + StringUtil.decapitalize(template.getDescription());
+                ? template.getName()
+                : template.getName() + " - " + StringUtil.decapitalize(template.getDescription());
         component.setText(text);
         return component;
       }

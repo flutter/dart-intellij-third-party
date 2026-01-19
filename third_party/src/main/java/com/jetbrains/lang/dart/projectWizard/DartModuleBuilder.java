@@ -105,13 +105,17 @@ public final class DartModuleBuilder extends ModuleBuilder {
     setupSdk(modifiableRootModel, wizardData);
 
     if (wizardData.myTemplate != null) {
-      final DartSdk sdk = DartSdk.getDartSdk(modifiableRootModel.getProject());
+      DartSdk sdk = DartSdk.getDartSdk(modifiableRootModel.getProject());
+      if(sdk == null){
+        sdk = DartSdk.getDartSdkFromPath(wizardData.dartSdkPath);
+      }
       if (sdk == null) return;
 
+      DartSdk finalSdk = sdk;
       ApplicationManager.getApplication().executeOnPooledThread(() -> {
         try {
           final Collection<VirtualFile> filesToOpen =
-            wizardData.myTemplate.generateProject(sdk, modifiableRootModel.getModule(), baseDir);
+            wizardData.myTemplate.generateProject(finalSdk, modifiableRootModel.getModule(), baseDir);
           if (!filesToOpen.isEmpty()) {
             scheduleFilesOpeningAndPubGet(modifiableRootModel.getModule(), filesToOpen);
           }

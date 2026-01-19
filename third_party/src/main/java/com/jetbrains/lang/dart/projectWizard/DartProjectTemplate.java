@@ -81,16 +81,14 @@ public abstract class DartProjectTemplate {
   }
 
   private static @NotNull List<DartProjectTemplate> getDartCreateTemplates(@NotNull DartSdk sdk) {
-      // Todo: Check this
-      String sdkRoot = sdk.getDartExePath();
-    if (ourDartCreateTemplateCache != null && sdkRoot.equals(ourDartCreateTemplateCacheSdkPath)) {
+    if (ourDartCreateTemplateCache != null && sdk.getFullDartExePath().equals(ourDartCreateTemplateCacheSdkPath)) {
       return ourDartCreateTemplateCache;
     }
 
     final List<DartCreateTemplate> templates = DART_CREATE.getAvailableTemplates(sdk);
 
     ourDartCreateTemplateCache = new ArrayList<>();
-    ourDartCreateTemplateCacheSdkPath = sdkRoot;
+    ourDartCreateTemplateCacheSdkPath = sdk.getFullDartExePath();
     for (DartCreateTemplate template : templates) {
       ourDartCreateTemplateCache.add(new DartCreateProjectTemplate(DART_CREATE, template));
     }
