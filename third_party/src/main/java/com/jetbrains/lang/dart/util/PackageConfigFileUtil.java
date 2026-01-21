@@ -1,6 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.util;
 
+import com.jetbrains.lang.dart.logging.PluginLogger;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -25,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public final class PackageConfigFileUtil {
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(PackageConfigFileUtil.class);
 
   public static final String DART_TOOL_DIR = ".dart_tool";
   public static final String PACKAGE_CONFIG_JSON = "package_config.json";
@@ -140,7 +143,7 @@ public final class PackageConfigFileUtil {
       jsonElement = JsonParser.parseString(fileContentsStr);
     }
     catch (Exception e) {
-      Logger.getInstance(PackageConfigFileUtil.class).info(e);
+      LOG.info(e);
       return null;
     }
 

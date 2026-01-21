@@ -1,18 +1,21 @@
-## 501.0.0
+## 502.0.0
 
 ### Added
 
 ### Changed
 
+- Update stagehand mentions to dart create (#171)
+
 ### Removed
 
 - Dropped support for Dart SDK versions older than 2.12.
+- Unsupported Dart in HTML logic (#173)
+- Outdated web template (#172)
 
 ### Fixed
 
 - Fixed resolution for Dart dot shorthands (e.g. `.new`, `.named`). (#89)
 - UI freeze during refactoring operations (e.g. Move File) when Analysis Server is slow (#122)
-
 
 ## 500.0.0
 

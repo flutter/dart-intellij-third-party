@@ -63,13 +63,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import com.jetbrains.lang.dart.logging.PluginLogger;
+
 /**
  * The {@link XDebugProcess} for the Dart VM debug process.
  * <p>
  * This classes has intentionally been left extensible for downstream plugins.
  */
 public class DartVmServiceDebugProcess extends XDebugProcess {
-  private static final Logger LOG = Logger.getInstance(DartVmServiceDebugProcess.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartVmServiceDebugProcess.class);
 
   private static final String ORG_DARTLANG_APP_PREFIX = "org-dartlang-app://";
 
