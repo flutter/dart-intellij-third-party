@@ -10,6 +10,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import org.jetbrains.annotations.NotNull;
@@ -20,7 +21,7 @@ import java.util.Comparator;
 import java.util.Map;
 
 public class DartTypeHierarchyBrowser extends TypeHierarchyBrowserBase {
-  private static final Logger LOG = Logger.getInstance(DartTypeHierarchyBrowser.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartTypeHierarchyBrowser.class);
 
   public DartTypeHierarchyBrowser(Project project, DartClass dartClass) {
     super(project, dartClass);
