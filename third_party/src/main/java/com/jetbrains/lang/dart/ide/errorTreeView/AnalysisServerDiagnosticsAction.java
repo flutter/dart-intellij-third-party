@@ -6,6 +6,7 @@ import com.intellij.ide.BrowserUtil;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.DumbAwareAction;
@@ -17,6 +18,7 @@ import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
 
@@ -41,12 +43,10 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
     final Project project = e.getProject();
     if (project == null) return;
 
-    run(project);
-
-    Analytics.report(AnalyticsData.forAction(this, e));
+    run(project, e);
   }
 
-  void run(final @NotNull Project project) {
+  void run(final @NotNull Project project, @Nullable AnActionEvent event) {
     // Get the current analysis server.
     DartAnalysisServerService server = DartAnalysisServerService.getInstance(project);
 
@@ -66,5 +66,15 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
         Notifications.Bus.notify(notification);
       }
     });
+
+    if (event != null) {
+      Analytics.report(AnalyticsData.forAction(this, event));
+    } else {
+      ActionManager actionManager = ActionManager.getInstance();
+      if (actionManager != null) {
+        String id = actionManager.getId(this);
+        Analytics.report(AnalyticsData.forAction(id, project));
+      }
+    }
   }
 }
