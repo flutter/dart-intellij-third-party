@@ -72,8 +72,7 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
     } else {
       ActionManager actionManager = ActionManager.getInstance();
       if (actionManager != null) {
-        String id = actionManager.getId(this);
-        Analytics.report(AnalyticsData.forAction(id, project));
+        Analytics.report(AnalyticsData.forAction(actionManager.getId(this), project));
       }
     }
   }
