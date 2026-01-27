@@ -114,6 +114,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
 
+      - name: Free Disk Space (ubuntu-only)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: jlumbroso/free-disk-space-action@v1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
         with:
