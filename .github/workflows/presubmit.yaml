@@ -114,17 +114,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
 
-      - name: Free Disk Space (ubuntu-only)
+      - name: Free up disk space (ubuntu only)
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
 
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
