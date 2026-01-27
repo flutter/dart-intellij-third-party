@@ -10,19 +10,13 @@ import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.*;
-import com.intellij.util.SmartList;
-import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaders;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.builtInWebServer.ConsoleManager;
-
-import java.util.Collection;
-import java.util.Map;
 
 @Service(Service.Level.PROJECT)
 public final class PubServerManager implements Disposable {
@@ -129,40 +123,5 @@ public final class PubServerManager implements Disposable {
         LOG.error(e);
       }
     }
-  }
-
-  public @NotNull Collection<String> getAllAlivePubServerAuthorities() {
-    final Collection<String> result = new SmartList<>();
-    for (PubServerService service : myServedDirToPubService.asMap().values()) {
-      result.addAll(service.getAllPubServeAuthorities());
-    }
-    return result;
-  }
-
-  public @NotNull Collection<String> getAlivePubServerAuthoritiesForDartRoot(final @NotNull VirtualFile dartProjectRoot) {
-    final Collection<String> result = new SmartList<>();
-    for (VirtualFile subdir : dartProjectRoot.getChildren()) {
-      if (!subdir.isDirectory()) continue;
-      final PubServerService service = myServedDirToPubService.getIfPresent(subdir);
-      if (service == null) continue;
-      ContainerUtil.addIfNotNull(result, service.getPubServeAuthority(subdir));
-    }
-    return result;
-  }
-
-  public @Nullable VirtualFile getDartRootByAuthority(final @NotNull String authority) {
-    for (Map.Entry<VirtualFile, PubServerService> entry : myServedDirToPubService.asMap().entrySet()) {
-      if (entry.getValue().getAllPubServeAuthorities().contains(authority)) {
-        return entry.getKey();
-      }
-    }
-    return null;
-  }
-
-  public @Nullable String getPubServerAuthorityForServedDir(final @NotNull VirtualFile servedDir) {
-    LOG.assertTrue(servedDir.isDirectory() && servedDir.getParent().findChild(PubspecYamlUtil.PUBSPEC_YAML) != null,
-                   "Bad argument: " + servedDir.getPath());
-    final PubServerService service = myServedDirToPubService.getIfPresent(servedDir);
-    return service != null ? service.getPubServeAuthority(servedDir) : null;
   }
 }
