@@ -116,7 +116,7 @@ jobs:
 
       - name: Free Disk Space (ubuntu-only)
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: jlumbroso/free-disk-space-action@v1
+        uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: true
           android: true
