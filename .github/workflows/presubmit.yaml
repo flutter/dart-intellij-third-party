@@ -106,11 +106,29 @@ jobs:
     needs: build-plugin
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        # TODO(pq): temporarily reduced to address IO exceptions (https://github.com/flutter/dart-intellij-third-party/issues/220)
+        # os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+
+      - name: Free up disk space (on ubuntu only)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        # Inspired by the https://github.com/marketplace/actions/free-disk-space-ubuntu action
+        # See: https://github.com/flutter/dart-intellij-third-party/issues/220
+        run: |
+          echo "Freeing disk space...\n"
+          echo "Before:\n"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          echo "After:\n"
+          df -h
 
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
