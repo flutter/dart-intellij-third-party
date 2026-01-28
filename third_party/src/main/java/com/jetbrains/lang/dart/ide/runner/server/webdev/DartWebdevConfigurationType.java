@@ -44,9 +44,4 @@ public final class DartWebdevConfigurationType extends ConfigurationTypeBase imp
       }
     });
   }
-
-  @Override
-  public String getHelpTopic() {
-    return "reference.dialogs.rundebug.DartWebdevConfigurationType";
-  }
 }
