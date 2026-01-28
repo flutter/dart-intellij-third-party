@@ -278,6 +278,11 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
     fun forAction(action: AnAction, event: AnActionEvent): ActionData = forAction(
       event.actionManager.getId(action), event.place, event.project
     )
+    
+    @JvmStatic
+    fun forAction(id: String?, event: AnActionEvent): ActionData = forAction(
+      id, event.place, event.project
+    )
 
     @JvmStatic
     fun forAction(id: String?, place: String, project: Project?): ActionData = ActionData(
