@@ -39,11 +39,6 @@ public final class DartExceptionBreakpointType
   }
 
   @Override
-  public String getBreakpointsDialogHelpTopic() {
-    return "reference.dialogs.breakpoints";
-  }
-
-  @Override
   public String getDisplayText(XBreakpoint<DartExceptionBreakpointProperties> breakpoint) {
     return DartBundle.message("break.on.exceptions");
   }

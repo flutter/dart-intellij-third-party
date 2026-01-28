@@ -206,11 +206,6 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   }
 
   @Override
-  public @Nullable String getHelpTopic() {
-    return "settings.dart.settings";
-  }
-
-  @Override
   public @Nullable JComponent createComponent() {
     return myMainPanel;
   }
