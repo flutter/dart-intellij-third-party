@@ -2,6 +2,6 @@
 
 
 # Default owners for everything in the repo. Unless a later 
-* match takes precedence, these users will be added to a
+# match takes precedence, these users will be added to a
 # review when someone opens a pull request.
 *                @helin24 @jwren @pq
