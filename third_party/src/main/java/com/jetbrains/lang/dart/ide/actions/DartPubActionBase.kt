@@ -21,12 +21,15 @@ import com.intellij.notification.Notifications
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
@@ -137,7 +140,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       setupPubExePath(command, sdk)
       command.addParameters(*pubParameters)
 
-      doPerformPubAction(module, pubspecYamlFile, command, getTitle(pubspecYamlFile))
+      doPerformPubActionAsync(module, pubspecYamlFile, command, getTitle(pubspecYamlFile))
     }
   }
 
@@ -226,6 +229,17 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
         return if (file != null) Pair(module, file) else null
       }
       return null
+    }
+
+    private fun doPerformPubActionAsync(
+      module: Module,
+      pubspecYamlFile: VirtualFile,
+      command: GeneralCommandLine,
+      actionTitle: @NlsContexts.NotificationTitle String,
+    ) {
+      ApplicationManager.getApplication().invokeLater {
+        doPerformPubAction(module, pubspecYamlFile, command, actionTitle)
+      };
     }
 
     private fun doPerformPubAction(
