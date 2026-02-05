@@ -105,6 +105,24 @@ public class DartFunctionDescription {
 
   public static @Nullable DartFunctionDescription tryGetDescription(DartCallExpression callExpression) {
     final DartReference expression = (DartReference)callExpression.getExpression();
+
+    // TODO(pq): vet this change
+    
+    // If the expression is a call or new expression (e.g. foo()(...) or new Foo()(...)),
+    // we are invoking the 'call' method on the returned object.
+    // We must check this BEFORE calling expression.resolve(), because DartResolver now resolves
+    // foo() to the function 'foo', which would mislead us to show parameters of 'foo' instead of 'call'.
+    if (expression instanceof DartCallExpression || expression instanceof DartNewExpression) {
+      DartClassResolveResult resolveResult = expression.resolveDartClass();
+      DartClass dartClass = resolveResult.getDartClass();
+      if (dartClass != null) {
+        DartComponent callMethod = dartClass.findMethodByName("call");
+        if (callMethod != null) {
+          return createDescription(callMethod, resolveResult);
+        }
+      }
+    }
+
     PsiElement target = expression != null ? expression.resolve() : null;
     PsiElement targetParent = target == null ? null : target.getParent();
     // If no target, such as "new Test()" or the target is a variable,

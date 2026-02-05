@@ -65,6 +65,12 @@ public class DartClassDefinitionImpl extends AbstractDartPsiClass implements Dar
 
   @Override
   @Nullable
+  public DartPrimaryConstructorDeclaration getPrimaryConstructorDeclaration() {
+    return findChildByClass(DartPrimaryConstructorDeclaration.class);
+  }
+
+  @Override
+  @Nullable
   public DartStringLiteralExpression getStringLiteralExpression() {
     return findChildByClass(DartStringLiteralExpression.class);
   }

@@ -64,6 +64,7 @@ public class DartServerQuickFixTest extends CodeInsightFixtureTestCase {
     myFixture.checkResultByFile(updatedFileName + ".after.dart");
   }
 
+  // todo(pq): failing locally (02/04/2026) -- investigate
   public void testCreateMethodInAnotherFile() {
     final VirtualFile partFile = myFixture.copyFileToProject(getTestName(false) + "_part.dart");
     doQuickFixTest("Create method 'doSomething'", partFile);
