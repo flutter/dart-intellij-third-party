@@ -14,7 +14,6 @@ import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.EventDispatcher
@@ -22,6 +21,7 @@ import com.intellij.util.io.BaseOutputReader
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonConsumer
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonRequestHandler
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import de.roderick.weberknecht.WebSocket
@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class DTDProcess {
   companion object {
-    private val logger = logger<DTDProcess>()
+    private val logger = PluginLogger.createLogger(DTDProcess::class.java)
   }
 
   private lateinit var osProcessHandler: KillableProcessHandler
