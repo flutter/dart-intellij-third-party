@@ -68,7 +68,7 @@ jobs:
         # TODO(https://github.com/flutter/dart-intellij-third-party/issues/47)
         # Fix tests to run over additional operating systems as well as Dart SDK versions:
 
-        dart-version: ['stable']
+        dart-version: ['dev']
         os: [ macos-latest ]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
