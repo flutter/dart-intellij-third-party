@@ -52,7 +52,7 @@ import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analytics.AnalyticsData
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
-import com.jetbrains.lang.dart.excludeBuildAndToolCacheFolders
+import com.jetbrains.lang.dart.prepareExcludeBuildAndToolCacheFolders
 import com.jetbrains.lang.dart.flutter.FlutterUtil
 import com.jetbrains.lang.dart.ide.runner.DartConsoleFilter
 import com.jetbrains.lang.dart.ide.runner.DartRelativePathsConsoleFilter
@@ -237,9 +237,16 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       command: GeneralCommandLine,
       actionTitle: @NlsContexts.NotificationTitle String,
     ) {
+      // Save documents on EDT first
       ApplicationManager.getApplication().invokeLater {
+        FileDocumentManager.getInstance().saveAllDocuments()
+      }
+
+      // Run process creation on background thread to support WSL
+      // WSLDistribution.patchCommandLine requires a background thread
+      ApplicationManager.getApplication().executeOnPooledThread {
         doPerformPubAction(module, pubspecYamlFile, command, actionTitle)
-      };
+      }
     }
 
     private fun doPerformPubAction(
@@ -248,8 +255,6 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       command: GeneralCommandLine,
       actionTitle: @NlsContexts.NotificationTitle String,
     ) {
-      FileDocumentManager.getInstance().saveAllDocuments()
-
       try {
         if (ourInProgress.compareAndSet(false, true)) {
           command.withEnvironment(PUB_ENV_VAR_NAME, pubEnvValue)
@@ -263,14 +268,29 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
             override fun processTerminated(event: ProcessEvent) {
               ourInProgress.set(false)
 
-              ApplicationManager.getApplication().invokeLater {
-                if (!module.isDisposed) {
-                  excludeBuildAndToolCacheFolders(module, pubspecYamlFile)
+              // Use coroutine to run slow file index operation in background, then finish on EDT
+              module.project.service<DartPubActionsService>().cs.launch {
+                if (module.isDisposed) return@launch
+
+                // prepareExcludeBuildAndToolCacheFolders uses ProjectFileIndex.getContentRootForFile
+                // which is a slow operation requiring read access
+                val excludeAction = readAction {
+                  prepareExcludeBuildAndToolCacheFolders(module, pubspecYamlFile)
+                }
+
+                withContext(Dispatchers.EDT) {
+                  if (module.isDisposed) return@withContext
+
+                  excludeAction?.invoke()
 
                   // refresh later than exclude, otherwise IDE may start indexing excluded folders
                   VfsUtil.markDirtyAndRefresh(true, true, true, pubspecYamlFile.parent)
+                }
 
-                  if (DartSdkLibUtil.isDartSdkEnabled(module)) {
+                // serverReadyForRequest requires read access and does blocking operations,
+                // so it must run on a background thread with read access
+                if (!module.isDisposed && DartSdkLibUtil.isDartSdkEnabled(module)) {
+                  readAction {
                     DartAnalysisServerService.getInstance(module.project).serverReadyForRequest()
                   }
                 }

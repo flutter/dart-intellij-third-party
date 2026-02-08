@@ -5,7 +5,9 @@ import com.intellij.execution.RunManager;
 import com.intellij.execution.RunnerAndConfigurationSettings;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -110,20 +112,24 @@ public abstract class DartProjectTemplate {
   }
 
   static void createCmdLineRunConfiguration(final @NotNull Module module, final @NotNull VirtualFile mainDartFile) {
-    DartModuleBuilder.runWhenNonModalIfModuleNotDisposed(() -> {
-      final RunManager runManager = RunManager.getInstance(module.getProject());
-      final RunnerAndConfigurationSettings settings = runManager.createConfiguration("", DartCommandLineRunConfigurationType.class);
+    // suggestDartWorkingDir calls PubspecYamlUtil.findPubspecYamlFile which uses ProjectFileIndex.isInContent(),
+    // a slow operation that must run in a background thread with read access.
+    ReadAction.nonBlocking(() -> DartCommandLineRunnerParameters.suggestDartWorkingDir(module.getProject(), mainDartFile))
+      .expireWhen(module::isDisposed)
+      .finishOnUiThread(ModalityState.nonModal(), workingDir -> {
+        final RunManager runManager = RunManager.getInstance(module.getProject());
+        final RunnerAndConfigurationSettings settings = runManager.createConfiguration("", DartCommandLineRunConfigurationType.class);
 
-      final DartCommandLineRunConfiguration runConfiguration = (DartCommandLineRunConfiguration)settings.getConfiguration();
-      runConfiguration.getRunnerParameters().setFilePath(mainDartFile.getPath());
-      runConfiguration.getRunnerParameters()
-        .setWorkingDirectory(DartCommandLineRunnerParameters.suggestDartWorkingDir(module.getProject(), mainDartFile));
+        final DartCommandLineRunConfiguration runConfiguration = (DartCommandLineRunConfiguration)settings.getConfiguration();
+        runConfiguration.getRunnerParameters().setFilePath(mainDartFile.getPath());
+        runConfiguration.getRunnerParameters().setWorkingDirectory(workingDir);
 
-      settings.setName(runConfiguration.suggestedName());
+        settings.setName(runConfiguration.suggestedName());
 
-      runManager.addConfiguration(settings);
-      runManager.setSelectedConfiguration(settings);
-    }, module);
+        runManager.addConfiguration(settings);
+        runManager.setSelectedConfiguration(settings);
+      })
+      .submit(AppExecutorUtil.getAppExecutorService());
   }
 
   static void createTestRunConfiguration(@NotNull Module module, @NotNull @NonNls String baseDirPath) {
