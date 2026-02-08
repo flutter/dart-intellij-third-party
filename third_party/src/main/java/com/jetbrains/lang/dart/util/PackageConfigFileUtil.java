@@ -20,6 +20,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.io.URLUtil;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -84,7 +85,7 @@ public final class PackageConfigFileUtil {
     return null;
   }
 
-  public static @Nullable Map<String, String> getPackagesMapFromPackageConfigJsonFile(final @NotNull VirtualFile packageConfigJsonFile) {
+  public static @Nullable Map<String, String> getPackagesMapFromPackageConfigJsonFile(@NotNull Project project, final @NotNull VirtualFile packageConfigJsonFile) {
     Pair<Long, Map<String, String>> data = packageConfigJsonFile.getUserData(MOD_STAMP_TO_PACKAGES_MAP);
 
     final Long currentTimestamp = packageConfigJsonFile.getModificationCount();
@@ -93,7 +94,7 @@ public final class PackageConfigFileUtil {
     if (cachedTimestamp == null || !cachedTimestamp.equals(currentTimestamp)) {
       data = null;
       packageConfigJsonFile.putUserData(MOD_STAMP_TO_PACKAGES_MAP, null);
-      final Map<String, String> packagesMap = loadPackagesMapFromJson(packageConfigJsonFile);
+      final Map<String, String> packagesMap = loadPackagesMapFromJson(DartSdk.getDartSdk(project), packageConfigJsonFile);
 
       if (packagesMap != null) {
         data = Pair.create(currentTimestamp, packagesMap);
@@ -129,7 +130,7 @@ public final class PackageConfigFileUtil {
    * }
    * ```
    */
-  private static @Nullable Map<String, String> loadPackagesMapFromJson(@NotNull VirtualFile packageConfigJsonFile) {
+  private static @Nullable Map<String, String> loadPackagesMapFromJson(DartSdk dartSdk, @NotNull VirtualFile packageConfigJsonFile) {
     final String fileContentsStr;
     try {
       fileContentsStr = StringUtil.convertLineSeparators(VfsUtilCore.loadText(packageConfigJsonFile));
@@ -164,7 +165,7 @@ public final class PackageConfigFileUtil {
           // need to protect '+' chars because URLDecoder.decode replaces '+' with space
           final String encodedUriWithoutPluses = StringUtil.replace(rootUriValue + "/" + packageUriValue, "+", "%2B");
           final String uri = URLUtil.decode(encodedUriWithoutPluses);
-          final String packageUri = getAbsolutePackageRootPath(packageConfigJsonFile.getParent(), uri);
+          final String packageUri = getAbsolutePackageRootPath(dartSdk, packageConfigJsonFile.getParent(), uri);
           if (!packageName.isEmpty() && packageUri != null) {
             result.put(packageName, packageUri);
           }
@@ -175,9 +176,12 @@ public final class PackageConfigFileUtil {
     return null;
   }
 
-  private static @Nullable String getAbsolutePackageRootPath(@NotNull VirtualFile baseDir, @NotNull String uri) {
+  private static @Nullable String getAbsolutePackageRootPath(DartSdk dartSdk, @NotNull VirtualFile baseDir, @NotNull String uri) {
     if (uri.startsWith("file:/")) {
       final String pathAfterSlashes = StringUtil.trimEnd(StringUtil.trimLeading(StringUtil.trimStart(uri, "file:/"), '/'), "/");
+      if (dartSdk != null && dartSdk.isWsl()) {
+        return dartSdk.getIDEFilePath("/" + pathAfterSlashes);
+      }
       if (SystemInfo.isWindows && !ApplicationManager.getApplication().isUnitTestMode()) {
         if (pathAfterSlashes.length() > 2 && OSAgnosticPathUtil.startsWithWindowsDrive(pathAfterSlashes)) {
           return pathAfterSlashes;
@@ -188,6 +192,9 @@ public final class PackageConfigFileUtil {
       }
     }
     else {
+      if (dartSdk != null && dartSdk.isWsl()) {
+        return dartSdk.getIDEFilePath(FileUtil.toCanonicalPath(baseDir.getPath() + "/" + uri));
+      }
       return FileUtil.toCanonicalPath(baseDir.getPath() + "/" + uri);
     }
 

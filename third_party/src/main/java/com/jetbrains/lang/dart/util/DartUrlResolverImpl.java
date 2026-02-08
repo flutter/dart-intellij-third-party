@@ -204,7 +204,7 @@ public final class DartUrlResolverImpl extends DartUrlResolver {
     if (myPubspecYamlFile == null || baseDir == null) return;
 
     final VirtualFile packagesFile = PackageConfigFileUtil.getPackageConfigJsonFile(myProject, myPubspecYamlFile);
-    final Map<String, String> packagesMap = packagesFile != null ? PackageConfigFileUtil.getPackagesMapFromPackageConfigJsonFile(packagesFile) : null;
+    final Map<String, String> packagesMap = packagesFile != null ? PackageConfigFileUtil.getPackagesMapFromPackageConfigJsonFile(myProject, packagesFile) : null;
 
     if (packagesMap != null) {
       for (Map.Entry<String, String> entry : packagesMap.entrySet()) {
