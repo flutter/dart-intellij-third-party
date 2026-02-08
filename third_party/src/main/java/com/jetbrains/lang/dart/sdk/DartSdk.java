@@ -100,7 +100,7 @@ public final class DartSdk {
    * @return a new DartSdk instance, or throws if the SDK version cannot be determined
    * @throws NullPointerException if the SDK version cannot be read from the given path
    */
-  public static @Nullable DartSdk getDartSdkFromPath(final @NotNull String sdkPath) {
+  public static @NotNull DartSdk getDartSdkFromPath(final @NotNull String sdkPath) {
     return new DartSdk(sdkPath, Objects.requireNonNull(DartSdkUtil.getSdkVersion(sdkPath)));
   }
 
@@ -119,7 +119,6 @@ public final class DartSdk {
     final VirtualFile dartCoreRoot = DartSdkLibraryPresentationProvider.findDartCoreRoot(Arrays.asList(roots));
     if (dartCoreRoot != null) {
       final String homePath = dartCoreRoot.getParent().getParent().getPath();
-      final String firstVersion = DartSdkUtil.getSdkVersion(homePath);
       final String version = StringUtil.notNullize(DartSdkUtil.getSdkVersion(homePath), UNKNOWN_VERSION);
       return new DartSdk(homePath, version);
     }
@@ -160,7 +159,7 @@ public final class DartSdk {
   /**
    * Returns the full path to the Dart executable using the SDK home path.
    * <p>
-   * For WSL SDKs, returns the Windows UNC path (e.g., {@code \\wsl$\Ubuntu\usr\lib\dart\bin\dart}).
+   * For WSL SDKs, returns the Windows UNC path (e.g., {@code \\wsl$\Ubuntu\ usr\lib\dart\bin\dart}).
    * For Windows SDKs, returns the path with {@code .exe} extension.
    * For other platforms, returns the path without extension.
    *
@@ -196,7 +195,7 @@ public final class DartSdk {
   /**
    * Returns the full path to the Pub executable using the SDK home path.
    * <p>
-   * For WSL SDKs, returns the Windows UNC path (e.g., {@code \\wsl$\Ubuntu\usr\lib\dart\bin\pub}).
+   * For WSL SDKs, returns the Windows UNC path (e.g., {@code \\wsl$\Ubuntu\ usr\lib\dart\bin\pub}).
    * For Windows SDKs, returns the path to {@code pub.bat}.
    * For other platforms, returns the path to the {@code pub} script.
    *
@@ -212,8 +211,8 @@ public final class DartSdk {
   /**
    * Converts a Linux file path to a Windows-accessible path for WSL SDKs.
    * <p>
-   * For WSL SDKs, converts a Linux path (e.g., {@code /home/user/.pub-cache/...}) to a
-   * Windows UNC path (e.g., {@code \\wsl$\Ubuntu\home\user\.pub-cache\...}).
+   * For WSL SDKs, converts a Linux path (e.g., {@code /home/name/.pub-cache/...}) to a
+   * Windows UNC path (e.g., {@code \\wsl$\Ubuntu\home\name\.pub-cache\...}).
    * For non-WSL SDKs, returns the path unchanged.
    *
    * @param path the file path in Linux format (for WSL) or any format (for non-WSL)
@@ -251,8 +250,7 @@ public final class DartSdk {
       return FileUtil.toSystemDependentName(localFilePath);
     }
 
-    String fileUri = file.getUserData(DartFileInfoKt.DART_NOT_LOCAL_FILE_URI_KEY);
-    return fileUri != null ? fileUri : getLocalFileUri(file.getPath());
+      return file.getUserData(DartFileInfoKt.DART_NOT_LOCAL_FILE_URI_KEY);
   }
 
   /**
@@ -345,6 +343,7 @@ public final class DartSdk {
    */
   public void patchCommandLineIfRequired(GeneralCommandLine commandLine) {
     if(isWsl()){
+
       try {
         var workDirectory = commandLine.getWorkingDirectory();
         // In some cases using .setLaunchWithWslExe(true) fixed errors.
@@ -357,15 +356,16 @@ public final class DartSdk {
           var exePathString = getLocalFilePath(commandLine.getExePath());
           Path exePath = Path.of(exePathString).getParent();
           workDirectoryString = exePath.toString();
-        }else{
-          if(WslPath.isWslUncPath(workDirectory.toString())){
-            workDirectoryString = distribution.getWslPath(Path.of(workDirectory.toString()));
           }else{
-            workDirectoryString = workDirectory.toString();
+            if(WslPath.isWslUncPath(workDirectory.toString())){
+              workDirectoryString = distribution.getWslPath(Path.of(workDirectory.toString()));
+            }else{
+              workDirectoryString = workDirectory.toString();
+            }
           }
-        }
 
-        if(workDirectoryString.startsWith("/")){
+          assert workDirectoryString != null;
+          if(workDirectoryString.startsWith("/")){
           wslCommandLineOptions.setRemoteWorkingDirectory(workDirectoryString);
         }else{
           wslCommandLineOptions.setRemoteWorkingDirectory(fixLinuxPath(workDirectoryString));
@@ -386,11 +386,16 @@ public final class DartSdk {
    * This method returns a mutable list that can be modified by the caller.
    *
    * @return a mutable list of command arguments for executing Dart
+   * @throws IllegalStateException if WSL executable cannot be found for a WSL SDK
    */
   public List<String> getDartSimpleCommandList() {
     List<String> commandList = new ArrayList<>();
     if (isWsl()) {
-      commandList.add(Objects.requireNonNull(WSLDistribution.findWslExe()).toAbsolutePath().toString());
+      java.nio.file.Path wslExe = WSLDistribution.findWslExe();
+      if (wslExe == null) {
+        throw new IllegalStateException("WSL executable not found. Please ensure WSL is properly installed.");
+      }
+      commandList.add(wslExe.toAbsolutePath().toString());
     }
     commandList.add(getDartExePath());
     return commandList;
@@ -432,8 +437,7 @@ public final class DartSdk {
       if(command.getWorkDirectory() != null){
         options.setRemoteWorkingDirectory(fixLinuxPath(command.getWorkDirectory().getPath()));
       }
-      ProcessOutput output = distribution.executeOnWsl(command.getCommandLineList(fixLinuxPath(command.getExePath())), options, timeout, processHandlerConsumer);
-      return output;
+        return distribution.executeOnWsl(command.getCommandLineList(fixLinuxPath(command.getExePath())), options, timeout, processHandlerConsumer);
     }else{
       final CapturingProcessHandler processHandler = new CapturingProcessHandler(command);
       if(processHandlerConsumer != null){
