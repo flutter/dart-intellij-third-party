@@ -235,6 +235,12 @@ public final class DartSdk {
    * </ul>
    */
   public String getFileUri(@NotNull VirtualFile file) {
+    // Check for non-local file URI first (e.g., files from remote sources)
+    String notLocalFileUri = file.getUserData(DartFileInfoKt.DART_NOT_LOCAL_FILE_URI_KEY);
+    if (notLocalFileUri != null) {
+      return notLocalFileUri;
+    }
+
     String localFilePath = file.getPath();
     if(isWsl()){
       if(!WslPath.isWslUncPath(localFilePath)){
@@ -250,7 +256,11 @@ public final class DartSdk {
       return FileUtil.toSystemDependentName(localFilePath);
     }
 
-      return file.getUserData(DartFileInfoKt.DART_NOT_LOCAL_FILE_URI_KEY);
+    // For SDK >= 3.4, construct a proper file:// URI
+    String escapedPath = URLUtil.encodePath(FileUtil.toSystemIndependentName(localFilePath));
+    String url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath);
+    URI uri = VfsUtil.toUri(url);
+    return uri != null ? uri.toString() : url;
   }
 
   /**
