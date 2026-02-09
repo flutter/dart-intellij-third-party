@@ -103,7 +103,40 @@ jobs:
          path: |
            **/build/reports/
            **/build/test-results/
-  # Job 4: Verify Plugin
+  # Job 4: WSL Dart SDK Tests
+  wsl-dart-tests:
+    needs: build-plugin
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Install WSL with Ubuntu
+        run: wsl --install -d Ubuntu --no-launch
+
+      - name: Install Dart SDK in WSL
+        run: |
+          wsl -d Ubuntu -- sudo apt-get update
+          wsl -d Ubuntu -- sudo apt-get install -y wget gnupg2
+          wsl -d Ubuntu -- sh -c "wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/dart.gpg"
+          wsl -d Ubuntu -- sh -c 'echo "deb [signed-by=/usr/share/keyrings/dart.gpg arch=amd64] https://storage.googleapis.com/dart-archive/channels/stable/release/latest/linux_packages/debian stable main" | sudo tee /etc/apt/sources.list.d/dart_stable.list > /dev/null'
+          wsl -d Ubuntu -- sudo apt-get update
+          wsl -d Ubuntu -- sudo apt-get install -y dart
+
+      - name: Run WSL Tests
+        run: ./gradlew :test --tests "com.jetbrains.lang.dart.sdk.DartSdkWslTest"
+        working-directory: third_party
+        env:
+          WSL_DART_SDK: "\\\\wsl$\\Ubuntu\\usr\\lib\\dart"
+
+  # Job 5: Verify Plugin
   verify-plugin:
     needs: build-plugin
     strategy:

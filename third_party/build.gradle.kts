@@ -131,6 +131,20 @@ tasks {
         } else {
             logger.error("DART_HOME environment variable is not set. Dart Analysis Server tests will fail.")
         }
+
+        // WSL Dart SDK for WSL-specific tests
+        val wslDartSdkPath = System.getenv("WSL_DART_SDK")
+        if (wslDartSdkPath != null) {
+            val versionFile = file("${wslDartSdkPath}/version")
+            if (versionFile.exists() && versionFile.isFile) {
+                jvmArgs("-Dwsl.dart.sdk=${wslDartSdkPath}")
+            } else {
+                logger.error("This directory, ${dartSdkPath}, doesn't appear to be Dart SDK path, " +
+                        "no version file found at ${versionFile.absolutePath}")
+            }
+        } else {
+            logger.error("WSL_DART_SDK environment variable is not set. WSL-specific DartSdk tests will be skipped.")
+        }
     }
 }
 

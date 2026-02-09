@@ -176,7 +176,8 @@ public final class PackageConfigFileUtil {
     return null;
   }
 
-  private static @Nullable String getAbsolutePackageRootPath(DartSdk dartSdk, @NotNull VirtualFile baseDir, @NotNull String uri) {
+  // Package-private for testing
+  static @Nullable String getAbsolutePackageRootPath(DartSdk dartSdk, @NotNull VirtualFile baseDir, @NotNull String uri) {
     if (uri.startsWith("file:/")) {
       final String pathAfterSlashes = StringUtil.trimEnd(StringUtil.trimLeading(StringUtil.trimStart(uri, "file:/"), '/'), "/");
       if (dartSdk != null && dartSdk.isWsl()) {
