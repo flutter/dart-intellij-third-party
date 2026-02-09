@@ -85,7 +85,15 @@ public final class PackageConfigFileUtil {
     return null;
   }
 
-  public static @Nullable Map<String, String> getPackagesMapFromPackageConfigJsonFile(@NotNull Project project, final @NotNull VirtualFile packageConfigJsonFile) {
+  /**
+   * Overload without {@link Project} for compatibility with the Flutter plugin <= 89.0.0.
+   * WSL path resolution is not available through this entry point.
+   */
+  public static @Nullable Map<String, String> getPackagesMapFromPackageConfigJsonFile(final @NotNull VirtualFile packageConfigJsonFile) {
+    return getPackagesMapFromPackageConfigJsonFile(null, packageConfigJsonFile);
+  }
+
+  public static @Nullable Map<String, String> getPackagesMapFromPackageConfigJsonFile(@Nullable Project project, final @NotNull VirtualFile packageConfigJsonFile) {
     Pair<Long, Map<String, String>> data = packageConfigJsonFile.getUserData(MOD_STAMP_TO_PACKAGES_MAP);
 
     final Long currentTimestamp = packageConfigJsonFile.getModificationCount();
@@ -94,7 +102,7 @@ public final class PackageConfigFileUtil {
     if (cachedTimestamp == null || !cachedTimestamp.equals(currentTimestamp)) {
       data = null;
       packageConfigJsonFile.putUserData(MOD_STAMP_TO_PACKAGES_MAP, null);
-      final Map<String, String> packagesMap = loadPackagesMapFromJson(DartSdk.getDartSdk(project), packageConfigJsonFile);
+      final Map<String, String> packagesMap = loadPackagesMapFromJson(project != null ? DartSdk.getDartSdk(project) : null, packageConfigJsonFile);
 
       if (packagesMap != null) {
         data = Pair.create(currentTimestamp, packagesMap);
