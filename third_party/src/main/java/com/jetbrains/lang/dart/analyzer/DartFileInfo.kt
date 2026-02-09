@@ -1,6 +1,6 @@
 package com.jetbrains.lang.dart.analyzer
 
-import com.intellij.openapi.diagnostic.logger
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.SystemInfo
@@ -10,6 +10,8 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import java.net.URI
 import java.net.URISyntaxException
+
+private val LOG = PluginLogger.createLogger(DartFileInfo::class.java)
 
 sealed class DartFileInfo {
   abstract fun findFile(): VirtualFile?
@@ -36,7 +38,7 @@ fun getDartFileInfo(project: Project, filePathOrUri: String): DartFileInfo = whe
     DartLocalFileInfo(path)
   }
   catch (_: URISyntaxException) {
-    logger<DartFileInfo>().warn("Malformed URI: $filePathOrUri")
+    LOG.warn("Malformed URI: $filePathOrUri")
     DartNotLocalFileInfo(project, filePathOrUri)
   }
 }

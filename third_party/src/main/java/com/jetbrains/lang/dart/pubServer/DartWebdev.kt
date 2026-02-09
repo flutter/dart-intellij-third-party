@@ -4,7 +4,7 @@ package com.jetbrains.lang.dart.pubServer
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessOutput
-import com.intellij.openapi.diagnostic.logger
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
@@ -14,7 +14,7 @@ import com.jetbrains.lang.dart.ide.actions.DartPubActionBase
 import com.jetbrains.lang.dart.sdk.DartSdk
 import java.util.concurrent.ExecutionException
 
-private val LOG = logger<DartWebdev>()
+private val LOG = PluginLogger.createLogger(DartWebdev::class.java)
 
 object DartWebdev {
   var activated: Boolean = false
