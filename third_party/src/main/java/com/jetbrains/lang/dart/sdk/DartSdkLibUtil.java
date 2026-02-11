@@ -22,7 +22,7 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.platform.workspace.jps.entities.*;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ArrayUtilRt;
-import com.intellij.util.PlatformUtils;
+
 import com.intellij.util.SmartList;
 import com.jetbrains.lang.dart.ide.index.DartLibraryIndex;
 import org.jetbrains.annotations.NotNull;
@@ -45,7 +45,8 @@ public final class DartSdkLibUtil {
   };
 
   public static boolean isIdeWithMultipleModuleSupport() {
-    return PlatformUtils.isIntelliJ() || "AndroidStudio".equals(PlatformUtils.getPlatformPrefix());
+    String prefix = System.getProperty("idea.platform.prefix");
+    return prefix == null || prefix.startsWith("Idea") || "AndroidStudio".equals(prefix);
   }
 
   public static void ensureDartSdkConfigured(final @NotNull Project project, final @NotNull String sdkHomePath) {
