@@ -58,6 +58,7 @@ jobs:
     continue-on-error: true  # Flakes and stalls are not uncommon so we don't want to break the build
     timeout-minutes: 20      # Nor do we want to tie up the builder if we're stalled
     strategy:
+      fail-fast: false # Try and not fail the whole workflow on a cancellation
       matrix:
         # https://github.com/dart-lang/setup-dart
         # Define the Dart SDK versions to test against.
