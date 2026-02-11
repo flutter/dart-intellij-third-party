@@ -4,15 +4,11 @@ package com.jetbrains.lang.dart.util;
 import com.intellij.lang.ASTNode;
 import com.intellij.openapi.util.Condition;
 import com.intellij.psi.*;
-import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.Function;
 import com.jetbrains.lang.dart.DartTokenTypes;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 public final class UsefulPsiTreeUtil {
   public static ASTNode[] findChildrenRange(ASTNode[] elements, int startOffset, int endOffset) {
@@ -57,22 +53,6 @@ public final class UsefulPsiTreeUtil {
     return element instanceof PsiWhiteSpace || element instanceof PsiComment;
   }
 
-  public static @Nullable List<PsiElement> getPathToParentOfType(@Nullable PsiElement element,
-                                                                 @NotNull Class<? extends PsiElement> aClass) {
-    if (element == null) return null;
-    final List<PsiElement> result = new ArrayList<>();
-    while (element != null) {
-      result.add(element);
-      if (aClass.isInstance(element)) {
-        return result;
-      }
-      if (element instanceof PsiFile) return null;
-      element = element.getParent();
-    }
-
-    return null;
-  }
-
   public static @Nullable PsiElement getNextSiblingSkippingWhiteSpacesAndComments(PsiElement sibling) {
     return getSiblingSkippingCondition(
       sibling,
@@ -114,14 +94,5 @@ public final class UsefulPsiTreeUtil {
       result = nextSibling.fun(result);
     }
     return result;
-  }
-
-  public static boolean isAncestor(@NotNull PsiElement element, List<? extends PsiElement> children, boolean strict) {
-    for (PsiElement child : children) {
-      if (child != null && !PsiTreeUtil.isAncestor(element, child, strict)) {
-        return false;
-      }
-    }
-    return true;
   }
 }
