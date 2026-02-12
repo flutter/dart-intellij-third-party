@@ -95,7 +95,7 @@ jobs:
         run: |
           ./gradlew :test --tests "com.jetbrains.dart.analysisServer.*"
         working-directory: third_party
-      - name: Upload build artifacts
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -146,3 +146,11 @@ jobs:
           ./gradlew verifyPluginSignature
           ./gradlew verifyPluginStructure
         working-directory: third_party
+      - name: Upload verifier results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build
+          path: |
+            **/build/reports/
+            **/build/test-results/  
