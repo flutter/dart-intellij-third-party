@@ -156,7 +156,6 @@ jobs:
             **/build/test-results/
       - name: Check baselines
         run: |
-          # Color constants.
           RED='\033[0;31m'
           GREEN='\033[0;32m'
           YELLOW='\033[1;33m'
@@ -172,7 +171,7 @@ jobs:
 
             if [ -f "$REPORT" ]; then
               echo "Comparing baseline against report in $REPORT"
-              grep "^*" "$REPORT" | sort > current_issues.tmp
+              grep "^*" "$REPORT" | sort > current_issues.tmp || true
 
               if [ -f "$BASELINE" ]; then
                 NEW_ERRORS=$(comm -13 <(sort "$BASELINE") current_issues.tmp)
