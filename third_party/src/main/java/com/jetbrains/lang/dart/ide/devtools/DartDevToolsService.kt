@@ -17,7 +17,6 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.io.BaseOutputReader
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
-import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import java.nio.charset.StandardCharsets
 
 @Service(Service.Level.PROJECT)
@@ -39,7 +38,7 @@ class DartDevToolsService(private val myProject: Project) : Disposable {
 
     val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
     commandLine.charset = StandardCharsets.UTF_8
-    commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
+    commandLine.exePath = if (sdk.isWsl) sdk.dartExePath else FileUtil.toSystemDependentName(sdk.dartExePath)
     commandLine.addParameter("devtools")
     commandLine.addParameter("--machine")
     dtdUri?.let { commandLine.addParameter("--dtd-uri=$it") }

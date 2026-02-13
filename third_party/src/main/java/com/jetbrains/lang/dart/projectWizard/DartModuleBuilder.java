@@ -9,6 +9,8 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleType;
@@ -105,10 +107,17 @@ public final class DartModuleBuilder extends ModuleBuilder {
     setupSdk(modifiableRootModel, wizardData);
 
     if (wizardData.myTemplate != null) {
+      DartSdk sdk = DartSdk.getDartSdk(modifiableRootModel.getProject());
+      if(sdk == null){
+        sdk = DartSdk.getDartSdkFromPath(wizardData.dartSdkPath);
+      }
+      if (sdk == null) return;
+
+      DartSdk finalSdk = sdk;
       ApplicationManager.getApplication().executeOnPooledThread(() -> {
         try {
           final Collection<VirtualFile> filesToOpen =
-            wizardData.myTemplate.generateProject(wizardData.dartSdkPath, modifiableRootModel.getModule(), baseDir);
+            wizardData.myTemplate.generateProject(finalSdk, modifiableRootModel.getModule(), baseDir);
           if (!filesToOpen.isEmpty()) {
             scheduleFilesOpeningAndPubGet(modifiableRootModel.getModule(), filesToOpen);
           }
@@ -148,19 +157,28 @@ public final class DartModuleBuilder extends ModuleBuilder {
   private static void scheduleFilesOpeningAndPubGet(final @NotNull Module module, final @NotNull Collection<VirtualFile> files) {
     module.getProject().putUserData(PUB_GET_SCHEDULED_KEY, Boolean.TRUE);
     runWhenNonModalIfModuleNotDisposed(() -> {
-      module.getProject().putUserData(PUB_GET_SCHEDULED_KEY, null);
+      // DartSdk.getDartSdk() uses slow VFS operations (LocalFileSystem.findFileByPath),
+      // so pre-fetch it in a background thread to avoid slow operations on EDT
+      ReadAction.nonBlocking(() -> DartSdk.getDartSdk(module.getProject()))
+        .expireWhen(module::isDisposed)
+        .finishOnUiThread(ModalityState.nonModal(), sdk -> {
+          if (module.isDisposed()) return;
 
-      final FileEditorManager manager = FileEditorManager.getInstance(module.getProject());
-      for (VirtualFile file : files) {
-        manager.openFile(file, true);
+          module.getProject().putUserData(PUB_GET_SCHEDULED_KEY, null);
 
-        if (PubspecYamlUtil.PUBSPEC_YAML.equals(file.getName())) {
-          final AnAction pubGetAction = ActionManager.getInstance().getAction("Dart.pub.get");
-          if (pubGetAction instanceof DartPubGetAction) {
-            ((DartPubGetAction)pubGetAction).performPubAction(module, file, false);
+          final FileEditorManager manager = FileEditorManager.getInstance(module.getProject());
+          for (VirtualFile file : files) {
+            manager.openFile(file, true);
+
+            if (PubspecYamlUtil.PUBSPEC_YAML.equals(file.getName())) {
+              final AnAction pubGetAction = ActionManager.getInstance().getAction("Dart.pub.get");
+              if (pubGetAction instanceof DartPubGetAction) {
+                ((DartPubGetAction)pubGetAction).performPubAction(module, file, false);
+              }
+            }
           }
-        }
-      }
+        })
+        .submit(AppExecutorUtil.getAppExecutorService());
     }, module);
   }
 

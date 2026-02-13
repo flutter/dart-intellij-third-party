@@ -8,6 +8,7 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.jetbrains.lang.dart.sdk.DartSdk
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -28,13 +29,15 @@ data class DartNotLocalFileInfo(private val project: Project, val fileUri: Strin
 
 
 fun getDartFileInfo(project: Project, filePathOrUri: String): DartFileInfo = when {
-  !filePathOrUri.contains("://") -> DartLocalFileInfo(FileUtil.toSystemIndependentName(filePathOrUri))
-  !filePathOrUri.startsWith("file://") -> DartNotLocalFileInfo(project, filePathOrUri)
+  !filePathOrUri.contains("://") -> DartLocalFileInfo(FileUtil.toSystemIndependentName(getIDEFileName(project, filePathOrUri)))
+  !filePathOrUri.startsWith("file://") -> DartNotLocalFileInfo(project, getIDEFileName(project, filePathOrUri))
   else -> try {
     var path = URI(filePathOrUri).path
+    path = getIDEFileName(project, path)
     if (SystemInfo.isWindows && path.length >= 3 && path[0] == '/' && OSAgnosticPathUtil.startsWithWindowsDrive(path.substring(1))) {
       path = path.substring(1)
     }
+    path = FileUtil.toSystemIndependentName(path)
     DartLocalFileInfo(path)
   }
   catch (_: URISyntaxException) {
@@ -50,3 +53,13 @@ fun getDartFileInfo(project: Project, virtualFile: VirtualFile): DartFileInfo =
   virtualFile.getUserData(DART_NOT_LOCAL_FILE_URI_KEY)
     ?.let { DartNotLocalFileInfo(project, it) }
   ?: DartLocalFileInfo(virtualFile.path)
+
+fun getIDEFileName(project: Project, filePathOrUri: String): String {
+  val sdk = DartSdk.getDartSdk(project)
+  return sdk?.getIDEFilePath(filePathOrUri) ?: filePathOrUri
+}
+
+fun getIDEFileUri(project: Project, filePathOrUri: String): String {
+  val sdk = DartSdk.getDartSdk(project)
+  return sdk?.getLocalFileUri(filePathOrUri) ?: filePathOrUri
+}

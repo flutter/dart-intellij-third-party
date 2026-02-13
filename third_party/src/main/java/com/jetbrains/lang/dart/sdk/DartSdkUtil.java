@@ -187,12 +187,4 @@ public final class DartSdkUtil {
 
     return null;
   }
-
-  public static @NotNull String getDartExePath(@NotNull DartSdk sdk) {
-    return getDartExePath(sdk.getHomePath());
-  }
-
-  public static @NotNull String getDartExePath(@NotNull String sdkRoot) {
-    return sdkRoot + (SystemInfo.isWindows ? "/bin/dart.exe" : "/bin/dart");
-  }
 }

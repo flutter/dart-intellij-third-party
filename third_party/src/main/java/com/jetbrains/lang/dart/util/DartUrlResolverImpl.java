@@ -145,6 +145,12 @@ public final class DartUrlResolverImpl extends DartUrlResolver {
     result = getUrlIfFileFromDartPackagesLib(file, myPackagesMapFromLib);
     if (result != null) return result;
 
+    if(myDartSdk != null && myDartSdk.isWsl()){
+      String path = file.getPath();
+      path = myDartSdk.getLocalFileUri(path);
+      return "file://" + path;
+    }
+
     // see com.google.dart.tools.debug.core.server.ServerBreakpointManager#getAbsoluteUrlForResource()
     return new File(file.getPath()).toURI().toString();
   }
@@ -195,7 +201,7 @@ public final class DartUrlResolverImpl extends DartUrlResolver {
     if (myPubspecYamlFile == null || baseDir == null) return;
 
     final VirtualFile packagesFile = PackageConfigFileUtil.getPackageConfigJsonFile(myProject, myPubspecYamlFile);
-    final Map<String, String> packagesMap = packagesFile != null ? PackageConfigFileUtil.getPackagesMapFromPackageConfigJsonFile(packagesFile) : null;
+    final Map<String, String> packagesMap = packagesFile != null ? PackageConfigFileUtil.getPackagesMapFromPackageConfigJsonFile(myProject, packagesFile) : null;
 
     if (packagesMap != null) {
       for (Map.Entry<String, String> entry : packagesMap.entrySet()) {

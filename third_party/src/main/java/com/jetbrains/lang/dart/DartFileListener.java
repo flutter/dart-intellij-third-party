@@ -138,7 +138,7 @@ public final class DartFileListener implements AsyncFileListener {
       Map<String, String> packagesMap = null;
       VirtualFile packagesFile = PackageConfigFileUtil.findPackageConfigJsonFile(pubspecFile.getParent());
       if (packagesFile != null) {
-        packagesMap = PackageConfigFileUtil.getPackagesMapFromPackageConfigJsonFile(packagesFile);
+        packagesMap = PackageConfigFileUtil.getPackagesMapFromPackageConfigJsonFile(project, packagesFile);
       }
 
       if (packagesMap != null) {

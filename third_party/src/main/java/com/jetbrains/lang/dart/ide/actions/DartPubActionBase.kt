@@ -48,14 +48,13 @@ import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analytics.AnalyticsData
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
-import com.jetbrains.lang.dart.excludeBuildAndToolCacheFolders
+import com.jetbrains.lang.dart.prepareExcludeBuildAndToolCacheFolders
 import com.jetbrains.lang.dart.flutter.FlutterUtil
 import com.jetbrains.lang.dart.ide.runner.DartConsoleFilter
 import com.jetbrains.lang.dart.ide.runner.DartRelativePathsConsoleFilter
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
-import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -107,7 +106,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
     if (sdk == null) return
 
-    val exeFile = File(DartSdkUtil.getDartExePath(sdk))
+    val exeFile = File(sdk.fullDartExePath)
 
     if (!exeFile.isFile) {
       if (allowModalDialogs) {
@@ -137,7 +136,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       setupPubExePath(command, sdk)
       command.addParameters(*pubParameters)
 
-      doPerformPubAction(module, pubspecYamlFile, command, getTitle(pubspecYamlFile))
+      doPerformPubActionAsync(module, pubspecYamlFile, command, getTitle(pubspecYamlFile))
     }
   }
 
@@ -191,7 +190,12 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
     @JvmStatic
     fun setupPubExePath(commandLine: GeneralCommandLine, dartSdk: DartSdk) {
-      commandLine.withExePath(FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(dartSdk)))
+      if (dartSdk.isWsl) {
+        commandLine.setExePath(dartSdk.dartExePath)
+      }
+      else {
+        commandLine.setExePath(FileUtil.toSystemDependentName(dartSdk.dartExePath))
+      }
       commandLine.addParameter("pub")
     }
 
@@ -223,17 +227,36 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       return null
     }
 
+    private fun doPerformPubActionAsync(
+      module: Module,
+      pubspecYamlFile: VirtualFile,
+      command: GeneralCommandLine,
+      actionTitle: @NlsContexts.NotificationTitle String,
+    ) {
+      // Save documents on EDT first
+      ApplicationManager.getApplication().invokeLater {
+        FileDocumentManager.getInstance().saveAllDocuments()
+      }
+
+      // Run process creation on background thread to support WSL
+      // WSLDistribution.patchCommandLine requires a background thread
+      ApplicationManager.getApplication().executeOnPooledThread {
+        doPerformPubAction(module, pubspecYamlFile, command, actionTitle)
+      }
+    }
+
     private fun doPerformPubAction(
       module: Module,
       pubspecYamlFile: VirtualFile,
       command: GeneralCommandLine,
       actionTitle: @NlsContexts.NotificationTitle String,
     ) {
-      FileDocumentManager.getInstance().saveAllDocuments()
-
       try {
         if (ourInProgress.compareAndSet(false, true)) {
           command.withEnvironment(PUB_ENV_VAR_NAME, pubEnvValue)
+
+          val sdk = DartSdk.getDartSdk(module.getProject())
+          sdk?.patchCommandLineIfRequired(command)
 
           val processHandler = OSProcessHandler(command)
 
@@ -241,14 +264,29 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
             override fun processTerminated(event: ProcessEvent) {
               ourInProgress.set(false)
 
-              ApplicationManager.getApplication().invokeLater {
-                if (!module.isDisposed) {
-                  excludeBuildAndToolCacheFolders(module, pubspecYamlFile)
+              // Use coroutine to run slow file index operation in background, then finish on EDT
+              module.project.service<DartPubActionsService>().cs.launch {
+                if (module.isDisposed) return@launch
+
+                // prepareExcludeBuildAndToolCacheFolders uses ProjectFileIndex.getContentRootForFile
+                // which is a slow operation requiring read access
+                val excludeAction = readAction {
+                  prepareExcludeBuildAndToolCacheFolders(module, pubspecYamlFile)
+                }
+
+                withContext(Dispatchers.EDT) {
+                  if (module.isDisposed) return@withContext
+
+                  excludeAction?.invoke()
 
                   // refresh later than exclude, otherwise IDE may start indexing excluded folders
                   VfsUtil.markDirtyAndRefresh(true, true, true, pubspecYamlFile.parent)
+                }
 
-                  if (DartSdkLibUtil.isDartSdkEnabled(module)) {
+                // serverReadyForRequest requires read access and does blocking operations,
+                // so it must run on a background thread with read access
+                if (!module.isDisposed && DartSdkLibUtil.isDartSdkEnabled(module)) {
+                  readAction {
                     DartAnalysisServerService.getInstance(module.project).serverReadyForRequest()
                   }
                 }

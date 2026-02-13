@@ -25,6 +25,7 @@ import com.intellij.ui.components.JBList;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.util.ui.AsyncProcessIcon;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -59,6 +60,17 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   private String myDartCreateTemplatesSdkPath; //used to expire the above cache if the sdk is changed an alternative would be to use the same cache method as com.jetbrains.lang.dart.sdk.DartSdkUtil.getSdkVersion
 
   public DartGeneratorPeer() {
+    initialiseTemplatesPanel();
+  }
+
+  // This needs to run in a background thread to avoid blocking the UI which could
+  // happen because WSL initialization can be slow, which is required for any
+  // WSL file access like confirming an exiting Dart SDK directory.
+  private void initialiseTemplatesPanel() {
+    ApplicationManager.getApplication().executeOnPooledThread(this::initialiseTemplatesPanelAsync);
+  }
+
+  private void initialiseTemplatesPanelAsync() {
     // set initial values before initDartSdkControls() because listeners should not be triggered on initialization
     mySdkPathComboWithBrowse.getComboBox().setEditable(true);
     //mySdkPathComboWithBrowse.getComboBox().getEditor().setItem(...); initial sdk path will be correctly taken from known paths history
@@ -78,8 +90,8 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
         JLabel component = (JLabel)super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
         DartProjectTemplate template = (DartProjectTemplate)value;
         String text = template.getDescription().isEmpty()
-                      ? template.getName()
-                      : template.getName() + " - " + StringUtil.decapitalize(template.getDescription());
+                ? template.getName()
+                : template.getName() + " - " + StringUtil.decapitalize(template.getDescription());
         component.setText(text);
         return component;
       }
@@ -162,7 +174,14 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
       final String comboSdkPath = mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim();
       final String sdkPath =
         FileUtil.toSystemIndependentName(comboSdkPath);
-      DartProjectTemplate.loadTemplatesAsync(sdkPath, templates -> {
+        final DartSdk sdk = DartSdk.forPath(sdkPath);
+        if (sdk == null) {
+            asyncProcessIcon.suspend();
+            myLoadingTemplatesPanel.remove(asyncProcessIcon);
+            Disposer.dispose(asyncProcessIcon);
+            return;
+        }
+        DartProjectTemplate.loadTemplatesAsync(sdk, templates -> {
         asyncProcessIcon.suspend();
         myLoadingTemplatesPanel.remove(asyncProcessIcon);
         Disposer.dispose(asyncProcessIcon);

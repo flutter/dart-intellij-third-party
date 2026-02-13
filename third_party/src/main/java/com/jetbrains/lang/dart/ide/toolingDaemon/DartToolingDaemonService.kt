@@ -33,7 +33,6 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
-import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import de.roderick.weberknecht.WebSocket
 import de.roderick.weberknecht.WebSocketEventHandler
 import de.roderick.weberknecht.WebSocketException
@@ -84,7 +83,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     activeLocationChangeEventSupported = DartAnalysisServerService.isDartSdkVersionSufficientForWorkspaceApplyEdits(sdk.version)
 
     val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
-    commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
+    commandLine.exePath = if (sdk.isWsl) sdk.dartExePath else FileUtil.toSystemDependentName(sdk.dartExePath)
     commandLine.charset = StandardCharsets.UTF_8
     commandLine.addParameter("tooling-daemon")
     commandLine.addParameter("--machine")

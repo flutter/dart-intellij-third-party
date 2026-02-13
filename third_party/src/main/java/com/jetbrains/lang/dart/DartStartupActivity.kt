@@ -77,11 +77,26 @@ class DartStartupActivity : ProjectActivity {
   }
 }
 
+/**
+ * Excludes build and tool cache folders (.dart_tool, .pub, build) from the module.
+ * This function performs a slow file index operation followed by a write action,
+ * so it should be called with appropriate threading considerations.
+ *
+ * For EDT-safe usage, call [prepareExcludeBuildAndToolCacheFolders] in a background
+ * thread with read access, then invoke the returned action on the EDT.
+ */
 fun excludeBuildAndToolCacheFolders(module: Module, pubspecYamlFile: VirtualFile) {
   prepareExcludeBuildAndToolCacheFolders(module, pubspecYamlFile)?.invoke()
 }
 
-private fun prepareExcludeBuildAndToolCacheFolders(module: Module, pubspecYamlFile: VirtualFile): (() -> Unit)? {
+/**
+ * Prepares the exclusion of build and tool cache folders.
+ * This performs a slow file index operation (ProjectFileIndex.getContentRootForFile)
+ * and should be called from a background thread with read access.
+ *
+ * @return A write action to execute on EDT, or null if no exclusions are needed.
+ */
+internal fun prepareExcludeBuildAndToolCacheFolders(module: Module, pubspecYamlFile: VirtualFile): (() -> Unit)? {
   val root = pubspecYamlFile.parent ?: return null
   val contentRoot = ProjectFileIndex.getInstance(module.project).getContentRootForFile(root) ?: return null
   val rootUrl = root.url

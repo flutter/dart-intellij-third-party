@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.DartFileType;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -33,11 +34,11 @@ class DartCreateProjectTemplate extends DartProjectTemplate {
   }
 
   @Override
-  public Collection<VirtualFile> generateProject(final @NotNull String sdkRoot,
+  public Collection<VirtualFile> generateProject(final @NotNull DartSdk sdk,
                                                  final @NotNull Module module,
                                                  final @NotNull VirtualFile baseDir) throws IOException {
     try {
-      myDartCreate.generateInto(sdkRoot, baseDir, myTemplate.myId);
+      myDartCreate.generateInto(sdk, baseDir, myTemplate.myId);
     }
     catch (ExecutionException e) {
       throw new IOException(e);

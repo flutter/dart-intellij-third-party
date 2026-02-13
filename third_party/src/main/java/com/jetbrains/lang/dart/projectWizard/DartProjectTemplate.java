@@ -5,7 +5,9 @@ import com.intellij.execution.RunManager;
 import com.intellij.execution.RunnerAndConfigurationSettings;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -19,6 +21,7 @@ import com.jetbrains.lang.dart.ide.runner.test.DartTestRunConfiguration;
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunConfigurationType;
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunnerParameters;
 import com.jetbrains.lang.dart.projectWizard.DartCreate.DartCreateTemplate;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -52,7 +55,7 @@ public abstract class DartProjectTemplate {
     return myDescription;
   }
 
-  public abstract Collection<VirtualFile> generateProject(@NotNull String sdkRoot,
+  public abstract Collection<VirtualFile> generateProject(@NotNull DartSdk sdk,
                                                           @NotNull Module module,
                                                           @NotNull VirtualFile baseDir)
     throws IOException;
@@ -61,14 +64,14 @@ public abstract class DartProjectTemplate {
   /**
    * Must be called in pooled thread without read action; {@code templatesConsumer} will be invoked in EDT
    */
-  public static void loadTemplatesAsync(@NotNull String sdkRoot, @NotNull Consumer<? super List<DartProjectTemplate>> templatesConsumer) {
+  public static void loadTemplatesAsync(@NotNull DartSdk sdk, @NotNull Consumer<? super List<DartProjectTemplate>> templatesConsumer) {
     if (ApplicationManager.getApplication().isReadAccessAllowed()) {
       LOG.error("DartProjectTemplate.loadTemplatesAsync() must be called in pooled thread without read action");
     }
 
     final List<DartProjectTemplate> templates = new ArrayList<>();
     try {
-      templates.addAll(getDartCreateTemplates(sdkRoot));
+      templates.addAll(getDartCreateTemplates(sdk));
     }
     finally {
       if (templates.isEmpty()) {
@@ -79,15 +82,15 @@ public abstract class DartProjectTemplate {
     }
   }
 
-  private static @NotNull List<DartProjectTemplate> getDartCreateTemplates(@NotNull String sdkRoot) {
-    if (ourDartCreateTemplateCache != null && sdkRoot.equals(ourDartCreateTemplateCacheSdkPath)) {
+  private static @NotNull List<DartProjectTemplate> getDartCreateTemplates(@NotNull DartSdk sdk) {
+    if (ourDartCreateTemplateCache != null && sdk.getFullDartExePath().equals(ourDartCreateTemplateCacheSdkPath)) {
       return ourDartCreateTemplateCache;
     }
 
-    final List<DartCreateTemplate> templates = DART_CREATE.getAvailableTemplates(sdkRoot);
+    final List<DartCreateTemplate> templates = DART_CREATE.getAvailableTemplates(sdk);
 
     ourDartCreateTemplateCache = new ArrayList<>();
-    ourDartCreateTemplateCacheSdkPath = sdkRoot;
+    ourDartCreateTemplateCacheSdkPath = sdk.getFullDartExePath();
     for (DartCreateTemplate template : templates) {
       ourDartCreateTemplateCache.add(new DartCreateProjectTemplate(DART_CREATE, template));
     }
@@ -109,20 +112,24 @@ public abstract class DartProjectTemplate {
   }
 
   static void createCmdLineRunConfiguration(final @NotNull Module module, final @NotNull VirtualFile mainDartFile) {
-    DartModuleBuilder.runWhenNonModalIfModuleNotDisposed(() -> {
-      final RunManager runManager = RunManager.getInstance(module.getProject());
-      final RunnerAndConfigurationSettings settings = runManager.createConfiguration("", DartCommandLineRunConfigurationType.class);
+    // suggestDartWorkingDir calls PubspecYamlUtil.findPubspecYamlFile which uses ProjectFileIndex.isInContent(),
+    // a slow operation that must run in a background thread with read access.
+    ReadAction.nonBlocking(() -> DartCommandLineRunnerParameters.suggestDartWorkingDir(module.getProject(), mainDartFile))
+      .expireWhen(module::isDisposed)
+      .finishOnUiThread(ModalityState.nonModal(), workingDir -> {
+        final RunManager runManager = RunManager.getInstance(module.getProject());
+        final RunnerAndConfigurationSettings settings = runManager.createConfiguration("", DartCommandLineRunConfigurationType.class);
 
-      final DartCommandLineRunConfiguration runConfiguration = (DartCommandLineRunConfiguration)settings.getConfiguration();
-      runConfiguration.getRunnerParameters().setFilePath(mainDartFile.getPath());
-      runConfiguration.getRunnerParameters()
-        .setWorkingDirectory(DartCommandLineRunnerParameters.suggestDartWorkingDir(module.getProject(), mainDartFile));
+        final DartCommandLineRunConfiguration runConfiguration = (DartCommandLineRunConfiguration)settings.getConfiguration();
+        runConfiguration.getRunnerParameters().setFilePath(mainDartFile.getPath());
+        runConfiguration.getRunnerParameters().setWorkingDirectory(workingDir);
 
-      settings.setName(runConfiguration.suggestedName());
+        settings.setName(runConfiguration.suggestedName());
 
-      runManager.addConfiguration(settings);
-      runManager.setSelectedConfiguration(settings);
-    }, module);
+        runManager.addConfiguration(settings);
+        runManager.setSelectedConfiguration(settings);
+      })
+      .submit(AppExecutorUtil.getAppExecutorService());
   }
 
   static void createTestRunConfiguration(@NotNull Module module, @NotNull @NonNls String baseDirPath) {
