@@ -69,7 +69,9 @@ public final class DartFileListener implements AsyncFileListener {
       if (event.getFileSystem() != LocalFileSystem.getInstance() && !ApplicationManager.getApplication().isUnitTestMode()) continue;
 
       if (event instanceof VFilePropertyChangeEvent) {
-        if (((VFilePropertyChangeEvent)event).isRename()) {
+        // 'isRename()' is an experimental API. Checking the property name directly is
+        // functionally equivalent.
+        if (VirtualFile.PROP_NAME.equals(((VFilePropertyChangeEvent)event).getPropertyName())) {
           if (PackageConfigFileUtil.PACKAGE_CONFIG_JSON.equals(((VFilePropertyChangeEvent)event).getOldValue()) ||
               PackageConfigFileUtil.PACKAGE_CONFIG_JSON.equals(((VFilePropertyChangeEvent)event).getNewValue())) {
             packagesFileEvents.add(event);
