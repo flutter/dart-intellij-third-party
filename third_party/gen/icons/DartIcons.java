@@ -1,7 +1,7 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package icons;
 
-import com.intellij.ui.IconManager;
+
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -12,7 +12,7 @@ import javax.swing.*;
  */
 public final class DartIcons {
   private static @NotNull Icon load(@NotNull String expUIPath, @NotNull String path, int cacheKey, int flags) {
-    return IconManager.getInstance().loadRasterizedIcon(path, expUIPath, DartIcons.class.getClassLoader(), cacheKey, flags);
+    return com.intellij.openapi.util.IconLoader.getIcon(path, DartIcons.class);
   }
   /** 13x13 */ public static final @NotNull Icon Dart_13 = load("icons/expui/toolWindowDart.svg", "icons/dart_13.svg", 650580758, 2);
   /** 16x16 */ public static final @NotNull Icon Dart_16 = load("icons/expui/dart.svg", "icons/dart_16.svg", 1655941025, 2);
