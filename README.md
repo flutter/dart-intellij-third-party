@@ -2,6 +2,8 @@
 
 ![Latest Plugin Version](https://img.shields.io/jetbrains/plugin/v/Dart)
 [![presubmit](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml/badge.svg)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml)
+[![das tests](https://github.com/flutter/dart-intellij-third-party/actions/workflows/das_tests.yaml/badge.svg)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/das_tests.yaml)
+
 
 ## Development setup
 
