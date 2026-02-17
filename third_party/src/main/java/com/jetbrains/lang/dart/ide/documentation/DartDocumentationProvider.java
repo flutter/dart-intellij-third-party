@@ -163,7 +163,12 @@ public final class DartDocumentationProvider implements DocumentationProvider {
       final String dartUrl = urlResolver.getDartUrlForFile(libFile);
       // "dart:html" -> "dart-html"
       if (dartUrl.startsWith(DartUrlResolver.DART_PREFIX)) {
-        return "dart-" + dartUrl.substring(DartUrlResolver.DART_PREFIX.length());
+        String url = dartUrl.substring(DartUrlResolver.DART_PREFIX.length());
+        int slashIndex = url.indexOf('/');
+        if (slashIndex > 0) {
+          url = url.substring(0, slashIndex);
+        }
+        return "dart-" + url;
       }
     }
 
