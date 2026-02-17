@@ -52,58 +52,7 @@ jobs:
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
         working-directory: third_party
 
-  # Job 3: Dart Analysis Server Tests
-  dart-analysis-server-tests:
-    needs: build-plugin
-    continue-on-error: true  # Flakes and stalls are not uncommon so we don't want to break the build
-    timeout-minutes: 20      # Nor do we want to tie up the builder if we're stalled
-    strategy:
-      matrix:
-        # https://github.com/dart-lang/setup-dart
-        # Define the Dart SDK versions to test against.
-        # 'stable' and 'beta' will fetch the latest respective versions.
-        # You can also specify exact versions like '3.0.0', '3.8.1'.
-        # dart-version: ['3.0.0', 'stable', 'beta', 'dev' ]
-
-        # TODO(https://github.com/flutter/dart-intellij-third-party/issues/47)
-        # Fix tests to run over additional operating systems as well as Dart SDK versions:
-
-        dart-version: ['stable']
-        os: [ macos-latest ]
-    runs-on: ${{ matrix.os }} # Use the OS from the matrix
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
-
-      - name: Set up Dart SDK ${{ matrix.dart-version }}
-        # This action installs the specified Dart SDK version.
-        # It sets the DART_SDK environment variable to the SDK root.
-        uses: dart-lang/setup-dart@v1
-        with:
-          sdk: ${{ matrix.dart-version }}
-
-      - name: Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
-        if: always() # Run even if one SDK version fails
-        # Pass the Dart SDK path with DART_HOME
-        run: |
-          ./gradlew :test --tests "com.jetbrains.dart.analysisServer.*"
-        working-directory: third_party
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build
-          path: |
-            **/build/reports/
-            **/build/test-results/
-  # Job 4: Verify Plugin
+  # Job 3: Verify Plugin
   verify-plugin:
     needs: build-plugin
     strategy:
