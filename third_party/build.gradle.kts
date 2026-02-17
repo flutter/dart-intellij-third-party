@@ -17,7 +17,7 @@ allprojects {
 // Plugins - must be first
 plugins {
     id("java") // Java support
-    id("org.jetbrains.kotlin.jvm") version "2.3.0" // Kotlin support
+    id("org.jetbrains.kotlin.jvm") version "2.2.21" // Kotlin support
     id("org.jetbrains.intellij.platform") version "2.10.5" // IntelliJ Platform Gradle Plugin
     id("org.jetbrains.changelog") version "2.2.0" // Gradle Changelog Plugin
     id("org.jetbrains.kotlinx.kover") version "0.9.4" // Kover Code Coverage Plugin
