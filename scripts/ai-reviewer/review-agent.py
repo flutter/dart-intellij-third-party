@@ -7,7 +7,7 @@ import google.generativeai as genai
 # Setup
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-HUMAN_REVIEWER = os.getenv()
+HUMAN_REVIEWER = os.getenv('HUMAN_REVIEWER')  # GitHub username of the human reviewer
 PR_NUMBER = int(sys.argv[1])
 
 genai.configure(api_key=GEMINI_API_KEY)
