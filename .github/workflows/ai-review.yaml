@@ -1,15 +1,21 @@
 name: AI PR Reviewer
 on:
   pull_request:
-    # Trigger on new PRs or when new code is pushed to an existing PR
+    # Trigger only when the PR is targeting these specific branches
+    branches:
+      # - 'main'               # You can keep this if you want it on main
+      - 'ai-test/**'         # Trigger for any branch starting with ai-test/
+      - 'experimental-agent' # Or a specific named branch
     types: [opened, synchronized]
 
 jobs:
   ai-review:
+    # Added a safety check: Only run if the PR author is NOT a bot
+    if: github.event.pull_request.user.login != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write  # Necessary to post comments and reassign
+      pull-requests: write
     
     steps:
       - name: Checkout Repository
@@ -26,7 +32,6 @@ jobs:
 
       - name: Run Review Agent
         env:
-          # These secrets must be set in your Repo Settings
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
