@@ -7,6 +7,7 @@ import google.generativeai as genai
 # Setup
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+HUMAN_REVIEWER = os.getenv()
 PR_NUMBER = int(sys.argv[1])
 
 genai.configure(api_key=GEMINI_API_KEY)
@@ -64,8 +65,8 @@ def apply_line_comments(raw_response, commit):
             )
         
         if "READY_FOR_HUMAN_REVIEW" in raw_response:
-            pr.add_to_assignees("your-github-username")
-            pr.create_issue_comment("AI Review complete. Reassigning to @your-github-username for final sign-off.")
+            pr.add_to_assignees(HUMAN_REVIEWER)
+            pr.create_issue_comment(f"AI Review complete. Reassigning to @{HUMAN_REVIEWER} for final sign-off.")
 
     except Exception as e:
         print(f"Error parsing AI response: {e}")
