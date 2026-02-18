@@ -1,38 +1,52 @@
 name: AI PR Reviewer
+
 on:
   pull_request:
-    # Trigger only when the PR is targeting these specific branches
+    # Restricts the agent to specific testing branches or main
     branches:
-      # - 'main'               # You can keep this if you want it on main
-      - 'ai-test/**'         # Trigger for any branch starting with ai-test/
-      - 'experimental-agent' # Or a specific named branch
+      #- 'main'
+      - 'ai-test/**'
+      - 'experimental-agent'
+    # Trigger on opening a PR or pushing new code to an existing one
     types: [opened, synchronized]
+  
+  # Allows you to manually trigger the review from the "Actions" tab
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review'
+        required: true
 
 jobs:
   ai-review:
-    # Added a safety check: Only run if the PR author is NOT a bot
+    # Safety check: Prevent the bot from reviewing its own comments
     if: github.event.pull_request.user.login != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    
     permissions:
       contents: read
-      pull-requests: write
-    
+      pull-requests: write # Required for posting comments and reassigning
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install PyGithub google-generativeai
 
       - name: Run Review Agent
         env:
+          # These must be set in Repo Settings > Secrets and variables > Actions
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          python scripts/ai_reviewer/review_agent.py ${{ github.event.pull_request.number }}
+          # Use the input PR number if triggered manually, otherwise use the event context
+          PR_NUM=${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+          python scripts/ai_reviewer/review_agent.py $PR_NUM
