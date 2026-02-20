@@ -23,7 +23,6 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.util.Consumer;
-import com.intellij.util.SmartList;
 import com.intellij.util.net.NetKt;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.ide.actions.DartPubActionBase;
@@ -98,7 +97,7 @@ final class PubServerService extends NetService {
   PubServerService(@NotNull Project project, @NotNull ConsoleManager consoleManager) {
     super(project, consoleManager);
 
-    BuiltInServerManager.getInstance().createClientBootstrap().handler(new ChannelInitializer() {
+    BuiltInServerManager.getInstance().createClientBootstrap().handler(new ChannelInitializer<>() {
       @Override
       protected void initChannel(Channel channel) {
         channel.pipeline().addLast(serverChannelRegistrar, new HttpClientCodec());
@@ -286,25 +285,6 @@ final class PubServerService extends NetService {
 
     response.headers().add(HttpHeaderNames.LOCATION, encoder.toString());
     Responses.send(response, clientChannel, clientRequest, extraHeaders);
-  }
-
-  @NotNull
-  Collection<String> getAllPubServeAuthorities() {
-    final Collection<String> result = new SmartList<>();
-    for (ServerInfo serverInfo : servedDirToSocketAddress.values()) {
-      if (serverInfo.address != null) {
-        result.add(serverInfo.address.getHostString() + ":" + serverInfo.address.getPort());
-      }
-    }
-    return result;
-  }
-
-
-  @Nullable
-  String getPubServeAuthority(final @NotNull VirtualFile dir) {
-    final ServerInfo serverInfo = servedDirToSocketAddress.get(dir);
-    final InetSocketAddress address = serverInfo == null ? null : serverInfo.address;
-    return address != null ? address.getHostString() + ":" + address.getPort() : null;
   }
 
   @ChannelHandler.Sharable
