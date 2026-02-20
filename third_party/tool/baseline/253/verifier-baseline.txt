@@ -1,9 +1,3 @@
-* Deprecated class com.intellij.execution.process.ProcessAdapter is referenced in com.jetbrains.lang.dart.ide.actions.DartPubActionBase.Companion.doPerformPubAction$1
-* Deprecated class com.intellij.execution.process.ProcessAdapter is referenced in com.jetbrains.lang.dart.ide.actions.DartPubActionBase.Companion.doPerformPubAction$1.<init>(Module, VirtualFile)
-* Deprecated class com.intellij.execution.process.ProcessAdapter is referenced in com.jetbrains.lang.dart.ide.actions.DartPubActionBase.Companion.showPubOutputConsole$4
-* Deprecated class com.intellij.execution.process.ProcessAdapter is referenced in com.jetbrains.lang.dart.ide.actions.DartPubActionBase.Companion.showPubOutputConsole$4.<init>(ConsoleView)
-* Deprecated class com.intellij.execution.process.ProcessAdapter is referenced in com.jetbrains.lang.dart.pubServer.PubServerService.PubServeOutputListener
-* Deprecated class com.intellij.execution.process.ProcessAdapter is referenced in com.jetbrains.lang.dart.pubServer.PubServerService.PubServeOutputListener.<init>(Project, Object)
 * Deprecated class com.intellij.ui.ComboboxWithBrowseButton is referenced in com.jetbrains.lang.dart.ide.runner.server.ui.DartRemoteDebugConfigurationEditor.$$$setupUI$$$() : void
 * Deprecated class com.intellij.ui.ComboboxWithBrowseButton is referenced in com.jetbrains.lang.dart.ide.runner.server.ui.DartRemoteDebugConfigurationEditor.applyEditorTo(DartRemoteDebugConfiguration) : void
 * Deprecated class com.intellij.ui.ComboboxWithBrowseButton is referenced in com.jetbrains.lang.dart.ide.runner.server.ui.DartRemoteDebugConfigurationEditor.initDartProjectsCombo(Project) : void
