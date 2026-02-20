@@ -8,7 +8,7 @@ import com.intellij.ui.components.JBRadioButton;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
+
 import com.jetbrains.lang.dart.DartBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -17,7 +17,7 @@ import javax.swing.*;
 import java.awt.*;
 
 public final class DartExceptionBreakpointType
-  extends XBreakpointType<XBreakpoint<DartExceptionBreakpointProperties>, DartExceptionBreakpointProperties> {
+    extends XBreakpointType<XBreakpoint<DartExceptionBreakpointProperties>, DartExceptionBreakpointProperties> {
 
   public DartExceptionBreakpointType() {
     super("dart-exception", DartBundle.message("breakpoint.type.title.dart.exception.breakpoint"));
@@ -44,19 +44,22 @@ public final class DartExceptionBreakpointType
   }
 
   @Override
-  public XBreakpoint<DartExceptionBreakpointProperties> createDefaultBreakpoint(@NotNull XBreakpointCreator<DartExceptionBreakpointProperties> creator) {
-    final XBreakpoint<DartExceptionBreakpointProperties> breakpoint = creator.createBreakpoint(new DartExceptionBreakpointProperties());
+  public XBreakpoint<DartExceptionBreakpointProperties> createDefaultBreakpoint(
+      @NotNull XBreakpointCreator<DartExceptionBreakpointProperties> creator) {
+    final XBreakpoint<DartExceptionBreakpointProperties> breakpoint = creator
+        .createBreakpoint(new DartExceptionBreakpointProperties());
     breakpoint.setEnabled(true);
     return breakpoint;
   }
 
   @Override
-  public @Nullable XBreakpointCustomPropertiesPanel<XBreakpoint<DartExceptionBreakpointProperties>> createCustomPropertiesPanel(final @NotNull Project project) {
+  public @Nullable XBreakpointCustomPropertiesPanel<XBreakpoint<DartExceptionBreakpointProperties>> createCustomPropertiesPanel(
+      final @NotNull Project project) {
     return new DartExceptionBreakpointPropertiesPanel();
   }
 
   private static class DartExceptionBreakpointPropertiesPanel
-    extends XBreakpointCustomPropertiesPanel<XBreakpoint<DartExceptionBreakpointProperties>> {
+      extends XBreakpointCustomPropertiesPanel<XBreakpoint<DartExceptionBreakpointProperties>> {
 
     private JBRadioButton myBreakOnUncaughtExceptions;
     private JBRadioButton myBreakOnAllExceptions;
@@ -84,7 +87,9 @@ public final class DartExceptionBreakpointType
       final boolean newValue = myBreakOnAllExceptions.isSelected();
       if (oldValue != newValue) {
         breakpoint.getProperties().setBreakOnAllExceptions(newValue);
-        ((XBreakpointBase<?, ?, ?>)breakpoint).fireBreakpointChanged();
+        // 'fireBreakpointChanged' is an internal API. The platform handles change
+        // notifications
+        // automatically after 'saveTo' returns, so explicit firing is not needed.
       }
     }
 
@@ -92,8 +97,7 @@ public final class DartExceptionBreakpointType
     public void loadFrom(final @NotNull XBreakpoint<DartExceptionBreakpointProperties> breakpoint) {
       if (breakpoint.getProperties().isBreakOnAllExceptions()) {
         myBreakOnAllExceptions.setSelected(true);
-      }
-      else {
+      } else {
         myBreakOnUncaughtExceptions.setSelected(true);
       }
     }
