@@ -176,9 +176,6 @@ class ExtractLocalVariableProcessor {
       final int[] occurrencesOffsets = refactoring.getOccurrencesOffsets();
       final int[] occurrencesLengths = refactoring.getOccurrencesLengths();
       occurrences = getDartExpressions(occurrencesOffsets, occurrencesLengths);
-      if (occurrences == null) {
-        return;
-      }
     }
     // handle occurrences
     OccurrencesChooser.<DartExpression>simpleChooser(editor).showChooser(expression, occurrences, new Pass<>() {
