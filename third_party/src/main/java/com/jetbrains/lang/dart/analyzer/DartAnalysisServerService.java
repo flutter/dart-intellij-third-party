@@ -28,6 +28,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.fileEditor.impl.FileOffsetsManager;
 import com.intellij.openapi.fileTypes.FileTypeRegistry;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -2259,8 +2260,11 @@ public final class DartAnalysisServerService implements Disposable {
         }
       }
       catch (Exception e) {
-        LOG.warn("Failed to start Dart analysis server", e);
         stopServer();
+        // `ProcessCanceledException`s need to be rethrown and not logged
+        // https://github.com/flutter/dart-intellij-third-party/issues/263
+        if (e instanceof ProcessCanceledException) throw (ProcessCanceledException)e;
+        LOG.warn("Failed to start Dart analysis server", e);
       }
     }
   }
