@@ -37,6 +37,18 @@ public class DartResolver implements ResolveCache.AbstractResolver<DartReference
     int refLength = reference.getTextRange().getLength();
     DartNavigationRegion region = findRegion(refPsiFile, refOffset, refLength);
 
+    // ▼▼▼ FIX 1: Parent Reference Fallback (Handles AA.a mismatch) ▼▼▼
+    if (region == null) {
+      // If resolving 'a' failed, check if the parent is a reference (e.g., 'AA.a')
+      // and try resolving that. DAS often returns regions for the full qualified name.
+      PsiElement parent = reference.getParent();
+      if (parent instanceof DartReference) {
+        refOffset = parent.getTextRange().getStartOffset();
+        refLength = parent.getTextRange().getLength();
+        region = findRegion(refPsiFile, refOffset, refLength);
+      }
+    }
+
     if (region == null && reference instanceof DartLibraryId) {
       // DAS returns the whole "part of foo" as a region, but we have only "foo" as a reference
       final PsiElement parent = reference.getParent();
@@ -77,6 +89,32 @@ public class DartResolver implements ResolveCache.AbstractResolver<DartReference
         }
       }
     }
+
+
+    // This is breaking `DartParameterInfoTest#testParamInfo_call_functionInvocation`
+
+    // [INSERT THIS BLOCK]
+    // Fix for Primary Constructors / Implicit New:
+    // C('n') is parsed as a DartCallExpression. If strict region matching fails
+    // (e.g. due to generics or slight offset mismatches), we must dig for the reference child.
+    if (region == null && reference instanceof DartCallExpression) {
+      for (ASTNode child : reference.getNode().getChildren(null)) {
+        if (child.getPsi() instanceof DartReference) {
+          refOffset = child.getTextRange().getStartOffset();
+          refLength = child.getTextRange().getLength();
+          region = findRegion(refPsiFile, refOffset, refLength);
+          if (region != null) break;
+        }
+        // Stop if we hit arguments or type args, we only want the function/class name
+        if (child.getElementType() == DartTokenTypes.LPAREN ||
+                child.getElementType() == DartTokenTypes.TYPE_ARGUMENTS) {
+          break;
+        }
+      }
+    }
+
+//    PsiElement parent = ((DartCallExpression) reference).getParent();
+//    System.out.println(parent);
 
     return region != null ? getTargetElements(reference.getProject(), region) : null;
   }
@@ -120,8 +158,16 @@ public class DartResolver implements ResolveCache.AbstractResolver<DartReference
     if (file != null) {
       int targetOffset = target.getOffset(project, file.getVirtualFile());
       PsiElement elementAtOffset = file.findElementAt(targetOffset);
+
+      // Add DartPrimaryConstructorDeclaration.class to this check
       PsiNameIdentifierOwner nameOwner =
-        PsiTreeUtil.getNonStrictParentOfType(elementAtOffset, DartComponentName.class, DartLibraryNameElement.class);
+              PsiTreeUtil.getNonStrictParentOfType(elementAtOffset,
+                      DartComponentName.class,
+                      DartLibraryNameElement.class,
+                      DartPrimaryConstructorDeclaration.class); // <--- Add this
+
+//      PsiNameIdentifierOwner nameOwner =
+//        PsiTreeUtil.getNonStrictParentOfType(elementAtOffset, DartComponentName.class, DartLibraryNameElement.class);
       return nameOwner != null ? nameOwner : elementAtOffset;
     }
 

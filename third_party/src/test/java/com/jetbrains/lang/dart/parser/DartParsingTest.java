@@ -189,4 +189,8 @@ public class DartParsingTest extends ParsingTestCase {
   public void testShorthandAccess() {
     doTest();
   }
+
+  public void testPrimaryConstructors() {
+    doTest();
+  }
 }
