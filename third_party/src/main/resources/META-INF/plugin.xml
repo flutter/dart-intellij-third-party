@@ -20,6 +20,7 @@
   <vendor url="https://google.com">Google</vendor>
   <category>Languages</category>
   <depends>com.intellij.modules.xml</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
   <depends optional="true" config-file="dart-yaml.xml">org.jetbrains.plugins.yaml</depends>
   <depends optional="true" config-file="dart-copyright.xml">com.intellij.copyright</depends>
 
@@ -33,9 +34,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <moveFileHandler implementation="com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler"/>
     <fileType name="Dart" extensions="dart" language="Dart" implementationClass="com.jetbrains.lang.dart.DartFileType" fieldName="INSTANCE"/>
-    <lang.syntaxHighlighter language="Dart" implementationClass="com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter"/>
     <highlightErrorFilter implementation="com.jetbrains.lang.dart.highlight.DartHighlightingErrorFilter"/>
-    <embeddedTokenHighlighter implementation="com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter"/>
 
     <lang.braceMatcher language="Dart" implementationClass="com.jetbrains.lang.dart.ide.DartBraceMatcher"/>
     <typedHandler implementation="com.jetbrains.lang.dart.ide.editor.DartTypeHandler" id="Dart"/>
@@ -60,20 +59,19 @@
     <basicWordSelectionFilter implementation="com.jetbrains.lang.dart.ide.editor.DartSelectionFilter"/>
 
     <nonProjectFileWritingAccessExtension implementation="com.jetbrains.lang.dart.ide.DartWritingAccessProvider"/>
-    <spellchecker.support language="Dart" implementationClass="com.jetbrains.lang.dart.ide.spelling.DartSpellcheckingStrategy"/>
+<!--    <spellchecker.support language="Dart" implementationClass="com.jetbrains.lang.dart.ide.spelling.DartSpellcheckingStrategy"/>-->
     <spellchecker.bundledDictionaryProvider implementation="com.jetbrains.lang.dart.ide.spelling.DartBundledDictionaryProvider"/>
     <lang.documentationProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider"/>
     <lang.implementationTextSelectioner language="Dart"
                                         implementationClass="com.jetbrains.lang.dart.ide.DartImplementationTextSelectioner"/>
-    <lang.formatter language="Dart" implementationClass="com.jetbrains.lang.dart.ide.formatter.DartFormattingModelBuilder"/>
-    <postFormatProcessor implementation="com.jetbrains.lang.dart.ide.formatter.DartPostFormatProcessor"/>
     <readerModeMatcher implementation="com.jetbrains.lang.dart.ide.DartReaderModeMatcher"/>
     <lang.psiStructureViewFactory language="Dart" implementationClass="com.jetbrains.lang.dart.ide.structure.DartStructureViewFactory"/>
     <psi.referenceContributor language="Dart" implementation="com.jetbrains.lang.dart.psi.DartReferenceContributor"/>
     <psi.referenceContributor language="XML" implementation="com.jetbrains.lang.dart.psi.DartReferenceContributor"/>
     <xml.xmlTypedHandlersAdditionalSupport implementation="com.jetbrains.lang.dart.xml.DartXmlTypedHandlersAdditionalSupport" />
     <include.provider implementation="com.jetbrains.lang.dart.psi.DartPackageAwareFileIncludeProvider" order="first"/>
-    <typeHierarchyProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.hierarchy.type.DartTypeHierarchyProvider"/>
+<!--    <typeHierarchyProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.hierarchy.type.DartTypeHierarchyProvider"/>-->
+    <typeHierarchyProvider language="Dart" implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider"/>
     <callHierarchyProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.hierarchy.call.DartCallHierarchyProvider"/>
     <methodHierarchyProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.hierarchy.method.DartMethodHierarchyProvider"/>
     <lang.elementManipulator forClass="com.jetbrains.lang.dart.psi.DartUriElement"
@@ -87,9 +85,8 @@
                                implementationClass="com.jetbrains.lang.dart.ide.info.DartParameterInfoHandler"/>
 
     <langCodeStyleSettingsProvider implementation="com.jetbrains.lang.dart.ide.formatter.settings.DartLanguageCodeStyleSettingsProvider"/>
-    <lang.importOptimizer language="Dart" implementationClass="com.jetbrains.lang.dart.ide.imports.DartImportOptimizer"/>
+<!--    <lang.importOptimizer language="Dart" implementationClass="com.jetbrains.lang.dart.ide.imports.DartImportOptimizer"/>-->
 
-    <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartServerRenameHandler"/>
     <inlineActionHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartInlineHandler"/>
 
     <codeInsight.lineMarkerProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.marker.DartMethodLineMarkerProvider"/>
@@ -152,16 +149,6 @@
     <codeInsight.template.postfixTemplateProvider language="Dart"
        implementationClass="com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider"/>
 
-    <codeInsight.declarativeInlayProvider language="Dart"
-                                          implementationClass="com.jetbrains.lang.dart.hints.DartInlayHintsProvider"
-                                          isEnabledByDefault="true"
-                                          group="OTHER_GROUP"
-                                          providerId="dart.closing.labels"
-                                          bundle="messages.DartBundle"
-                                          nameKey="dart.inlay.hints.closing.labels.name"
-                                          descriptionKey="dart.inlay.hints.closing.labels.description">
-    </codeInsight.declarativeInlayProvider>
-
     <lang.surroundDescriptor language="Dart"
                              implementationClass="com.jetbrains.lang.dart.ide.surroundWith.DartExpressionSurroundDescriptor"/>
     <lang.surroundDescriptor language="Dart"
@@ -176,7 +163,7 @@
     <lang.smartEnterProcessor language="Dart"
                               implementationClass="com.jetbrains.lang.dart.ide.completion.DartServerStatementCompletionProcessor"/>
 
-    <annotator language="Dart" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>
+<!--    <annotator language="Dart" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>-->
     <annotator language="XML" implementationClass="com.jetbrains.lang.dart.ide.annotator.DartAnnotator"/>
 
     <lang.findUsagesProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.findUsages.DartFindUsagesProvider"/>
@@ -267,7 +254,20 @@
     <webServerPathHandler implementation="com.jetbrains.lang.dart.pubServer.PubServerPathHandler"/>
   </extensions>
 
-  <projectListeners>
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="myLanguageServerId"
+                name="My Language Server"
+                factoryClass="com.jetbrains.lang.dart.lsp.DartLspServerFactory">
+            <description><![CDATA[
+        helinx: Some description written in HTML to display it in the LSP consoles view and Language Servers settings.
+        ]]>
+            </description>
+        </server>
+        <languageMapping language="Dart" serverId="myLanguageServerId" />
+    </extensions>
+
+
+    <projectListeners>
     <listener class="com.jetbrains.lang.dart.DartWorkspaceModelChangeListener" topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
     <listener class="com.jetbrains.lang.dart.ide.errorTreeView.DartAnalysisToolWindowFactory$DartToolWindowManagerListener"
               topic="com.intellij.openapi.wm.ex.ToolWindowManagerListener"/>
@@ -280,13 +280,13 @@
             icon="DartIcons.Dart_file">
       <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFromTemplate"/>
     </action>
-    <action id="Dart.Reanalyze" class="com.jetbrains.lang.dart.ide.errorTreeView.ReanalyzeDartSourcesAction"
-            icon="AllIcons.Actions.Restart">
-    </action>
+<!--    <action id="Dart.Reanalyze" class="com.jetbrains.lang.dart.ide.errorTreeView.ReanalyzeDartSourcesAction"-->
+<!--            icon="AllIcons.Actions.Restart">-->
+<!--    </action>-->
     <!--suppress PluginXmlCapitalization -->
-    <action id="Dart.Restart.Analysis.Server" class="com.jetbrains.lang.dart.ide.errorTreeView.RestartDartAnalysisServerAction"
-            icon="AllIcons.Actions.ForceRefresh">
-    </action>
+<!--    <action id="Dart.Restart.Analysis.Server" class="com.jetbrains.lang.dart.ide.errorTreeView.RestartDartAnalysisServerAction"-->
+<!--            icon="AllIcons.Actions.ForceRefresh">-->
+<!--    </action>-->
     <action id="Dart.Analyzer.Diagnostics" class="com.jetbrains.lang.dart.ide.errorTreeView.AnalysisServerDiagnosticsAction">
     </action>
     <action id="Dart.DartStyle" class="com.jetbrains.lang.dart.ide.actions.DartStyleAction">
