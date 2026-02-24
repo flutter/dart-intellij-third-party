@@ -112,9 +112,10 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
       ExtendableTextField.Extension.create(
         AllIcons.General.OpenDisk,
         AllIcons.General.OpenDiskHover,
-        DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"),
+        DartBundle.message("button.browse.dialog.title.select.dart.project.path"),
         () -> {
-          var descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor();
+          var descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
+            .withTitle(DartBundle.message("button.browse.dialog.title.select.dart.project.path"));
           VirtualFile file = FileChooser.chooseFile(descriptor, myDartProjectCombo, myProject, null);
           if (file != null) {
             setSelectedProjectPath(FileUtil.toSystemIndependentName(file.getPath()));
