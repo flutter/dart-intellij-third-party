@@ -1,11 +1,13 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.runner.server.ui;
 
+import com.intellij.icons.AllIcons;
+import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectRootManager;
-import com.intellij.openapi.ui.TextComponentAccessor;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -13,9 +15,10 @@ import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
-import com.intellij.ui.ComboboxWithBrowseButton;
 import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.components.fields.ExtendableTextField;
+import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.ide.runner.server.DartRemoteDebugConfiguration;
 import com.jetbrains.lang.dart.ide.runner.server.DartRemoteDebugParameters;
@@ -24,6 +27,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.plaf.basic.BasicComboBoxEditor;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -32,18 +36,21 @@ import static com.jetbrains.lang.dart.util.PubspecYamlUtil.PUBSPEC_YAML;
 public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemoteDebugConfiguration> {
 
   private JPanel myMainPanel;
-  private ComboboxWithBrowseButton myDartProjectCombo;
+  private ComboBox<NameAndPath> myDartProjectCombo;
   private JBLabel myHintLabel;
 
+  private final Project myProject;
   private final SortedSet<NameAndPath> myComboItems = new TreeSet<>();
 
   public DartRemoteDebugConfigurationEditor(final @NotNull Project project) {
+    myProject = project;
+    installBrowseExtension();
     initDartProjectsCombo(project);
     myHintLabel.setCopyable(true);
   }
 
   private void initDartProjectsCombo(final @NotNull Project project) {
-    myDartProjectCombo.getComboBox().setRenderer(SimpleListCellRenderer.create("", NameAndPath::getPresentableText));
+    myDartProjectCombo.setRenderer(SimpleListCellRenderer.create("", NameAndPath::getPresentableText));
 
     if (!project.isDefault()) {
       for (VirtualFile pubspecFile : FilenameIndex.getVirtualFilesByName(PUBSPEC_YAML, GlobalSearchScope.projectScope(project))) {
@@ -59,23 +66,7 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
       }
     }
 
-    myDartProjectCombo.getComboBox().setModel(new DefaultComboBoxModel<>(myComboItems.toArray()));
-
-    myDartProjectCombo.addBrowseFolderListener(
-      project,
-      FileChooserDescriptorFactory.createSingleFolderDescriptor(),
-      new TextComponentAccessor<>() {
-        @Override
-        public String getText(final JComboBox combo) {
-          final Object item = combo.getSelectedItem();
-          return item instanceof NameAndPath ? ((NameAndPath)item).myPath : "";
-        }
-
-        @Override
-        public void setText(final JComboBox combo, final @NotNull String path) {
-          setSelectedProjectPath(FileUtil.toSystemIndependentName(path));
-        }
-      });
+    myDartProjectCombo.setModel(new DefaultComboBoxModel<>(myComboItems.toArray(NameAndPath[]::new)));
   }
 
   @Override
@@ -98,17 +89,45 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
 
     if (!myComboItems.contains(item)) {
       myComboItems.add(item);
-      myDartProjectCombo.getComboBox().setModel(new DefaultComboBoxModel(myComboItems.toArray()));
+      myDartProjectCombo.setModel(new DefaultComboBoxModel<>(myComboItems.toArray(NameAndPath[]::new)));
     }
 
-    myDartProjectCombo.getComboBox().setSelectedItem(item);
+    myDartProjectCombo.setSelectedItem(item);
   }
 
   @Override
   protected void applyEditorTo(final @NotNull DartRemoteDebugConfiguration config) {
     final DartRemoteDebugParameters params = config.getParameters();
-    final Object selectedItem = myDartProjectCombo.getComboBox().getSelectedItem();
+    final Object selectedItem = myDartProjectCombo.getSelectedItem();
     params.setDartProjectPath(selectedItem instanceof NameAndPath ? ((NameAndPath)selectedItem).myPath : "");
+  }
+
+  private void createUIComponents() {
+    myDartProjectCombo = new ComboBox<>();
+  }
+
+  private void installBrowseExtension() {
+    ExtendableTextField editor = new ExtendableTextField();
+    editor.addExtension(
+      ExtendableTextField.Extension.create(
+        AllIcons.General.OpenDisk,
+        AllIcons.General.OpenDiskHover,
+        DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"),
+        () -> {
+          var descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor();
+          VirtualFile file = FileChooser.chooseFile(descriptor, myDartProjectCombo, myProject, null);
+          if (file != null) {
+            setSelectedProjectPath(FileUtil.toSystemIndependentName(file.getPath()));
+          }
+        }));
+    editor.setBorder(null);
+    myDartProjectCombo.setEditable(true);
+    myDartProjectCombo.setEditor(new BasicComboBoxEditor() {
+      @Override
+      protected JTextField createEditorComponent() {
+        return editor;
+      }
+    });
   }
 
   private static class NameAndPath implements Comparable<NameAndPath> {
