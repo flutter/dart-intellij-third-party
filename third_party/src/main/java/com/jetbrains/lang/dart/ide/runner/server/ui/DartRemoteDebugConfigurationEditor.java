@@ -27,7 +27,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.swing.plaf.basic.BasicComboBoxEditor;
+import java.awt.Component;
+import java.awt.event.ActionListener;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -123,10 +124,35 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
         }));
     editor.setBorder(null);
     myDartProjectCombo.setEditable(true);
-    myDartProjectCombo.setEditor(new BasicComboBoxEditor() {
+    myDartProjectCombo.setEditor(new ComboBoxEditor() {
       @Override
-      protected JTextField createEditorComponent() {
+      public @NotNull Component getEditorComponent() {
         return editor;
+      }
+
+      @Override
+      public void setItem(Object anObject) {
+        editor.setText(anObject == null ? "" : anObject.toString());
+      }
+
+      @Override
+      public Object getItem() {
+        return editor.getText();
+      }
+
+      @Override
+      public void selectAll() {
+        editor.selectAll();
+      }
+
+      @Override
+      public void addActionListener(ActionListener l) {
+        editor.addActionListener(l);
+      }
+
+      @Override
+      public void removeActionListener(ActionListener l) {
+        editor.removeActionListener(l);
       }
     });
   }

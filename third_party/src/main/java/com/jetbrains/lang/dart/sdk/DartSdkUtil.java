@@ -28,7 +28,8 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
-import javax.swing.plaf.basic.BasicComboBoxEditor;
+import java.awt.Component;
+import java.awt.event.ActionListener;
 import javax.swing.text.JTextComponent;
 import java.io.File;
 import java.util.ArrayList;
@@ -93,13 +94,39 @@ public final class DartSdkUtil {
           }
         });
 
-    dartSdkCombo.setEditor(new BasicComboBoxEditor() {
+    final ExtendableTextField editor = new ExtendableTextField();
+    editor.addExtension(browseExtension);
+    editor.setBorder(null);
+
+    dartSdkCombo.setEditor(new ComboBoxEditor() {
       @Override
-      protected JTextField createEditorComponent() {
-        ExtendableTextField editor = new ExtendableTextField();
-        editor.addExtension(browseExtension);
-        editor.setBorder(null);
+      public @NotNull Component getEditorComponent() {
         return editor;
+      }
+
+      @Override
+      public void setItem(Object anObject) {
+        editor.setText(anObject == null ? "" : anObject.toString());
+      }
+
+      @Override
+      public Object getItem() {
+        return editor.getText();
+      }
+
+      @Override
+      public void selectAll() {
+        editor.selectAll();
+      }
+
+      @Override
+      public void addActionListener(ActionListener l) {
+        editor.addActionListener(l);
+      }
+
+      @Override
+      public void removeActionListener(ActionListener l) {
+        editor.removeActionListener(l);
       }
     });
 
