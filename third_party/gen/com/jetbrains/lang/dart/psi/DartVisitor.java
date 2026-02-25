@@ -480,6 +480,10 @@ public class DartVisitor extends PsiElementVisitor {
     visitPsiCompositeElement(o);
   }
 
+  public void visitPrimaryConstructorDeclaration(@NotNull DartPrimaryConstructorDeclaration o) {
+    visitPsiNameIdentifierOwner(o);
+  }
+
   public void visitRecord(@NotNull DartRecord o) {
     visitPsiCompositeElement(o);
   }
@@ -733,6 +737,10 @@ public class DartVisitor extends PsiElementVisitor {
 
   public void visitYieldStatement(@NotNull DartYieldStatement o) {
     visitPsiCompositeElement(o);
+  }
+
+  public void visitPsiNameIdentifierOwner(@NotNull PsiNameIdentifierOwner o) {
+    visitElement(o);
   }
 
   public void visitClass(@NotNull DartClass o) {
