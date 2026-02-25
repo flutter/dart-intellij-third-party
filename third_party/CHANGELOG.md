@@ -1,3 +1,21 @@
+## Unreleased
+
+### Added
+- Analytics instrumentation (#230, #225)
+- Logging with `PluginLogger` (#245, #222)
+
+### Changed
+- Migrate from deprecated `ProcessAdapter` to `ProcessListener` (#265)
+- Build system: migrate from `community` to `intellijIdea` dependency (#209)
+
+### Removed
+- Stale `helpTopic` and `helpId` references (#232, #227)
+
+### Fixed
+- Rethrow `ProcessCanceledException` during refactorings (#264)
+- Keep New Project dialog details in sync with the selected Dart SDK (#215)
+- Downgrade Kotlin to be compatible with a 2.1.0 compiler (#254)
+
 ## 502.0.0
 
 ### Added
