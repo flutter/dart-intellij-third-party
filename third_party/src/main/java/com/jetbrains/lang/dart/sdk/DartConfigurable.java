@@ -56,7 +56,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   private JBCheckBox myEnableDartSupportCheckBox;
 
   private JPanel mySettingsPanel;
-  private ComboboxWithBrowseButton mySdkPathComboWithBrowse;
+  private ComboBox<String> mySdkPathComboWithBrowse;
   private JBLabel myVersionLabel;
   private JBCheckBox myCheckSdkUpdateCheckBox;
   // disabled and unchecked, shown in UI instead of myCheckSdkUpdateCheckBox if selected Dart SDK is a part of a Flutter SDK
@@ -102,7 +102,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   private void initDartSdkControls() {
     DartSdkUtil.initDartSdkControls(myProject, mySdkPathComboWithBrowse, myVersionLabel);
 
-    final JTextComponent sdkEditor = (JTextComponent)mySdkPathComboWithBrowse.getComboBox().getEditor().getEditorComponent();
+    final JTextComponent sdkEditor = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
     sdkEditor.getDocument().addDocumentListener(new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
@@ -249,8 +249,8 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     return false;
   }
 
-  private static @NotNull String getTextFromCombo(final @NotNull ComboboxWithBrowseButton combo) {
-    return FileUtilRt.toSystemIndependentName(combo.getComboBox().getEditor().getItem().toString().trim());
+  private static @NotNull String getTextFromCombo(final @NotNull ComboBox<?> combo) {
+    return FileUtilRt.toSystemIndependentName(combo.getEditor().getItem().toString().trim());
   }
 
   @Override
@@ -268,9 +268,9 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     // reset UI
     myEnableDartSupportCheckBox.setSelected(myDartSupportEnabledInitial);
     @NlsSafe String sdkInitialPath = mySdkInitial == null ? "" : FileUtilRt.toSystemDependentName(mySdkInitial.getHomePath());
-    mySdkPathComboWithBrowse.getComboBox().getEditor().setItem(sdkInitialPath);
+    mySdkPathComboWithBrowse.getEditor().setItem(sdkInitialPath);
     if (!sdkInitialPath.isEmpty()) {
-      ensureComboModelContainsCurrentItem(mySdkPathComboWithBrowse.getComboBox());
+      ensureComboModelContainsCurrentItem(mySdkPathComboWithBrowse);
     }
 
     final DartSdkUpdateOption sdkUpdateOption = DartSdkUpdateOption.getDartSdkUpdateOption();
@@ -409,7 +409,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   }
 
   private void createUIComponents() {
-    mySdkPathComboWithBrowse = new ComboboxWithBrowseButton(new ComboBox<>());
+    mySdkPathComboWithBrowse = new ComboBox<>();
 
     final CheckboxTree.CheckboxTreeCellRenderer checkboxTreeCellRenderer = new CheckboxTree.CheckboxTreeCellRenderer() {
       @Override
