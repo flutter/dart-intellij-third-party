@@ -12,7 +12,7 @@
 - Stale `helpTopic` and `helpId` references (#232, #227)
 
 ### Fixed
-- Rethrow `ProcessCanceledException` during refactorings (#264)
+- Improved cancellation handling for refactoring operations to prevent potential UI freezes (#264)
 - Keep New Project dialog details in sync with the selected Dart SDK (#215)
 - Downgrade Kotlin to be compatible with a 2.1.0 compiler (#254)
 
