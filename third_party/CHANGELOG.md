@@ -1,4 +1,4 @@
-## Unreleased
+## 503.0.0
 
 ### Added
 - Analytics instrumentation (#230, #225)
