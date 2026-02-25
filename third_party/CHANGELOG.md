@@ -3,6 +3,7 @@
 ### Added
 - Analytics instrumentation (#230, #225)
 - Logging with `PluginLogger` (#245, #222)
+- Support for IDEA platform 2026.1 (#272)
 
 ### Changed
 - Migrate from deprecated `ProcessAdapter` to `ProcessListener` (#265)
