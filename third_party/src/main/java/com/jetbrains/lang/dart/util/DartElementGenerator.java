@@ -16,11 +16,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public final class DartElementGenerator {
-  public static @Nullable DartReference createReferenceFromText(Project myProject, String text) {
-    final DartExpression expression = createExpressionFromText(myProject, text);
-    return expression instanceof DartReference ? (DartReference)expression : null;
-  }
-
   public static @Nullable DartExpression createExpressionFromText(Project myProject, String text) {
     final PsiFile file = createDummyFile(myProject, "var dummy = " + text + ";");
     final PsiElement child = file.getFirstChild();

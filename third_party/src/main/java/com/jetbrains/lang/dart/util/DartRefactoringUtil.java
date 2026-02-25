@@ -1,18 +1,14 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.util;
 
-import com.intellij.codeInsight.PsiEquivalenceUtil;
 import com.intellij.lang.ASTNode;
 import com.intellij.navigation.NavigationItem;
-import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiWhiteSpace;
 import com.intellij.psi.ResolveState;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.intellij.util.SmartList;
 import com.intellij.util.containers.ContainerUtil;
-import com.jetbrains.lang.dart.DartComponentType;
 import com.jetbrains.lang.dart.DartTokenTypes;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.resolve.ComponentNameScopeProcessor;
@@ -30,41 +26,6 @@ public final class DartRefactoringUtil {
     final Set<DartComponentName> usedComponentNames = new HashSet<>();
     PsiTreeUtil.treeWalkUp(new ComponentNameScopeProcessor(usedComponentNames), context, null, ResolveState.initial());
     return usedComponentNames;
-  }
-
-  public static @Nullable DartExpression getSelectedExpression(final @NotNull Project project,
-                                                               @NotNull PsiFile file,
-                                                               final @NotNull PsiElement element1,
-                                                               final @NotNull PsiElement element2) {
-    PsiElement parent = PsiTreeUtil.findCommonParent(element1, element2);
-    if (parent == null) {
-      return null;
-    }
-    if (parent instanceof DartExpression) {
-      return (DartExpression)parent;
-    }
-    return PsiTreeUtil.getParentOfType(parent, DartExpression.class);
-  }
-
-  public static @NotNull List<PsiElement> getOccurrences(final @NotNull PsiElement pattern, final @Nullable PsiElement context) {
-    if (context == null) {
-      return Collections.emptyList();
-    }
-    final List<PsiElement> occurrences = new SmartList<>();
-    context.acceptChildren(new DartRecursiveVisitor() {
-      @Override
-      public void visitElement(final @NotNull PsiElement element) {
-        if (DartComponentType.typeOf(element) == DartComponentType.PARAMETER) {
-          return;
-        }
-        if (PsiEquivalenceUtil.areElementsEquivalent(element, pattern)) {
-          occurrences.add(element);
-          return;
-        }
-        super.visitElement(element);
-      }
-    });
-    return occurrences;
   }
 
   public static PsiElement @NotNull [] findStatementsInRange(PsiFile file, int startOffset, int endOffset) {

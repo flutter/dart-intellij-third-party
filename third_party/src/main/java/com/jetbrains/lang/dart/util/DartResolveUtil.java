@@ -866,12 +866,6 @@ public final class DartResolveUtil {
     return null;
   }
 
-  public static boolean aloneOrFirstInChain(DartReference reference) {
-    return PsiTreeUtil.getChildrenOfType(reference, DartReference.class) == null &&
-           getLeftReference(reference) == null &&
-           getLeftReference(reference.getParent()) == null;
-  }
-
   public static ResolveResult @NotNull [] toCandidateInfoArray(@Nullable List<? extends PsiElement> elements) {
     if (elements == null) {
       return ResolveResult.EMPTY_ARRAY;
