@@ -7,6 +7,9 @@ import com.intellij.ide.actions.ShowSettingsUtilImpl;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.fileChooser.FileChooser;
+import com.intellij.openapi.fileChooser.FileChooserDescriptor;
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
@@ -23,10 +26,13 @@ import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.IdeFocusManager;
 import com.intellij.ui.*;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.components.fields.ExtendableTextComponent;
+import com.intellij.ui.components.fields.ExtendableTextField;
 import com.intellij.ui.treeStructure.treetable.TreeColumnInfo;
 import com.intellij.util.ui.ColumnInfo;
 import com.intellij.util.ui.JBUI;
@@ -41,6 +47,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeWillExpandListener;
+import javax.swing.plaf.basic.BasicComboBoxEditor;
 import javax.swing.text.JTextComponent;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.ExpandVetoException;
@@ -56,7 +63,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   private JBCheckBox myEnableDartSupportCheckBox;
 
   private JPanel mySettingsPanel;
-  private ComboboxWithBrowseButton mySdkPathComboWithBrowse;
+  private ComboBox<String> mySdkPathComboWithBrowse;
   private JBLabel myVersionLabel;
   private JBCheckBox myCheckSdkUpdateCheckBox;
   // disabled and unchecked, shown in UI instead of myCheckSdkUpdateCheckBox if selected Dart SDK is a part of a Flutter SDK
@@ -100,9 +107,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   }
 
   private void initDartSdkControls() {
-    DartSdkUtil.initDartSdkControls(myProject, mySdkPathComboWithBrowse, myVersionLabel);
-
-    final JTextComponent sdkEditor = (JTextComponent)mySdkPathComboWithBrowse.getComboBox().getEditor().getEditorComponent();
+    final JTextComponent sdkEditor = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
     sdkEditor.getDocument().addDocumentListener(new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
@@ -113,6 +118,9 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
             mySdkUpdateChannelCombo.setSelectedItem(DartSdkUpdateOption.StableAndDev);
           }
         }
+
+        final @NlsSafe String version = DartSdkUtil.getSdkVersion(sdkHomePath);
+        myVersionLabel.setText(version);
 
         updateControlsEnabledState();
         updateErrorLabel();
@@ -249,8 +257,8 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     return false;
   }
 
-  private static @NotNull String getTextFromCombo(final @NotNull ComboboxWithBrowseButton combo) {
-    return FileUtilRt.toSystemIndependentName(combo.getComboBox().getEditor().getItem().toString().trim());
+  private static @NotNull String getTextFromCombo(final @NotNull ComboBox<String> combo) {
+    return FileUtilRt.toSystemIndependentName(combo.getEditor().getItem().toString().trim());
   }
 
   @Override
@@ -268,10 +276,11 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     // reset UI
     myEnableDartSupportCheckBox.setSelected(myDartSupportEnabledInitial);
     @NlsSafe String sdkInitialPath = mySdkInitial == null ? "" : FileUtilRt.toSystemDependentName(mySdkInitial.getHomePath());
-    mySdkPathComboWithBrowse.getComboBox().getEditor().setItem(sdkInitialPath);
+    mySdkPathComboWithBrowse.getEditor().setItem(sdkInitialPath);
     if (!sdkInitialPath.isEmpty()) {
-      ensureComboModelContainsCurrentItem(mySdkPathComboWithBrowse.getComboBox());
+      ensureComboModelContainsCurrentItem(mySdkPathComboWithBrowse);
     }
+    DartSdkUtil.addKnownSDKPathsToCombo(mySdkPathComboWithBrowse);
 
     final DartSdkUpdateOption sdkUpdateOption = DartSdkUpdateOption.getDartSdkUpdateOption();
     myCheckSdkUpdateCheckBox.setSelected(sdkUpdateOption != DartSdkUpdateOption.DoNotCheck);
@@ -409,7 +418,30 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   }
 
   private void createUIComponents() {
-    mySdkPathComboWithBrowse = new ComboboxWithBrowseButton(new ComboBox<>());
+    ExtendableTextComponent.Extension browseExtension =
+      ExtendableTextComponent.Extension.create(AllIcons.General.OpenDisk, AllIcons.General.OpenDiskHover,
+                                               DartBundle.message("dart.sdk.path.label"),
+                                               () -> {
+                                                 final FileChooserDescriptor descriptor =
+                                                   FileChooserDescriptorFactory.createSingleFolderDescriptor();
+                                                 final VirtualFile file =
+                                                   FileChooser.chooseFile(descriptor, mySdkPathComboWithBrowse, myProject, null);
+                                                 if (file != null) {
+                                                   mySdkPathComboWithBrowse.getEditor().setItem(file.getPath());
+                                                 }
+                                               });
+
+    mySdkPathComboWithBrowse = new ComboBox<>();
+    mySdkPathComboWithBrowse.setEditable(true);
+    mySdkPathComboWithBrowse.setEditor(new BasicComboBoxEditor() {
+      @Override
+      protected JTextField createEditorComponent() {
+        final ExtendableTextField ecbEditor = new ExtendableTextField();
+        ecbEditor.addExtension(browseExtension);
+        ecbEditor.setBorder(null);
+        return ecbEditor;
+      }
+    });
 
     final CheckboxTree.CheckboxTreeCellRenderer checkboxTreeCellRenderer = new CheckboxTree.CheckboxTreeCellRenderer() {
       @Override
