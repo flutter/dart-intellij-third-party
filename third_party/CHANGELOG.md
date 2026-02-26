@@ -1,6 +1,16 @@
 ## Unreleased
 
 ### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## 503.0.0
+
+### Added
 - Analytics instrumentation (#230, #225)
 - Logging with `PluginLogger` (#245, #222)
 - Support for IDEA platform 2026.1 (#272)
