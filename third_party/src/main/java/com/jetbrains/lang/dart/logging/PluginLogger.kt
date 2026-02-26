@@ -23,17 +23,27 @@ object PluginLogger {
 
   init {
     val logPath = PathManager.getLogPath()
-    try {
-      fileHandler = FileHandler(logPath + File.separatorChar + LOG_FILE_NAME, 1024 * 1024, 1)
-    } catch (e: IOException) {
-      throw RuntimeException(e)
+    val fullPath = logPath + File.separatorChar + LOG_FILE_NAME
+    
+    // Check if a FileHandler for dash.log already exists on the rootLogger.
+    // This happens when multiple plugins (e.g., Dart and Flutter) use the same logger name.
+    val existingHandler = rootLogger.handlers.filterIsInstance<FileHandler>().firstOrNull()
+    
+    if (existingHandler != null) {
+      fileHandler = existingHandler
+    } else {
+      try {
+        fileHandler = FileHandler(fullPath, 10 * 1024 * 1024, 5, true)
+        System.setProperty(
+          "java.util.logging.SimpleFormatter.format",
+          "%1\$tF %1\$tT %3\$s [%4$-7s] %5\$s %6\$s %n"
+        )
+        fileHandler.formatter = SimpleFormatter()
+        rootLogger.addHandler(fileHandler)
+      } catch (e: IOException) {
+        throw RuntimeException(e)
+      }
     }
-    System.setProperty(
-      "java.util.logging.SimpleFormatter.format",
-      "%1\$tF %1\$tT %3\$s [%4$-7s] %5\$s %6\$s %n"
-    )
-    fileHandler.formatter = SimpleFormatter()
-    rootLogger.addHandler(fileHandler)
   }
 
   fun createLogger(logClass: Class<*>): IJLogger {
