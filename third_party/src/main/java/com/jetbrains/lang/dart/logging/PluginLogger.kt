@@ -28,8 +28,12 @@ object PluginLogger {
 
     if (existingHandler != null) {
       // Another plugin initialized first; reuse its handler
-      rootLogger.addHandler(existingHandler)
-      flutterLogger.addHandler(existingHandler)
+      if (!rootLogger.handlers.contains(existingHandler)) {
+        rootLogger.addHandler(existingHandler)
+      }
+      if (!flutterLogger.handlers.contains(existingHandler)) {
+        flutterLogger.addHandler(existingHandler)
+      }
     } else {
       // We are the first plugin to initialize; create the handler
       try {
