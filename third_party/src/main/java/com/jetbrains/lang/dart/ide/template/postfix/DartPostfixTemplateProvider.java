@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.psi.PsiFile;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import org.dartlang.analysis.server.protocol.PostfixTemplateDescriptor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -17,6 +18,8 @@ import java.util.Map;
 import java.util.Set;
 
 public final class DartPostfixTemplateProvider implements PostfixTemplateProvider {
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartPostfixTemplateProvider.class);
+
   private static final String UNINITIALIZED_KEY = "none";
   private static final Map<String, Set<PostfixTemplate>> TEMPLATE_CACHE = new HashMap<>();
 
@@ -45,7 +48,7 @@ public final class DartPostfixTemplateProvider implements PostfixTemplateProvide
         TEMPLATE_CACHE.put(version, set);
       }
       catch (Exception ex) {
-        Logger.getInstance(DartPostfixTemplateProvider.class).error(ex);
+        LOG.error(ex);
       }
     }
   }

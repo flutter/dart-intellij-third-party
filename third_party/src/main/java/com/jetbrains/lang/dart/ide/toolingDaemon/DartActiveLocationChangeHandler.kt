@@ -2,7 +2,7 @@ package com.jetbrains.lang.dart.ide.toolingDaemon
 
 import com.google.gson.JsonObject
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.diagnostic.logger
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.*
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -85,6 +85,6 @@ internal class DartActiveLocationChangeHandler(private val dtdService: DartTooli
   }
 
   companion object {
-    private val logger = logger<DartActiveLocationChangeHandler>()
+    private val logger = PluginLogger.createLogger(DartActiveLocationChangeHandler::class.java)
   }
 }

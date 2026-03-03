@@ -15,7 +15,7 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.logger
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.Key
@@ -390,6 +390,6 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     fun getInstance(project: Project): DartToolingDaemonService = project.service()
 
     private const val MIN_SDK_VERSION: String = "3.4"
-    private val logger = logger<DartToolingDaemonService>()
+    private val logger = PluginLogger.createLogger(DartToolingDaemonService::class.java)
   }
 }

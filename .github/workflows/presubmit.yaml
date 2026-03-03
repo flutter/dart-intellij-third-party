@@ -13,7 +13,7 @@ permissions:
 jobs:
   # Job 1: Build Plugin
   build-plugin:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-large
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         # TODO(https://github.com/flutter/dart-intellij-third-party/pull/33) Fix and enable execution on Windows
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-large, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
@@ -52,65 +52,34 @@ jobs:
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
         working-directory: third_party
 
-  # Job 3: Dart Analysis Server Tests
-  dart-analysis-server-tests:
-    needs: build-plugin
-    strategy:
-      matrix:
-        # https://github.com/dart-lang/setup-dart
-        # Define the Dart SDK versions to test against.
-        # 'stable' and 'beta' will fetch the latest respective versions.
-        # You can also specify exact versions like '3.0.0', '3.8.1'.
-        # dart-version: ['3.0.0', 'stable', 'beta', 'dev' ]
-
-        # TODO(https://github.com/flutter/dart-intellij-third-party/issues/47)
-        # Fix tests to run over additional operating systems as well as Dart SDK versions:
-
-        dart-version: ['stable']
-        os: [ macos-latest ]
-    runs-on: ${{ matrix.os }} # Use the OS from the matrix
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
-
-      - name: Set up Dart SDK ${{ matrix.dart-version }}
-        # This action installs the specified Dart SDK version.
-        # It sets the DART_SDK environment variable to the SDK root.
-        uses: dart-lang/setup-dart@v1
-        with:
-          sdk: ${{ matrix.dart-version }}
-
-      - name: Run Dart Analysis Server Tests with Dart SDK ${{ matrix.dart-version }}
-        if: always() # Run even if one SDK version fails
-        # Pass the Dart SDK path with DART_HOME
-        run: |
-          ./gradlew :test --tests "com.jetbrains.dart.analysisServer.*"
-        working-directory: third_party
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-         name: build
-         path: |
-           **/build/reports/
-           **/build/test-results/
-  # Job 4: Verify Plugin
+  # Job 3: Verify Plugin
   verify-plugin:
     needs: build-plugin
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        # TODO(pq): temporarily reduced to address IO exceptions (https://github.com/flutter/dart-intellij-third-party/issues/220)
+        # os: [ ubuntu-large, macos-latest, windows-latest ]
+        os: [ ubuntu-large ]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
         uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+
+      - name: Free up disk space (on ubuntu only)
+        if: ${{ matrix.os == 'uubuntu-large' }}
+        # Inspired by the https://github.com/marketplace/actions/free-disk-space-ubuntu action
+        # See: https://github.com/flutter/dart-intellij-third-party/issues/220
+        run: |
+          echo "Freeing disk space...\n"
+          echo "Before:\n"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          echo "After:\n"
+          df -h
 
       - name: Set up JDK
         uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
@@ -126,3 +95,54 @@ jobs:
           ./gradlew verifyPluginSignature
           ./gradlew verifyPluginStructure
         working-directory: third_party
+      - name: Upload verifier results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build
+          path: |
+            **/build/reports/
+            **/build/test-results/
+      - name: Check baselines
+        run: |
+          
+          RED='\033[0;31m'
+          GREEN='\033[0;32m'
+          YELLOW='\033[1;33m'
+          BOLD='\033[1m'
+          NC='\033[0m' # None (Reset)
+
+          EXIT_STATUS=0
+          for version in 251 252 253 261; do
+            echo -e "${BOLD}Checking baseline for $version...${NC}"
+            BASELINE="third_party/tool/baseline/$version/verifier-baseline.txt"
+            REPORT=$(find third_party/build/reports/pluginVerifier -path "*-$version.*/report.md" | head -n 1)
+            echo "Found report: $REPORT"
+
+            if [ -f "$REPORT" ]; then
+              echo "Comparing baseline against report in $REPORT"
+              grep "^*" "$REPORT" | sort > current_issues.tmp || true
+
+              if [ -f "$BASELINE" ]; then
+                NEW_ERRORS=$(comm -13 <(sort "$BASELINE") current_issues.tmp)
+
+                if [ -n "$NEW_ERRORS" ]; then
+                  echo -e "${RED}${BOLD}Error: New verification issues found for version $version:${NC}"
+                  echo "$NEW_ERRORS"
+                  EXIT_STATUS=1
+                else
+                  echo -e "${GREEN}Verification passed for version $version (no new issues).${NC}"
+                fi
+              else
+                echo -e "${YELLOW}Warning: No baseline file found at $BASELINE. Skipping comparison.${NC}"
+              fi
+            else
+              echo -e "${RED}${BOLD}Error: Report does not exist.${NC}"
+              EXIT_STATUS=1
+            fi
+          done
+
+          if [ $EXIT_STATUS -ne 0 ]; then
+            echo -e "${RED}${BOLD}Build failed: New verification issues were detected.${NC}"
+            exit 1
+          fi

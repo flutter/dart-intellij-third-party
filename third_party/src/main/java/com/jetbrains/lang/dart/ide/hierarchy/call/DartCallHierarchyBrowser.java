@@ -14,6 +14,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.ui.PopupHandler;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,7 +23,7 @@ import java.util.Comparator;
 import java.util.Map;
 
 public class DartCallHierarchyBrowser extends CallHierarchyBrowserBase {
-  private static final Logger LOG = Logger.getInstance(DartCallHierarchyBrowser.class);
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartCallHierarchyBrowser.class);
 
   public DartCallHierarchyBrowser(Project project, PsiElement method) {
     super(project, method);

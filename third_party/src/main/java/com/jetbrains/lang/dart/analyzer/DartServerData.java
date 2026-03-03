@@ -1,6 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.analyzer;
 
+import com.jetbrains.lang.dart.logging.PluginLogger;
+
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.codeInsight.hints.declarative.impl.DeclarativeInlayHintsPassFactory;
 import com.intellij.openapi.application.ApplicationManager;
@@ -29,6 +31,8 @@ public final class DartServerData {
   public interface OutlineListener extends EventListener {
     void outlineUpdated(@NotNull DartFileInfo fileInfo);
   }
+
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartServerData.class);
 
   private final DartAnalysisServerService myService;
 
@@ -246,7 +250,7 @@ public final class DartServerData {
 
   void textDocumentContentDidChange(@NotNull String fileUri) {
     if (fileUri.startsWith("file://")) {
-      Logger.getInstance(DartServerData.class).warn("Ignoring textDocumentContentDidChange('" + fileUri + "')");
+      LOG.warn("Ignoring textDocumentContentDidChange('" + fileUri + "')");
       return;
     }
 

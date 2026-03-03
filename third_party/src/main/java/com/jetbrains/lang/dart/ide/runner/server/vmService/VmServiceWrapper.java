@@ -39,9 +39,11 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.jetbrains.lang.dart.logging.PluginLogger;
+
 public final class VmServiceWrapper implements Disposable {
 
-  public static final Logger LOG = Logger.getInstance(VmServiceWrapper.class.getName());
+  public static final Logger LOG = PluginLogger.INSTANCE.createLogger(VmServiceWrapper.class);
   private static final long RESPONSE_WAIT_TIMEOUT = 3000; // millis
 
   private final DartVmServiceDebugProcess myDebugProcess;

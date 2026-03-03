@@ -56,6 +56,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
   private boolean myDartCreateCalcStarted;
   private List<DartProjectTemplate> myDartCreateTemplates;// not-null means that it's been already calculated
+  private String myDartCreateTemplatesSdkPath; //used to expire the above cache if the sdk is changed an alternative would be to use the same cache method as com.jetbrains.lang.dart.sdk.DartSdkUtil.getSdkVersion
 
   public DartGeneratorPeer() {
     // set initial values before initDartSdkControls() because listeners should not be triggered on initialization
@@ -95,9 +96,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
-        final String sdkPath = mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim();
-        final String message = DartSdkUtil.getErrorMessageIfWrongSdkRootPath(sdkPath);
-        if (message == null) {
+        if(e.getType() == DocumentEvent.EventType.INSERT){
           onSdkPathChanged();
         }
       }
@@ -108,10 +107,13 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
   private void onSdkPathChanged() {
     String sdkPath = mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim();
+    // If the sdk path has changed, recalculate the create template options
+    if (myDartCreateTemplatesSdkPath != null && !myDartCreateTemplatesSdkPath.equals(sdkPath)) {
+      clearTemplates();
+    }
     String errorMessage = DartSdkUtil.getErrorMessageIfWrongSdkRootPath(sdkPath);
     if (errorMessage != null) {
-      myLoadingTemplatesPanel.setVisible(false);
-      myTemplatesPanel.setVisible(false);
+      clearTemplates();
       return;
     }
 
@@ -131,6 +133,21 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     }
   }
 
+  // Clears myTemplateList which is required when an invalid Dart SDK directory
+  // is selected
+  private void clearTemplates() {
+    myDartCreateTemplates = null;
+    myDartCreateTemplatesSdkPath = null;
+    myDartCreateCalcStarted = false;
+
+    myLoadingTemplatesPanel.setVisible(false);
+    // myLoadedTemplatesPanel should be visible to show the default text
+    myLoadedTemplatesPanel.setVisible(true);
+    myCreateSampleProjectCheckBox.setEnabled(false);
+    myTemplatesList.setEnabled(false);
+    myTemplatesList.setModel(new DefaultListModel<>());
+  }
+
   private void startLoadingTemplates() {
     myLoadingTemplatesPanel.setVisible(true);
     myLoadingTemplatesPanel.setPreferredSize(myLoadedTemplatesPanel.getPreferredSize());
@@ -142,14 +159,16 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     asyncProcessIcon.resume();
 
     ApplicationManager.getApplication().executeOnPooledThread(() -> {
+      final String comboSdkPath = mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim();
       final String sdkPath =
-        FileUtil.toSystemIndependentName(mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim());
+        FileUtil.toSystemIndependentName(comboSdkPath);
       DartProjectTemplate.loadTemplatesAsync(sdkPath, templates -> {
         asyncProcessIcon.suspend();
         myLoadingTemplatesPanel.remove(asyncProcessIcon);
         Disposer.dispose(asyncProcessIcon);
 
         myDartCreateTemplates = templates;
+        myDartCreateTemplatesSdkPath = comboSdkPath;
 
         // it's better to call onSdkPathChanged() but not showTemplates() directly as sdk path could have been changed during this long calculation
         onSdkPathChanged();

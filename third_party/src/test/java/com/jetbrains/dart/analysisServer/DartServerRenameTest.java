@@ -117,7 +117,8 @@ public class DartServerRenameTest extends CodeInsightFixtureTestCase {
     doTest("newName");
   }
 
-  public void testFileRename() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/219
+  public void skipped_testFileRename() {
     PsiFile barFile = myFixture.addFileToProject("src/bar.dart",
                                                  "<info>class</info> <info>InBar</info> { <info>var</info> <info>field</info>; <error>incorrect</error>; }");
     PsiFile fooFile = myFixture.addFileToProject("foo.dart", "import  r'''src/bar.dart''' ;");

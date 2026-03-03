@@ -25,8 +25,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
+import com.jetbrains.lang.dart.logging.PluginLogger;
+
 public class DartVmServiceListener implements VmServiceListener {
-  private static final Logger LOG = Logger.getInstance(DartVmServiceListener.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartVmServiceListener.class);
 
   private final @NotNull DartVmServiceDebugProcess myDebugProcess;
   private final @NotNull DartVmServiceBreakpointHandler myBreakpointHandler;
