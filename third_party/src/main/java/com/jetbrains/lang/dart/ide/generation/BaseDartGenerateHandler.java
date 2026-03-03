@@ -16,6 +16,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.containers.ContainerUtil;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.DartComponentType;
 import com.jetbrains.lang.dart.ide.DartNamedElementNode;
 import com.jetbrains.lang.dart.psi.DartClass;
@@ -32,6 +33,8 @@ import java.util.*;
 import java.util.List;
 
 public abstract class BaseDartGenerateHandler implements LanguageCodeInsightActionHandler {
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(BaseDartGenerateHandler.class);
+
   @Override
   public boolean isValidFor(final @NotNull Editor editor, final @NotNull PsiFile file) {
     return file instanceof DartFile &&
@@ -83,7 +86,7 @@ public abstract class BaseDartGenerateHandler implements LanguageCodeInsightActi
               createMethodsFix.invoke(project, editor, file);
             }
             catch (IncorrectOperationException ex) {
-              Logger.getInstance(getClass().getName()).error(ex);
+              LOG.error(ex);
             }
           }
         });

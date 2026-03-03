@@ -188,7 +188,7 @@ public class DartSpacingProcessor {
       return Spacing.createSpacing(0, Integer.MAX_VALUE, 0, true, mySettings.KEEP_BLANK_LINES_IN_CODE);
     }
     if (BLOCKS_EXT.contains(elementType)) {
-      boolean topLevel = elementType == DART_FILE || elementType == EMBEDDED_CONTENT;
+      boolean topLevel = elementType == DART_FILE;
       int lineFeeds = node1 instanceof PsiErrorElement || node2 instanceof PsiErrorElement ? 0 : 1;
       int spaces = 0;
       int blanks = mySettings.KEEP_BLANK_LINES_IN_CODE;
@@ -1057,8 +1057,7 @@ public class DartSpacingProcessor {
 
   private static boolean needsBlankLineBeforeFunction(IElementType elementType) {
     return elementType == DART_FILE ||
-           elementType == CLASS_MEMBERS ||
-           elementType instanceof DartEmbeddedContentElementType;
+           elementType == CLASS_MEMBERS;
   }
 
   private static boolean isEmbeddedComment(IElementType type, Block block) {

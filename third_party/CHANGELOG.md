@@ -1,4 +1,4 @@
-## 501.0.0
+## Unreleased
 
 ### Added
 
@@ -6,13 +6,45 @@
 
 ### Removed
 
+### Fixed
+
+## 503.0.0
+
+### Added
+- Analytics instrumentation (#230, #225)
+- Logging with `PluginLogger` (#245, #222)
+- Support for IDEA platform 2026.1 (#272)
+
+### Changed
+- Migrate from deprecated `ProcessAdapter` to `ProcessListener` (#265)
+- Build system: migrate from `community` to `intellijIdea` dependency (#209)
+
+### Removed
+- Stale `helpTopic` and `helpId` references (#232, #227)
+
+### Fixed
+- Improved cancellation handling for refactoring operations to prevent potential UI freezes (#264)
+- Keep New Project dialog details in sync with the selected Dart SDK (#215)
+- Downgrade Kotlin to be compatible with a 2.1.0 compiler (#254)
+
+## 502.0.0
+
+### Added
+
+### Changed
+
+- Update stagehand mentions to dart create (#171)
+
+### Removed
+
 - Dropped support for Dart SDK versions older than 2.12.
+- Unsupported Dart in HTML logic (#173)
+- Outdated web template (#172)
 
 ### Fixed
 
 - Fixed resolution for Dart dot shorthands (e.g. `.new`, `.named`). (#89)
 - UI freeze during refactoring operations (e.g. Move File) when Analysis Server is slow (#122)
-
 
 ## 500.0.0
 

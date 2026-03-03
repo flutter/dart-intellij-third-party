@@ -19,13 +19,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-class StagehandTemplate extends DartProjectTemplate {
-  private final @NotNull Stagehand myStagehand;
-  private final @NotNull Stagehand.StagehandDescriptor myTemplate;
+/**
+ * A project template backed by `dart create`.
+ */
+class DartCreateProjectTemplate extends DartProjectTemplate {
+  private final @NotNull DartCreate myDartCreate;
+  private final @NotNull DartCreate.DartCreateTemplate myTemplate;
 
-  StagehandTemplate(final @NotNull Stagehand stagehand, final @NotNull Stagehand.StagehandDescriptor template) {
+  DartCreateProjectTemplate(final @NotNull DartCreate dartCreate, final @NotNull DartCreate.DartCreateTemplate template) {
     super(template.myLabel, template.myDescription);
-    myStagehand = stagehand;
+    myDartCreate = dartCreate;
     myTemplate = template;
   }
 
@@ -34,7 +37,7 @@ class StagehandTemplate extends DartProjectTemplate {
                                                  final @NotNull Module module,
                                                  final @NotNull VirtualFile baseDir) throws IOException {
     try {
-      myStagehand.generateInto(sdkRoot, baseDir, myTemplate.myId);
+      myDartCreate.generateInto(sdkRoot, baseDir, myTemplate.myId);
     }
     catch (ExecutionException e) {
       throw new IOException(e);

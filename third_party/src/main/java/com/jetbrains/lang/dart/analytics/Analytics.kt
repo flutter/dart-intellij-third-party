@@ -17,11 +17,11 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.PrintingLogger
 import de.roderick.weberknecht.WebSocketException
@@ -49,7 +49,7 @@ private object UnifiedAnalytics {
   }
 
   private val logger: Logger =
-    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else logger<UnifiedAnalytics>()
+    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else PluginLogger.createLogger(UnifiedAnalytics::class.java)
 
   /// Service name for the DTD-hosted unified analytics service.
   const val SERVICE_NAME = "UnifiedAnalytics"
@@ -109,8 +109,9 @@ private object UnifiedAnalytics {
     return value
   }
 
-  fun callServiceWithNoResponse(dtdProcess: DTDProcess, name: String) =
+  fun callServiceWithNoResponse(dtdProcess: DTDProcess, name: String) {
     callServiceWithJsonResponse(dtdProcess, name)
+  }
 
   fun callServiceWithStringResponse(dtdProcess: DTDProcess, name: String): String? =
     callServiceWithJsonResponse(dtdProcess, name)?.asString
@@ -207,7 +208,7 @@ private object AnalyticsConfigurationManager {
 
 object Analytics {
   private val logger: Logger =
-    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else logger<Analytics>()
+    if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else PluginLogger.createLogger(Analytics::class.java)
 
   private val reporter: AnalyticsReporter
     get() = if (DEBUGGING_LOCALLY) PrintingReporter else AnalyticsReporter.forConfiguration(
@@ -276,6 +277,11 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
     @JvmStatic
     fun forAction(action: AnAction, event: AnActionEvent): ActionData = forAction(
       event.actionManager.getId(action), event.place, event.project
+    )
+    
+    @JvmStatic
+    fun forAction(id: String?, event: AnActionEvent): ActionData = forAction(
+      id, event.place, event.project
     )
 
     @JvmStatic

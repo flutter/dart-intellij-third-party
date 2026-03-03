@@ -49,11 +49,6 @@ public final class DartLanguageCodeStyleSettingsProvider extends LanguageCodeSty
       protected @NotNull CodeStyleAbstractPanel createPanel(@NotNull CodeStyleSettings settings) {
         return new DartCodeStylePanel(getCurrentSettings(), settings);
       }
-
-      @Override
-      public String getHelpTopic() {
-        return "reference.settingsdialog.codestyle.dart";
-      }
     };
   }
 }

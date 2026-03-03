@@ -30,6 +30,8 @@ import com.intellij.util.EditSourceOnEnterKeyHandler;
 import com.intellij.util.OpenSourceUtil;
 import com.intellij.util.SmartList;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.analyzer.DartFileInfo;
 import com.jetbrains.lang.dart.analyzer.DartFileInfoKt;
@@ -52,6 +54,13 @@ import java.util.List;
 import java.util.Map;
 
 public class DartProblemsViewPanel extends SimpleToolWindowPanel implements CopyProvider {
+  private static final String ID_PREFIX = "dart.problems.view";
+
+  public static final String FILTER_PROBLEMS_ACTION_ID = ID_PREFIX + ".filterProblems";
+  public static final String JUMP_TO_SOURCE_ACTION_ID = ID_PREFIX + ".jumpToSource";
+  public static final String OPEN_DOCUMENTATION_ACTION_ID = ID_PREFIX + ".openDocumentation";
+  public static final String OPEN_SERVER_SETTINGS_ACTION_ID = ID_PREFIX + ".openServerSettings";
+
   private static final LayeredIcon DART_ERRORS_ICON;
   private static final LayeredIcon DART_WARNINGS_ICON;
 
@@ -194,6 +203,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
           public void actionPerformed(@NotNull AnActionEvent e) {
             int offset = DartAnalysisServerService.getInstance(myProject).getConvertedOffset(vFile, location.getOffset());
             OpenSourceUtil.navigate(PsiNavigationSupport.getInstance().createNavigatable(myProject, vFile, offset));
+            Analytics.report(AnalyticsData.forAction(JUMP_TO_SOURCE_ACTION_ID, e));
           }
         });
       }
@@ -211,6 +221,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
       @Override
       public void actionPerformed(@NotNull AnActionEvent e) {
         BrowserUtil.browse(url);
+        Analytics.report(AnalyticsData.forAction(OPEN_DOCUMENTATION_ACTION_ID, e));
       }
     });
   }
@@ -380,9 +391,9 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
     if (problem != null) {
       VirtualFile file = LocalFileSystem.getInstance().findFileByPath(problem.getSystemIndependentPath());
       if (file != null) {
-        OpenFileDescriptor navigatable = new OpenFileDescriptor(myProject, file, problem.getOffset());
-        navigatable.setScrollType(ScrollType.MAKE_VISIBLE);
-        return navigatable;
+        OpenFileDescriptor navigable = new OpenFileDescriptor(myProject, file, problem.getOffset());
+        navigable.setScrollType(ScrollType.MAKE_VISIBLE);
+        return navigable;
       }
     }
 
@@ -428,6 +439,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
       showFiltersPopup();
+      Analytics.report(AnalyticsData.forAction(FILTER_PROBLEMS_ACTION_ID, e));
     }
   }
 
@@ -451,6 +463,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
       showAnalysisServerSettingsPopup();
+      Analytics.report(AnalyticsData.forAction(OPEN_SERVER_SETTINGS_ACTION_ID, e));
     }
   }
 }

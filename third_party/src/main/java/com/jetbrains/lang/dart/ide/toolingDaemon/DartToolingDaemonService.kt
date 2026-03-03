@@ -15,7 +15,7 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.logger
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.Key
@@ -29,7 +29,6 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
-import com.intellij.xdebugger.impl.XSourcePositionImpl
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
@@ -40,9 +39,7 @@ import de.roderick.weberknecht.WebSocketEventHandler
 import de.roderick.weberknecht.WebSocketException
 import de.roderick.weberknecht.WebSocketMessage
 import kotlinx.coroutines.CoroutineScope
-import java.net.MalformedURLException
 import java.net.URI
-import java.net.URISyntaxException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
 import java.util.concurrent.atomic.AtomicInteger
@@ -393,6 +390,6 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     fun getInstance(project: Project): DartToolingDaemonService = project.service()
 
     private const val MIN_SDK_VERSION: String = "3.4"
-    private val logger = logger<DartToolingDaemonService>()
+    private val logger = PluginLogger.createLogger(DartToolingDaemonService::class.java)
   }
 }

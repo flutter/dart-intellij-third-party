@@ -17,6 +17,7 @@ import com.intellij.refactoring.ui.RefactoringDialog;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.assists.DartSourceEditException;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -106,7 +107,7 @@ public abstract class ServerRefactoringDialog<T extends ServerRefactoring> exten
   protected final void doRefactoring(final @NotNull Set<String> excludedIds) {
     final SourceChange change = myRefactoring.getChange();
     if (change == null) {
-      Logger.getInstance(ServerRefactoringDialog.class)
+      PluginLogger.INSTANCE.createLogger(ServerRefactoringDialog.class)
         .warn(myRefactoring.getClass().getSimpleName() + ".getChange() == null\n" + myOptionsStatus);
       return;
     }

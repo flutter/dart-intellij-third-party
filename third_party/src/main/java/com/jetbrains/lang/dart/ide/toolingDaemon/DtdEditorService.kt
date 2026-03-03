@@ -4,7 +4,6 @@ package com.jetbrains.lang.dart.ide.toolingDaemon
 import com.google.gson.JsonObject
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.xdebugger.impl.XSourcePositionImpl
@@ -34,9 +33,9 @@ internal class DtdEditorService(private val project: Project, private val dtdSer
         var path: String? = null
         try {
           path = URI(fileUri).toURL().file
-        } catch (e: MalformedURLException) {
+        } catch (_: MalformedURLException) {
           // A null path will cause an early return.
-        } catch (e: URISyntaxException) {
+        } catch (_: URISyntaxException) {
         }
         if (path == null) {
           val params = JsonObject()
@@ -48,20 +47,16 @@ internal class DtdEditorService(private val project: Project, private val dtdSer
         val line: Int = request.get("line").asInt
         val column: Int = request.get("column").asInt
 
-        ApplicationManager.getApplication().invokeLater(Runnable {
+        ApplicationManager.getApplication().invokeLater {
           if (file != null && line >= 0 && column >= 0) {
             val position = XSourcePositionImpl.create(file, line - 1, column - 1)
             position.createNavigatable(project).navigate(false)
           }
-        })
+        }
 
         val params = JsonObject()
         params.addProperty("success", true)
         DartToolingDaemonResponse(params, null)
       }
-    }
-
-    companion object {
-        private val logger = logger<DtdEditorService>()
     }
 }

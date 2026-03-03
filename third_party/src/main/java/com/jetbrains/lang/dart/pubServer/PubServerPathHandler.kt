@@ -2,14 +2,13 @@
 package com.jetbrains.lang.dart.pubServer
 
 import com.google.common.net.UrlEscapers
-import com.intellij.openapi.diagnostic.logger
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.DartUrlResolver
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import io.netty.channel.ChannelHandlerContext
@@ -19,7 +18,7 @@ import org.jetbrains.builtInWebServer.PathQuery
 import org.jetbrains.builtInWebServer.WebServerPathHandler
 import org.jetbrains.builtInWebServer.WebServerPathToFileManager
 
-private val LOG = logger<PubServerPathHandler>()
+private val LOG = PluginLogger.createLogger(PubServerPathHandler::class.java)
 
 private class PubServerPathHandler : WebServerPathHandler {
   override fun process(

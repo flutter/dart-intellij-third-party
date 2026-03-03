@@ -33,8 +33,10 @@ import java.util.regex.Pattern;
  * event followed some time later by an 'error' event for that same test. That should
  * convert a successful test into a failure. That case is not being handled.
  */
+import com.jetbrains.lang.dart.logging.PluginLogger;
+
 public final class DartTestEventsConverter extends OutputToGeneralTestEventsConverter {
-  private static final Logger LOG = Logger.getInstance(DartTestEventsConverter.class.getName());
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartTestEventsConverter.class);
 
   private static final String TYPE_START = "start";
   private static final String TYPE_SUITE = "suite";

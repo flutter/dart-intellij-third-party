@@ -2,7 +2,6 @@
 package com.jetbrains.lang.dart.typing;
 
 import com.intellij.application.options.CodeStyle;
-import com.intellij.ide.highlighter.HtmlFileType;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.editor.impl.TrailingSpacesStripper;
@@ -419,17 +418,6 @@ public class DartTypingTest extends DartCodeInsightFixtureTestCase {
     doTypingTest('\n', "  ///   q  <caret>    z", "  ///   q  \n  ///   <caret> z");
     doTypingTest('\n', "///q<caret>z", "///q\n///<caret>z");
     doTypingTest('\n', " ///q<caret> \t ///z", " ///q \t \n ///<caret>z");
-
-    doTypingTest(HtmlFileType.INSTANCE, '\n',
-                 """
-                   <script type="application/dart">
-                   ///   q<caret>   z
-                   </script>""",
-                 """
-                   <script type="application/dart">
-                   ///   q
-                   ///   <caret>z
-                   </script>""");
   }
 
   public void testEnterAfterSingleLineComment() {
@@ -568,19 +556,6 @@ public class DartTypingTest extends DartCodeInsightFixtureTestCase {
                  "var x = '123456789012345\\t890123456789012<caret>'",
                  "var x = '123456789012345'\n" +
                  "    '\\t8901234567890123'");
-  }
-
-  public void testEnterBetweenInterpolationsHtml() {
-    doTypingTest(HtmlFileType.INSTANCE, '\n',
-                 """
-                   <script type="application/dart">
-                   var a = '$x and <caret> also $y';
-                   </script>""",
-                 "<script type=\"application/dart\">\n" +
-                 "var a = '$x and '\n" +
-                 // 8 spaces continuation indent is taken from HTML language instead of Dart's 4 spaces. Fix expected result when it is fixed in Platform
-                 "        '<caret> also $y';\n" +
-                 "</script>");
   }
 
   public void testEnterAfterEqualsVar() {

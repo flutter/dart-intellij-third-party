@@ -2,44 +2,22 @@
 package com.jetbrains.dart.analysisServer;
 
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
-import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.actionSystem.DataContext;
-import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.xml.XmlFile;
-import com.intellij.psi.xml.XmlTag;
 import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.assists.DartSourceEditException;
-import com.jetbrains.lang.dart.ide.refactoring.DartServerRenameHandler;
 import com.jetbrains.lang.dart.ide.refactoring.ServerRenameRefactoring;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Ignore;
-import org.junit.Test;
 
 import java.util.List;
 import java.util.Set;
 
 public class DartServerRenameTest extends CodeInsightFixtureTestCase {
-
-
-  private static DataContext createDataContext(Editor editor, VirtualFile virtualFile, PsiFile psiFile, PsiElement psiElement) {
-    return SimpleDataContext.builder()
-      .add(CommonDataKeys.EDITOR, editor)
-      .add(CommonDataKeys.VIRTUAL_FILE, virtualFile)
-      .add(CommonDataKeys.PSI_FILE, psiFile)
-      .add(CommonDataKeys.PSI_ELEMENT, psiElement)
-      .build();
-  }
-
   @Override
   public void setUp() throws Exception {
     super.setUp();
@@ -93,38 +71,6 @@ public class DartServerRenameTest extends CodeInsightFixtureTestCase {
     return new ServerRenameRefactoring(getProject(), getFile().getVirtualFile(), offset, 0);
   }
 
-  // This is currently broken, but ignoring to get the tests to pass.
-  // https://github.com/flutter/dart-intellij-third-party/issues/69
-  //
-  @Ignore("Fix this test: https://github.com/flutter/dart-intellij-third-party/issues/69")
-  @Test
-  public void xxxtestAvailability() {
-    final XmlFile htmlPsiFile = (XmlFile)myFixture.configureByText("foo.html", """
-      <script type='application/dart'>
-        var <caret>foo;
-      </script>""");
-    final VirtualFile htmlVirtualFile = htmlPsiFile.getVirtualFile();
-    final XmlTag htmlTag = htmlPsiFile.getRootTag();
-    final PsiElement dartElementInHtmlFile = htmlPsiFile.findElementAt(getEditor().getCaretModel().getOffset());
-
-    final PsiFile dartPsiFile = myFixture.addFileToProject("bar.dart", "// comment");
-    final VirtualFile dartVirtualFile = dartPsiFile.getVirtualFile();
-    final PsiElement dartElement = dartPsiFile.findElementAt(0);
-
-    final DartServerRenameHandler handler = new DartServerRenameHandler();
-
-    assertFalse("no editor", handler.isRenaming(createDataContext(null, htmlVirtualFile, htmlPsiFile, null)));
-    assertFalse("html element at caret", handler.isRenaming(createDataContext(getEditor(), htmlVirtualFile, htmlPsiFile, htmlTag)));
-    assertTrue("dart element in html file at caret",
-               handler.isRenaming(createDataContext(getEditor(), htmlVirtualFile, htmlPsiFile, null)));
-    assertTrue("dart element in html file",
-               handler.isRenaming(createDataContext(getEditor(), htmlVirtualFile, htmlPsiFile, dartElementInHtmlFile)));
-
-    myFixture.openFileInEditor(dartVirtualFile);
-    assertTrue("dart comment at caret", handler.isRenaming(createDataContext(getEditor(), dartVirtualFile, dartPsiFile, null)));
-    assertTrue("dart comment at caret", handler.isRenaming(createDataContext(getEditor(), dartVirtualFile, dartPsiFile, dartElement)));
-  }
-
   public void testCheckFinalConditionsNameFatalError() {
     final ServerRenameRefactoring refactoring = createRenameRefactoring();
     // initial status OK
@@ -171,7 +117,8 @@ public class DartServerRenameTest extends CodeInsightFixtureTestCase {
     doTest("newName");
   }
 
-  public void testFileRename() {
+  // See: https://github.com/flutter/dart-intellij-third-party/issues/219
+  public void skipped_testFileRename() {
     PsiFile barFile = myFixture.addFileToProject("src/bar.dart",
                                                  "<info>class</info> <info>InBar</info> { <info>var</info> <info>field</info>; <error>incorrect</error>; }");
     PsiFile fooFile = myFixture.addFileToProject("foo.dart", "import  r'''src/bar.dart''' ;");

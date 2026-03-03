@@ -47,9 +47,4 @@ public final class DartCommandLineRunConfigurationType extends ConfigurationType
       }
     });
   }
-
-  @Override
-  public String getHelpTopic() {
-    return "reference.dialogs.rundebug.DartCommandLineRunConfigurationType";
-  }
 }

@@ -10,6 +10,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiWhiteSpace;
 import com.intellij.psi.ResolveState;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.intellij.util.SmartList;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.DartComponentType;
 import com.jetbrains.lang.dart.DartTokenTypes;
@@ -49,7 +50,7 @@ public final class DartRefactoringUtil {
     if (context == null) {
       return Collections.emptyList();
     }
-    final List<PsiElement> occurrences = new ArrayList<>();
+    final List<PsiElement> occurrences = new SmartList<>();
     context.acceptChildren(new DartRecursiveVisitor() {
       @Override
       public void visitElement(final @NotNull PsiElement element) {

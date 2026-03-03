@@ -7,7 +7,7 @@ import com.intellij.ide.actions.ShowSettingsUtilImpl;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.application.ex.ApplicationManagerEx;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.module.ModuleType;
@@ -134,9 +134,8 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
 
     myCheckSdkUpdateButton.addActionListener(e -> {
       final Runnable runnable = this::checkSdkUpdate;
-      ApplicationManagerEx.getApplicationEx()
-        .runProcessWithProgressSynchronously(runnable, DartBundle.message("checking.dart.sdk.update"), true, true, myProject,
-                                             myMainPanel, null);
+      ProgressManager.getInstance()
+        .runProcessWithProgressSynchronously(runnable, DartBundle.message("checking.dart.sdk.update"), true, myProject, myMainPanel);
     });
   }
 
@@ -204,11 +203,6 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   @Override
   public @Nls String getDisplayName() {
     return DartBundle.message("dart.title");
-  }
-
-  @Override
-  public @Nullable String getHelpTopic() {
-    return "settings.dart.settings";
   }
 
   @Override

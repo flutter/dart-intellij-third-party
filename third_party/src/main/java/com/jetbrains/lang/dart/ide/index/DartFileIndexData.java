@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.index;
 
+import com.intellij.util.SmartList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -10,12 +11,12 @@ import java.util.List;
 import java.util.Map;
 
 public final class DartFileIndexData {
-  private final List<String> myClassNames = new ArrayList<>();
-  private final List<DartImportOrExportInfo> myImportAndExportInfos = new ArrayList<>();
+  private final List<String> myClassNames = new SmartList<>();
+  private final List<DartImportOrExportInfo> myImportAndExportInfos = new SmartList<>();
   private final Map<String, DartComponentInfo> myComponentInfoMap = new HashMap<>();
   private @Nullable String myLibraryName;
-  private final List<String> myPartUris = new ArrayList<>();
-  private final List<String> mySymbols = new ArrayList<>();
+  private final List<String> myPartUris = new SmartList<>();
+  private final List<String> mySymbols = new SmartList<>();
   private boolean myIsPart;
 
   public List<String> getClassNames() {

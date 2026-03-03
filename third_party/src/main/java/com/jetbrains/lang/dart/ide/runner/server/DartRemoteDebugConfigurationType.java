@@ -42,9 +42,4 @@ public final class DartRemoteDebugConfigurationType extends ConfigurationTypeBas
       }
     });
   }
-
-  @Override
-  public String getHelpTopic() {
-    return "reference.dialogs.rundebug.DartRemoteDebugConfigurationType";
-  }
 }

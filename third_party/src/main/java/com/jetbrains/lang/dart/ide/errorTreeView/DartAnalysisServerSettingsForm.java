@@ -39,7 +39,7 @@ public class DartAnalysisServerSettingsForm {
     myAnalysisDiagnosticsHyperlink.addHyperlinkListener(new HyperlinkAdapter() {
       @Override
       protected void hyperlinkActivated(final @NotNull HyperlinkEvent e) {
-        new AnalysisServerDiagnosticsAction().run(myProject);
+        new AnalysisServerDiagnosticsAction().run(myProject, null);
       }
     });
   }

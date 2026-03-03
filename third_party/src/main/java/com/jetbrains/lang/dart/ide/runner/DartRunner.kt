@@ -11,7 +11,6 @@ import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.GenericProgramRunner
 import com.intellij.execution.ui.RunContentDescriptor
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -29,6 +28,7 @@ import com.jetbrains.lang.dart.ide.runner.server.vmService.DartVmServiceDebugPro
 import com.jetbrains.lang.dart.ide.runner.server.vmService.DartVmServiceDebugProcess.DebugType
 import com.jetbrains.lang.dart.ide.runner.server.webdev.DartWebdevConfiguration
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunConfiguration
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.util.DartUrlResolver
 
 class DartRunner : GenericProgramRunner<RunnerSettings>() {
@@ -148,7 +148,7 @@ class DartRunner : GenericProgramRunner<RunnerSettings>() {
   )
 
   companion object {
-    private val LOG = logger<DartRunner>()
+    private val LOG = PluginLogger.createLogger(DartRunner::class.java)
     private const val VM_SERVICE_TIMEOUT_IN_MS = 5000
   }
 }
