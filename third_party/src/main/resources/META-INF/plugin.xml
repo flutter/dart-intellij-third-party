@@ -20,6 +20,7 @@
   <vendor url="https://google.com">Google</vendor>
   <category>Languages</category>
   <depends>com.intellij.modules.xml</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
   <depends optional="true" config-file="dart-yaml.xml">org.jetbrains.plugins.yaml</depends>
   <depends optional="true" config-file="dart-copyright.xml">com.intellij.copyright</depends>
 
@@ -29,6 +30,11 @@
     <extensionPoint name="completionExtension" interface="com.jetbrains.lang.dart.ide.completion.DartCompletionExtension" dynamic="true"/>
     <extensionPoint name="completionTimerExtension" interface="com.jetbrains.lang.dart.ide.completion.DartCompletionTimerExtension" dynamic="true"/>
   </extensionPoints>
+
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+    <server id="Dart" factoryClass="com.jetbrains.lang.dart.analyzer.DartLanguageServerFactory"/>
+    <languageMapping language="Dart" serverId="Dart" languageId="dart"/>
+  </extensions>
 
   <extensions defaultExtensionNs="com.intellij">
     <moveFileHandler implementation="com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler"/>
@@ -62,7 +68,7 @@
     <nonProjectFileWritingAccessExtension implementation="com.jetbrains.lang.dart.ide.DartWritingAccessProvider"/>
     <spellchecker.support language="Dart" implementationClass="com.jetbrains.lang.dart.ide.spelling.DartSpellcheckingStrategy"/>
     <spellchecker.bundledDictionaryProvider implementation="com.jetbrains.lang.dart.ide.spelling.DartBundledDictionaryProvider"/>
-    <lang.documentationProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider"/>
+    <!-- <lang.documentationProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider"/> -->
     <lang.implementationTextSelectioner language="Dart"
                                         implementationClass="com.jetbrains.lang.dart.ide.DartImplementationTextSelectioner"/>
     <lang.formatter language="Dart" implementationClass="com.jetbrains.lang.dart.ide.formatter.DartFormattingModelBuilder"/>

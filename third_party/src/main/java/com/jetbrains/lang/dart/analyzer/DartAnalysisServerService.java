@@ -2587,6 +2587,15 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   /**
+   * Send an LSP JSON-RPC message directly to the server.
+   */
+  public void sendLspMessage(JsonObject request) {
+    if (myServerSocket != null && myServerSocket.isOpen()) {
+      myServerSocket.getRequestSink().add(request);
+    }
+  }
+
+  /**
    * Send the request and associate it with the passed {@link com.google.dart.server.Consumer}.
    */
   @SuppressWarnings("unused") // for Flutter plugin
