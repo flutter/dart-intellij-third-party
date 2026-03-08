@@ -15,11 +15,17 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import org.eclipse.lsp4j.ClientCapabilities
+import org.eclipse.lsp4j.DidChangeTextDocumentParams
+import org.eclipse.lsp4j.DidCloseTextDocumentParams
+import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.InitializeParams
+import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.InitializedParams
+import org.eclipse.lsp4j.TextDocumentSyncKind
 import org.eclipse.lsp4j.WorkspaceFolder
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import org.eclipse.lsp4j.services.LanguageServer
+import org.eclipse.lsp4j.services.TextDocumentService
 import java.util.MissingResourceException
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
@@ -68,6 +74,9 @@ internal class LspClientConnectionManager(
 
   @Volatile
   private var isServerAlive = false
+
+  @Volatile
+  private var serverTextDocumentSyncKind = TextDocumentSyncKind.Full
 
   private val languageClient = NoOpDartLanguageClient()
 
@@ -189,6 +198,20 @@ internal class LspClientConnectionManager(
     val server = synchronized(lock) { remoteServer }
                  ?: throw IllegalStateException("Dart LSP server is not running")
     return server.diagnosticServer()
+  }
+
+  fun textDocumentSyncKind(): TextDocumentSyncKind = serverTextDocumentSyncKind
+
+  fun didOpen(params: DidOpenTextDocumentParams) {
+    textDocumentService().didOpen(params)
+  }
+
+  fun didChange(params: DidChangeTextDocumentParams) {
+    textDocumentService().didChange(params)
+  }
+
+  fun didClose(params: DidCloseTextDocumentParams) {
+    textDocumentService().didClose(params)
   }
 
   fun isSocketOpen(): Boolean = process?.isAlive == true
@@ -374,8 +397,26 @@ internal class LspClientConnectionManager(
       }
     }
 
-    server.initialize(initializeParams).get(INITIALIZE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    val initializeResult = server.initialize(initializeParams).get(INITIALIZE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    serverTextDocumentSyncKind = extractTextDocumentSyncKind(initializeResult)
     server.initialized(InitializedParams())
+  }
+
+  private fun extractTextDocumentSyncKind(initializeResult: InitializeResult?): TextDocumentSyncKind {
+    val capabilities = initializeResult?.capabilities ?: return TextDocumentSyncKind.Full
+    val textDocumentSync = capabilities.textDocumentSync ?: return TextDocumentSyncKind.Full
+    return if (textDocumentSync.isLeft) {
+      textDocumentSync.left ?: TextDocumentSyncKind.Full
+    }
+    else {
+      textDocumentSync.right?.change ?: TextDocumentSyncKind.Full
+    }
+  }
+
+  private fun textDocumentService(): TextDocumentService {
+    val server = synchronized(lock) { remoteServer }
+                 ?: throw IllegalStateException("Dart LSP server is not running")
+    return server.textDocumentService
   }
 
   private fun notifyAliveIfCurrent(expectedProcess: Process) {
