@@ -39,24 +39,12 @@ import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.analyzer.DartClient
 import com.jetbrains.lang.dart.sdk.DartSdk
-import org.dartlang.analysis.server.protocol.AddContentOverlay
 import org.dartlang.analysis.server.protocol.AnalysisOptions
 import org.dartlang.analysis.server.protocol.ImportedElements
-import org.dartlang.analysis.server.protocol.RemoveContentOverlay
 import org.dartlang.analysis.server.protocol.RefactoringOptions
 import org.dartlang.analysis.server.protocol.RequestError
 import org.dartlang.analysis.server.protocol.RuntimeCompletionExpression
 import org.dartlang.analysis.server.protocol.RuntimeCompletionVariable
-import org.eclipse.lsp4j.DidChangeTextDocumentParams
-import org.eclipse.lsp4j.DidCloseTextDocumentParams
-import org.eclipse.lsp4j.DidOpenTextDocumentParams
-import org.eclipse.lsp4j.Position
-import org.eclipse.lsp4j.Range
-import org.eclipse.lsp4j.TextDocumentContentChangeEvent
-import org.eclipse.lsp4j.TextDocumentIdentifier
-import org.eclipse.lsp4j.TextDocumentItem
-import org.eclipse.lsp4j.TextDocumentSyncKind
-import org.eclipse.lsp4j.VersionedTextDocumentIdentifier
 import java.util.UUID
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ExecutionException
@@ -70,16 +58,15 @@ internal class LspDartAnalysisClient(
   private companion object {
     private val LOG = Logger.getInstance(LspDartAnalysisClient::class.java)
     private const val DIAGNOSTIC_SERVER_TIMEOUT_MS = 30_000L
-    private const val DART_LANGUAGE_ID = "dart"
   }
 
   private val lifecycle = LspClientConnectionManager(project, sdk, suppressAnalytics)
   private val documentLock = Any()
-  private val openDocuments = mutableMapOf<String, OpenDocumentState>()
-
-  private data class OpenDocumentState(
-    val version: Int,
-    val content: String,
+  private val documentSync = LspDocumentSyncManager(
+    onDidOpen = lifecycle::didOpen,
+    onDidChange = lifecycle::didChange,
+    onDidClose = lifecycle::didClose,
+    syncKindProvider = lifecycle::textDocumentSyncKind,
   )
 
   override fun start() {
@@ -110,7 +97,7 @@ internal class LspDartAnalysisClient(
     try {
       synchronized(documentLock) {
         files.forEach { (uri, overlay) ->
-          applyOverlay(uri, overlay)
+          documentSync.applyOverlay(uri, overlay)
         }
       }
     }
@@ -284,7 +271,7 @@ internal class LspDartAnalysisClient(
 
   override fun server_shutdown() {
     synchronized(documentLock) {
-      openDocuments.clear()
+      documentSync.clear()
     }
     lifecycle.shutdown()
   }
@@ -298,86 +285,4 @@ internal class LspDartAnalysisClient(
   override fun lspMessage_dart_textDocumentContent(uri: String, consumer: DartLspTextDocumentContentConsumer) {}
 
   override fun lsp_connectToDtd(uri: String) {}
-
-  private fun applyOverlay(uri: String, overlay: Any) {
-    when (overlay) {
-      is AddContentOverlay -> applyContent(uri, overlay.content)
-      is RemoveContentOverlay -> removeContent(uri)
-      else -> throw IllegalArgumentException("Unsupported content overlay type ${overlay::class.java.name} for $uri")
-    }
-  }
-
-  private fun applyContent(uri: String, newContent: String) {
-    val currentState = openDocuments[uri]
-    if (currentState == null) {
-      lifecycle.didOpen(
-        DidOpenTextDocumentParams(
-          TextDocumentItem(uri, DART_LANGUAGE_ID, 1, newContent),
-        ),
-      )
-      openDocuments[uri] = OpenDocumentState(1, newContent)
-      return
-    }
-
-    if (currentState.content == newContent) return
-
-    val nextVersion = currentState.version + 1
-    lifecycle.didChange(
-      DidChangeTextDocumentParams(
-        VersionedTextDocumentIdentifier(uri, nextVersion),
-        listOf(createChangeEvent(currentState.content, newContent)),
-      ),
-    )
-    openDocuments[uri] = OpenDocumentState(nextVersion, newContent)
-  }
-
-  private fun removeContent(uri: String) {
-    if (openDocuments.containsKey(uri)) {
-      lifecycle.didClose(DidCloseTextDocumentParams(TextDocumentIdentifier(uri)))
-      openDocuments.remove(uri)
-    }
-  }
-
-  private fun createChangeEvent(previousContent: String, newContent: String): TextDocumentContentChangeEvent {
-    return if (lifecycle.textDocumentSyncKind() == TextDocumentSyncKind.Incremental) {
-      //Behavior is just like the Full for now
-      //The only problem is performance
-      TextDocumentContentChangeEvent().apply {
-        range = fullDocumentRange(previousContent)
-        text = newContent
-      }
-    }
-    else {
-      TextDocumentContentChangeEvent(newContent)
-    }
-  }
-
-  private fun fullDocumentRange(content: String): Range {
-    return Range(Position(0, 0), endPosition(content))
-  }
-
-  private fun endPosition(content: String): Position {
-    var line = 0
-    var character = 0
-    var index = 0
-    while (index < content.length) {
-      val ch = content[index]
-      if (ch == '\n') {
-        line++
-        character = 0
-      }
-      else if (ch == '\r') {
-        line++
-        character = 0
-        if (index + 1 < content.length && content[index + 1] == '\n') {
-          index++
-        }
-      }
-      else {
-        character++
-      }
-      index++
-    }
-    return Position(line, character)
-  }
 }
