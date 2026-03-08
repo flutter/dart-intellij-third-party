@@ -6,8 +6,8 @@ import org.eclipse.lsp4j.services.LanguageServer
 import java.util.concurrent.CompletableFuture
 
 internal interface DartExtendedLanguageServer : LanguageServer {
-  @JsonRequest("dart/diagnosticServer")
-  fun diagnosticServer(): CompletableFuture<DartDiagnosticServerResult>
+    @JsonRequest("dart/diagnosticServer")
+    fun diagnosticServer(): CompletableFuture<DartDiagnosticServerResult>
 }
 
 internal data class DartDiagnosticServerResult(val port: Int = 0)

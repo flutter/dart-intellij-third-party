@@ -37,434 +37,442 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 internal class LspClientConnectionManager(
-  private val project: Project,
-  private val sdk: DartSdk,
-  private val suppressAnalytics: Boolean,
+    private val project: Project,
+    private val sdk: DartSdk,
+    private val suppressAnalytics: Boolean,
 ) {
-  private companion object {
-    private val LOG = Logger.getInstance(LspClientConnectionManager::class.java)
-    private const val INITIALIZE_TIMEOUT_SECONDS = 10L
-    private const val SHUTDOWN_TIMEOUT_SECONDS = 1L
-  }
+    private companion object {
+        private val LOG = Logger.getInstance(LspClientConnectionManager::class.java)
+        private const val INITIALIZE_TIMEOUT_SECONDS = 10L
+        private const val SHUTDOWN_TIMEOUT_SECONDS = 1L
+    }
 
-  private val lock = Any()
-  private val statusListeners = CopyOnWriteArrayList<AnalysisServerStatusListener>()
-  private val statusVersion = AtomicLong()
-  private val listenerStatusVersions = ConcurrentHashMap<AnalysisServerStatusListener, Long>()
+    private val lock = Any()
+    private val statusListeners = CopyOnWriteArrayList<AnalysisServerStatusListener>()
+    private val statusVersion = AtomicLong()
+    private val listenerStatusVersions = ConcurrentHashMap<AnalysisServerStatusListener, Long>()
 
-  @Volatile
-  private var process: Process? = null
+    @Volatile
+    private var process: Process? = null
 
-  @Volatile
-  private var pendingProcess: Process? = null
+    @Volatile
+    private var pendingProcess: Process? = null
 
-  @Volatile
-  private var remoteServer: DartExtendedLanguageServer? = null
+    @Volatile
+    private var remoteServer: DartExtendedLanguageServer? = null
 
-  @Volatile
-  private var pendingServer: DartExtendedLanguageServer? = null
+    @Volatile
+    private var pendingServer: DartExtendedLanguageServer? = null
 
-  @Volatile
-  private var listeningFuture: Future<*>? = null
+    @Volatile
+    private var listeningFuture: Future<*>? = null
 
-  @Volatile
-  private var pendingListeningFuture: Future<*>? = null
+    @Volatile
+    private var pendingListeningFuture: Future<*>? = null
 
-  private var startupInProgress = false
+    private var startupInProgress = false
 
-  @Volatile
-  private var isServerAlive = false
+    @Volatile
+    private var isServerAlive = false
 
-  @Volatile
-  private var serverTextDocumentSyncKind = TextDocumentSyncKind.Full
+    @Volatile
+    private var serverTextDocumentSyncKind = TextDocumentSyncKind.Full
 
-  private val languageClient = NoOpDartLanguageClient()
+    private val languageClient = NoOpDartLanguageClient()
 
-  private class StartupSession(
-    val process: Process,
-    val server: DartExtendedLanguageServer,
-    val listeningFuture: Future<*>,
-  )
+    private class StartupSession(
+        val process: Process,
+        val server: DartExtendedLanguageServer,
+        val listeningFuture: Future<*>,
+    )
 
-  fun start() {
-    if (!beginStartupIfNeeded()) return
+    fun start() {
+        if (!beginStartupIfNeeded()) return
 
-    var startupSession: StartupSession? = null
+        var startupSession: StartupSession? = null
 
-    try {
-      val createdSession = createStartupSession()
-      startupSession = createdSession
-      registerPendingStartup(createdSession)
+        try {
+            val createdSession = createStartupSession()
+            startupSession = createdSession
+            registerPendingStartup(createdSession)
 
-      startErrorReader(createdSession.process)
-      monitorListening(createdSession.process, createdSession.listeningFuture)
-      initializeServer(createdSession.server)
+            startErrorReader(createdSession.process)
+            monitorListening(createdSession.process, createdSession.listeningFuture)
+            initializeServer(createdSession.server)
 
-      val startupPromoted = synchronized(lock) {
-        val startupStillCurrent = isPendingStartupSessionCurrentLocked(createdSession)
-        if (startupStillCurrent) {
-          activatePendingStartupLocked(createdSession)
+            val startupPromoted =
+                synchronized(lock) {
+                    val startupStillCurrent = isPendingStartupSessionCurrentLocked(createdSession)
+                    if (startupStillCurrent) {
+                        activatePendingStartupLocked(createdSession)
+                    }
+                    startupInProgress = false
+                    startupStillCurrent
+                }
+
+            if (!startupPromoted) {
+                closeConnection(
+                    createdSession.server,
+                    createdSession.process,
+                    createdSession.listeningFuture,
+                    sendShutdownRequest = false,
+                )
+                return
+            }
+
+            notifyAliveIfCurrent(createdSession.process)
+        } catch (t: Throwable) {
+            failStartup(startupSession)
+            closeConnection(
+                localServer = startupSession?.server,
+                localProcess = startupSession?.process,
+                localListeningFuture = startupSession?.listeningFuture,
+                sendShutdownRequest = false,
+            )
+            LOG.warn("Failed to start Dart LSP server", t)
+            notifyDeadIfChanged()
+            throw t
         }
-        startupInProgress = false
-        startupStillCurrent
-      }
-
-      if (!startupPromoted) {
-        closeConnection(
-          createdSession.server,
-          createdSession.process,
-          createdSession.listeningFuture,
-          sendShutdownRequest = false,
-        )
-        return
-      }
-
-      notifyAliveIfCurrent(createdSession.process)
-    }
-    catch (t: Throwable) {
-      failStartup(startupSession)
-      closeConnection(
-        localServer = startupSession?.server,
-        localProcess = startupSession?.process,
-        localListeningFuture = startupSession?.listeningFuture,
-        sendShutdownRequest = false,
-      )
-      LOG.warn("Failed to start Dart LSP server", t)
-      notifyDeadIfChanged()
-      throw t
-    }
-  }
-
-  private fun beginStartupIfNeeded(): Boolean {
-    synchronized(lock) {
-      if (process?.isAlive == true || startupInProgress) {
-        return false
-      }
-      startupInProgress = true
-      return true
-    }
-  }
-
-  private fun createStartupSession(): StartupSession {
-    val command = buildCommandLine()
-    val startedProcess = ProcessBuilder(command).start()
-    val launcher = Launcher.Builder<DartExtendedLanguageServer>()
-      .setLocalService(languageClient)
-      .setRemoteInterface(DartExtendedLanguageServer::class.java)
-      .setInput(startedProcess.inputStream)
-      .setOutput(startedProcess.outputStream)
-      .create()
-    val startedServer = launcher.remoteProxy
-    val startedListeningFuture = launcher.startListening()
-    return StartupSession(startedProcess, startedServer, startedListeningFuture)
-  }
-
-  private fun registerPendingStartup(startupSession: StartupSession) {
-    synchronized(lock) {
-      pendingProcess = startupSession.process
-      pendingServer = startupSession.server
-      pendingListeningFuture = startupSession.listeningFuture
-    }
-  }
-
-  private fun isPendingStartupSessionCurrentLocked(startupSession: StartupSession): Boolean {
-    return startupInProgress &&
-           pendingProcess === startupSession.process &&
-           pendingServer === startupSession.server &&
-           pendingListeningFuture === startupSession.listeningFuture
-  }
-
-  private fun activatePendingStartupLocked(startupSession: StartupSession) {
-    process = startupSession.process
-    remoteServer = startupSession.server
-    listeningFuture = startupSession.listeningFuture
-    pendingProcess = null
-    pendingServer = null
-    pendingListeningFuture = null
-  }
-
-  private fun failStartup(startupSession: StartupSession?) {
-    synchronized(lock) {
-      if (startupSession != null) {
-        if (pendingProcess === startupSession.process) pendingProcess = null
-        if (pendingServer === startupSession.server) pendingServer = null
-        if (pendingListeningFuture === startupSession.listeningFuture) pendingListeningFuture = null
-      }
-      startupInProgress = false
-    }
-  }
-
-  fun requestDiagnosticServer(): CompletableFuture<DartDiagnosticServerResult> {
-    val server = synchronized(lock) { remoteServer }
-                 ?: throw IllegalStateException("Dart LSP server is not running")
-    return server.diagnosticServer()
-  }
-
-  fun textDocumentSyncKind(): TextDocumentSyncKind = serverTextDocumentSyncKind
-
-  fun didOpen(params: DidOpenTextDocumentParams) {
-    textDocumentService().didOpen(params)
-  }
-
-  fun didChange(params: DidChangeTextDocumentParams) {
-    textDocumentService().didChange(params)
-  }
-
-  fun didClose(params: DidCloseTextDocumentParams) {
-    textDocumentService().didClose(params)
-  }
-
-  fun isSocketOpen(): Boolean = process?.isAlive == true
-
-  fun addStatusListener(listener: AnalysisServerStatusListener) {
-    val statusVersionSnapshot: Long
-    val serverAlive: Boolean
-    synchronized(lock) {
-      statusListeners.add(listener)
-      statusVersionSnapshot = statusVersion.get()
-      serverAlive = isServerAlive
-    }
-    if (serverAlive) {
-      notifyStatusListener(listener, true, statusVersionSnapshot)
-    }
-  }
-
-  fun shutdown() {
-    val localProcess: Process?
-    val localServer: LanguageServer?
-    val localListeningFuture: Future<*>?
-    synchronized(lock) {
-      localProcess = process ?: pendingProcess
-      localServer = remoteServer ?: pendingServer
-      localListeningFuture = listeningFuture ?: pendingListeningFuture
-      process = null
-      remoteServer = null
-      listeningFuture = null
-      pendingProcess = null
-      pendingServer = null
-      pendingListeningFuture = null
-      startupInProgress = false
     }
 
-    closeConnection(localServer, localProcess, localListeningFuture, sendShutdownRequest = true)
-    notifyDeadIfChanged()
-  }
-
-  private fun buildCommandLine(): List<String> {
-    if (!DartAnalysisServerService.isDartSdkVersionSufficientForDartLangServer(sdk)) {
-      throw IllegalStateException(
-        "LSP client requires Dart SDK version ${DartAnalysisServerService.MIN_DART_LANG_SERVER_SDK_VERSION} or newer",
-      )
-    }
-
-    val runtimePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
-    val vmArguments = try {
-      StringUtil.split(Registry.stringValue("dart.server.vm.options"), " ")
-    }
-    catch (_: MissingResourceException) {
-      emptyList()
-    }
-
-    val serverArgsRaw = buildString {
-      append("--protocol=lsp")
-      if (suppressAnalytics) {
-        append(" --suppress-analytics")
-      }
-      try {
-        val extra = Registry.stringValue("dart.server.additional.arguments")
-        if (extra.isNotBlank()) {
-          append(" ").append(extra)
-        }
-      }
-      catch (_: MissingResourceException) {
-      }
-    }
-    val serverArguments = StringUtil.split(serverArgsRaw, " ")
-
-    val clientId = ApplicationNamesInfo.getInstance().fullProductName.replace(' ', '-')
-    val clientVersion = ApplicationInfo.getInstance().apiVersion
-
-    return mutableListOf<String>().apply {
-      add(runtimePath)
-      addAll(vmArguments)
-      add("language-server")
-      add("--client-id=$clientId")
-      add("--client-version=$clientVersion")
-      addAll(serverArguments)
-    }
-  }
-
-  private fun startErrorReader(startedProcess: Process) {
-    ApplicationManager.getApplication().executeOnPooledThread {
-      startedProcess.errorStream.bufferedReader().useLines { lines ->
-        lines.forEach { line ->
-          LOG.debug("[dart-lsp stderr] $line")
-        }
-      }
-    }
-  }
-
-  private fun monitorListening(startedProcess: Process, future: Future<*>?) {
-    ApplicationManager.getApplication().executeOnPooledThread {
-      try {
-        future?.get()
-      }
-      catch (_: CancellationException) {
-      }
-      catch (_: InterruptedException) {
-        Thread.currentThread().interrupt()
-      }
-      catch (e: ExecutionException) {
-        LOG.warn("Dart LSP listening loop failed", e.cause ?: e)
-      }
-      catch (t: Throwable) {
-        LOG.warn("Unexpected error in Dart LSP listening loop", t)
-      }
-      finally {
-        var notifyDead = false
+    private fun beginStartupIfNeeded(): Boolean {
         synchronized(lock) {
-          if (process === startedProcess) {
+            if (process?.isAlive == true || startupInProgress) {
+                return false
+            }
+            startupInProgress = true
+            return true
+        }
+    }
+
+    private fun createStartupSession(): StartupSession {
+        val command = buildCommandLine()
+        val startedProcess = ProcessBuilder(command).start()
+        val launcher =
+            Launcher.Builder<DartExtendedLanguageServer>()
+                .setLocalService(languageClient)
+                .setRemoteInterface(DartExtendedLanguageServer::class.java)
+                .setInput(startedProcess.inputStream)
+                .setOutput(startedProcess.outputStream)
+                .create()
+        val startedServer = launcher.remoteProxy
+        val startedListeningFuture = launcher.startListening()
+        return StartupSession(startedProcess, startedServer, startedListeningFuture)
+    }
+
+    private fun registerPendingStartup(startupSession: StartupSession) {
+        synchronized(lock) {
+            pendingProcess = startupSession.process
+            pendingServer = startupSession.server
+            pendingListeningFuture = startupSession.listeningFuture
+        }
+    }
+
+    private fun isPendingStartupSessionCurrentLocked(startupSession: StartupSession): Boolean {
+        return startupInProgress &&
+            pendingProcess === startupSession.process &&
+            pendingServer === startupSession.server &&
+            pendingListeningFuture === startupSession.listeningFuture
+    }
+
+    private fun activatePendingStartupLocked(startupSession: StartupSession) {
+        process = startupSession.process
+        remoteServer = startupSession.server
+        listeningFuture = startupSession.listeningFuture
+        pendingProcess = null
+        pendingServer = null
+        pendingListeningFuture = null
+    }
+
+    private fun failStartup(startupSession: StartupSession?) {
+        synchronized(lock) {
+            if (startupSession != null) {
+                if (pendingProcess === startupSession.process) pendingProcess = null
+                if (pendingServer === startupSession.server) pendingServer = null
+                if (pendingListeningFuture === startupSession.listeningFuture) pendingListeningFuture = null
+            }
+            startupInProgress = false
+        }
+    }
+
+    fun requestDiagnosticServer(): CompletableFuture<DartDiagnosticServerResult> {
+        val server =
+            synchronized(lock) { remoteServer }
+                ?: throw IllegalStateException("Dart LSP server is not running")
+        return server.diagnosticServer()
+    }
+
+    fun textDocumentSyncKind(): TextDocumentSyncKind = serverTextDocumentSyncKind
+
+    fun didOpen(params: DidOpenTextDocumentParams) {
+        textDocumentService().didOpen(params)
+    }
+
+    fun didChange(params: DidChangeTextDocumentParams) {
+        textDocumentService().didChange(params)
+    }
+
+    fun didClose(params: DidCloseTextDocumentParams) {
+        textDocumentService().didClose(params)
+    }
+
+    fun isSocketOpen(): Boolean = process?.isAlive == true
+
+    fun addStatusListener(listener: AnalysisServerStatusListener) {
+        val statusVersionSnapshot: Long
+        val serverAlive: Boolean
+        synchronized(lock) {
+            statusListeners.add(listener)
+            statusVersionSnapshot = statusVersion.get()
+            serverAlive = isServerAlive
+        }
+        if (serverAlive) {
+            notifyStatusListener(listener, true, statusVersionSnapshot)
+        }
+    }
+
+    fun shutdown() {
+        val localProcess: Process?
+        val localServer: LanguageServer?
+        val localListeningFuture: Future<*>?
+        synchronized(lock) {
+            localProcess = process ?: pendingProcess
+            localServer = remoteServer ?: pendingServer
+            localListeningFuture = listeningFuture ?: pendingListeningFuture
             process = null
             remoteServer = null
             listeningFuture = null
-            notifyDead = true
-          }
-          if (pendingProcess === startedProcess) {
             pendingProcess = null
             pendingServer = null
             pendingListeningFuture = null
             startupInProgress = false
-          }
         }
-        if (notifyDead) {
-          notifyDeadIfChanged()
+
+        closeConnection(localServer, localProcess, localListeningFuture, sendShutdownRequest = true)
+        notifyDeadIfChanged()
+    }
+
+    private fun buildCommandLine(): List<String> {
+        if (!DartAnalysisServerService.isDartSdkVersionSufficientForDartLangServer(sdk)) {
+            throw IllegalStateException(
+                "LSP client requires Dart SDK version ${DartAnalysisServerService.MIN_DART_LANG_SERVER_SDK_VERSION} or newer",
+            )
         }
-      }
-    }
-  }
 
-  private fun closeConnection(
-    localServer: LanguageServer?,
-    localProcess: Process?,
-    localListeningFuture: Future<*>?,
-    sendShutdownRequest: Boolean,
-  ) {
-    if (sendShutdownRequest) {
-      try {
-        localServer?.shutdown()?.get(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      }
-      catch (t: Throwable) {
-        LOG.debug("Error while sending shutdown to Dart LSP server", t)
-      }
+        val runtimePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
+        val vmArguments =
+            try {
+                StringUtil.split(Registry.stringValue("dart.server.vm.options"), " ")
+            } catch (_: MissingResourceException) {
+                emptyList()
+            }
 
-      try {
-        localServer?.exit()
-      }
-      catch (t: Throwable) {
-        LOG.debug("Error while sending exit to Dart LSP server", t)
-      }
-    }
+        val serverArgsRaw =
+            buildString {
+                append("--protocol=lsp")
+                if (suppressAnalytics) {
+                    append(" --suppress-analytics")
+                }
+                try {
+                    val extra = Registry.stringValue("dart.server.additional.arguments")
+                    if (extra.isNotBlank()) {
+                        append(" ").append(extra)
+                    }
+                } catch (_: MissingResourceException) {
+                }
+            }
+        val serverArguments = StringUtil.split(serverArgsRaw, " ")
 
-    if (localProcess != null && localProcess.isAlive) {
-      localProcess.destroy()
-      try {
-        if (!localProcess.waitFor(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-          localProcess.destroyForcibly()
+        val clientId = ApplicationNamesInfo.getInstance().fullProductName.replace(' ', '-')
+        val clientVersion = ApplicationInfo.getInstance().apiVersion
+
+        return mutableListOf<String>().apply {
+            add(runtimePath)
+            addAll(vmArguments)
+            add("language-server")
+            add("--client-id=$clientId")
+            add("--client-version=$clientVersion")
+            addAll(serverArguments)
         }
-      }
-      catch (_: InterruptedException) {
-        Thread.currentThread().interrupt()
-        localProcess.destroyForcibly()
-      }
     }
 
-    localListeningFuture?.cancel(true)
-  }
-
-  private fun initializeServer(server: LanguageServer) {
-    val initializeParams = InitializeParams().apply {
-      capabilities = ClientCapabilities()
-      val basePath = project.basePath
-      if (basePath != null) {
-        workspaceFolders = listOf(WorkspaceFolder(VfsUtilCore.pathToUrl(basePath), project.name))
-      }
-      else {
-        LOG.warn("Dart LSP: project.basePath is null, workspaceFolders not set")
-      }
-      val currentPid = ProcessHandle.current().pid()
-      if (currentPid in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
-        processId = currentPid.toInt()
-      }
+    private fun startErrorReader(startedProcess: Process) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            startedProcess.errorStream.bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    LOG.debug("[dart-lsp stderr] $line")
+                }
+            }
+        }
     }
 
-    val initializeResult = server.initialize(initializeParams).get(INITIALIZE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-    serverTextDocumentSyncKind = extractTextDocumentSyncKind(initializeResult)
-    server.initialized(InitializedParams())
-  }
-
-  private fun extractTextDocumentSyncKind(initializeResult: InitializeResult?): TextDocumentSyncKind {
-    val capabilities = initializeResult?.capabilities ?: return TextDocumentSyncKind.Full
-    val textDocumentSync = capabilities.textDocumentSync ?: return TextDocumentSyncKind.Full
-    return if (textDocumentSync.isLeft) {
-      textDocumentSync.left ?: TextDocumentSyncKind.Full
+    private fun monitorListening(
+        startedProcess: Process,
+        future: Future<*>?,
+    ) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                future?.get()
+            } catch (_: CancellationException) {
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } catch (e: ExecutionException) {
+                LOG.warn("Dart LSP listening loop failed", e.cause ?: e)
+            } catch (t: Throwable) {
+                LOG.warn("Unexpected error in Dart LSP listening loop", t)
+            } finally {
+                var notifyDead = false
+                synchronized(lock) {
+                    if (process === startedProcess) {
+                        process = null
+                        remoteServer = null
+                        listeningFuture = null
+                        notifyDead = true
+                    }
+                    if (pendingProcess === startedProcess) {
+                        pendingProcess = null
+                        pendingServer = null
+                        pendingListeningFuture = null
+                        startupInProgress = false
+                    }
+                }
+                if (notifyDead) {
+                    notifyDeadIfChanged()
+                }
+            }
+        }
     }
-    else {
-      textDocumentSync.right?.change ?: TextDocumentSyncKind.Full
-    }
-  }
 
-  private fun textDocumentService(): TextDocumentService {
-    val server = synchronized(lock) { remoteServer }
-                 ?: throw IllegalStateException("Dart LSP server is not running")
-    return server.textDocumentService
-  }
+    private fun closeConnection(
+        localServer: LanguageServer?,
+        localProcess: Process?,
+        localListeningFuture: Future<*>?,
+        sendShutdownRequest: Boolean,
+    ) {
+        if (sendShutdownRequest) {
+            try {
+                localServer?.shutdown()?.get(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            } catch (t: Throwable) {
+                LOG.debug("Error while sending shutdown to Dart LSP server", t)
+            }
 
-  private fun notifyAliveIfCurrent(expectedProcess: Process) {
-    val statusVersionSnapshot = synchronized(lock) {
-      if (process !== expectedProcess) {
-        return
-      }
-      isServerAlive = true
-      statusVersion.incrementAndGet()
-    }
-    notifyStatusListeners(true, statusVersionSnapshot)
-  }
+            try {
+                localServer?.exit()
+            } catch (t: Throwable) {
+                LOG.debug("Error while sending exit to Dart LSP server", t)
+            }
+        }
 
-  private fun notifyDeadIfChanged() {
-    val statusVersionSnapshot = synchronized(lock) {
-      if (!isServerAlive) return
-      isServerAlive = false
-      statusVersion.incrementAndGet()
-    }
-    notifyStatusListeners(false, statusVersionSnapshot)
-  }
+        if (localProcess != null && localProcess.isAlive) {
+            localProcess.destroy()
+            try {
+                if (!localProcess.waitFor(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    localProcess.destroyForcibly()
+                }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                localProcess.destroyForcibly()
+            }
+        }
 
-  private fun notifyStatusListeners(isAlive: Boolean, statusVersionSnapshot: Long) {
-    statusListeners.forEach { listener ->
-      notifyStatusListener(listener, isAlive, statusVersionSnapshot)
+        localListeningFuture?.cancel(true)
     }
-  }
 
-  private fun notifyStatusListener(listener: AnalysisServerStatusListener, isAlive: Boolean, statusVersionSnapshot: Long) {
-    if (!recordNotificationVersion(listener, statusVersionSnapshot)) return
+    private fun initializeServer(server: LanguageServer) {
+        val initializeParams =
+            InitializeParams().apply {
+                capabilities = ClientCapabilities()
+                val basePath = project.basePath
+                if (basePath != null) {
+                    workspaceFolders = listOf(WorkspaceFolder(VfsUtilCore.pathToUrl(basePath), project.name))
+                } else {
+                    LOG.warn("Dart LSP: project.basePath is null, workspaceFolders not set")
+                }
+                val currentPid = ProcessHandle.current().pid()
+                if (currentPid in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+                    processId = currentPid.toInt()
+                }
+            }
 
-    try {
-      listener.isAliveServer(isAlive)
+        val initializeResult = server.initialize(initializeParams).get(INITIALIZE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        serverTextDocumentSyncKind = extractTextDocumentSyncKind(initializeResult)
+        server.initialized(InitializedParams())
     }
-    catch (t: Throwable) {
-      LOG.warn("Error in LSP status listener", t)
-    }
-  }
 
-  private fun recordNotificationVersion(listener: AnalysisServerStatusListener, statusVersionSnapshot: Long): Boolean {
-    while (true) {
-        val previousVersion = listenerStatusVersions.putIfAbsent(listener, statusVersionSnapshot) ?: return true
-        if (previousVersion >= statusVersionSnapshot) {
-        return false
-      }
-      if (listenerStatusVersions.replace(listener, previousVersion, statusVersionSnapshot)) {
-        return true
-      }
+    private fun extractTextDocumentSyncKind(initializeResult: InitializeResult?): TextDocumentSyncKind {
+        val capabilities = initializeResult?.capabilities ?: return TextDocumentSyncKind.Full
+        val textDocumentSync = capabilities.textDocumentSync ?: return TextDocumentSyncKind.Full
+        return if (textDocumentSync.isLeft) {
+            textDocumentSync.left ?: TextDocumentSyncKind.Full
+        } else {
+            textDocumentSync.right?.change ?: TextDocumentSyncKind.Full
+        }
     }
-  }
+
+    private fun textDocumentService(): TextDocumentService {
+        val server =
+            synchronized(lock) { remoteServer }
+                ?: throw IllegalStateException("Dart LSP server is not running")
+        return server.textDocumentService
+    }
+
+    private fun notifyAliveIfCurrent(expectedProcess: Process) {
+        val statusVersionSnapshot =
+            synchronized(lock) {
+                if (process !== expectedProcess) {
+                    return
+                }
+                isServerAlive = true
+                statusVersion.incrementAndGet()
+            }
+        notifyStatusListeners(true, statusVersionSnapshot)
+    }
+
+    private fun notifyDeadIfChanged() {
+        val statusVersionSnapshot =
+            synchronized(lock) {
+                if (!isServerAlive) return
+                isServerAlive = false
+                statusVersion.incrementAndGet()
+            }
+        notifyStatusListeners(false, statusVersionSnapshot)
+    }
+
+    private fun notifyStatusListeners(
+        isAlive: Boolean,
+        statusVersionSnapshot: Long,
+    ) {
+        statusListeners.forEach { listener ->
+            notifyStatusListener(listener, isAlive, statusVersionSnapshot)
+        }
+    }
+
+    private fun notifyStatusListener(
+        listener: AnalysisServerStatusListener,
+        isAlive: Boolean,
+        statusVersionSnapshot: Long,
+    ) {
+        if (!recordNotificationVersion(listener, statusVersionSnapshot)) return
+
+        try {
+            listener.isAliveServer(isAlive)
+        } catch (t: Throwable) {
+            LOG.warn("Error in LSP status listener", t)
+        }
+    }
+
+    private fun recordNotificationVersion(
+        listener: AnalysisServerStatusListener,
+        statusVersionSnapshot: Long,
+    ): Boolean {
+        while (true) {
+            val previousVersion = listenerStatusVersions.putIfAbsent(listener, statusVersionSnapshot) ?: return true
+            if (previousVersion >= statusVersionSnapshot) {
+                return false
+            }
+            if (listenerStatusVersions.replace(listener, previousVersion, statusVersionSnapshot)) {
+                return true
+            }
+        }
+    }
 }
