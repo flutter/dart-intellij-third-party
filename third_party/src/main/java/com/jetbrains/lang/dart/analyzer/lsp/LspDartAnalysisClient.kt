@@ -33,48 +33,70 @@ import com.google.dart.server.RequestListener
 import com.google.dart.server.ResponseListener
 import com.google.dart.server.SortMembersConsumer
 import com.google.dart.server.UpdateContentConsumer
+import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.analyzer.DartClient
+import com.jetbrains.lang.dart.analyzer.getDartFileInfo
 import com.jetbrains.lang.dart.sdk.DartSdk
+import org.dartlang.analysis.server.protocol.AddContentOverlay
 import org.dartlang.analysis.server.protocol.AnalysisOptions
 import org.dartlang.analysis.server.protocol.ImportedElements
 import org.dartlang.analysis.server.protocol.RefactoringOptions
 import org.dartlang.analysis.server.protocol.RequestError
 import org.dartlang.analysis.server.protocol.RuntimeCompletionExpression
 import org.dartlang.analysis.server.protocol.RuntimeCompletionVariable
+import org.dartlang.analysis.server.protocol.SourceChange
+import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionContext
+import org.eclipse.lsp4j.CodeActionKind
+import org.eclipse.lsp4j.CodeActionParams
+import org.eclipse.lsp4j.CodeActionTriggerKind
+import org.eclipse.lsp4j.Command
+import org.eclipse.lsp4j.TextDocumentIdentifier
+import org.eclipse.lsp4j.WorkspaceEdit
+import org.eclipse.lsp4j.WorkspaceFolder
+import org.eclipse.lsp4j.jsonrpc.messages.Either
 import java.util.UUID
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
 internal class LspDartAnalysisClient(
-    project: Project,
+    private val project: Project,
     sdk: DartSdk,
     suppressAnalytics: Boolean,
 ) : DartClient {
     private companion object {
         private val LOG = Logger.getInstance(LspDartAnalysisClient::class.java)
+        private val GSON = Gson()
         private const val DIAGNOSTIC_SERVER_TIMEOUT_MS = 30_000L
+        private const val ASSISTS_RETRY_TIMEOUT_MS = 1_000L
+        private const val ASSISTS_RETRY_INTERVAL_MS = 100L
+        private val ASSIST_ACTION_KINDS = listOf(CodeActionKind.Refactor)
     }
 
-    private val lifecycle = LspClientConnectionManager(project, sdk, suppressAnalytics)
+    private val lspClientConnectionManager = LspClientConnectionManager(project, sdk, suppressAnalytics)
+    private val sourceChangeConverter = LspSourceChangeConverter(project)
     private val documentLock = Any()
     private val documentSync =
         LspDocumentSyncManager(
-            onDidOpen = lifecycle::didOpen,
-            onDidChange = lifecycle::didChange,
-            onDidClose = lifecycle::didClose,
-            syncKindProvider = lifecycle::textDocumentSyncKind,
+            onDidOpen = lspClientConnectionManager::didOpen,
+            onDidChange = lspClientConnectionManager::didChange,
+            onDidClose = lspClientConnectionManager::didClose,
+            syncKindProvider = lspClientConnectionManager::textDocumentSyncKind,
         )
 
     override fun start() {
-        lifecycle.start()
+        lspClientConnectionManager.start()
     }
 
-    override fun isSocketOpen(): Boolean = lifecycle.isSocketOpen()
+    override fun isSocketOpen(): Boolean = lspClientConnectionManager.isSocketOpen()
 
     override fun addAnalysisServerListener(listener: AnalysisServerListener) {}
 
@@ -89,7 +111,7 @@ internal class LspDartAnalysisClient(
     override fun removeResponseListener(listener: ResponseListener) {}
 
     override fun addStatusListener(listener: AnalysisServerStatusListener) {
-        lifecycle.addStatusListener(listener)
+        lspClientConnectionManager.addStatusListener(listener)
     }
 
     override fun completion_setSubscriptions(subscriptions: List<String>) {}
@@ -100,9 +122,7 @@ internal class LspDartAnalysisClient(
     ) {
         try {
             synchronized(documentLock) {
-                files.forEach { (uri, overlay) ->
-                    documentSync.applyOverlay(uri, overlay)
-                }
+                files.forEach { (uri, overlay) -> documentSync.applyOverlay(uri, overlay) }
             }
         } catch (t: Throwable) {
             LOG.warn("Failed to synchronize overlaid Dart document content over LSP", t)
@@ -117,7 +137,13 @@ internal class LspDartAnalysisClient(
         included: List<String>,
         excluded: List<String>,
         packageRoots: Map<String, String>?,
-    ) {}
+    ) {
+        try {
+            lspClientConnectionManager.synchronizeWorkspaceFolders(included.toSet(), ::toWorkspaceFolder)
+        } catch (t: Throwable) {
+            LOG.warn("Failed to synchronize Dart LSP analysis roots", t)
+        }
+    }
 
     override fun analysis_getHover(
         file: String,
@@ -137,7 +163,55 @@ internal class LspDartAnalysisClient(
         offset: Int,
         length: Int,
         consumer: GetAssistsConsumer,
-    ) {}
+    ) {
+        try {
+            synchronized(documentLock) {
+                ensureWorkspaceFolderForFile(file)
+                loadCurrentContent(file)?.let { content ->
+                    documentSync.applyOverlay(file, AddContentOverlay(content))
+                }
+            }
+        } catch (t: Throwable) {
+            consumer.onError(toRequestError(t))
+            return
+        }
+
+        val params =
+            try {
+                CodeActionParams(
+                    TextDocumentIdentifier(file),
+                    sourceChangeConverter.toRange(file, offset, length),
+                    CodeActionContext(emptyList()).apply {
+                        only = ASSIST_ACTION_KINDS
+                        triggerKind = CodeActionTriggerKind.Invoked
+                    },
+                )
+            } catch (t: Throwable) {
+                consumer.onError(toRequestError(t))
+                return
+            }
+
+        try {
+            val deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ASSISTS_RETRY_TIMEOUT_MS)
+            while (true) {
+                val actions = lspClientConnectionManager.codeAction(params).get(ASSISTS_RETRY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                val sourceChanges =
+                    actions
+                        .orEmpty()
+                        .mapNotNull(::toAssistSourceChange)
+                if (sourceChanges.isNotEmpty() || System.nanoTime() >= deadlineNs) {
+                    consumer.computedSourceChanges(sourceChanges)
+                    return
+                }
+                Thread.sleep(ASSISTS_RETRY_INTERVAL_MS)
+            }
+        } catch (t: Throwable) {
+            if (t is InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            consumer.onError(toRequestError(t))
+        }
+    }
 
     override fun edit_isPostfixCompletionApplicable(
         file: String,
@@ -164,7 +238,7 @@ internal class LspDartAnalysisClient(
     override fun diagnostic_getServerPort(consumer: GetServerPortConsumer) {
         val future =
             try {
-                lifecycle.requestDiagnosticServer()
+                lspClientConnectionManager.requestDiagnosticServer()
             } catch (t: Throwable) {
                 consumer.onError(toRequestError(t))
                 return
@@ -209,6 +283,58 @@ internal class LspDartAnalysisClient(
             current = current.cause!!
         }
         return current
+    }
+
+    private fun toAssistSourceChange(actionResult: Either<Command, CodeAction>): SourceChange? {
+        if (actionResult.isLeft) {
+            val command = actionResult.left ?: return null
+            val workspaceEdit = extractWorkspaceEdit(command) ?: return null
+            return sourceChangeConverter.toSourceChange(command.title, command.command, workspaceEdit)
+        }
+
+        val action = actionResult.right ?: return null
+        if (!isAssistAction(action)) {
+            return null
+        }
+
+        val workspaceEdit = extractWorkspaceEdit(action) ?: return null
+        if (!sourceChangeConverter.hasTranslatableChanges(workspaceEdit)) {
+            return null
+        }
+
+        return sourceChangeConverter.toSourceChange(action, workspaceEdit)
+    }
+
+    private fun isAssistAction(action: CodeAction): Boolean {
+        if (action.disabled != null || !action.diagnostics.isNullOrEmpty()) {
+            return false
+        }
+        val kind = action.kind ?: return true
+        return ASSIST_ACTION_KINDS.any { kind == it || kind.startsWith("${it}.") }
+    }
+
+    private fun extractWorkspaceEdit(action: CodeAction): WorkspaceEdit? {
+        action.edit?.let { return it }
+        return extractWorkspaceEdit(action.command)
+    }
+
+    private fun extractWorkspaceEdit(command: Command?): WorkspaceEdit? {
+        val safeCommand = command ?: return null
+        safeCommand.arguments.orEmpty().forEach { argument ->
+            val candidate =
+                try {
+                    when (argument) {
+                        is WorkspaceEdit -> argument
+                        else -> GSON.fromJson(GSON.toJsonTree(argument), WorkspaceEdit::class.java)
+                    }
+                } catch (_: Throwable) {
+                    null
+                }
+            if (sourceChangeConverter.hasTranslatableChanges(candidate)) {
+                return candidate
+            }
+        }
+        return null
     }
 
     override fun edit_getFixes(
@@ -350,7 +476,7 @@ internal class LspDartAnalysisClient(
         synchronized(documentLock) {
             documentSync.clear()
         }
-        lifecycle.shutdown()
+        lspClientConnectionManager.shutdown()
     }
 
     override fun generateUniqueId(): String = UUID.randomUUID().toString()
@@ -372,4 +498,23 @@ internal class LspDartAnalysisClient(
     ) {}
 
     override fun lsp_connectToDtd(uri: String) {}
+
+    private fun loadCurrentContent(fileUri: String): String? {
+        val virtualFile = getDartFileInfo(project, fileUri).findFile() ?: return null
+        return FileDocumentManager.getInstance().getDocument(virtualFile)?.text ?: VfsUtilCore.loadText(virtualFile)
+    }
+
+    private fun toWorkspaceFolder(uri: String): WorkspaceFolder {
+        val name =
+            getDartFileInfo(project, uri).findFile()?.name
+                ?: StringUtil.trimEnd(uri.substringAfterLast('/'), '/')
+        return WorkspaceFolder(uri, name)
+    }
+
+    private fun ensureWorkspaceFolderForFile(fileUri: String) {
+        val virtualFile = getDartFileInfo(project, fileUri).findFile() ?: return
+        val parent = virtualFile.parent ?: return
+        val workspaceFolderUri = VfsUtilCore.pathToUrl(parent.path)
+        lspClientConnectionManager.ensureWorkspaceFolderRegistered(workspaceFolderUri, ::toWorkspaceFolder)
+    }
 }

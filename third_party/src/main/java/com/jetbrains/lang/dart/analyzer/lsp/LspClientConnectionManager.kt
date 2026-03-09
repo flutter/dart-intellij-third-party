@@ -11,11 +11,16 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.remoteDev.thinClientLink.ClientToGtwMessage
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import org.eclipse.lsp4j.ClientCapabilities
+import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionParams
+import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
+import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.InitializeParams
@@ -24,8 +29,10 @@ import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.TextDocumentSyncKind
 import org.eclipse.lsp4j.WorkspaceFolder
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageServer
 import org.eclipse.lsp4j.services.TextDocumentService
+import org.eclipse.lsp4j.services.WorkspaceService
 import java.util.MissingResourceException
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
@@ -79,6 +86,7 @@ internal class LspClientConnectionManager(
     private var serverTextDocumentSyncKind = TextDocumentSyncKind.Full
 
     private val languageClient = NoOpDartLanguageClient()
+    private val workspaceFoldersManager = LspWorkspaceFoldersManager()
 
     private class StartupSession(
         val process: Process,
@@ -182,6 +190,7 @@ internal class LspClientConnectionManager(
         pendingProcess = null
         pendingServer = null
         pendingListeningFuture = null
+        resetRegisteredWorkspaceFoldersLocked()
     }
 
     private fun failStartup(startupSession: StartupSession?) {
@@ -192,6 +201,7 @@ internal class LspClientConnectionManager(
                 if (pendingListeningFuture === startupSession.listeningFuture) pendingListeningFuture = null
             }
             startupInProgress = false
+            workspaceFoldersManager.clear()
         }
     }
 
@@ -214,6 +224,28 @@ internal class LspClientConnectionManager(
 
     fun didClose(params: DidCloseTextDocumentParams) {
         textDocumentService().didClose(params)
+    }
+
+    fun codeAction(params: CodeActionParams): CompletableFuture<List<Either<Command, CodeAction>>> {
+        return textDocumentService().codeAction(params)
+    }
+
+    fun didChangeWorkspaceFolders(params: DidChangeWorkspaceFoldersParams) {
+        workspaceService().didChangeWorkspaceFolders(params)
+    }
+
+    fun ensureWorkspaceFolderRegistered(
+        workspaceFolderUri: String,
+        toWorkspaceFolder: (String) -> WorkspaceFolder,
+    ) {
+        workspaceFoldersManager.ensureWorkspaceFolderRegistered(workspaceFolderUri, toWorkspaceFolder, this::didChangeWorkspaceFolders)
+    }
+
+    fun synchronizeWorkspaceFolders(
+        newWorkspaceFolderUris: Set<String>,
+        toWorkspaceFolder: (String) -> WorkspaceFolder,
+    ) {
+        workspaceFoldersManager.synchronizeWorkspaceFolders(newWorkspaceFolderUris, toWorkspaceFolder, this::didChangeWorkspaceFolders)
     }
 
     fun isSocketOpen(): Boolean = process?.isAlive == true
@@ -246,6 +278,7 @@ internal class LspClientConnectionManager(
             pendingServer = null
             pendingListeningFuture = null
             startupInProgress = false
+            workspaceFoldersManager.clear()
         }
 
         closeConnection(localServer, localProcess, localListeningFuture, sendShutdownRequest = true)
@@ -327,6 +360,7 @@ internal class LspClientConnectionManager(
                         process = null
                         remoteServer = null
                         listeningFuture = null
+                        workspaceFoldersManager.clear()
                         notifyDead = true
                     }
                     if (pendingProcess === startedProcess) {
@@ -334,6 +368,7 @@ internal class LspClientConnectionManager(
                         pendingServer = null
                         pendingListeningFuture = null
                         startupInProgress = false
+                        workspaceFoldersManager.clear()
                     }
                 }
                 if (notifyDead) {
@@ -379,12 +414,12 @@ internal class LspClientConnectionManager(
     }
 
     private fun initializeServer(server: LanguageServer) {
+        val initialWorkspaceFolders = initialWorkspaceFolders()
         val initializeParams =
             InitializeParams().apply {
-                capabilities = ClientCapabilities()
-                val basePath = project.basePath
-                if (basePath != null) {
-                    workspaceFolders = listOf(WorkspaceFolder(VfsUtilCore.pathToUrl(basePath), project.name))
+                capabilities = createClientCapabilities()
+                if (initialWorkspaceFolders.isNotEmpty()) {
+                    workspaceFolders = initialWorkspaceFolders
                 } else {
                     LOG.warn("Dart LSP: project.basePath is null, workspaceFolders not set")
                 }
@@ -397,6 +432,15 @@ internal class LspClientConnectionManager(
         val initializeResult = server.initialize(initializeParams).get(INITIALIZE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         serverTextDocumentSyncKind = extractTextDocumentSyncKind(initializeResult)
         server.initialized(InitializedParams())
+    }
+
+    private fun initialWorkspaceFolders(): List<WorkspaceFolder> {
+        val basePath = project.basePath ?: return emptyList()
+        return listOf(WorkspaceFolder(VfsUtilCore.pathToUrl(basePath), project.name))
+    }
+
+    private fun resetRegisteredWorkspaceFoldersLocked() {
+        workspaceFoldersManager.resetRegisteredWorkspaceFolders(initialWorkspaceFolders().map(WorkspaceFolder::getUri))
     }
 
     private fun extractTextDocumentSyncKind(initializeResult: InitializeResult?): TextDocumentSyncKind {
@@ -414,6 +458,13 @@ internal class LspClientConnectionManager(
             synchronized(lock) { remoteServer }
                 ?: throw IllegalStateException("Dart LSP server is not running")
         return server.textDocumentService
+    }
+
+    private fun workspaceService(): WorkspaceService {
+        val server =
+            synchronized(lock) { remoteServer }
+                ?: throw IllegalStateException("Dart LSP server is not running")
+        return server.workspaceService
     }
 
     private fun notifyAliveIfCurrent(expectedProcess: Process) {
