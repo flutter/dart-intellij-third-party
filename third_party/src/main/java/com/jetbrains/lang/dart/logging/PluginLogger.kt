@@ -52,9 +52,9 @@ object PluginLogger {
           rootLogger.addHandler(newHandler)
           flutterLogger.addHandler(newHandler)
         } catch (e: IOException) {
-          throw RuntimeException(e)
+          IJLogger.getInstance(PluginLogger::class.java).error("Failed to initialize plugin log file handler", e)
         } catch (e: SecurityException) {
-          throw RuntimeException(e)
+          IJLogger.getInstance(PluginLogger::class.java).error("Failed to initialize plugin log file handler", e)
         }
       }
     }
