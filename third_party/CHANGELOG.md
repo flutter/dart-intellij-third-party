@@ -3,16 +3,7 @@
 ### Added
 
 ### Changed
-
-### Removed
-
-### Fixed
-
-## 503.0.0
-
-### Added
-
-### Changed
+- Log to same file as Flutter plugin
 
 ### Removed
 
