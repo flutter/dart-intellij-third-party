@@ -7,8 +7,11 @@ package com.jetbrains.lang.dart.logging
 
 import com.intellij.openapi.application.PathManager
 import java.io.File
+import java.io.IOException
 import java.util.logging.FileHandler
+import java.util.logging.LogManager
 import java.util.logging.Logger
+import java.util.logging.SimpleFormatter
 import com.intellij.openapi.diagnostic.Logger as IJLogger
 
 object PluginLogger {
@@ -20,7 +23,7 @@ object PluginLogger {
     val logPath = PathManager.getLogPath()
     val fullPath = logPath + File.separatorChar + LOG_FILE_NAME
 
-    synchronized(java.util.logging.LogManager.getLogManager()) {
+    synchronized(LogManager.getLogManager()) {
       val flutterLogger = Logger.getLogger("io.flutter")
 
       // Check if either logger already has a FileHandler for dash.log
@@ -43,12 +46,14 @@ object PluginLogger {
             "java.util.logging.SimpleFormatter.format",
             "%1\$tF %1\$tT %3\$s [%4$-7s] %5\$s %6\$s %n"
           )
-          newHandler.formatter = java.util.logging.SimpleFormatter()
+          newHandler.formatter = SimpleFormatter()
 
           // Attach to both loggers so the next plugin finds it
           rootLogger.addHandler(newHandler)
           flutterLogger.addHandler(newHandler)
-        } catch (e: Exception) {
+        } catch (e: IOException) {
+          throw RuntimeException(e)
+        } catch (e: SecurityException) {
           throw RuntimeException(e)
         }
       }
