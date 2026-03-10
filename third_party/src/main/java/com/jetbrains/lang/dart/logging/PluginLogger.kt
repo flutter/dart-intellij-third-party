@@ -43,11 +43,7 @@ object PluginLogger {
         // We are the first plugin to initialize; create the handler
         try {
           val newHandler = FileHandler(fullPath, LOG_FILE_SIZE_BYTES, LOG_FILE_COUNT, true)
-          System.setProperty(
-            "java.util.logging.SimpleFormatter.format",
-            LOG_FORMAT
-          )
-          newHandler.formatter = SimpleFormatter()
+          newHandler.formatter = PluginLogFormatter()
 
           // Attach to the dart logger so it can be found
           rootLogger.addHandler(newHandler)
@@ -63,5 +59,19 @@ object PluginLogger {
 
   fun createLogger(logClass: Class<*>): IJLogger {
     return IJLogger.getInstance(logClass.getName())
+  }
+
+  private class PluginLogFormatter : java.util.logging.Formatter() {
+    override fun format(record: java.util.logging.LogRecord): String {
+      return String.format(
+        LOG_FORMAT,
+        java.util.Date(record.millis),
+        null,
+        record.loggerName,
+        record.level.localizedName,
+        formatMessage(record),
+        if (record.thrown != null) "\n" + record.thrown.stackTraceToString() else ""
+      )
+    }
   }
 }
