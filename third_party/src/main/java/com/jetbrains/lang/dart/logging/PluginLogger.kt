@@ -39,9 +39,6 @@ object PluginLogger {
         if (!rootLogger.handlers.contains(existingHandler)) {
           rootLogger.addHandler(existingHandler)
         }
-        if (!flutterLogger.handlers.contains(existingHandler)) {
-          flutterLogger.addHandler(existingHandler)
-        }
       } else {
         // We are the first plugin to initialize; create the handler
         try {
@@ -52,9 +49,8 @@ object PluginLogger {
           )
           newHandler.formatter = SimpleFormatter()
 
-          // Attach to both loggers so the next plugin finds it
+          // Attach to the dart logger so it can be found
           rootLogger.addHandler(newHandler)
-          flutterLogger.addHandler(newHandler)
         } catch (e: IOException) {
           IJLogger.getInstance(PluginLogger::class.java).error("Failed to initialize plugin log file handler", e)
         } catch (e: SecurityException) {
