@@ -16,6 +16,10 @@ import com.intellij.openapi.diagnostic.Logger as IJLogger
 
 object PluginLogger {
   private const val LOG_FILE_NAME = "dash.log"
+  private const val FLUTTER_LOGGER_NAME = "io.flutter"
+  private const val LOG_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+  private const val LOG_FILE_COUNT = 5
+  private const val LOG_FORMAT = "%1\$tF %1\$tT %3\$s [%4$-7s] %5\$s %6\$s %n"
 
   private val rootLogger: Logger = Logger.getLogger("com.jetbrains.lang.dart")
 
@@ -24,7 +28,7 @@ object PluginLogger {
     val fullPath = logPath + File.separatorChar + LOG_FILE_NAME
 
     synchronized(LogManager.getLogManager()) {
-      val flutterLogger = Logger.getLogger("io.flutter")
+      val flutterLogger = Logger.getLogger(FLUTTER_LOGGER_NAME)
 
       // Check if either logger already has a FileHandler for dash.log
       val existingHandler = rootLogger.handlers.filterIsInstance<FileHandler>().firstOrNull()
@@ -41,10 +45,10 @@ object PluginLogger {
       } else {
         // We are the first plugin to initialize; create the handler
         try {
-          val newHandler = FileHandler(fullPath, 10 * 1024 * 1024, 5, true)
+          val newHandler = FileHandler(fullPath, LOG_FILE_SIZE_BYTES, LOG_FILE_COUNT, true)
           System.setProperty(
             "java.util.logging.SimpleFormatter.format",
-            "%1\$tF %1\$tT %3\$s [%4$-7s] %5\$s %6\$s %n"
+            LOG_FORMAT
           )
           newHandler.formatter = SimpleFormatter()
 
