@@ -3,7 +3,7 @@
 ### Added
 
 ### Changed
-- Log to same file as Flutter plugin
+- Log to same file as Flutter plugin (#276)
 
 ### Removed
 

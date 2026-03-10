@@ -52,6 +52,7 @@ object PluginLogger {
           // Attach to the dart logger so it can be found
           rootLogger.addHandler(newHandler)
         } catch (e: IOException) {
+          // TODO(helin24): Consider adding a backup logging method if this fails at any point.
           IJLogger.getInstance(PluginLogger::class.java).error("Failed to initialize plugin log file handler", e)
         } catch (e: SecurityException) {
           IJLogger.getInstance(PluginLogger::class.java).error("Failed to initialize plugin log file handler", e)
