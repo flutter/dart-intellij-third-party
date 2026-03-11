@@ -4,6 +4,7 @@ package com.jetbrains.dart.analysisServer;
 import com.intellij.openapi.util.registry.Registry;
 import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
 public class DartLspServerHighlightingTest extends CodeInsightFixtureTestCase {
@@ -12,6 +13,7 @@ public class DartLspServerHighlightingTest extends CodeInsightFixtureTestCase {
     super.setUp();
     Registry.get("dart.use.lsp.client").setValue(true, myFixture.getTestRootDisposable());
     DartTestUtils.configureDartSdk(myModule, myFixture.getTestRootDisposable(), true);
+    DartAnalysisServerService.getInstance(getProject()).serverReadyForRequest();
     myFixture.setTestDataPath(DartTestUtils.BASE_TEST_DATA_PATH + getBasePath());
     ((CodeInsightTestFixtureImpl)myFixture).canChangeDocumentDuringHighlighting(true);
   }

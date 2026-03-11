@@ -21,35 +21,47 @@ import org.eclipse.lsp4j.Range
 internal class LspDiagnosticConverter(
     private val project: Project,
 ) {
+    data class ConvertedDiagnostic(
+        val diagnostic: Diagnostic,
+        val analysisError: AnalysisError,
+    )
+
     fun toAnalysisErrors(params: PublishDiagnosticsParams): List<AnalysisError> {
+        return toConvertedDiagnostics(params).map(ConvertedDiagnostic::analysisError)
+    }
+
+    fun toConvertedDiagnostics(params: PublishDiagnosticsParams): List<ConvertedDiagnostic> {
         val fileUri = params.uri ?: return emptyList()
         val documentText = getDocumentText(fileUri) ?: return emptyList()
         return params.diagnostics.orEmpty().mapNotNull { diagnostic ->
-            toAnalysisError(fileUri, documentText, diagnostic)
+            toConvertedDiagnostic(fileUri, documentText, diagnostic)
         }
     }
 
-    private fun toAnalysisError(
+    private fun toConvertedDiagnostic(
         fileUri: String,
         documentText: DocumentText,
         diagnostic: Diagnostic,
-    ): AnalysisError? {
+    ): ConvertedDiagnostic? {
         val location = toLocation(fileUri, documentText, diagnostic.range) ?: return null
         val (message, correction) = splitMessageAndCorrection(diagnostic.message)
         val contextMessages =
             diagnostic.relatedInformation
                 ?.mapNotNull { toDiagnosticMessage(it) }
                 ?.takeIf { it.isNotEmpty() }
-        return AnalysisError(
-            toSeverity(diagnostic.severity),
-            toType(diagnostic),
-            location,
-            message,
-            correction,
-            diagnostic.getCodeAsString() ?: "LSP",
-            diagnostic.codeDescription?.href,
-            contextMessages,
-            null,
+        return ConvertedDiagnostic(
+            diagnostic,
+            AnalysisError(
+                toSeverity(diagnostic.severity),
+                toType(diagnostic),
+                location,
+                message,
+                correction,
+                diagnostic.getCodeAsString() ?: "LSP",
+                diagnostic.codeDescription?.href,
+                contextMessages,
+                null,
+            ),
         )
     }
 

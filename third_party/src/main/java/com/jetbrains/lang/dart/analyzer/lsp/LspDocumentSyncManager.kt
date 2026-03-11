@@ -40,6 +40,8 @@ internal class LspDocumentSyncManager(
     }
 
     fun clear() {
+        // This manager is cleared only during connection teardown, so the server is
+        // already going away and does not need individual didClose notifications.
         openDocuments.clear()
     }
 

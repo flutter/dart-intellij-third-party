@@ -48,6 +48,7 @@ import com.jetbrains.lang.dart.analyzer.getDartFileInfo
 import com.jetbrains.lang.dart.sdk.DartSdk
 import org.dartlang.analysis.server.protocol.AddContentOverlay
 import org.dartlang.analysis.server.protocol.AnalysisError
+import org.dartlang.analysis.server.protocol.AnalysisErrorFixes
 import org.dartlang.analysis.server.protocol.AnalysisOptions
 import org.dartlang.analysis.server.protocol.ImportedElements
 import org.dartlang.analysis.server.protocol.RefactoringOptions
@@ -61,6 +62,7 @@ import org.eclipse.lsp4j.CodeActionKind
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.CodeActionTriggerKind
 import org.eclipse.lsp4j.Command
+import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.WorkspaceEdit
@@ -82,8 +84,27 @@ internal class LspDartAnalysisClient(
         private const val DIAGNOSTIC_SERVER_TIMEOUT_MS = 30_000L
         private const val ASSISTS_RETRY_TIMEOUT_MS = 1_000L
         private const val ASSISTS_RETRY_INTERVAL_MS = 100L
+        private const val FIXES_RETRY_TIMEOUT_MS = 1_000L
+        private const val FIXES_RETRY_INTERVAL_MS = 100L
         private val ASSIST_ACTION_KINDS = listOf(CodeActionKind.Refactor)
+        private val FIX_ACTION_KINDS = listOf(CodeActionKind.QuickFix)
     }
+
+    private data class CachedDiagnostic(
+        val lspDiagnostic: Diagnostic,
+        val analysisError: AnalysisError,
+    )
+
+    private data class DiagnosticKey(
+        val startLine: Int?,
+        val startCharacter: Int?,
+        val endLine: Int?,
+        val endCharacter: Int?,
+        val severity: Int?,
+        val code: String?,
+        val source: String?,
+        val message: String?,
+    )
 
     private val analysisServerListeners = BroadcastAnalysisServerListener()
     private val diagnosticConverter = LspDiagnosticConverter(project)
@@ -91,6 +112,7 @@ internal class LspDartAnalysisClient(
         LspClientConnectionManager(project, sdk, suppressAnalytics, ::handlePublishDiagnostics)
     private val sourceChangeConverter = LspSourceChangeConverter(project)
     private val documentLock = Any()
+    private val diagnosticsByFileUri = mutableMapOf<String, List<CachedDiagnostic>>()
     private val documentSync =
         LspDocumentSyncManager(
             onDidOpen = lspClientConnectionManager::didOpen,
@@ -298,12 +320,17 @@ internal class LspDartAnalysisClient(
 
     private fun handlePublishDiagnostics(params: PublishDiagnosticsParams) {
         val fileUri = params.uri ?: return
-        val errors =
-            ReadAction.compute<List<AnalysisError>, RuntimeException> {
+        val diagnostics =
+            ReadAction.compute<List<CachedDiagnostic>, RuntimeException> {
                 synchronized(documentLock) {
-                    diagnosticConverter.toAnalysisErrors(params)
+                    diagnosticConverter
+                        .toConvertedDiagnostics(params)
+                        .map { convertedDiagnostic ->
+                            CachedDiagnostic(convertedDiagnostic.diagnostic, convertedDiagnostic.analysisError)
+                        }.also { diagnosticsByFileUri[fileUri] = it }
                 }
             }
+        val errors = diagnostics.map(CachedDiagnostic::analysisError)
         analysisServerListeners.computedErrors(fileUri, errors)
     }
 
@@ -335,6 +362,107 @@ internal class LspDartAnalysisClient(
         return ASSIST_ACTION_KINDS.any { kind == it || kind.startsWith("$it.") }
     }
 
+    private fun toAnalysisErrorFixes(
+        matchingDiagnostics: List<CachedDiagnostic>,
+        actionResults: List<Either<Command, CodeAction>>,
+    ): List<AnalysisErrorFixes> {
+        val fixesByDiagnostic = LinkedHashMap<CachedDiagnostic, MutableList<SourceChange>>()
+        matchingDiagnostics.forEach { diagnostic ->
+            fixesByDiagnostic[diagnostic] = mutableListOf()
+        }
+
+        actionResults.forEach { actionResult ->
+            val sourceChange = toFixSourceChange(actionResult) ?: return@forEach
+            val diagnostics = associatedDiagnostics(actionResult, matchingDiagnostics)
+            diagnostics.forEach { diagnostic ->
+                fixesByDiagnostic.getOrPut(diagnostic, ::mutableListOf).add(sourceChange)
+            }
+        }
+
+        return fixesByDiagnostic.mapNotNull { (diagnostic, fixes) ->
+            if (fixes.isEmpty()) {
+                null
+            } else {
+                AnalysisErrorFixes(diagnostic.analysisError, fixes)
+            }
+        }
+    }
+
+    private fun toFixSourceChange(actionResult: Either<Command, CodeAction>): SourceChange? {
+        if (actionResult.isLeft) {
+            val command = actionResult.left ?: return null
+            val workspaceEdit = extractWorkspaceEdit(command) ?: return null
+            return sourceChangeConverter.toSourceChange(command.title, command.command, workspaceEdit)
+        }
+
+        val action = actionResult.right ?: return null
+        if (!isFixAction(action)) {
+            return null
+        }
+
+        val workspaceEdit = extractWorkspaceEdit(action) ?: return null
+        if (!sourceChangeConverter.hasTranslatableChanges(workspaceEdit)) {
+            return null
+        }
+
+        return sourceChangeConverter.toSourceChange(action, workspaceEdit)
+    }
+
+    private fun isFixAction(action: CodeAction): Boolean {
+        if (action.disabled != null) {
+            return false
+        }
+        val kind = action.kind ?: return true
+        return FIX_ACTION_KINDS.any { kind == it || kind.startsWith("$it.") }
+    }
+
+    private fun associatedDiagnostics(
+        actionResult: Either<Command, CodeAction>,
+        matchingDiagnostics: List<CachedDiagnostic>,
+    ): List<CachedDiagnostic> {
+        if (matchingDiagnostics.size <= 1) {
+            // If only one diagnostic matches the requested offset, attribute the returned fix to it even if
+            // the server omits CodeAction.diagnostics. That preserves the existing one-error/one-fix UX.
+            return matchingDiagnostics
+        }
+
+        val action = actionResult.takeIf(Either<Command, CodeAction>::isRight)?.right ?: return matchingDiagnostics
+        val actionDiagnostics = action.diagnostics.orEmpty()
+        if (actionDiagnostics.isEmpty()) {
+            // Some servers omit the per-action diagnostic list. Fall back to all matching diagnostics so
+            // fix actions are still surfaced instead of being dropped on the floor.
+            return matchingDiagnostics
+        }
+
+        val matchingDiagnosticsByKey = matchingDiagnostics.associateBy { diagnostic -> diagnostic.key() }
+        return actionDiagnostics.mapNotNull { diagnostic ->
+            matchingDiagnosticsByKey[diagnostic.key()]
+        }
+    }
+
+    private fun CachedDiagnostic.matchesOffset(offset: Int): Boolean {
+        val startOffset = analysisError.location.offset
+        val length = analysisError.location.length
+        if (length <= 0) {
+            return offset == startOffset
+        }
+        return offset in startOffset until (startOffset + length)
+    }
+
+    private fun CachedDiagnostic.key(): DiagnosticKey = lspDiagnostic.key()
+
+    private fun Diagnostic.key(): DiagnosticKey =
+        DiagnosticKey(
+            range?.start?.line,
+            range?.start?.character,
+            range?.end?.line,
+            range?.end?.character,
+            severity?.value,
+            getCodeAsString(),
+            source,
+            message,
+        )
+
     private fun extractWorkspaceEdit(action: CodeAction): WorkspaceEdit? {
         action.edit?.let { return it }
         return extractWorkspaceEdit(action.command)
@@ -363,7 +491,59 @@ internal class LspDartAnalysisClient(
         file: String,
         offset: Int,
         consumer: GetFixesConsumer,
-    ) {}
+    ) {
+        val matchingDiagnostics =
+            try {
+                synchronized(documentLock) {
+                    ensureWorkspaceFolderForFile(file)
+                    loadCurrentContent(file)?.let { content ->
+                        documentSync.applyOverlay(file, AddContentOverlay(content))
+                    }
+                    diagnosticsByFileUri[file].orEmpty().filter { it.matchesOffset(offset) }
+                }
+            } catch (t: Throwable) {
+                consumer.onError(toRequestError(t))
+                return
+            }
+
+        if (matchingDiagnostics.isEmpty()) {
+            consumer.computedFixes(emptyList())
+            return
+        }
+
+        val params =
+            try {
+                CodeActionParams(
+                    TextDocumentIdentifier(file),
+                    sourceChangeConverter.toRange(file, offset, 0),
+                    CodeActionContext(matchingDiagnostics.map(CachedDiagnostic::lspDiagnostic)).apply {
+                        only = FIX_ACTION_KINDS
+                        triggerKind = CodeActionTriggerKind.Invoked
+                    },
+                )
+            } catch (t: Throwable) {
+                consumer.onError(toRequestError(t))
+                return
+            }
+
+        try {
+            val deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(FIXES_RETRY_TIMEOUT_MS)
+            while (true) {
+                val actions = lspClientConnectionManager.codeAction(params).get(FIXES_RETRY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                val fixes = toAnalysisErrorFixes(matchingDiagnostics, actions.orEmpty())
+                if (fixes.isNotEmpty() || System.nanoTime() >= deadlineNs) {
+                    consumer.computedFixes(fixes)
+                    return
+                }
+                Thread.sleep(FIXES_RETRY_INTERVAL_MS)
+            }
+        } catch (t: Throwable) {
+            if (t is InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            consumer.onError(toRequestError(t))
+        }
+    }
 
     override fun search_findElementReferences(
         file: String,
@@ -497,6 +677,7 @@ internal class LspDartAnalysisClient(
     override fun server_shutdown() {
         synchronized(documentLock) {
             documentSync.clear()
+            diagnosticsByFileUri.clear()
         }
         lspClientConnectionManager.shutdown()
     }
