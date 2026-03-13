@@ -6,6 +6,8 @@ import org.eclipse.lsp4j.CodeActionCapabilities
 import org.eclipse.lsp4j.CodeActionKind
 import org.eclipse.lsp4j.CodeActionKindCapabilities
 import org.eclipse.lsp4j.CodeActionLiteralSupportCapabilities
+import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
+import org.eclipse.lsp4j.RenameCapabilities
 import org.eclipse.lsp4j.TextDocumentClientCapabilities
 import org.eclipse.lsp4j.WorkspaceClientCapabilities
 import org.eclipse.lsp4j.WorkspaceEditCapabilities
@@ -13,10 +15,15 @@ import org.eclipse.lsp4j.WorkspaceEditCapabilities
 internal fun createClientCapabilities(): ClientCapabilities {
     val workspaceCapabilities =
         WorkspaceClientCapabilities().apply {
+            applyEdit = true
             workspaceFolders = true
             workspaceEdit =
                 WorkspaceEditCapabilities().apply {
                     documentChanges = true
+                }
+            fileOperations =
+                FileOperationsWorkspaceCapabilities().apply {
+                    willRename = true
                 }
         }
     val textDocumentCapabilities =
@@ -40,6 +47,10 @@ internal fun createClientCapabilities(): ClientCapabilities {
                         )
                     isPreferredSupport = true
                     disabledSupport = true
+                }
+            rename =
+                RenameCapabilities().apply {
+                    prepareSupport = true
                 }
         }
     return ClientCapabilities().apply {

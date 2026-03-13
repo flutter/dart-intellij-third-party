@@ -4,6 +4,8 @@ package com.jetbrains.lang.dart.analyzer.lsp
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.analyzer.getDartFileInfo
 import org.dartlang.analysis.server.protocol.LinkedEditGroup
 import org.dartlang.analysis.server.protocol.LinkedEditSuggestion
@@ -29,8 +31,9 @@ internal class LspSourceChangeConverter(
         length: Int,
     ): Range {
         val document = getDocument(fileUri)
-        val start = toPosition(document, offset)
-        val end = toPosition(document, offset + length)
+        val virtualFile = findVirtualFile(fileUri)
+        val start = toPosition(document, toCurrentOffset(virtualFile, offset))
+        val end = toPosition(document, toCurrentOffset(virtualFile, offset + length))
         return Range(start, end)
     }
 
@@ -48,26 +51,30 @@ internal class LspSourceChangeConverter(
         val linkedEditGroups = mutableListOf<LinkedEditGroup>()
         var selection: ServerPosition? = null
         var selectionLength: Int? = null
-        workspaceEdit.changes?.forEach { (fileUri, textEdits) ->
-            val convertedEdit = toSourceFileEdit(fileUri, textEdits) ?: return null
-            fileEdits.add(convertedEdit.fileEdit)
-            linkedEditGroups.addAll(convertedEdit.linkedEditGroups)
-            if (selection == null && convertedEdit.selection != null) {
-                selection = convertedEdit.selection
-                selectionLength = convertedEdit.selectionLength
+        val documentChanges = workspaceEdit.documentChanges
+        if (!documentChanges.isNullOrEmpty()) {
+            documentChanges.forEach { change ->
+                if (!change.isLeft) {
+                    return null
+                }
+                val documentChange = change.left ?: return null
+                val convertedEdit = toSourceFileEdit(documentChange) ?: return null
+                fileEdits.add(convertedEdit.fileEdit)
+                linkedEditGroups.addAll(convertedEdit.linkedEditGroups)
+                if (selection == null && convertedEdit.selection != null) {
+                    selection = convertedEdit.selection
+                    selectionLength = convertedEdit.selectionLength
+                }
             }
-        }
-        workspaceEdit.documentChanges?.forEach { change ->
-            if (!change.isLeft) {
-                return null
-            }
-            val documentChange = change.left ?: return null
-            val convertedEdit = toSourceFileEdit(documentChange) ?: return null
-            fileEdits.add(convertedEdit.fileEdit)
-            linkedEditGroups.addAll(convertedEdit.linkedEditGroups)
-            if (selection == null && convertedEdit.selection != null) {
-                selection = convertedEdit.selection
-                selectionLength = convertedEdit.selectionLength
+        } else {
+            workspaceEdit.changes?.forEach { (fileUri, textEdits) ->
+                val convertedEdit = toSourceFileEdit(fileUri, textEdits) ?: return null
+                fileEdits.add(convertedEdit.fileEdit)
+                linkedEditGroups.addAll(convertedEdit.linkedEditGroups)
+                if (selection == null && convertedEdit.selection != null) {
+                    selection = convertedEdit.selection
+                    selectionLength = convertedEdit.selectionLength
+                }
             }
         }
         if (fileEdits.isEmpty()) {
@@ -116,10 +123,13 @@ internal class LspSourceChangeConverter(
     ): ConvertedTextEdit? {
         val startOffset = getOffset(document, textEdit.range.start) ?: return null
         val endOffset = getOffset(document, textEdit.range.end) ?: return null
+        val virtualFile = findVirtualFile(fileUri)
         val newText = textEdit.newText ?: ""
         val decodedSnippet = LspSnippetTextEditDecoder.decode(newText)
         val replacement = decodedSnippet?.text ?: newText
-        val sourceEdit = SourceEdit(startOffset, endOffset - startOffset, replacement, null, null)
+        val sourceStartOffset = toOriginalOffset(virtualFile, startOffset)
+        val sourceEndOffset = toOriginalOffset(virtualFile, endOffset)
+        val sourceEdit = SourceEdit(sourceStartOffset, sourceEndOffset - sourceStartOffset, replacement, null, null)
         if (decodedSnippet == null || decodedSnippet.placeholders.isEmpty()) {
             return ConvertedTextEdit(sourceEdit, null, null, emptyList())
         }
@@ -132,13 +142,13 @@ internal class LspSourceChangeConverter(
             val choices = sortedPlaceholders.firstNotNullOfOrNull(DecodedSnippetPlaceholder::choices)
             if (number == 0 && shouldUsePlaceholderGroupAsSelection(sortedPlaceholders, choices)) {
                 val placeholder = sortedPlaceholders.first()
-                selection = ServerPosition(fileUri, startOffset + placeholder.offset)
+                selection = ServerPosition(fileUri, toOriginalOffset(virtualFile, startOffset + placeholder.offset))
                 selectionLength = placeholder.length
             } else {
                 linkedEditGroups.add(
                     LinkedEditGroup(
                         sortedPlaceholders.map { placeholder ->
-                            ServerPosition(fileUri, startOffset + placeholder.offset)
+                            ServerPosition(fileUri, toOriginalOffset(virtualFile, startOffset + placeholder.offset))
                         },
                         sortedPlaceholders.first().length,
                         choices
@@ -174,15 +184,31 @@ internal class LspSourceChangeConverter(
     )
 
     private fun getDocument(fileUri: String): Document {
-        val virtualFile =
-            getDartFileInfo(project, fileUri).findFile()
-                ?: throw IllegalStateException("Unable to resolve Dart file for $fileUri")
+        val virtualFile = findVirtualFile(fileUri) ?: throw IllegalStateException("Unable to resolve Dart file for $fileUri")
         return FileDocumentManager.getInstance().getDocument(virtualFile)
             ?: throw IllegalStateException("Unable to load document for $fileUri")
     }
 
     private fun getFileStamp(fileUri: String): Long {
-        return getDartFileInfo(project, fileUri).findFile()?.modificationStamp ?: 0L
+        return findVirtualFile(fileUri)?.modificationStamp ?: 0L
+    }
+
+    private fun findVirtualFile(fileUri: String): VirtualFile? = getDartFileInfo(project, fileUri).findFile()
+
+    private fun toCurrentOffset(
+        virtualFile: VirtualFile?,
+        originalOffset: Int,
+    ): Int {
+        if (virtualFile == null) return originalOffset
+        return DartAnalysisServerService.getInstance(project).getConvertedOffset(virtualFile, originalOffset)
+    }
+
+    private fun toOriginalOffset(
+        virtualFile: VirtualFile?,
+        currentOffset: Int,
+    ): Int {
+        if (virtualFile == null) return currentOffset
+        return DartAnalysisServerService.getInstance(project).getOriginalOffset(virtualFile, currentOffset)
     }
 
     private fun toPosition(

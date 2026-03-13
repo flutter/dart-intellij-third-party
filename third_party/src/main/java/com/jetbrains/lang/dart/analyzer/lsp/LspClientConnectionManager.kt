@@ -21,14 +21,23 @@ import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWorkspaceFoldersParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
+import org.eclipse.lsp4j.ExecuteCommandParams
+import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.InitializedParams
+import org.eclipse.lsp4j.PrepareRenameDefaultBehavior
+import org.eclipse.lsp4j.PrepareRenameParams
+import org.eclipse.lsp4j.PrepareRenameResult
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.RenameFilesParams
+import org.eclipse.lsp4j.RenameParams
 import org.eclipse.lsp4j.TextDocumentSyncKind
+import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.WorkspaceFolder
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.jsonrpc.messages.Either3
 import org.eclipse.lsp4j.services.LanguageServer
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
@@ -47,6 +56,9 @@ internal class LspClientConnectionManager(
     private val sdk: DartSdk,
     private val suppressAnalytics: Boolean,
     onPublishDiagnostics: (PublishDiagnosticsParams) -> Unit = {},
+    onApplyEdit: (
+        org.eclipse.lsp4j.ApplyWorkspaceEditParams,
+    ) -> org.eclipse.lsp4j.ApplyWorkspaceEditResponse = { org.eclipse.lsp4j.ApplyWorkspaceEditResponse(false) },
 ) {
     private companion object {
         private val LOG = Logger.getInstance(LspClientConnectionManager::class.java)
@@ -85,7 +97,7 @@ internal class LspClientConnectionManager(
     @Volatile
     private var serverTextDocumentSyncKind = TextDocumentSyncKind.Full
 
-    private val languageClient = DartLspLanguageClient(onPublishDiagnostics)
+    private val languageClient = DartLspLanguageClient(onPublishDiagnostics, onApplyEdit)
     private val workspaceFoldersManager = LspWorkspaceFoldersManager()
 
     private class StartupSession(
@@ -228,6 +240,27 @@ internal class LspClientConnectionManager(
 
     fun codeAction(params: CodeActionParams): CompletableFuture<List<Either<Command, CodeAction>>> {
         return textDocumentService().codeAction(params)
+    }
+
+    fun prepareRename(
+        params: PrepareRenameParams,
+    ): CompletableFuture<Either3<org.eclipse.lsp4j.Range, PrepareRenameResult, PrepareRenameDefaultBehavior>> {
+        return textDocumentService().prepareRename(params)
+    }
+
+    fun rename(params: RenameParams): CompletableFuture<WorkspaceEdit> {
+        return textDocumentService().rename(params)
+    }
+
+    fun executeCommand(
+        command: String,
+        arguments: List<Any?>,
+    ): CompletableFuture<Any> {
+        return workspaceService().executeCommand(ExecuteCommandParams(command, ArrayList(arguments)))
+    }
+
+    fun willRenameFiles(files: List<FileRename>): CompletableFuture<WorkspaceEdit> {
+        return workspaceService().willRenameFiles(RenameFilesParams(files))
     }
 
     fun didChangeWorkspaceFolders(params: DidChangeWorkspaceFoldersParams) {

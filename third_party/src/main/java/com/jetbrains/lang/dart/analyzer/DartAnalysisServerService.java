@@ -54,6 +54,8 @@ import com.jetbrains.lang.dart.assists.DartQuickAssistIntention;
 import com.jetbrains.lang.dart.assists.DartQuickAssistIntentionListener;
 import com.jetbrains.lang.dart.fixes.DartQuickFix;
 import com.jetbrains.lang.dart.fixes.DartQuickFixListener;
+import com.jetbrains.lang.dart.analyzer.lsp.LspDartAnalysisClient;
+import com.jetbrains.lang.dart.analyzer.lsp.LspRenameRefactoringResult;
 import com.jetbrains.lang.dart.ide.actions.DartPubActionBase;
 import com.jetbrains.lang.dart.ide.completion.DartCompletionTimerExtension;
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
@@ -1792,6 +1794,22 @@ public final class DartAnalysisServerService implements Disposable {
     final int length = getOriginalOffset(file, _offset + _length) - offset;
     server.edit_getRefactoring(kind, fileUri, offset, length, validateOnly, options, consumer);
     return true;
+  }
+
+  public @Nullable LspRenameRefactoringResult lsp_getRenameRefactoring(@NotNull VirtualFile file,
+                                                                       int _offset,
+                                                                       boolean validateOnly,
+                                                                       @Nullable String newName) {
+    if (!file.isInLocalFileSystem()) return null;
+
+    final DartClient server = myClient;
+    if (!(server instanceof LspDartAnalysisClient lspClient)) {
+      return null;
+    }
+
+    final String fileUri = getLocalFileUri(file.getPath());
+    final int offset = getOriginalOffset(file, _offset);
+    return lspClient.computeRenameRefactoring(fileUri, offset, validateOnly, newName);
   }
 
   public @Nullable SourceFileEdit edit_organizeDirectives(@NotNull String filePath) {

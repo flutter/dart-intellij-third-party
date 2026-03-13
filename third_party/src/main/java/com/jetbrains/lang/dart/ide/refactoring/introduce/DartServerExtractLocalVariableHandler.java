@@ -132,7 +132,9 @@ class ExtractLocalVariableProcessor {
   private void performInPlace() {
     final String[] names = refactoring.getNames();
     if (names.length != 0) {
-      refactoring.setName(names[0]);
+      // In-place extract immediately runs final validation afterwards, so avoid firing a
+      // separate async preview-validation request here and keep the LSP command flow single-shot.
+      refactoring.setNameWithoutValidation(names[0]);
     }
     // validate final status
     {

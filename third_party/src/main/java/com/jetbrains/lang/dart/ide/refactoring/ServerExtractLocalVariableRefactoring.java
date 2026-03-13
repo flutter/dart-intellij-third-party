@@ -62,4 +62,8 @@ public class ServerExtractLocalVariableRefactoring extends ServerRefactoring {
     options.setName(name);
     setOptions(true, null);
   }
+
+  public void setNameWithoutValidation(@NotNull String name) {
+    options.setName(name);
+  }
 }

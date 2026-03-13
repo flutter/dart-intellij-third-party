@@ -45,6 +45,8 @@ internal class LspDocumentSyncManager(
         openDocuments.clear()
     }
 
+    fun documentVersion(uri: String): Int? = openDocuments[uri]?.version
+
     private fun applyContent(
         uri: String,
         newContent: String,

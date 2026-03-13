@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.Caret;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -47,7 +48,7 @@ public final class DartServerRenameHandler implements RenameHandler, TitledHandl
 
     final PsiElement psiElement = CommonDataKeys.PSI_ELEMENT.getData(dataContext);
     if (psiElement != null) {
-      if (psiElement.getUseScope() instanceof LocalSearchScope) {
+      if (!Registry.is("dart.use.lsp.client", false) && psiElement.getUseScope() instanceof LocalSearchScope) {
         // Standard VariableInplaceRenameHandler or PsiElementRenameHandler will do the trick (based on existing navigation data from Analysis Server)
         return false;
       }
@@ -101,4 +102,3 @@ public final class DartServerRenameHandler implements RenameHandler, TitledHandl
     new DartRenameDialog(project, editor, refactoring).show();
   }
 }
-

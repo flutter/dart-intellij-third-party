@@ -2,6 +2,7 @@
 package com.jetbrains.lang.dart.ide.refactoring;
 
 import com.intellij.lang.refactoring.RefactoringSupportProvider;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.LocalSearchScope;
 import com.intellij.refactoring.RefactoringActionHandler;
@@ -14,6 +15,10 @@ import org.jetbrains.annotations.Nullable;
 public final class DartRefactoringSupportProvider extends RefactoringSupportProvider {
   @Override
   public boolean isInplaceRenameAvailable(@NotNull PsiElement element, PsiElement context) {
+    if (Registry.is("dart.use.lsp.client", false)) {
+      return false;
+    }
+
     return element instanceof DartNamedElement &&
            element.getUseScope() instanceof LocalSearchScope;
   }

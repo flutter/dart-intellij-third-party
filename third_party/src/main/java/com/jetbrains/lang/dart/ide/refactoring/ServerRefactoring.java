@@ -71,6 +71,14 @@ public abstract class ServerRefactoring {
     return file;
   }
 
+  protected int getOffset() {
+    return offset;
+  }
+
+  protected int getLength() {
+    return length;
+  }
+
   public @Nullable RefactoringStatus checkFinalConditions() {
     ProgressManager.getInstance().run(new Task.Modal(null, myRefactoringProgressTitle, true) {
       @Override
