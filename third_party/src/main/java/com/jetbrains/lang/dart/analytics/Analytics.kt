@@ -185,7 +185,6 @@ private object AnalyticsConfigurationManager {
 
             // Update global suppression state (note that the default is to suppress).
             Analytics.suppressAnalytics = data.suppressAnalytics
-            println("suppressAnalytics = [${data.suppressAnalytics}]")
 
             if (data.shouldShowMessage) {
               // Process termination happens after the prompt.
