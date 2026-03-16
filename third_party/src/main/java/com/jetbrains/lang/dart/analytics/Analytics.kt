@@ -145,6 +145,8 @@ private object AnalyticsConfigurationManager {
   private const val INITIALIZATION_TIMEOUT_IN_MS: Long = 700
   lateinit var data: AnalyticsConfiguration
   private val initLatch = CountDownLatch(1)
+  
+  @Volatile
   private var isInitializing = false
 
   fun getConfiguration(sdk: DartSdk, project: Project, logger: Logger): AnalyticsConfiguration {
@@ -153,8 +155,15 @@ private object AnalyticsConfigurationManager {
     if (::data.isInitialized && initLatch.count == 0L) return data
 
     // TODO (pq): capture timing info and report (if analytics are enabled)
-    if (!isInitializing) {
-      isInitializing = true
+    var shouldInitialize = false
+    synchronized(this) {
+      if (!isInitializing) {
+        isInitializing = true
+        shouldInitialize = true
+      }
+    }
+
+    if (shouldInitialize) {
       data = AnalyticsConfiguration()
 
       // Return a default configuration (that suppresses analytics) when running tests.
