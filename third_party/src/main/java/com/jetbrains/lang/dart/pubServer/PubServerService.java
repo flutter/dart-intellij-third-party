@@ -15,6 +15,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.Balloon;
@@ -197,6 +198,8 @@ final class PubServerService extends NetService {
     commandLine.addParameters("global", "run", "webdev", "serve");
     commandLine.addParameter(firstServedDir.getName() + ":" + port);
     commandLine.withEnvironment(DartPubActionBase.PUB_ENV_VAR_NAME, DartPubActionBase.getPubEnvValue() + ".webdev");
+
+    Analytics.updateEnvironment(commandLine);
 
     final OSProcessHandler processHandler = new OSProcessHandler(commandLine);
     processHandler.addProcessListener(new PubServeOutputListener(project, myServerReadyLock));

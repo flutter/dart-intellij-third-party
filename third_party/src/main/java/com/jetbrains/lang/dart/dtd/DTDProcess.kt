@@ -18,6 +18,8 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.EventDispatcher
 import com.intellij.util.io.BaseOutputReader
+import com.jetbrains.lang.dart.analytics.Analytics
+import com.jetbrains.lang.dart.analytics.AnalyticsConfiguration
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonConsumer
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonRequestHandler
@@ -128,6 +130,7 @@ class DTDProcess {
     commandLine.charset = StandardCharsets.UTF_8
     commandLine.addParameter("tooling-daemon")
     commandLine.addParameter("--machine")
+    Analytics.updateEnvironment(commandLine)
 
     osProcessHandler = object : KillableProcessHandler(commandLine) {
       override fun readerOptions(): BaseOutputReader.Options = BaseOutputReader.Options.forMostlySilentProcess()

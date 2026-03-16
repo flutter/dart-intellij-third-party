@@ -10,6 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.concurrency.ThreadingAssertions
 import com.jetbrains.lang.dart.DartBundle
+import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.ide.actions.DartPubActionBase
 import com.jetbrains.lang.dart.sdk.DartSdk
 import java.util.concurrent.ExecutionException
@@ -40,6 +41,7 @@ object DartWebdev {
       DartPubActionBase.setupPubExePath(command, sdk)
       command.addParameters("global", "activate", "webdev")
       command.withEnvironment(DartPubActionBase.PUB_ENV_VAR_NAME, DartPubActionBase.pubEnvValue + ".webdev.activate")
+      Analytics.updateEnvironment(command)
 
       CapturingProcessHandler(command).runProcessWithProgressIndicator(indicator, 60 * 1000, false)
     }
