@@ -50,11 +50,11 @@ private object UnifiedAnalytics {
     const val VALUE = "value"
   }
 
-  /// Environment variables used by the unified analytics package.
+  /** Environment variables used by the unified analytics package. */
   object Env {
-    /// Environment variable used to suppress analytics.
+    // Environment variable used to suppress analytics.
     const val SUPPRESS_ANALYTICS = "DASH__SUPPRESS_ANALYTICS"
-    /// Environment variable used to specify the top-level tool.
+    // Environment variable used to specify the top-level tool.
     const val TOOL = "DASH__TOOL"
   }
 
