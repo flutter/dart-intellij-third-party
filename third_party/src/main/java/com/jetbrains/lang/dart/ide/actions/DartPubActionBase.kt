@@ -127,6 +127,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
     if (pubParameters != null) {
       val command = GeneralCommandLine().withWorkingDirectory(Path.of(pubspecYamlFile.parent.path))
+      Analytics.updateEnvironment(command)
 
       if (FlutterUtil.isFlutterModule(module)) {
         FlutterUtil.getFlutterRoot(sdk.homePath)?.let { flutterRoot ->

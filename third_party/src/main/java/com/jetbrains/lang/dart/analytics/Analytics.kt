@@ -9,6 +9,7 @@ package com.jetbrains.lang.dart.analytics
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.intellij.CommonBundle
+import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -28,6 +29,7 @@ import de.roderick.weberknecht.WebSocketException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import kotlin.script.dependencies.Environment
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -46,6 +48,14 @@ private object UnifiedAnalytics {
     const val RESULT = "result"
     const val TOOL = "tool"
     const val VALUE = "value"
+  }
+
+  /** Environment variables used by the unified analytics package. */
+  object Env {
+    // Environment variable used to suppress analytics.
+    const val SUPPRESS_ANALYTICS = "DASH__SUPPRESS_ANALYTICS"
+    // Environment variable used to specify the top-level tool.
+    const val TOOL = "DASH__TOOL"
   }
 
   private val logger: Logger =
@@ -167,6 +177,9 @@ private object AnalyticsConfigurationManager {
               UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.TELEMETRY_ENABLED)
           }
 
+          // Update global suppression state (note that the default is to suppress).
+          Analytics.suppressAnalytics = data.suppressAnalytics
+
           if (data.shouldShowMessage) {
             // Process termination happens after the prompt.
             scheduleConsentPromptNotification(project, dtdProcess)
@@ -180,6 +193,8 @@ private object AnalyticsConfigurationManager {
       }
     }
     dtdProcess.start(sdk)
+
+
 
     // TODO (pq): fix race condition if we get here before the first countdown latch is started
     return data
@@ -207,6 +222,7 @@ private object AnalyticsConfigurationManager {
 }
 
 object Analytics {
+
   private val logger: Logger =
     if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else PluginLogger.createLogger(Analytics::class.java)
 
@@ -215,6 +231,8 @@ object Analytics {
       AnalyticsConfigurationManager.data
     )
 
+  var suppressAnalytics: Boolean = true
+    internal set
 
   @JvmStatic
   fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
@@ -222,6 +240,16 @@ object Analytics {
 
   @JvmStatic
   fun report(data: AnalyticsData) = data.reportTo(reporter)
+  @JvmStatic
+  fun updateEnvironment(commandLine: GeneralCommandLine) {
+    updateEnvironment(commandLine.environment)
+  }
+
+  @JvmStatic
+  fun updateEnvironment(environment:  MutableMap<String, String>) {
+      environment[UnifiedAnalytics.Env.TOOL] = getToolName()
+      environment[UnifiedAnalytics.Env.SUPPRESS_ANALYTICS] = suppressAnalytics.toString()
+  }
 }
 
 

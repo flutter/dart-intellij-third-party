@@ -15,6 +15,7 @@ package com.google.dart.server.internal.remote;
 
 import com.google.dart.server.AnalysisServerSocket;
 import com.google.dart.server.utilities.logging.Logging;
+import com.jetbrains.lang.dart.analytics.Analytics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -123,6 +124,7 @@ public class StdioServerSocket implements AnalysisServerSocket {
       debugStream.println(builder.toString());
     }
     ProcessBuilder processBuilder = new ProcessBuilder(arguments);
+    Analytics.updateEnvironment(processBuilder.environment());
     process = processBuilder.start();
     requestSink = new ByteRequestSink(process.getOutputStream(), debugStream);
     responseStream = new ByteResponseStream(process.getInputStream(), debugStream, () -> requestSink.close());

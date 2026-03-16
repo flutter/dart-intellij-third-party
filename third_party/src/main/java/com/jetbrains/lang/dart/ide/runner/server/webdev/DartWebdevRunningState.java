@@ -16,6 +16,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.ide.actions.DartPubActionBase;
 import com.jetbrains.lang.dart.ide.runner.DartRelativePathsConsoleFilter;
 import com.jetbrains.lang.dart.pubServer.DartWebdev;
@@ -86,6 +87,7 @@ public class DartWebdevRunningState extends CommandLineState {
     commandLine.setCharset(StandardCharsets.UTF_8);
     DartPubActionBase.setupPubExePath(commandLine, sdk);
     commandLine.addParameters("global", "run", "webdev", "daemon");
+    Analytics.updateEnvironment(commandLine);
 
     // Compute the relative html file path and first directory name in the relative html file path
     final String htmlFilePath = myDartWebdevParameters.getHtmlFilePath();

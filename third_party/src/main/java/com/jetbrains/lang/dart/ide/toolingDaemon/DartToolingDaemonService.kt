@@ -29,6 +29,7 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
+import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
@@ -88,6 +89,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     commandLine.charset = StandardCharsets.UTF_8
     commandLine.addParameter("tooling-daemon")
     commandLine.addParameter("--machine")
+    Analytics.updateEnvironment(commandLine)
 
     logger.info("Starting Dart Tooling Daemon, sdk ${sdk.version}")
     dtdProcessHandler = object : KillableProcessHandler(commandLine) {
