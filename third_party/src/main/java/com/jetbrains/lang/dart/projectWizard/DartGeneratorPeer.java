@@ -5,6 +5,9 @@ import com.intellij.icons.AllIcons;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.ide.util.projectWizard.SettingsStep;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileChooser.FileChooser;
+import com.intellij.openapi.fileChooser.FileChooserDescriptor;
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.ui.ValidationInfo;
@@ -13,15 +16,17 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.ProjectGeneratorPeer;
 import com.intellij.platform.WebProjectGenerator;
 import com.intellij.ui.ColorUtil;
-import com.intellij.ui.ComboboxWithBrowseButton;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBList;
+import com.intellij.ui.components.fields.ExtendableTextComponent;
+import com.intellij.ui.components.fields.ExtendableTextField;
 import com.intellij.uiDesigner.core.GridConstraints;
 import com.intellij.util.ui.AsyncProcessIcon;
 import com.jetbrains.lang.dart.DartBundle;
@@ -31,6 +36,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
+import javax.swing.plaf.basic.BasicComboBoxEditor;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.util.List;
@@ -41,7 +47,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   private static final String CREATE_SAMPLE_UNCHECKED = "CREATE_SAMPLE_UNCHECKED";
 
   private JPanel myMainPanel;
-  private ComboboxWithBrowseButton mySdkPathComboWithBrowse;
+  private ComboBox<String> mySdkPathComboWithBrowse;
   private JBLabel myVersionLabel;
 
   private JPanel myTemplatesPanel;
@@ -59,12 +65,8 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   private String myDartCreateTemplatesSdkPath; //used to expire the above cache if the sdk is changed an alternative would be to use the same cache method as com.jetbrains.lang.dart.sdk.DartSdkUtil.getSdkVersion
 
   public DartGeneratorPeer() {
-    // set initial values before initDartSdkControls() because listeners should not be triggered on initialization
-    mySdkPathComboWithBrowse.getComboBox().setEditable(true);
-    //mySdkPathComboWithBrowse.getComboBox().getEditor().setItem(...); initial sdk path will be correctly taken from known paths history
-
-    // now setup controls
-    DartSdkUtil.initDartSdkControls(null, mySdkPathComboWithBrowse, myVersionLabel);
+    mySdkPathComboWithBrowse.setEditable(true);
+    DartSdkUtil.addKnownSDKPathsToCombo(mySdkPathComboWithBrowse);
 
     myCreateSampleProjectCheckBox.addActionListener(e -> myTemplatesList.setEnabled(myCreateSampleProjectCheckBox.isSelected()));
     String selectedTemplateName = PropertiesComponent.getInstance().getValue(DART_PROJECT_TEMPLATE);
@@ -92,11 +94,14 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     myCreateSampleProjectCheckBox.setEnabled(false);
     myTemplatesList.setEnabled(false);
 
-    final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getComboBox().getEditor().getEditorComponent();
+    final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
     editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
         if(e.getType() == DocumentEvent.EventType.INSERT){
+          final String sdkHomePath = getSdkPathText();
+          final String sdkVersion = DartSdkUtil.getSdkVersion(sdkHomePath);
+          myVersionLabel.setText(sdkVersion == null ? "" : sdkVersion);
           onSdkPathChanged();
         }
       }
@@ -105,8 +110,12 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     onSdkPathChanged();
   }
 
+  private String getSdkPathText() {
+    return mySdkPathComboWithBrowse.getEditor().getItem().toString().trim();
+  }
+
   private void onSdkPathChanged() {
-    String sdkPath = mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim();
+    String sdkPath = getSdkPathText();
     // If the sdk path has changed, recalculate the create template options
     if (myDartCreateTemplatesSdkPath != null && !myDartCreateTemplatesSdkPath.equals(sdkPath)) {
       clearTemplates();
@@ -159,7 +168,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     asyncProcessIcon.resume();
 
     ApplicationManager.getApplication().executeOnPooledThread(() -> {
-      final String comboSdkPath = mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim();
+      final String comboSdkPath = getSdkPathText();
       final String sdkPath =
         FileUtil.toSystemIndependentName(comboSdkPath);
       DartProjectTemplate.loadTemplatesAsync(sdkPath, templates -> {
@@ -236,7 +245,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
   @Override
   public @NotNull DartProjectWizardData getSettings() {
-    final String sdkPath = FileUtil.toSystemIndependentName(mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim());
+    final String sdkPath = FileUtil.toSystemIndependentName(getSdkPathText());
     final DartProjectTemplate template = myCreateSampleProjectCheckBox.isSelected() ? myTemplatesList.getSelectedValue() : null;
     PropertiesComponent.getInstance().setValue(DART_PROJECT_TEMPLATE, template == null ? CREATE_SAMPLE_UNCHECKED : template.getName());
 
@@ -245,7 +254,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
   @Override
   public @Nullable ValidationInfo validate() {
-    final String sdkPath = mySdkPathComboWithBrowse.getComboBox().getEditor().getItem().toString().trim();
+    final String sdkPath = getSdkPathText();
     final String message = DartSdkUtil.getErrorMessageIfWrongSdkRootPath(sdkPath);
     if (message != null) {
       return new ValidationInfo(message, mySdkPathComboWithBrowse);
@@ -284,7 +293,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   }
 
   private void enableIntellijLiveValidation() {
-    final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getComboBox().getEditor().getEditorComponent();
+    final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
     editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
@@ -304,7 +313,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
   @Override
   public void addSettingsStateListener(final @NotNull WebProjectGenerator.SettingsStateListener stateListener) {
-    final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getComboBox().getEditor().getEditorComponent();
+    final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
     editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
@@ -318,6 +327,29 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   }
 
   private void createUIComponents() {
-    mySdkPathComboWithBrowse = new ComboboxWithBrowseButton(new ComboBox<>());
+    ExtendableTextComponent.Extension browseExtension =
+      ExtendableTextComponent.Extension.create(AllIcons.General.OpenDisk, AllIcons.General.OpenDiskHover,
+                                               DartBundle.message("dart.sdk.path.label"),
+                                               () -> {
+                                                 final FileChooserDescriptor descriptor =
+                                                   FileChooserDescriptorFactory.createSingleFolderDescriptor();
+                                                 final VirtualFile file =
+                                                   FileChooser.chooseFile(descriptor, mySdkPathComboWithBrowse, null, null);
+                                                 if (file != null) {
+                                                   mySdkPathComboWithBrowse.getEditor().setItem(file.getPath());
+                                                 }
+                                               });
+
+    mySdkPathComboWithBrowse = new ComboBox<>();
+    mySdkPathComboWithBrowse.setEditable(true);
+    mySdkPathComboWithBrowse.setEditor(new BasicComboBoxEditor() {
+      @Override
+      protected JTextField createEditorComponent() {
+        final ExtendableTextField ecbEditor = new ExtendableTextField();
+        ecbEditor.addExtension(browseExtension);
+        ecbEditor.setBorder(null);
+        return ecbEditor;
+      }
+    });
   }
 }
