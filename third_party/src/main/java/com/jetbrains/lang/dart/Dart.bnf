@@ -256,10 +256,10 @@ varDeclarationListPart ::= componentName varInit?
   methods= [getMetadataList]
 }
 
-classDefinition ::= metadata* 'augment'? (mixinClassModifiers | classModifiers) 'class' componentName typeParameters? (mixinApplication | standardClassDeclarationTail)
-{pin=5 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartPsiClass" implements="com.jetbrains.lang.dart.psi.DartClass"}
+classDefinition ::= metadata* 'augment'? (mixinClassModifiers | classModifiers) 'class' 'const'? componentName typeParameters? (mixinApplication | standardClassDeclarationTail)
+{pin=6 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartPsiClass" implements="com.jetbrains.lang.dart.psi.DartClass"}
 
-private classModifiers ::= 'sealed' | 'macro' | 'abstract'? ('base' | 'interface' | 'final')?
+private classModifiers ::= 'sealed' | 'macro' | 'const' | 'abstract'? ('base' | 'interface' | 'final')?
 private mixinClassModifiers ::= 'abstract'? 'base'? 'mixin'
 
 mixinDeclaration ::= metadata* 'augment'? mixinModifier? 'mixin' componentName typeParameters? onMixins? interfaces? classBody
@@ -267,7 +267,7 @@ mixinDeclaration ::= metadata* 'augment'? mixinModifier? 'mixin' componentName t
 
 private mixinModifier ::= 'sealed' | 'base' | 'interface' | 'final'
 
-enumDefinition ::= metadata* 'augment'? 'enum' componentName typeParameters? mixins? interfaces? '{' enumConstantDeclaration? (',' enumConstantDeclaration)* ','? ';'? classMembers '}'
+enumDefinition ::= metadata* 'augment'? 'enum' componentName typeParameters? primaryConstructorDeclaration? mixins? interfaces? '{' enumConstantDeclaration? (',' enumConstantDeclaration)* ','? ';'? classMembers '}'
 {pin=4 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartPsiClass" implements="com.jetbrains.lang.dart.psi.DartClass"}
 
 enumConstantDeclaration ::= metadata* 'augment'? componentName typeArguments? '.' componentName arguments |
@@ -286,7 +286,7 @@ extensionTypeDeclaration ::= metadata* 'augment'? 'extension' <<typeForExtension
 private representationDeclaration ::=  ('.' (componentName | 'new'))? '(' metadata* type componentName ')'
 
 mixinApplication ::= '=' type mixins? interfaces? ';' {pin = 1}
-private standardClassDeclarationTail ::= superclass? mixins? interfaces? ('native' stringLiteralExpression?)? classBody?
+private standardClassDeclarationTail ::= primaryConstructorDeclaration? superclass? mixins? interfaces? ('native' stringLiteralExpression?)? (classBody | ';')
 
 classBody ::= '{' classMembers '}' {pin=1}
 classMembers ::= classMemberDefinition*
@@ -341,6 +341,21 @@ private methodDeclarationPrivate ::= returnType <<methodNameWrapper>> typeParame
 
 namedConstructorDeclaration ::= metadata* 'augment'? ('external' | 'const')* componentName '.' (componentName | 'new') formalParameterList initializers? (';' | functionBodyOrNative | redirection)?
 {pin=7 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartComponentImpl" implements="com.jetbrains.lang.dart.psi.DartComponent" methods = [getComponentName]}
+
+private primaryConstructorName ::= <<nonStrictID>>
+primaryConstructorDeclaration ::= explicit_primary_constructor_declaration
+                                | implicit_primary_constructor_declaration
+{
+  implements="com.intellij.psi.PsiNameIdentifierOwner"
+  mixin="com.jetbrains.lang.dart.psi.impl.DartPrimaryConstructorDeclarationBase"
+}
+
+private explicit_primary_constructor_declaration ::= primaryConstructorPrefix formalParameterList { pin=1 }
+private implicit_primary_constructor_declaration ::= formalParameterList
+
+private primaryConstructorPrefix ::= const_prefix | dot_prefix
+private const_prefix ::= 'const' dot_prefix? { pin=1 }
+private dot_prefix ::= '.' primaryConstructorName { pin=1 }
 
 initializers ::= ':' superCallOrFieldInitializer (',' superCallOrFieldInitializer)*
 
@@ -440,6 +455,7 @@ private finalConstVarOrTypeAndComponentName ::= 'covariant'? 'late'? 'final' typ
                                                 'covariant'? 'late'? 'final'      componentName |
                                                 'covariant'?         'const' type componentName |
                                                 'covariant'?         'const'      componentName |
+                                                'covariant'? 'late'? 'var'   type componentName |
                                                 'covariant'? 'late'? 'var'        componentName |
                                                 'covariant'  'late'          type componentName |
                                                 'covariant'                  type componentName |
