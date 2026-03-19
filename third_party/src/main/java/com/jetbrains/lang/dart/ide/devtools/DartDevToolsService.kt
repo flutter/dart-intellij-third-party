@@ -15,6 +15,7 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.io.BaseOutputReader
+import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
@@ -43,6 +44,8 @@ class DartDevToolsService(private val myProject: Project) : Disposable {
     commandLine.addParameter("devtools")
     commandLine.addParameter("--machine")
     dtdUri?.let { commandLine.addParameter("--dtd-uri=$it") }
+
+    Analytics.updateEnvironment(commandLine)
 
     logger.info("Starting Dart DevTools, sdk ${sdk.version}")
     processHandler = object : KillableProcessHandler(commandLine) {

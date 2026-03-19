@@ -9,6 +9,7 @@ package com.jetbrains.lang.dart.analytics
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.intellij.CommonBundle
+import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -46,6 +47,14 @@ private object UnifiedAnalytics {
     const val RESULT = "result"
     const val TOOL = "tool"
     const val VALUE = "value"
+  }
+
+  /** Environment variables used by the unified analytics package. */
+  object Env {
+    // Environment variable used to suppress analytics.
+    const val SUPPRESS_ANALYTICS = "DASH__SUPPRESS_ANALYTICS"
+    // Environment variable used to specify the top-level tool.
+    const val TOOL = "DASH__TOOL"
   }
 
   private val logger: Logger =
@@ -133,55 +142,82 @@ class AnalyticsConfiguration {
 }
 
 private object AnalyticsConfigurationManager {
+  private const val INITIALIZATION_TIMEOUT_IN_MS: Long = 700
   lateinit var data: AnalyticsConfiguration
+  private val initLatch = CountDownLatch(1)
+  
+  @Volatile
+  private var isInitializing = false
 
   fun getConfiguration(sdk: DartSdk, project: Project, logger: Logger): AnalyticsConfiguration {
     logger.debug("Analytics.getConfiguration")
 
-    if (::data.isInitialized) return data
+    if (::data.isInitialized && initLatch.count == 0L) return data
 
     // TODO (pq): capture timing info and report (if analytics are enabled)
-
-    data = AnalyticsConfiguration()
-
-    // Return a default configuration (that suppresses analytics) when running tests.
-    if (ApplicationManager.getApplication().isUnitTestMode) return data
-
-    val dtdProcess = DTDProcess()
-    dtdProcess.listener = object : DTDProcessListener {
-      override fun onProcessStarted(uri: String?) {
-        logger.debug("DartAnalysisServerService.onProcessStarted")
-
-        val params = JsonObject()
-        params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
-
-        try {
-          data.shouldShowMessage =
-            UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.SHOULD_SHOW_MESSAGE)
-          if (data.shouldShowMessage) {
-            data.consentMessage =
-              UnifiedAnalytics.callServiceWithStringResponse(dtdProcess, UnifiedAnalytics.GET_CONSENT_MESSAGE)
-            data.telemetryEnabled = false // No need to ask
-          } else {
-            data.telemetryEnabled =
-              UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.TELEMETRY_ENABLED)
-          }
-
-          if (data.shouldShowMessage) {
-            // Process termination happens after the prompt.
-            scheduleConsentPromptNotification(project, dtdProcess)
-          } else {
-            dtdProcess.terminate()
-          }
-        } catch (t: Throwable) {
-          logger.error(t)
-          dtdProcess.terminate()
-        }
+    var shouldInitialize = false
+    synchronized(this) {
+      if (!isInitializing) {
+        isInitializing = true
+        shouldInitialize = true
       }
     }
-    dtdProcess.start(sdk)
 
-    // TODO (pq): fix race condition if we get here before the first countdown latch is started
+    if (shouldInitialize) {
+      data = AnalyticsConfiguration()
+
+      // Return a default configuration (that suppresses analytics) when running tests.
+      if (ApplicationManager.getApplication().isUnitTestMode) {
+        initLatch.countDown()
+        return data
+      }
+
+      val dtdProcess = DTDProcess()
+      dtdProcess.listener = object : DTDProcessListener {
+        override fun onProcessStarted(uri: String?) {
+          logger.debug("DartAnalysisServerService.onProcessStarted")
+
+          val params = JsonObject()
+          params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
+
+          try {
+            data.shouldShowMessage =
+              UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.SHOULD_SHOW_MESSAGE)
+            if (data.shouldShowMessage) {
+              data.consentMessage =
+                UnifiedAnalytics.callServiceWithStringResponse(dtdProcess, UnifiedAnalytics.GET_CONSENT_MESSAGE)
+              data.telemetryEnabled = false // No need to ask
+            } else {
+              data.telemetryEnabled =
+                UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.TELEMETRY_ENABLED)
+            }
+
+            // Update global suppression state (note that the default is to suppress).
+            Analytics.suppressAnalytics = data.suppressAnalytics
+
+            if (data.shouldShowMessage) {
+              // Process termination happens after the prompt.
+              scheduleConsentPromptNotification(project, dtdProcess)
+            } else {
+              dtdProcess.terminate()
+            }
+          } catch (t: Throwable) {
+            logger.error(t)
+            dtdProcess.terminate()
+          } finally {
+            initLatch.countDown()
+          }
+        }
+      }
+      dtdProcess.start(sdk)
+    }
+
+    try {
+      initLatch.await(INITIALIZATION_TIMEOUT_IN_MS, TimeUnit.MILLISECONDS)
+    } catch (_: InterruptedException) {
+      logger.debug("[DTDProcess] analytics data initialization timed out.")
+    }
+
     return data
   }
 
@@ -207,6 +243,7 @@ private object AnalyticsConfigurationManager {
 }
 
 object Analytics {
+
   private val logger: Logger =
     if (DEBUGGING_LOCALLY) PrintingLogger.SYSTEM_OUT else PluginLogger.createLogger(Analytics::class.java)
 
@@ -215,6 +252,8 @@ object Analytics {
       AnalyticsConfigurationManager.data
     )
 
+  var suppressAnalytics: Boolean = true
+    internal set
 
   @JvmStatic
   fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
@@ -222,6 +261,16 @@ object Analytics {
 
   @JvmStatic
   fun report(data: AnalyticsData) = data.reportTo(reporter)
+  @JvmStatic
+  fun updateEnvironment(commandLine: GeneralCommandLine) {
+    updateEnvironment(commandLine.environment)
+  }
+
+  @JvmStatic
+  fun updateEnvironment(environment:  MutableMap<String, String>) {
+      environment[UnifiedAnalytics.Env.TOOL] = getToolName()
+      environment[UnifiedAnalytics.Env.SUPPRESS_ANALYTICS] = suppressAnalytics.toString()
+  }
 }
 
 
@@ -278,7 +327,7 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
     fun forAction(action: AnAction, event: AnActionEvent): ActionData = forAction(
       event.actionManager.getId(action), event.place, event.project
     )
-    
+
     @JvmStatic
     fun forAction(id: String?, event: AnActionEvent): ActionData = forAction(
       id, event.place, event.project
