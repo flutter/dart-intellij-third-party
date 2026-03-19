@@ -6,6 +6,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
 
+@SuppressWarnings("unused") // Used in the Flutter plugin.
 public class ClassNameScopeProcessor extends DartPsiScopeProcessor {
 
   private final @NotNull Set<? super DartComponentName> myResult;
