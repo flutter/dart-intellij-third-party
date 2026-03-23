@@ -19,7 +19,6 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.EventDispatcher
 import com.intellij.util.io.BaseOutputReader
 import com.jetbrains.lang.dart.analytics.Analytics
-import com.jetbrains.lang.dart.analytics.AnalyticsConfiguration
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonConsumer
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonRequestHandler
@@ -142,7 +141,11 @@ class DTDProcess {
 
   fun terminate() {
     if (::osProcessHandler.isInitialized && !osProcessHandler.isProcessTerminated) {
-      osProcessHandler.killProcess()
+      ApplicationManager.getApplication().executeOnPooledThread {
+        if (!osProcessHandler.isProcessTerminated) {
+          osProcessHandler.killProcess()
+        }
+      }
     }
   }
 

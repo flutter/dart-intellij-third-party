@@ -241,7 +241,11 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
 
   override fun dispose() {
     if (::dtdProcessHandler.isInitialized && !dtdProcessHandler.isProcessTerminated) {
-      dtdProcessHandler.killProcess()
+      ApplicationManager.getApplication().executeOnPooledThread {
+        if (!dtdProcessHandler.isProcessTerminated) {
+          dtdProcessHandler.killProcess()
+        }
+      }
     }
   }
 
