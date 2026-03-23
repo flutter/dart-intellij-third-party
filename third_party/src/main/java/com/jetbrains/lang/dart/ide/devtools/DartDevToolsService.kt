@@ -8,6 +8,7 @@ import com.intellij.execution.process.KillableProcessHandler
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessListener
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -57,7 +58,11 @@ class DartDevToolsService(private val myProject: Project) : Disposable {
 
   override fun dispose() {
     if (::processHandler.isInitialized && !processHandler.isProcessTerminated) {
-      processHandler.killProcess()
+      ApplicationManager.getApplication().executeOnPooledThread {
+        if (!processHandler.isProcessTerminated) {
+          processHandler.destroyProcess()
+        }
+      }
     }
   }
 
