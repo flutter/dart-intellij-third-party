@@ -431,6 +431,12 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
   override fun process(data: AnalyticsData) {
     val project = data.project ?: return
 
+    ApplicationManager.getApplication().executeOnPooledThread {
+      sendAnalyticsEvent(project, data.data)
+    }
+  }
+
+  private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
     val params = JsonObject()
     params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
@@ -438,7 +444,7 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     event.addProperty(UnifiedAnalytics.Property.EVENT_NAME, IDE_EVENT)
 
     val evenData = JsonObject()
-    for (entry in data.data) {
+    for (entry in dataMap) {
       when (val value = entry.value) {
         is String -> evenData.addProperty(entry.key, value)
         is Boolean -> evenData.addProperty(entry.key, value)
