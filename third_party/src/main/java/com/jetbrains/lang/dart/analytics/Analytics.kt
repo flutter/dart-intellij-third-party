@@ -146,6 +146,9 @@ private object AnalyticsConfigurationManager {
   lateinit var data: AnalyticsConfiguration
   private val initLatch = CountDownLatch(1)
   
+  val safeData: AnalyticsConfiguration?
+    get() = if (::data.isInitialized) data else null
+
   @Volatile
   private var isInitializing = false
 
@@ -249,7 +252,7 @@ object Analytics {
 
   private val reporter: AnalyticsReporter
     get() = if (DEBUGGING_LOCALLY) PrintingReporter else AnalyticsReporter.forConfiguration(
-      AnalyticsConfigurationManager.data
+      AnalyticsConfigurationManager.safeData
     )
 
   var suppressAnalytics: Boolean = true
