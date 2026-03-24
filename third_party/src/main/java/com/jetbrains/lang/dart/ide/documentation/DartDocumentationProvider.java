@@ -48,14 +48,18 @@ public final class DartDocumentationProvider implements DocumentationProvider {
     } else {
       result = DartDocUtil.generateDoc(element);
     }
-    long durationMs = System.currentTimeMillis() - startTime;
-    LOG.info("Hover generateDoc end-to-end took " + durationMs + "ms");
-
-    LegacyHoverData hoverData = AnalyticsData.forLegacyHover("dart.legacy_hover.generateDoc", element.getProject());
-    hoverData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
-    Analytics.report(hoverData);
+    recordHoverTiming(startTime, "generateDoc", element.getProject());
 
     return result;
+  }
+
+  private static void recordHoverTiming(long startTime, @NotNull String actionName, @NotNull Project project) {
+    long durationMs = System.currentTimeMillis() - startTime;
+    LOG.info("Hover " + actionName + " end-to-end took " + durationMs + "ms");
+
+    LegacyHoverData hoverData = AnalyticsData.forLegacyHover("dart.legacy_hover." + actionName, project);
+    hoverData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
+    Analytics.report(hoverData);
   }
 
   private static boolean resolvesTo(final @Nullable PsiElement originalElement, final @NotNull PsiElement target) {
@@ -92,12 +96,7 @@ public final class DartDocumentationProvider implements DocumentationProvider {
     } else {
       result = DartDocUtil.getSignature(element);
     }
-    long durationMs = System.currentTimeMillis() - startTime;
-    LOG.info("Hover getQuickNavigateInfo end-to-end took " + durationMs + "ms");
-
-    LegacyHoverData hoverData = AnalyticsData.forLegacyHover("dart.legacy_hover.getQuickNavigateInfo", elementForInfo.getProject());
-    hoverData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
-    Analytics.report(hoverData);
+    recordHoverTiming(startTime, "getQuickNavigateInfo", elementForInfo.getProject());
 
     return result;
   }
