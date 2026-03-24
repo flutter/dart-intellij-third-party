@@ -288,6 +288,9 @@ class AssistData(id: String?, project: Project?) :
 class FixData(id: String?, project: Project?) :
   AnalyticsData(AnalyticsConstants.FIX_TYPE, id, project)
 
+class LegacyHoverData(id: String?, project: Project?) :
+  AnalyticsData(AnalyticsConstants.LEGACY_HOVER_TYPE, id, project)
+
 abstract class AnalyticsData(type: String, val id: String?, val project: Project? = null) {
   val data = mutableMapOf<String, Any>()
 
@@ -322,6 +325,9 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
 
     @JvmStatic
     fun forFix(id: String?, project: Project?): FixData = FixData(id, project)
+
+    @JvmStatic
+    fun forLegacyHover(id: String?, project: Project?): LegacyHoverData = LegacyHoverData(id, project)
 
     @JvmStatic
     fun forAction(action: AnAction, event: AnActionEvent): ActionData = forAction(
@@ -366,9 +372,13 @@ object AnalyticsConstants {
   @JvmField
   val TYPE = StringValue("type")
 
+  @JvmField
+  val DURATION_MS = IntValue("duration_ms")
+
   internal const val ACTION_TYPE = "action"
   internal const val ASSIST_TYPE = "assist"
   internal const val FIX_TYPE = "fix"
+  internal const val LEGACY_HOVER_TYPE = "legacy_hover"
 }
 
 sealed class DataValue<T>(val name: String) {
