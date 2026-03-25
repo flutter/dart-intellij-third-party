@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./tool/kokoro/setup.sh
+source ./third_party/tool/kokoro/setup.sh
 setup
 
 echo "kokoro build start"

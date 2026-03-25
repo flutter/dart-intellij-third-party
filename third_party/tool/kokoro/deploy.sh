@@ -6,9 +6,9 @@ setup
 echo "kokoro build start"
 
 cd third_party
-VERSION=$(grep 'pluginVersion' gradle.properties | cut -d'=' -f2 | tr -d ' ')
 
-./gradlew buildPlugin
+VERSION=$(./gradlew -q printVersion)
+./gradlew buildPlugin -Pdev
 
 echo "kokoro build finished"
 

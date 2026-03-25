@@ -1,4 +1,3 @@
-import ideaVersion
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
@@ -179,5 +178,11 @@ tasks.register("printCompileClasspath") {
             println(file.absolutePath)
         }
         println("--- End Compile Classpath ---")
+    }
+}
+
+tasks.register("printVersion") {
+    doLast {
+        println(version)
     }
 }
