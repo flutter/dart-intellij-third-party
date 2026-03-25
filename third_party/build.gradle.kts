@@ -1,8 +1,11 @@
+import ideaVersion
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 // Specify UTF-8 for all compilations so we avoid Windows-1252.
 allprojects {
@@ -34,13 +37,34 @@ repositories {
 
 intellijPlatform {
     pluginConfiguration {
+        var pluginVersion = providers.gradleProperty("pluginVersion").toString()
+
+        if (project.hasProperty("dev")) {
+           val latestVersion = changelog.getLatest().version
+           val majorVersion = latestVersion.substringBefore('.').toInt()
+           val nextMajorVersion = majorVersion + 1
+           val datestamp = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
+           pluginVersion = "$nextMajorVersion.0.0-dev.$datestamp"
+
+           val commitHash = System.getenv("KOKORO_GIT_COMMIT")
+           if (commitHash is String) {
+               val shortCommitHash = commitHash.take(7)
+               pluginVersion = "$pluginVersion-$shortCommitHash"
+           }
+        }
+
+        version = pluginVersion
         name = providers.gradleProperty("pluginName")
         id = providers.gradleProperty("pluginId")
-        version = providers.gradleProperty("pluginVersion")
+
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
+
+        println("plugin version: $pluginVersion")
+        println("ideaVersion: $ideaVersion")
+
         changeNotes = provider {
             project.changelog.renderItem(project.changelog.getLatest(), Changelog.OutputType.HTML)
         }
