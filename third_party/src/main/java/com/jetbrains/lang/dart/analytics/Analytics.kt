@@ -146,6 +146,9 @@ private object AnalyticsConfigurationManager {
   lateinit var data: AnalyticsConfiguration
   private val initLatch = CountDownLatch(1)
   
+  val safeData: AnalyticsConfiguration?
+    get() = if (::data.isInitialized) data else null
+
   @Volatile
   private var isInitializing = false
 
@@ -249,7 +252,7 @@ object Analytics {
 
   private val reporter: AnalyticsReporter
     get() = if (DEBUGGING_LOCALLY) PrintingReporter else AnalyticsReporter.forConfiguration(
-      AnalyticsConfigurationManager.data
+      AnalyticsConfigurationManager.safeData
     )
 
   var suppressAnalytics: Boolean = true
@@ -288,6 +291,9 @@ class AssistData(id: String?, project: Project?) :
 class FixData(id: String?, project: Project?) :
   AnalyticsData(AnalyticsConstants.FIX_TYPE, id, project)
 
+class LegacyHoverData(id: String?, project: Project?) :
+  AnalyticsData(AnalyticsConstants.LEGACY_HOVER_TYPE, id, project)
+
 abstract class AnalyticsData(type: String, val id: String?, val project: Project? = null) {
   val data = mutableMapOf<String, Any>()
 
@@ -322,6 +328,9 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
 
     @JvmStatic
     fun forFix(id: String?, project: Project?): FixData = FixData(id, project)
+
+    @JvmStatic
+    fun forLegacyHover(id: String?, project: Project?): LegacyHoverData = LegacyHoverData(id, project)
 
     @JvmStatic
     fun forAction(action: AnAction, event: AnActionEvent): ActionData = forAction(
@@ -366,9 +375,13 @@ object AnalyticsConstants {
   @JvmField
   val TYPE = StringValue("type")
 
+  @JvmField
+  val DURATION_MS = IntValue("duration_ms")
+
   internal const val ACTION_TYPE = "action"
   internal const val ASSIST_TYPE = "assist"
   internal const val FIX_TYPE = "fix"
+  internal const val LEGACY_HOVER_TYPE = "legacy_hover"
 }
 
 sealed class DataValue<T>(val name: String) {
@@ -421,6 +434,12 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
   override fun process(data: AnalyticsData) {
     val project = data.project ?: return
 
+    ApplicationManager.getApplication().executeOnPooledThread {
+      sendAnalyticsEvent(project, data.data)
+    }
+  }
+
+  private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
     val params = JsonObject()
     params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
@@ -428,7 +447,7 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     event.addProperty(UnifiedAnalytics.Property.EVENT_NAME, IDE_EVENT)
 
     val evenData = JsonObject()
-    for (entry in data.data) {
+    for (entry in dataMap) {
       when (val value = entry.value) {
         is String -> evenData.addProperty(entry.key, value)
         is Boolean -> evenData.addProperty(entry.key, value)

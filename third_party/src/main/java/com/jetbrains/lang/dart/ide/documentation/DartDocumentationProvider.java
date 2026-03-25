@@ -21,22 +21,45 @@ import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
+import com.jetbrains.lang.dart.analytics.LegacyHoverData;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
+
 import java.util.Collections;
 import java.util.List;
 
 public final class DartDocumentationProvider implements DocumentationProvider {
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartDocumentationProvider.class);
   private static final String BASE_DART_DOC_URL = "https://api.dart.dev/stable/";
 
   @Override
   public @Nls String generateDoc(final @NotNull PsiElement element, final @Nullable PsiElement originalElement) {
+    long startTime = System.currentTimeMillis();
     // in case of code completion 'element' comes from completion list and has nothing to do with 'originalElement',
     // but for Quick Doc in editor we should prefer building docs for 'originalElement' because such doc has info about propagated type
     final PsiElement elementForDocs = resolvesTo(originalElement, element) ? originalElement : element;
     final HoverInformation hover = getSingleHover(elementForDocs);
+    String result = null;
     if (hover != null) {
-      return generateDocServer(element.getProject(), hover);
+      result = generateDocServer(element.getProject(), hover);
+    } else {
+      result = DartDocUtil.generateDoc(element);
     }
-    return DartDocUtil.generateDoc(element);
+    recordHoverTiming(startTime, "generateDoc", element.getProject());
+
+    return result;
+  }
+
+  private static void recordHoverTiming(long startTime, @NotNull String actionName, @NotNull Project project) {
+    long durationMs = System.currentTimeMillis() - startTime;
+    LOG.info("Hover " + actionName + " end-to-end took " + durationMs + "ms");
+
+    LegacyHoverData hoverData = AnalyticsData.forLegacyHover("dart.legacy_hover." + actionName, project);
+    hoverData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
+    Analytics.report(hoverData);
   }
 
   private static boolean resolvesTo(final @Nullable PsiElement originalElement, final @NotNull PsiElement target) {
@@ -64,12 +87,18 @@ public final class DartDocumentationProvider implements DocumentationProvider {
 
   @Override
   public @Nls String getQuickNavigateInfo(final PsiElement element, final PsiElement originalElement) {
+    long startTime = System.currentTimeMillis();
     final PsiElement elementForInfo = resolvesTo(originalElement, element) ? originalElement : element;
     final HoverInformation hover = getSingleHover(elementForInfo);
+    String result = null;
     if (hover != null) {
-      return buildHoverTextServer(elementForInfo.getProject(), hover);
+      result = buildHoverTextServer(elementForInfo.getProject(), hover);
+    } else {
+      result = DartDocUtil.getSignature(element);
     }
-    return DartDocUtil.getSignature(element);
+    recordHoverTiming(startTime, "getQuickNavigateInfo", elementForInfo.getProject());
+
+    return result;
   }
 
   @Override
