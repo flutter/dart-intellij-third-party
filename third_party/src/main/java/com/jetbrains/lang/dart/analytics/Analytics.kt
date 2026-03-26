@@ -285,6 +285,7 @@ object Analytics {
       environment[UnifiedAnalytics.Env.IDE_NAME] = ApplicationInfo.getInstance().versionName
       environment[UnifiedAnalytics.Env.IDE_VERSION] = ApplicationInfo.getInstance().fullVersion
 
+      // TODO(helin24): Remove separate DartPluginId Java class once we no longer support 2025.1.
       val plugin = PluginManagerCore.getPlugin(DartPluginId.ID)
       if (plugin != null) {
           environment[UnifiedAnalytics.Env.PLUGIN_NAME] = plugin.name
