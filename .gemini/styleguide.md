@@ -55,3 +55,4 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - **Single Responsibility:** Methods should ideally be 10-20 lines. If a method exceeds 30 lines, suggest a refactor.
 - **DRY:** Identify blocks of code that are 90%+ identical to existing utility methods in this repo and flag them for duplication.
 - **Meaningful Naming:** Variables should describe their intent (e.g., `timeoutInMs` instead of `t`).
+- **Copyrights:** All new Dart, Java and Kotlin files should include a copyright header.
