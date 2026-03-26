@@ -12,12 +12,14 @@ import com.intellij.CommonBundle
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
@@ -39,6 +41,8 @@ private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 
 private val DEFAULT_RESPONSE_TIMEOUT = 1.seconds
 
+private const val DART_PLUGIN_ID = "Dart"
+
 private object UnifiedAnalytics {
   object Property {
     const val EVENT = "event"
@@ -55,6 +59,10 @@ private object UnifiedAnalytics {
     const val SUPPRESS_ANALYTICS = "DASH__SUPPRESS_ANALYTICS"
     // Environment variable used to specify the top-level tool.
     const val TOOL = "DASH__TOOL"
+    const val IDE_NAME = "DASH__IDE_NAME"
+    const val IDE_VERSION = "DASH__IDE_VERSION"
+    const val PLUGIN_NAME = "DASH__PLUGIN_NAME"
+    const val PLUGIN_VERSION = "DASH__PLUGIN_VERSION"
   }
 
   private val logger: Logger =
@@ -273,6 +281,20 @@ object Analytics {
   fun updateEnvironment(environment:  MutableMap<String, String>) {
       environment[UnifiedAnalytics.Env.TOOL] = getToolName()
       environment[UnifiedAnalytics.Env.SUPPRESS_ANALYTICS] = suppressAnalytics.toString()
+      environment[UnifiedAnalytics.Env.IDE_NAME] = ApplicationInfo.getInstance().versionName
+      environment[UnifiedAnalytics.Env.IDE_VERSION] = ApplicationInfo.getInstance().fullVersion
+
+      val plugin = PluginManagerCore.getPlugin(PluginId.getId(DART_PLUGIN_ID))
+      if (plugin != null) {
+          environment[UnifiedAnalytics.Env.PLUGIN_NAME] = plugin.name
+          environment[UnifiedAnalytics.Env.PLUGIN_VERSION] = plugin.version
+      }
+
+      logger.info("DASH environment updated:")
+      logger.info("  DASH__IDE_NAME=${environment[UnifiedAnalytics.Env.IDE_NAME]}")
+      logger.info("  DASH__IDE_VERSION=${environment[UnifiedAnalytics.Env.IDE_VERSION]}")
+      logger.info("  DASH__PLUGIN_NAME=${environment[UnifiedAnalytics.Env.PLUGIN_NAME]}")
+      logger.info("  DASH__PLUGIN_VERSION=${environment[UnifiedAnalytics.Env.PLUGIN_VERSION]}")
   }
 }
 
