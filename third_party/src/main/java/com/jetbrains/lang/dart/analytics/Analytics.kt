@@ -289,12 +289,6 @@ object Analytics {
           environment[UnifiedAnalytics.Env.PLUGIN_NAME] = plugin.name
           environment[UnifiedAnalytics.Env.PLUGIN_VERSION] = plugin.version
       }
-
-      logger.info("DASH environment updated:")
-      logger.info("  DASH__IDE_NAME=${environment[UnifiedAnalytics.Env.IDE_NAME]}")
-      logger.info("  DASH__IDE_VERSION=${environment[UnifiedAnalytics.Env.IDE_VERSION]}")
-      logger.info("  DASH__PLUGIN_NAME=${environment[UnifiedAnalytics.Env.PLUGIN_NAME]}")
-      logger.info("  DASH__PLUGIN_VERSION=${environment[UnifiedAnalytics.Env.PLUGIN_VERSION]}")
   }
 }
 
