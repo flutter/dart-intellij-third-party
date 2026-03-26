@@ -21,6 +21,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
+import com.jetbrains.lang.dart.DartPluginId
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
@@ -284,7 +285,7 @@ object Analytics {
       environment[UnifiedAnalytics.Env.IDE_NAME] = ApplicationInfo.getInstance().versionName
       environment[UnifiedAnalytics.Env.IDE_VERSION] = ApplicationInfo.getInstance().fullVersion
 
-      val plugin = PluginManagerCore.getPlugin(PluginId.getId(DART_PLUGIN_ID))
+      val plugin = PluginManagerCore.getPlugin(DartPluginId.ID)
       if (plugin != null) {
           environment[UnifiedAnalytics.Env.PLUGIN_NAME] = plugin.name
           environment[UnifiedAnalytics.Env.PLUGIN_VERSION] = plugin.version
