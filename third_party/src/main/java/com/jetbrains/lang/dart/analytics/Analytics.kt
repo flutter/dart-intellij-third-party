@@ -56,14 +56,19 @@ private object UnifiedAnalytics {
 
   /** Environment variables used by the unified analytics package. */
   object Env {
+    // For more context on these environment variables, see https://github.com/Dart-Code/Dart-Code/issues/5561.
+    // Environment variable used to specify the IDE name, e.g. IntelliJ IDEA.
+    const val IDE_NAME = "DASH__IDE_NAME"
+    // Environment variable used to specify the IDE platform version.
+    const val IDE_VERSION = "DASH__IDE_VERSION"
+    // Environment variable used to specify the plugin name, e.g. Dart.
+    const val PLUGIN_NAME = "DASH__PLUGIN_NAME"
+    // Environment variable used to specify the plugin version.
+    const val PLUGIN_VERSION = "DASH__PLUGIN_VERSION"
     // Environment variable used to suppress analytics.
     const val SUPPRESS_ANALYTICS = "DASH__SUPPRESS_ANALYTICS"
     // Environment variable used to specify the top-level tool.
     const val TOOL = "DASH__TOOL"
-    const val IDE_NAME = "DASH__IDE_NAME"
-    const val IDE_VERSION = "DASH__IDE_VERSION"
-    const val PLUGIN_NAME = "DASH__PLUGIN_NAME"
-    const val PLUGIN_VERSION = "DASH__PLUGIN_VERSION"
   }
 
   private val logger: Logger =
