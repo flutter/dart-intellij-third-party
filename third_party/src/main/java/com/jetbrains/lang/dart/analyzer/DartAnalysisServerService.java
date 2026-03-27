@@ -190,7 +190,7 @@ public final class DartAnalysisServerService implements Disposable {
 
   private final @NotNull List<AnalysisServerListener> myAdditionalServerListeners = new SmartList<>();
   private final @NotNull List<RequestListener> myRequestListeners = new SmartList<>();
-  private final @NotNull List<ResponseListener> myResponseListeners = new SmartList<>();
+  private final @NotNull List<com.google.dart.server.ResponseListener> myResponseListeners = new SmartList<>();
   private final @NotNull List<DartQuickAssistIntentionListener> myQuickAssistIntentionListeners = new SmartList<>();
   private final @NotNull List<DartQuickFixListener> myQuickFixListeners = new SmartList<>();
 
@@ -590,6 +590,7 @@ public final class DartAnalysisServerService implements Disposable {
       }
     }
   }
+
 
   @SuppressWarnings("unused") // for Flutter plugin
   public void removeAnalysisServerListener(final @NotNull AnalysisServerListener serverListener) {
@@ -2585,6 +2586,8 @@ public final class DartAnalysisServerService implements Disposable {
       server.sendRequestToServer(id, request);
     }
   }
+
+
 
   /**
    * Send the request and associate it with the passed {@link com.google.dart.server.Consumer}.
