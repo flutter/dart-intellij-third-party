@@ -25,7 +25,7 @@
         <properties/>
         <border type="none"/>
         <children>
-          <component id="80a7b" class="com.intellij.ui.ComboboxWithBrowseButton" binding="mySdkPathComboWithBrowse" custom-create="true">
+          <component id="80a7b" class="com.intellij.openapi.ui.ComboBox" binding="mySdkPathComboWithBrowse" custom-create="true">
             <constraints>
               <grid row="0" column="1" row-span="1" col-span="2" vsize-policy="0" hsize-policy="7" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
             </constraints>
