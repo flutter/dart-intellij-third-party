@@ -121,6 +121,7 @@ public interface DartTokenTypes {
   IElementType PATTERN_VARIABLE_DECLARATION = new DartElementType("PATTERN_VARIABLE_DECLARATION");
   IElementType PREFIX_EXPRESSION = new DartElementType("PREFIX_EXPRESSION");
   IElementType PREFIX_OPERATOR = new DartElementType("PREFIX_OPERATOR");
+  IElementType PRIMARY_CONSTRUCTOR_DECLARATION = new DartElementType("PRIMARY_CONSTRUCTOR_DECLARATION");
   IElementType RECORD = new DartElementType("RECORD");
   IElementType RECORD_FIELD = new DartElementType("RECORD_FIELD");
   IElementType RECORD_PATTERN = new DartElementType("RECORD_PATTERN");
@@ -665,6 +666,9 @@ public interface DartTokenTypes {
       }
       else if (type == PREFIX_OPERATOR) {
         return new DartPrefixOperatorImpl(node);
+      }
+      else if (type == PRIMARY_CONSTRUCTOR_DECLARATION) {
+        return new DartPrimaryConstructorDeclarationImpl(node);
       }
       else if (type == RECORD) {
         return new DartRecordImpl(node);
