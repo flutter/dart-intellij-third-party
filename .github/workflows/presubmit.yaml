@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-large
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@v5 # Use the latest stable version of actions/checkout
 
       - name: Set up JDK
-        uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
+        uses: actions/setup-java@v5 # https://github.com/marketplace/actions/setup-java-jdk
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
@@ -39,10 +39,10 @@ jobs:
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@v5 # Use the latest stable version of actions/checkout
 
       - name: Set up JDK
-        uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
+        uses: actions/setup-java@v5 # https://github.com/marketplace/actions/setup-java-jdk
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
@@ -63,7 +63,7 @@ jobs:
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@v5 # Use the latest stable version of actions/checkout
 
       - name: Free up disk space (on ubuntu only)
         if: ${{ matrix.os == 'uubuntu-large' }}
@@ -82,7 +82,7 @@ jobs:
           df -h
 
       - name: Set up JDK
-        uses: actions/setup-java@v4 # https://github.com/marketplace/actions/setup-java-jdk
+        uses: actions/setup-java@v5 # https://github.com/marketplace/actions/setup-java-jdk
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
