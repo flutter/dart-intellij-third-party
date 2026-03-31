@@ -3,11 +3,22 @@
 ### Added
 
 ### Changed
+
+### Removed
+
+### Fixed
+
+## 504.0.0
+
+### Added
+
+### Changed
 - Log to same file as Flutter plugin (#276)
 
 ### Removed
 
 ### Fixed
+- Avoid potential UI freezes by running `killProcess` asynchronously for DTD and DevTools processes (#287)
 
 ## 503.0.0
 
