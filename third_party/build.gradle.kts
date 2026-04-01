@@ -142,20 +142,17 @@ tasks {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
     test {
-        doFirst { // <-- This ensures the check only runs if the 'test' task is actually executed
-            val dartSdkPath = System.getenv("DART_HOME")
-            if (dartSdkPath != null) {
-                val versionFile = file("${dartSdkPath}/version")
-                if (versionFile.exists() && versionFile.isFile) {
-                    jvmArgs("-Ddart.sdk=${dartSdkPath}")
-                } else {
-                    logger.error(
-                        "This directory, ${dartSdkPath}, doesn't appear to be Dart SDK path, " +
-                                "no version file found at ${versionFile.absolutePath}"
-                    )
-                }
-            } else {
+        val dartHome = providers.environmentVariable("DART_HOME")
+        systemProperty("dart.sdk", dartHome)
+        doFirst {
+            val path = dartHome.orNull
+            if (path == null) {
                 logger.error("DART_HOME environment variable is not set. Dart Analysis Server tests will fail.")
+            } else {
+                val versionFile = file("${path}/version")
+                if (!versionFile.exists() || !versionFile.isFile) {
+                    logger.error("This directory, ${path}, doesn't appear to be Dart SDK path, no version file found at ${versionFile.absolutePath}")
+                }
             }
         }
     }
