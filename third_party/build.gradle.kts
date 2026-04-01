@@ -37,19 +37,13 @@ repositories {
 intellijPlatform {
     pluginConfiguration {
         if (project.hasProperty("dev")) {
-            var pluginVersion: String?
             val latestVersion = changelog.getLatest().version
-            val majorVersion = latestVersion.substringBefore('.').toInt()
-            val nextMajorVersion = majorVersion + 1
+            val nextMajorVersion = latestVersion.substringBefore('.').toInt() + 1
             val datestamp = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
-            pluginVersion = "$nextMajorVersion.0.0-dev.$datestamp"
+            val baseVersion = "$nextMajorVersion.0.0-dev.$datestamp"
 
             val commitHash = System.getenv("KOKORO_GIT_COMMIT")
-            if (commitHash is String) {
-                val shortCommitHash = commitHash.take(7)
-                pluginVersion = "$pluginVersion-$shortCommitHash"
-            }
-            version = pluginVersion
+            version = if (commitHash != null) "$baseVersion-${commitHash.take(7)}" else baseVersion
         } else {
             version = providers.gradleProperty("pluginVersion")
         }
