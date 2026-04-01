@@ -137,6 +137,7 @@ tasks {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
     test {
+        var showDartHomeWarning = false
         val dartSdkPath = System.getenv("DART_HOME")
         if (dartSdkPath != null) {
             val versionFile = file("${dartSdkPath}/version")
@@ -149,7 +150,13 @@ tasks {
                 )
             }
         } else {
-            logger.error("DART_HOME environment variable is not set. Dart Analysis Server tests will fail.")
+            showDartHomeWarning = true
+        }
+
+        doFirst {
+            if (showDartHomeWarning) {
+                logger.error("DART_HOME environment variable is not set. Dart Analysis Server tests will fail.")
+            }
         }
     }
 }
