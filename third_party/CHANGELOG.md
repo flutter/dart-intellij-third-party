@@ -18,7 +18,7 @@
 ### Removed
 
 ### Fixed
-- Avoid potential UI freezes by running `killProcess` asynchronously for DTD and DevTools processes (#287)
+- Avoid potential UI freezes by terminating DTD and DevTools processes asynchronously (#287)
 
 ## 503.0.0
 
