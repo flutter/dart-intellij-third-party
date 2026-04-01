@@ -36,23 +36,24 @@ repositories {
 
 intellijPlatform {
     pluginConfiguration {
-        var pluginVersion = providers.gradleProperty("pluginVersion").toString()
-
         if (project.hasProperty("dev")) {
-           val latestVersion = changelog.getLatest().version
-           val majorVersion = latestVersion.substringBefore('.').toInt()
-           val nextMajorVersion = majorVersion + 1
-           val datestamp = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
-           pluginVersion = "$nextMajorVersion.0.0-dev.$datestamp"
+            var pluginVersion: String?
+            val latestVersion = changelog.getLatest().version
+            val majorVersion = latestVersion.substringBefore('.').toInt()
+            val nextMajorVersion = majorVersion + 1
+            val datestamp = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
+            pluginVersion = "$nextMajorVersion.0.0-dev.$datestamp"
 
-           val commitHash = System.getenv("KOKORO_GIT_COMMIT")
-           if (commitHash is String) {
-               val shortCommitHash = commitHash.take(7)
-               pluginVersion = "$pluginVersion-$shortCommitHash"
-           }
+            val commitHash = System.getenv("KOKORO_GIT_COMMIT")
+            if (commitHash is String) {
+                val shortCommitHash = commitHash.take(7)
+                pluginVersion = "$pluginVersion-$shortCommitHash"
+            }
+            version = pluginVersion
+        } else {
+            version = providers.gradleProperty("pluginVersion")
         }
 
-        version = pluginVersion
         name = providers.gradleProperty("pluginName")
         id = providers.gradleProperty("pluginId")
 
@@ -61,8 +62,8 @@ intellijPlatform {
             untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
 
-        println("plugin version: $pluginVersion")
-        println("ideaVersion: $ideaVersion")
+        println("plugin version: ${version.get()}")
+        println("ideaVersion: ${ideaVersion.sinceBuild.get()} to ${ideaVersion.untilBuild.orNull}")
 
         changeNotes = provider {
             project.changelog.renderItem(project.changelog.getLatest(), Changelog.OutputType.HTML)
@@ -148,8 +149,10 @@ tasks {
             if (versionFile.exists() && versionFile.isFile) {
                 jvmArgs("-Ddart.sdk=${dartSdkPath}")
             } else {
-                logger.error("This directory, ${dartSdkPath}, doesn't appear to be Dart SDK path, " +
-                        "no version file found at ${versionFile.absolutePath}")
+                logger.error(
+                    "This directory, ${dartSdkPath}, doesn't appear to be Dart SDK path, " +
+                            "no version file found at ${versionFile.absolutePath}"
+                )
             }
         } else {
             logger.error("DART_HOME environment variable is not set. Dart Analysis Server tests will fail.")
