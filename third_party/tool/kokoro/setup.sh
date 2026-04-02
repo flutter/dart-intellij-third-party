@@ -9,5 +9,5 @@ setup() {
   # Enable verbose output for Gradle
   export JAVA_OPTS=" -Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
 
-  ./gradlew --version
+  ./third_party/gradlew --version
 }
