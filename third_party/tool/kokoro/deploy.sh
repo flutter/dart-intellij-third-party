@@ -35,7 +35,7 @@ echo "Uploading $ZIP_FILE to JetBrains Marketplace..."
 curl -i \
   --header "Authorization: Bearer $TOKEN" \
   -F pluginId=6351 \
-  -F file=@$ZIP_FILE \
+  -F file=@"$ZIP_FILE" \
   -F channel=dev \
   https://plugins.jetbrains.com/plugin/uploadPlugin
 
