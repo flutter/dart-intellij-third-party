@@ -36,6 +36,7 @@ curl -i \
   --header "Authorization: Bearer $TOKEN" \
   -F pluginId=6351 \
   -F file=@$ZIP_FILE \
+  -F channel=dev \
   https://plugins.jetbrains.com/plugin/uploadPlugin
 
 echo "kokoro deploy finished"
