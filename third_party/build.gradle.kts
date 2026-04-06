@@ -187,6 +187,6 @@ tasks.register("printCompileClasspath") {
 
 tasks.register("printVersion") {
     doLast {
-        println(version)
+        println(intellijPlatform.pluginConfiguration.version.get())
     }
 }

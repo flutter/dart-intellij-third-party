@@ -7,7 +7,9 @@ echo "kokoro build start"
 
 cd third_party
 
-VERSION=$(./gradlew -q printVersion --no-configuration-cache)
+VERSION=$(./gradlew -q printVersion -Pdev --no-configuration-cache | tail -n 1)
+echo "version: $VERSION"
+
 ./gradlew buildPlugin -Pdev
 
 echo "kokoro build finished"
@@ -24,7 +26,7 @@ if [ ! -f "$KOKORO_TOKEN_FILE" ]; then
 fi
 TOKEN=$(cat "$KOKORO_TOKEN_FILE")
 
-ZIP_FILE="build/distributions/Dart-$VERSION.zip"
+ZIP_FILE="build/distributions/Dart.zip"
 if [ ! -f "$ZIP_FILE" ]; then
   echo "Error: Zip file not found at $ZIP_FILE"
   exit 1
