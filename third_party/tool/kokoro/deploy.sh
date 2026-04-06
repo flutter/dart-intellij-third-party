@@ -7,7 +7,7 @@ echo "kokoro build start"
 
 cd third_party
 
-VERSION=$(./gradlew -q printVersion)
+VERSION=$(./gradlew -q printVersion --no-configuration-cache)
 ./gradlew buildPlugin -Pdev
 
 echo "kokoro build finished"
