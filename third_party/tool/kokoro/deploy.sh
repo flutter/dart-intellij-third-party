@@ -9,7 +9,7 @@ cd third_party
 
 VERSION=$(./gradlew -q printVersion -Pdev --no-configuration-cache | tail -n 1)
 
-./gradlew buildPlugin -Pdev
+./gradlew buildPlugin -Pdev --info
 
 echo "kokoro build finished"
 
