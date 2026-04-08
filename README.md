@@ -2,6 +2,7 @@
 
 ![Latest Plugin Version](https://img.shields.io/jetbrains/plugin/v/Dart)
 ![Dev Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fplugins.jetbrains.com%2Fapi%2Fplugins%2F6351%2Fupdates%3Fchannel%3Ddev%26size%3D1&query=%24%5B0%5D.version&label=dev%20release&color=lightgrey)
+
 [![presubmit](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml/badge.svg)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml)
 [![das tests](https://github.com/flutter/dart-intellij-third-party/actions/workflows/das_tests.yaml/badge.svg?label=das%20tests)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/das_tests.yaml)
 
