@@ -1,6 +1,7 @@
 # Dart IntelliJ Plugin
 
 ![Latest Plugin Version](https://img.shields.io/jetbrains/plugin/v/Dart)
+![Dev Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fplugins.jetbrains.com%2Fapi%2Fplugins%2F6351%2Fupdates%3Fchannel%3Ddev%26size%3D1&query=%24%5B0%5D.version&label=dev%20release&color=lightgrey)
 [![presubmit](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml/badge.svg)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/presubmit.yaml)
 [![das tests](https://github.com/flutter/dart-intellij-third-party/actions/workflows/das_tests.yaml/badge.svg?label=das%20tests)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/das_tests.yaml)
 
@@ -13,7 +14,7 @@
     git clone git@github.com:flutter/dart-intellij-third-party.git
     ```
    
-2. Download the latest stable [IntelliJ Ultimate](https://www.jetbrains.com/idea/buy) or [IntelliJ Community](https://www.jetbrains.com/idea/download)
+2. Download the latest stable [IntelliJ Ultimate](https://www.jetbrains.com/idea/buy) or [IntelliJ Community](https://www.jetbrains.com/idea/download).
 3. From the "Welcome to IntelliJ IDEA" dialog, select "Open" and then select `third_party` directory in this repository.
 4. View > Tool Windows > Gradle, and click the button "Sync All Gradle Projects".
 5. The Java source code should now be compiled. To launch an IDE with this plugin, execute the following on the command line (from the `third_party` directory):
