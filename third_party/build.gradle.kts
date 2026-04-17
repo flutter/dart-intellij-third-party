@@ -153,6 +153,7 @@ intellijPlatformTesting {
           "AndroidStudio" -> IntelliJPlatformType.AndroidStudio
           else -> IntelliJPlatformType.IntellijIdeaCommunity
         }
+        // Fallback to 2024.2 for IntelliJ Community because 2025.3+ has publication changes that cause resolution errors.
         val fallbackVersion = if (actualTarget == "IntelliJ") "2024.2" else ideaVersion
         this.version = ideV ?: fallbackVersion
       }
