@@ -25,6 +25,9 @@ plugins {
     id("org.jetbrains.kotlinx.kover") version "0.9.4" // Kover Code Coverage Plugin
 }
 
+// Read ideaVersion from gradle.properties
+val ideaVersion = providers.gradleProperty("ideaVersion").get()
+
 // Configure project's dependencies
 repositories {
     mavenCentral()
@@ -111,7 +114,7 @@ dependencies {
     intellijPlatform {
         // intellijIdea can be found here:
         // https://www.jetbrains.com/idea/download/other.html
-        intellijIdea("2025.3.1.1")
+        intellijIdea(ideaVersion)
 
         testFramework(TestFrameworkType.Platform)
 
@@ -131,6 +134,66 @@ dependencies {
     implementation(fileTree("lib") { include("*.jar") })
 
     testImplementation("junit:junit:4.13.2")
+}
+
+intellijPlatformTesting {
+  runIde {
+    register("runTarget") {
+      val ideTarget = project.findProperty("ide") as? String
+      val ideV = project.findProperty("ideV") as? String
+      val idePath = project.findProperty("idePath") as? String
+      
+      if (idePath != null) {
+        localPath = file(idePath)
+      } else {
+        val actualTarget = ideTarget ?: "IntelliJ"
+        type = when (actualTarget) {
+          "IntelliJ" -> IntelliJPlatformType.IntellijIdeaCommunity
+          "Ultimate" -> IntelliJPlatformType.IntellijIdeaUltimate
+          "AndroidStudio" -> IntelliJPlatformType.AndroidStudio
+          else -> IntelliJPlatformType.IntellijIdeaCommunity
+        }
+        val fallbackVersion = if (actualTarget == "IntelliJ") "2024.2" else ideaVersion
+        this.version = ideV ?: fallbackVersion
+      }
+    }
+  }
+}
+
+tasks.named("runTarget") {
+  val ideTarget = project.findProperty("ide") as? String
+  val ideV = project.findProperty("ideV") as? String
+  val idePath = project.findProperty("idePath") as? String
+  
+  doFirst {
+    if (ideTarget == null && ideV == null && idePath == null) {
+      println("============================================================")
+      println("runTarget - Available Options")
+      println("============================================================")
+      println("Valid values for -Pide:")
+      println(" - IntelliJ (default, IntelliJ IDEA Community)")
+      println(" - Ultimate (IntelliJ IDEA Ultimate)")
+      println(" - AndroidStudio")
+      println()
+      println("Valid values for -PideV:")
+      println(" - Any valid version string for the selected IDE.")
+      println(" - Examples for IntelliJ/Ultimate: 2024.1, 2024.2, 2024.3, 2025.1")
+      println(" - Run './gradlew printProductsReleases' to see the full list.")
+      println()
+      println("Valid values for -PidePath:")
+      println(" - Path to a local installation of the IDE (e.g., Android Studio).")
+      println(" - Use this if Gradle resolution fails for Android Studio.")
+      println()
+      println("Examples:")
+      println(" ./gradlew runTarget -Pide=IntelliJ -PideV=2025.1")
+      println(" ./gradlew runTarget -Pide=Ultimate -PideV=2025.1")
+      println(" ./gradlew runTarget -PidePath=/Applications/Android\\ Studio.app")
+      println("============================================================")
+      println("Stopping execution. Please run with parameters to launch a specific IDE.")
+      
+      throw org.gradle.api.tasks.StopExecutionException()
+    }
+  }
 }
 
 tasks {
@@ -165,11 +228,16 @@ tasks {
 // https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-faq.html#how-to-check-the-latest-available-eap-release
 tasks {
     printProductsReleases {
-        channels = listOf(ProductRelease.Channel.EAP)
-        types = listOf(IntelliJPlatformType.IntellijIdeaCommunity)
+        channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
+        types = listOf(IntelliJPlatformType.IntellijIdeaCommunity, IntelliJPlatformType.IntellijIdeaUltimate, IntelliJPlatformType.AndroidStudio)
         untilBuild = provider { null }
         doLast {
-            productsReleases.get().max()
+            println()
+            println("Mapping printProductsReleases output to ideV:")
+            println(" - The prefix (e.g., IU-, IC-, AI-) maps to -Pide (Ultimate, IntelliJ, AndroidStudio).")
+            println(" - The number part (e.g., 261.23567.71) maps to -PideV.")
+            println(" - Example: AI-2025.3.3.6 -> -Pide=AndroidStudio -PideV=2025.3.3.6")
+            println()
         }
     }
 }
