@@ -14,6 +14,10 @@ import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry
+import com.redhat.devtools.lsp4ij.server.definition.ServerLanguageMapping
+import com.jetbrains.lang.dart.analyzer.DartLanguageServerDefinition
+import com.intellij.lang.Language
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -22,6 +26,7 @@ import com.jetbrains.lang.dart.projectWizard.DartModuleBuilder
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
+import com.jetbrains.lang.dart.logging.PluginLogger
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +38,13 @@ import kotlinx.coroutines.launch
  */
 class DartStartupActivity : ProjectActivity {
   override suspend fun execute(project: Project) {
+    val definition = DartLanguageServerDefinition(project)
+    val mapping = ServerLanguageMapping(Language.findLanguageByID("Dart")!!, "Dart", "dart", object : com.redhat.devtools.lsp4ij.DocumentMatcher {
+      override fun match(vFile: VirtualFile, project: Project): Boolean = true
+    })
+    PluginLogger.createLogger(DartStartupActivity::class.java).info("Registering Dart lsp4ij ServerLanguageMapping!")
+    LanguageServersRegistry.getInstance().registerAssociation(definition, mapping)
+
     val serviceScope = DartAnalysisServerService.getInstance(project).serviceScope
 
     serviceScope.launch {
