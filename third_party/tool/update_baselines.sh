@@ -14,6 +14,7 @@ BOLD='\033[1m'
 NC='\033[0m' # None (Reset)
 
 echo -e "${BOLD}Running plugin verification...${NC}"
+rm -rf third_party/build/reports/pluginVerifier
 (cd third_party && ./gradlew verifyPlugin)
 
 for version in 251 252 253 261; do
