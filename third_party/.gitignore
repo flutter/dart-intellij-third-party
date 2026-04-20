@@ -41,3 +41,6 @@ gradle-app.setting
 
 # Mac Finder settings
 .DS_Store
+
+# Build output
+/bin/
