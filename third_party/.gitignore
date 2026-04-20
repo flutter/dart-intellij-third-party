@@ -43,4 +43,4 @@ gradle-app.setting
 .DS_Store
 
 # Build output
-bin/
+/bin/
