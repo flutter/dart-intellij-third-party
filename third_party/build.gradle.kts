@@ -112,9 +112,7 @@ java {
 
 dependencies {
     intellijPlatform {
-        // intellijIdea can be found here:
-        // https://www.jetbrains.com/idea/download/other.html
-        intellijIdea(ideaVersion)
+        intellijIdeaCommunity(ideaVersion)
 
         testFramework(TestFrameworkType.Platform)
 
