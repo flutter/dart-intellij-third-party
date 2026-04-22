@@ -256,7 +256,11 @@ varDeclarationListPart ::= componentName varInit?
   methods= [getMetadataList]
 }
 
-classDefinition ::= metadata* 'augment'? (mixinClassModifiers | classModifiers) 'class' ('const' componentName typeParameters? primaryConstructorTail (';' | standardClassDeclarationTail) | componentName typeParameters? primaryConstructorTail (';' | standardClassDeclarationTail) | componentName typeParameters? (mixinApplication | standardClassDeclarationTail))
+classDefinition ::= metadata* 'augment'? (mixinClassModifiers | classModifiers) 'class' 
+  (
+    'const' componentName typeParameters? primaryConstructorTail (';' | standardClassDeclarationTail)
+    | componentName typeParameters? (primaryConstructorTail (';' | standardClassDeclarationTail) | mixinApplication | standardClassDeclarationTail)
+  )
 {pin=4 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartPsiClass" implements="com.jetbrains.lang.dart.psi.DartClass"}
 
 primaryConstructorTail ::= ('.' (componentName | 'new'))? formalParameterList
