@@ -26,6 +26,9 @@ public interface DartEnumDefinition extends DartClass {
   DartMixins getMixins();
 
   @Nullable
+  DartPrimaryConstructorTail getPrimaryConstructorTail();
+
+  @Nullable
   DartTypeParameters getTypeParameters();
 
 }

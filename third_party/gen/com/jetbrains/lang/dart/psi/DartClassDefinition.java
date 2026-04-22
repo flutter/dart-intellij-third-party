@@ -10,7 +10,7 @@ public interface DartClassDefinition extends DartClass {
   @Nullable
   DartClassBody getClassBody();
 
-  @NotNull
+  @Nullable
   DartComponentName getComponentName();
 
   @Nullable
@@ -24,6 +24,9 @@ public interface DartClassDefinition extends DartClass {
 
   @Nullable
   DartMixins getMixins();
+
+  @Nullable
+  DartPrimaryConstructorTail getPrimaryConstructorTail();
 
   @Nullable
   DartStringLiteralExpression getStringLiteralExpression();

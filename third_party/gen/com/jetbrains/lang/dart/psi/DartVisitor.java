@@ -396,6 +396,10 @@ public class DartVisitor extends PsiElementVisitor {
     visitComponent(o);
   }
 
+  public void visitNewConstructorDeclaration(@NotNull DartNewConstructorDeclaration o) {
+    visitPsiCompositeElement(o);
+  }
+
   public void visitNewExpression(@NotNull DartNewExpression o) {
     visitExpression(o);
     // visitReference(o);
@@ -477,6 +481,10 @@ public class DartVisitor extends PsiElementVisitor {
   }
 
   public void visitPrefixOperator(@NotNull DartPrefixOperator o) {
+    visitPsiCompositeElement(o);
+  }
+
+  public void visitPrimaryConstructorTail(@NotNull DartPrimaryConstructorTail o) {
     visitPsiCompositeElement(o);
   }
 
@@ -640,6 +648,10 @@ public class DartVisitor extends PsiElementVisitor {
 
   public void visitTernaryExpression(@NotNull DartTernaryExpression o) {
     visitExpression(o);
+  }
+
+  public void visitThisDeclaration(@NotNull DartThisDeclaration o) {
+    visitPsiCompositeElement(o);
   }
 
   public void visitThisExpression(@NotNull DartThisExpression o) {

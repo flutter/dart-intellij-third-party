@@ -256,8 +256,10 @@ varDeclarationListPart ::= componentName varInit?
   methods= [getMetadataList]
 }
 
-classDefinition ::= metadata* 'augment'? (mixinClassModifiers | classModifiers) 'class' componentName typeParameters? (mixinApplication | standardClassDeclarationTail)
-{pin=5 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartPsiClass" implements="com.jetbrains.lang.dart.psi.DartClass"}
+classDefinition ::= metadata* 'augment'? (mixinClassModifiers | classModifiers) 'class' ('const' componentName typeParameters? primaryConstructorTail (';' | standardClassDeclarationTail) | componentName typeParameters? primaryConstructorTail (';' | standardClassDeclarationTail) | componentName typeParameters? (mixinApplication | standardClassDeclarationTail))
+{pin=4 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartPsiClass" implements="com.jetbrains.lang.dart.psi.DartClass"}
+
+primaryConstructorTail ::= ('.' (componentName | 'new'))? formalParameterList
 
 private classModifiers ::= 'sealed' | 'macro' | 'abstract'? ('base' | 'interface' | 'final')?
 private mixinClassModifiers ::= 'abstract'? 'base'? 'mixin'
@@ -267,7 +269,7 @@ mixinDeclaration ::= metadata* 'augment'? mixinModifier? 'mixin' componentName t
 
 private mixinModifier ::= 'sealed' | 'base' | 'interface' | 'final'
 
-enumDefinition ::= metadata* 'augment'? 'enum' componentName typeParameters? mixins? interfaces? '{' enumConstantDeclaration? (',' enumConstantDeclaration)* ','? ';'? classMembers '}'
+enumDefinition ::= metadata* 'augment'? 'enum' componentName typeParameters? primaryConstructorTail? mixins? interfaces? '{' enumConstantDeclaration? (',' enumConstantDeclaration)* ','? ';'? classMembers '}'
 {pin=4 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartPsiClass" implements="com.jetbrains.lang.dart.psi.DartClass"}
 
 enumConstantDeclaration ::= metadata* 'augment'? componentName typeArguments? '.' componentName arguments |
@@ -288,7 +290,7 @@ private representationDeclaration ::=  ('.' (componentName | 'new'))? '(' metada
 mixinApplication ::= '=' type mixins? interfaces? ';' {pin = 1}
 private standardClassDeclarationTail ::= superclass? mixins? interfaces? ('native' stringLiteralExpression?)? classBody?
 
-classBody ::= '{' classMembers '}' {pin=1}
+classBody ::= ';' | '{' classMembers '}' {pin=1}
 classMembers ::= classMemberDefinition*
 {recoverWhile="simple_scope_recover" implements="com.jetbrains.lang.dart.psi.DartExecutionScope"}
 private simple_scope_recover ::= !'}'
@@ -318,14 +320,20 @@ mixins ::= 'with' typeList {pin=1}
 onMixins ::= 'on' typeList {pin=1}
 interfaces ::= 'implements' typeList {pin=1}
 
-private classMemberDefinition ::= factoryConstructorDeclaration
+private classMemberDefinition ::= thisDeclaration
+                                | newConstructorDeclaration
+                                | factoryConstructorDeclaration
                                 | namedConstructorDeclaration
                                 | getterOrSetterDeclaration
                                 | methodDeclaration
                                 | varDeclarationListWithSemicolon
                                 | incompleteDeclaration // not valid according to spec, but we'd like it to be parsed in order to have completion
                                 {recoverWhile="class_member_recover"}
-private class_member_recover ::= !(<<nonStrictID>> | 'operator' | '(' | '@' | 'abstract' | 'base' | 'class' | 'const' | 'covariant' |
+
+newConstructorDeclaration ::= metadata* 'augment'? ('external' | 'const')* 'new' componentName? formalParameterList initializers? (';' | functionBodyOrNative | redirection)? {pin=4}
+
+thisDeclaration ::= 'this' initializers? (';' | block) {pin=1}
+private class_member_recover ::= !(<<nonStrictID>> | 'this' | 'operator' | '(' | '@' | 'abstract' | 'base' | 'class' | 'const' | 'covariant' |
                                  'enum' | 'export' | 'extension' | 'external' | 'factory' | 'final' | 'get' | 'import' | 'interface' |
                                  'late' | 'library' | 'mixin' | 'part' | 'sealed' | 'set' | 'static' | 'typedef' | 'var' | 'void' | '}')
 
@@ -377,7 +385,7 @@ optionalParameterTypes ::= optionalPositionalParameterTypes | namedParameterType
 private optionalPositionalParameterTypes ::= '[' normalParameterTypes ','? ']'
 private namedParameterTypes ::= '{' 'required'? typedIdentifier (',' 'required'? typedIdentifier)* ','? '}'
 
-factoryConstructorDeclaration ::= metadata* 'augment'? ('external' | 'const')* 'factory' componentName ('.' componentName)? formalParameterList factoryTail?
+factoryConstructorDeclaration ::= metadata* 'augment'? ('external' | 'const')* 'factory' (componentName ('.' componentName)? | componentName)? formalParameterList factoryTail?
 {pin=4 mixin="com.jetbrains.lang.dart.psi.impl.AbstractDartComponentImpl" implements="com.jetbrains.lang.dart.psi.DartComponent" methods = [getComponentName]}
 private factoryTail ::= varFactoryDeclaration ';' | functionBodyOrNative | ';' {pin(".*")=1}
 private varFactoryDeclaration ::= '=' type ['.' (referenceExpression | 'new')] {pin(".*")=1}
@@ -440,7 +448,8 @@ private finalConstVarOrTypeAndComponentName ::= 'covariant'? 'late'? 'final' typ
                                                 'covariant'? 'late'? 'final'      componentName |
                                                 'covariant'?         'const' type componentName |
                                                 'covariant'?         'const'      componentName |
-                                                'covariant'? 'late'? 'var'        componentName |
+                                                'covariant'? 'late'? 'var' type componentName |
+                                                'covariant'? 'late'? 'var'      componentName |
                                                 'covariant'  'late'          type componentName |
                                                 'covariant'                  type componentName |
                                                              'late'          type componentName |

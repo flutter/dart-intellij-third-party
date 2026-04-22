@@ -65,6 +65,12 @@ public class DartEnumDefinitionImpl extends AbstractDartPsiClass implements Dart
 
   @Override
   @Nullable
+  public DartPrimaryConstructorTail getPrimaryConstructorTail() {
+    return findChildByClass(DartPrimaryConstructorTail.class);
+  }
+
+  @Override
+  @Nullable
   public DartTypeParameters getTypeParameters() {
     return findChildByClass(DartTypeParameters.class);
   }

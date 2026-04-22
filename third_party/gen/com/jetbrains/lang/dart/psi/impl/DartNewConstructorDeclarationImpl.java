@@ -11,14 +11,14 @@ import static com.jetbrains.lang.dart.DartTokenTypes.*;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.util.DartPsiImplUtil;
 
-public class DartClassDefinitionImpl extends AbstractDartPsiClass implements DartClassDefinition {
+public class DartNewConstructorDeclarationImpl extends DartPsiCompositeElementImpl implements DartNewConstructorDeclaration {
 
-  public DartClassDefinitionImpl(@NotNull ASTNode node) {
+  public DartNewConstructorDeclarationImpl(@NotNull ASTNode node) {
     super(node);
   }
 
   public void accept(@NotNull DartVisitor visitor) {
-    visitor.visitClassDefinition(this);
+    visitor.visitNewConstructorDeclaration(this);
   }
 
   @Override
@@ -29,20 +29,26 @@ public class DartClassDefinitionImpl extends AbstractDartPsiClass implements Dar
 
   @Override
   @Nullable
-  public DartClassBody getClassBody() {
-    return findChildByClass(DartClassBody.class);
-  }
-
-  @Override
-  @Nullable
   public DartComponentName getComponentName() {
     return findChildByClass(DartComponentName.class);
   }
 
   @Override
   @Nullable
-  public DartInterfaces getInterfaces() {
-    return findChildByClass(DartInterfaces.class);
+  public DartFormalParameterList getFormalParameterList() {
+    return findChildByClass(DartFormalParameterList.class);
+  }
+
+  @Override
+  @Nullable
+  public DartFunctionBody getFunctionBody() {
+    return findChildByClass(DartFunctionBody.class);
+  }
+
+  @Override
+  @Nullable
+  public DartInitializers getInitializers() {
+    return findChildByClass(DartInitializers.class);
   }
 
   @Override
@@ -53,38 +59,14 @@ public class DartClassDefinitionImpl extends AbstractDartPsiClass implements Dar
 
   @Override
   @Nullable
-  public DartMixinApplication getMixinApplication() {
-    return findChildByClass(DartMixinApplication.class);
-  }
-
-  @Override
-  @Nullable
-  public DartMixins getMixins() {
-    return findChildByClass(DartMixins.class);
-  }
-
-  @Override
-  @Nullable
-  public DartPrimaryConstructorTail getPrimaryConstructorTail() {
-    return findChildByClass(DartPrimaryConstructorTail.class);
+  public DartRedirection getRedirection() {
+    return findChildByClass(DartRedirection.class);
   }
 
   @Override
   @Nullable
   public DartStringLiteralExpression getStringLiteralExpression() {
     return findChildByClass(DartStringLiteralExpression.class);
-  }
-
-  @Override
-  @Nullable
-  public DartSuperclass getSuperclass() {
-    return findChildByClass(DartSuperclass.class);
-  }
-
-  @Override
-  @Nullable
-  public DartTypeParameters getTypeParameters() {
-    return findChildByClass(DartTypeParameters.class);
   }
 
 }

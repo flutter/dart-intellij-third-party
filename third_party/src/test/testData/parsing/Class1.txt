@@ -18,17 +18,13 @@ Dart File
         STATEMENTS
           <empty list>
         PsiElement(})('}')
-  VAR_DECLARATION_LIST
-    VAR_ACCESS_DECLARATION
-      TYPE
-        SIMPLE_TYPE
-          REFERENCE_EXPRESSION
-            ID
-              PsiElement(mixin)('mixin')
-      COMPONENT_NAME
-        ID
-          PsiElement(mixin)('mixin')
-  PsiElement(;)(';')
+  MIXIN_DECLARATION
+    PsiElement(mixin)('mixin')
+    COMPONENT_NAME
+      ID
+        PsiElement(mixin)('mixin')
+    CLASS_BODY
+      PsiElement(;)(';')
   MIXIN_DECLARATION
     PsiElement(mixin)('mixin')
     COMPONENT_NAME

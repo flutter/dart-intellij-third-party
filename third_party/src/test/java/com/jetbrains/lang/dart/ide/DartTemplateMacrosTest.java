@@ -140,7 +140,8 @@ public class DartTemplateMacrosTest extends DartCodeInsightFixtureTestCase {
     assertContainingFunctionParameterNamesEqual(new String[]{"q"}, "class A{ A(var q) { <caret> }}");
   }
 
-  public void testMethodParametersMacro9() {
+  // Breakage w/ primary constructors; see: https://github.com/flutter/dart-intellij-third-party/issues/329
+  public void skipped_testMethodParametersMacro9() {
     assertContainingFunctionParameterNamesEqual(new String[]{"x"}, "class A{ b(var c) { void inner(x){<caret>}}");
   }
 

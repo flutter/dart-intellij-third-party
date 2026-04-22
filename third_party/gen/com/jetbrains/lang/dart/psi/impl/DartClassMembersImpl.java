@@ -59,8 +59,20 @@ public class DartClassMembersImpl extends DartPsiCompositeElementImpl implements
 
   @Override
   @NotNull
+  public List<DartNewConstructorDeclaration> getNewConstructorDeclarationList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, DartNewConstructorDeclaration.class);
+  }
+
+  @Override
+  @NotNull
   public List<DartSetterDeclaration> getSetterDeclarationList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, DartSetterDeclaration.class);
+  }
+
+  @Override
+  @NotNull
+  public List<DartThisDeclaration> getThisDeclarationList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, DartThisDeclaration.class);
   }
 
   @Override

@@ -101,6 +101,7 @@ public interface DartTokenTypes {
   IElementType MULTIPLICATIVE_OPERATOR = new DartElementType("MULTIPLICATIVE_OPERATOR");
   IElementType NAMED_ARGUMENT = new DartElementType("NAMED_ARGUMENT");
   IElementType NAMED_CONSTRUCTOR_DECLARATION = new DartElementType("NAMED_CONSTRUCTOR_DECLARATION");
+  IElementType NEW_CONSTRUCTOR_DECLARATION = new DartElementType("NEW_CONSTRUCTOR_DECLARATION");
   IElementType NEW_EXPRESSION = new DartElementType("NEW_EXPRESSION");
   IElementType NORMAL_FORMAL_PARAMETER = new DartElementType("NORMAL_FORMAL_PARAMETER");
   IElementType NORMAL_PARAMETER_TYPE = new DartElementType("NORMAL_PARAMETER_TYPE");
@@ -121,6 +122,7 @@ public interface DartTokenTypes {
   IElementType PATTERN_VARIABLE_DECLARATION = new DartElementType("PATTERN_VARIABLE_DECLARATION");
   IElementType PREFIX_EXPRESSION = new DartElementType("PREFIX_EXPRESSION");
   IElementType PREFIX_OPERATOR = new DartElementType("PREFIX_OPERATOR");
+  IElementType PRIMARY_CONSTRUCTOR_TAIL = new DartElementType("PRIMARY_CONSTRUCTOR_TAIL");
   IElementType RECORD = new DartElementType("RECORD");
   IElementType RECORD_FIELD = new DartElementType("RECORD_FIELD");
   IElementType RECORD_PATTERN = new DartElementType("RECORD_PATTERN");
@@ -160,6 +162,7 @@ public interface DartTokenTypes {
   IElementType SWITCH_STATEMENT_OR_EXPRESSION = new DartElementType("SWITCH_STATEMENT_OR_EXPRESSION");
   IElementType SYMBOL_LITERAL_EXPRESSION = new DartElementType("SYMBOL_LITERAL_EXPRESSION");
   IElementType TERNARY_EXPRESSION = new DartElementType("TERNARY_EXPRESSION");
+  IElementType THIS_DECLARATION = new DartElementType("THIS_DECLARATION");
   IElementType THIS_EXPRESSION = new DartElementType("THIS_EXPRESSION");
   IElementType THROW_EXPRESSION = new DartElementType("THROW_EXPRESSION");
   IElementType TRY_STATEMENT = new DartElementType("TRY_STATEMENT");
@@ -606,6 +609,9 @@ public interface DartTokenTypes {
       else if (type == NAMED_CONSTRUCTOR_DECLARATION) {
         return new DartNamedConstructorDeclarationImpl(node);
       }
+      else if (type == NEW_CONSTRUCTOR_DECLARATION) {
+        return new DartNewConstructorDeclarationImpl(node);
+      }
       else if (type == NEW_EXPRESSION) {
         return new DartNewExpressionImpl(node);
       }
@@ -665,6 +671,9 @@ public interface DartTokenTypes {
       }
       else if (type == PREFIX_OPERATOR) {
         return new DartPrefixOperatorImpl(node);
+      }
+      else if (type == PRIMARY_CONSTRUCTOR_TAIL) {
+        return new DartPrimaryConstructorTailImpl(node);
       }
       else if (type == RECORD) {
         return new DartRecordImpl(node);
@@ -782,6 +791,9 @@ public interface DartTokenTypes {
       }
       else if (type == TERNARY_EXPRESSION) {
         return new DartTernaryExpressionImpl(node);
+      }
+      else if (type == THIS_DECLARATION) {
+        return new DartThisDeclarationImpl(node);
       }
       else if (type == THIS_EXPRESSION) {
         return new DartThisExpressionImpl(node);
