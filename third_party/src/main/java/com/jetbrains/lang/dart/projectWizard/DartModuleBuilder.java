@@ -81,7 +81,7 @@ public final class DartModuleBuilder extends ModuleBuilder {
   }
 
   @Override
-  public @Nullable ModuleWizardStep getCustomOptionsStep(final WizardContext context, final Disposable parentDisposable) {
+  public @NotNull ModuleWizardStep getCustomOptionsStep(final WizardContext context, final Disposable parentDisposable) {
     final DartModuleWizardStep step = new DartModuleWizardStep(context);
     Disposer.register(parentDisposable, step);
     return step;
@@ -108,10 +108,22 @@ public final class DartModuleBuilder extends ModuleBuilder {
     if (wizardData.myTemplate != null) {
       ApplicationManager.getApplication().executeOnPooledThread(() -> {
         try {
-          final Collection<VirtualFile> filesToOpen = WriteAction.computeAndWait(
-            () -> wizardData.myTemplate.generateProject(wizardData.dartSdkPath, modifiableRootModel.getModule(), baseDir));
-          if (!filesToOpen.isEmpty()) {
-            scheduleFilesOpeningAndPubGet(modifiableRootModel.getModule(), filesToOpen);
+          final Module module = modifiableRootModel.getModule();
+          final String dartSdkPath = wizardData.dartSdkPath;
+          final Collection<VirtualFile> generatedFiles = wizardData.myTemplate.generateProject(
+                  dartSdkPath,
+                  module,
+                  baseDir
+          );
+
+          WriteAction.runAndWait(() -> {
+            for (VirtualFile file : generatedFiles) {
+              file.refresh(false, true);
+            }
+          });
+
+          if (!generatedFiles.isEmpty()) {
+            scheduleFilesOpeningAndPubGet(modifiableRootModel.getModule(), generatedFiles);
           }
         }
         catch (IOException ignore) {/*unlucky*/}
