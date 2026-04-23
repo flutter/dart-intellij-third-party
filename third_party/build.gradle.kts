@@ -45,8 +45,14 @@ intellijPlatform {
             val datestamp = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
             val baseVersion = "$nextMajorVersion.0.0-dev.$datestamp"
 
-            val commitHash = System.getenv("KOKORO_GIT_COMMIT")
-            version = if (commitHash != null) "$baseVersion-${commitHash.take(7)}" else baseVersion
+            val commitHash = System.getenv("KOKORO_GIT_COMMIT") ?: try {
+                providers.exec {
+                    commandLine("git", "rev-parse", "--short", "HEAD")
+                }.standardOutput.asText.get().trim()
+            } catch (e: Exception) {
+                ""
+            }
+            version = if (commitHash.isNotEmpty()) "$baseVersion-${commitHash.take(7)}" else baseVersion
         } else {
             version = providers.gradleProperty("pluginVersion")
         }
@@ -255,8 +261,16 @@ tasks.register("printCompileClasspath") {
     }
 }
 
-tasks.register("printVersion") {
-    doLast {
-        println(intellijPlatform.pluginConfiguration.version.get())
+abstract class PrintVersionTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.Input
+    abstract val pluginVersion: org.gradle.api.provider.Property<String>
+
+    @org.gradle.api.tasks.TaskAction
+    fun action() {
+        println(pluginVersion.get())
     }
+}
+
+tasks.register<PrintVersionTask>("printVersion") {
+    pluginVersion.set(intellijPlatform.pluginConfiguration.version)
 }
