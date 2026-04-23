@@ -9,6 +9,7 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleType;
@@ -107,8 +108,8 @@ public final class DartModuleBuilder extends ModuleBuilder {
     if (wizardData.myTemplate != null) {
       ApplicationManager.getApplication().executeOnPooledThread(() -> {
         try {
-          final Collection<VirtualFile> filesToOpen =
-            wizardData.myTemplate.generateProject(wizardData.dartSdkPath, modifiableRootModel.getModule(), baseDir);
+          final Collection<VirtualFile> filesToOpen = WriteAction.computeAndWait(
+            () -> wizardData.myTemplate.generateProject(wizardData.dartSdkPath, modifiableRootModel.getModule(), baseDir));
           if (!filesToOpen.isEmpty()) {
             scheduleFilesOpeningAndPubGet(modifiableRootModel.getModule(), filesToOpen);
           }
