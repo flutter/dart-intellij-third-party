@@ -4,7 +4,17 @@
 [versions]
 guava = "33.3.1-jre"
 junit = "4.13.2"
+kotlin = "2.2.21"
+intellijPlatform = "2.10.5"
+changelog = "2.2.0"
+kover = "0.9.4"
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 junit = { module = "junit:junit", version.ref = "junit" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+intellij-platform = { id = "org.jetbrains.intellij.platform", version.ref = "intellijPlatform" }
+changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
