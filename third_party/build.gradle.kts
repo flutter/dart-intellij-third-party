@@ -198,9 +198,7 @@ tasks.named("runTarget") {
 }
 
 tasks {
-    wrapper {
-        gradleVersion = providers.gradleProperty("gradleVersion").get()
-    }
+
     test {
         var showDartHomeWarning = false
         val dartSdkPath = System.getenv("DART_HOME")
