@@ -42,7 +42,7 @@ jobs:
         working-directory: third_party
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: das-test-results
