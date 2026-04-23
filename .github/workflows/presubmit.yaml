@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-large
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@v6 # Use the latest stable version of actions/checkout
 
       - name: Set up JDK
         uses: actions/setup-java@v5 # https://github.com/marketplace/actions/setup-java-jdk
@@ -39,7 +39,7 @@ jobs:
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@v6 # Use the latest stable version of actions/checkout
 
       - name: Set up JDK
         uses: actions/setup-java@v5 # https://github.com/marketplace/actions/setup-java-jdk
@@ -63,7 +63,7 @@ jobs:
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@v6 # Use the latest stable version of actions/checkout
 
       - name: Free up disk space (on ubuntu only)
         if: ${{ matrix.os == 'uubuntu-large' }}
