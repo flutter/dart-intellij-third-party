@@ -112,7 +112,12 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                             sendResponseToClient(response)
                         }
                         "shutdown" -> {
-                            // Write a response to lsp4ij
+                            val response = ResponseMessage()
+                            response.jsonrpc = "2.0"
+                            response.id = message.id
+                            response.result = null
+
+                            sendResponseToClient(response)
                         }
                         "textDocument/hover" -> {
                             logger.info("Hover message received: $message")
