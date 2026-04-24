@@ -273,7 +273,7 @@
             name="Dart Language Server"
             factoryClass="com.jetbrains.lang.dart.lsp.DartLanguageServerFactory">
       <description><![CDATA[
-        Some description written in HTML to display it in the LSP consoles view and Language Servers settings.
+        Dart Analysis Server
         ]]>
       </description>
     </server>
