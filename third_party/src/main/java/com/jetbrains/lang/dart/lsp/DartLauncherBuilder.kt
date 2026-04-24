@@ -13,6 +13,14 @@ import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.services.LanguageServer
 import java.io.InputStream
 
+/**
+ * Custom Launcher Builder for the Dart LSP client.
+ *
+ * Extends [DefaultLauncherBuilder] to provide a custom [MessageProducer].
+ * Instead of reading LSP messages from a standard input stream, it instantiates
+ * [DartMessageProducer] and registers it in a project-level registry, allowing
+ * the [DartVirtualStreamConnectionProvider] to push messages directly to the client.
+ */
 class DartLauncherBuilder<S : LanguageServer>(clientFeatures: LSPClientFeatures) : DefaultLauncherBuilder<S>(
     clientFeatures
 ) {

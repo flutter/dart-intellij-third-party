@@ -27,6 +27,12 @@ import java.io.PipedInputStream
 import java.io.PipedOutputStream
 import org.eclipse.lsp4j.jsonrpc.JsonRpcException
 
+/**
+ * This is essentially a virtual LSP language server.
+ *
+ * This provider intercepts LSP messages from the lsp4ij client, sends them to the DAS as LSP-over-legacy requests,
+ * intercepts responses from the DAS, and sends LSP responses back to the client.
+ */
 class DartVirtualStreamConnectionProvider(private val project: Project) : StreamConnectionProvider {
     companion object {
         private val logger = PluginLogger.createLogger(DartVirtualStreamConnectionProvider::class.java)

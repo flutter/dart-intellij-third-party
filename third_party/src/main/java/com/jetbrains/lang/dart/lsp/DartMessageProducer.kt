@@ -16,6 +16,16 @@ import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * Custom MessageProducer that bridges messages from the Dart Analysis Server to the lsp4ij client.
+ *
+ * This producer maintains a project-level registry ([projectProducers]) to allow other components
+ * (like the [DartVirtualStreamConnectionProvider]) to locate the producer for a given [Project]
+ * and enqueue responses received from the DAS.
+ *
+ * It uses a [LinkedBlockingQueue] to hold incoming JSON messages and supports a graceful
+ * shutdown sequence using a Poison Pill pattern.
+ */
 class DartMessageProducer(val jsonHandler: MessageJsonHandler) : MessageProducer {
     companion object {
         private val logger = PluginLogger.createLogger(DartMessageProducer::class.java)
