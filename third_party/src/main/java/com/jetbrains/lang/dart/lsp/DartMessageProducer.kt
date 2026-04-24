@@ -31,7 +31,8 @@ class DartMessageProducer(val jsonHandler: MessageJsonHandler) : MessageProducer
     // This is queue of responses from the DAS.
     val responseQueue = LinkedBlockingQueue<String>()
 
-    var keepRunning = true;
+    @Volatile
+    var keepRunning = true
 
     fun stop() {
         keepRunning = false
