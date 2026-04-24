@@ -19,6 +19,14 @@ class DartLanguageServerFactory : LanguageServerFactory {
 
     @NotNull
     override fun createConnectionProvider(project: Project): StreamConnectionProvider {
+        if (com.intellij.openapi.application.ApplicationManager.getApplication().isUnitTestMode) {
+            return object : StreamConnectionProvider {
+                override fun start() {}
+                override fun getInputStream(): java.io.InputStream? = null
+                override fun getOutputStream(): java.io.OutputStream? = null
+                override fun stop() {}
+            }
+        }
         logger.info("ConnectionProvider created logger")
         return DartVirtualStreamConnectionProvider(project)
     }

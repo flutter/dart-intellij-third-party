@@ -64,6 +64,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     private val pendingLegacyIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private var responseListener: ResponseListener? = null
     private var isStopping = false
+    private var clientMessageFuture: java.util.concurrent.Future<*>? = null
 
 
     override fun start() {
@@ -74,7 +75,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             stop()
         }
 
-        ApplicationManager.getApplication().executeOnPooledThread {
+        clientMessageFuture = ApplicationManager.getApplication().executeOnPooledThread {
             setupDasResponseListener(dartAnalysisService)
             processLspClientMessages()
         }
@@ -234,6 +235,17 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         virtualServerLspOutputStream.close()
         virtualServerLspInputStream.close()
         clientLspOutputStream.close()
+
+        // Wait for the client message thread to terminate.
+        // This is primarily needed for legacy unit tests to prevent ThreadLeakTracker from failing tests
+        // due to background threads that haven't fully terminated yet.
+        clientMessageFuture?.let {
+            try {
+                it.get(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            } catch (e: Exception) {
+                logger.warn("Failed to wait for client message thread to terminate", e)
+            }
+        }
 
         pendingLegacyIds.clear()
     }
