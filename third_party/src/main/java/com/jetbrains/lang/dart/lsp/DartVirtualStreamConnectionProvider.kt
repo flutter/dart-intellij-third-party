@@ -91,8 +91,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                 }
 
                 if (lspPayload != null) {
-                    val producer = DartMessageProducer.getProducer(project)
-                    producer?.enqueueResponse(lspPayload.toString())
+                    enqueueResponse(lspPayload.toString())
                 }
             }
             this.responseListener = responseListener
@@ -175,9 +174,10 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     }
 
     private fun enqueueResponse(jsonString: String) {
-        val producer = DartMessageProducer.getProducer(project)
+        val service = project.getService(DartLspProjectService::class.java)
+        val producer = service.producer
         if (producer == null) {
-            logger.warn("DartMessageProducer does not have a registered producer for project: ${project.name}")
+            logger.warn("DartLspProjectService does not have a registered producer for project: ${project.name}")
             return
         }
 
@@ -198,9 +198,9 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
         responseListener?.let { dartAnalysisService.removeResponseListener(it) }
 
-        val producer = DartMessageProducer.getProducer(project)
-        producer?.stop()
-        DartMessageProducer.unregisterProducer(project)
+        val service = project.getService(DartLspProjectService::class.java)
+        service.producer?.stop()
+        service.producer = null
 
         clientLspInputStream.close()
         virtualServerLspOutputStream.close()

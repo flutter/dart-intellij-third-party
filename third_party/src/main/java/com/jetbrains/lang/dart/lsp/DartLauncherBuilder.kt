@@ -18,8 +18,8 @@ import java.io.InputStream
  *
  * Extends [DefaultLauncherBuilder] to provide a custom [MessageProducer].
  * Instead of reading LSP messages from a standard input stream, it instantiates
- * [DartMessageProducer] and registers it in a project-level registry, allowing
- * the [DartVirtualStreamConnectionProvider] to push messages directly to the client.
+ * [DartMessageProducer] and stores it in the project-level [DartLspProjectService], 
+ * allowing other components to push messages directly to the client.
  */
 class DartLauncherBuilder<S : LanguageServer>(clientFeatures: LSPClientFeatures) : DefaultLauncherBuilder<S>(
     clientFeatures
@@ -30,7 +30,8 @@ class DartLauncherBuilder<S : LanguageServer>(clientFeatures: LSPClientFeatures)
         issueHandler: MessageIssueHandler
     ): MessageProducer {
         val producer = DartMessageProducer(jsonHandler)
-        DartMessageProducer.registerProducer(clientFeatures.project, producer)
+        val service = clientFeatures.project.getService(DartLspProjectService::class.java)
+        service.producer = producer
         return producer
     }
 }
