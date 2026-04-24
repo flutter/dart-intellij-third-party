@@ -61,6 +61,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     // requests to lsp4ij since lsp4ij was not the originator.
     private val pendingLegacyIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private var responseListener: ResponseListener? = null
+    private var isStopping = false
 
 
     override fun start() {
@@ -123,8 +124,12 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             }
         } catch (e: JsonRpcException) {
             val cause = e.cause
-            if (cause is IOException && cause.message == "Pipe broken") {
-                logger.info("Pipe broken while listening for lsp4ij messages (normal during shutdown)")
+            if (cause is IOException) {
+                if (isStopping) {
+                    logger.info("Connection closed during shutdown: ${cause.message}")
+                } else {
+                    logger.warn("Connection closed unexpectedly: ${cause.message}")
+                }
             } else {
                 logger.error("Error listening for lsp4ij messages", e)
             }
@@ -210,6 +215,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     override fun stop() {
         logger.info("Stopping DartVirtualStreamConnectionProvider")
+        isStopping = true
 
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
         responseListener?.let { dartAnalysisService.removeResponseListener(it) }
