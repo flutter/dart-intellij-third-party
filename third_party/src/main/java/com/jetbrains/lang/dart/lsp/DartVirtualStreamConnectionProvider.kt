@@ -7,8 +7,10 @@ package com.jetbrains.lang.dart.lsp
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.google.dart.server.ResponseListener
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
@@ -67,6 +69,10 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     override fun start() {
         logger.info("Starting DartVirtualStreamConnectionProvider")
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
+
+        Disposer.register(project) {
+            stop()
+        }
 
         ApplicationManager.getApplication().executeOnPooledThread {
             setupDasResponseListener(dartAnalysisService)
