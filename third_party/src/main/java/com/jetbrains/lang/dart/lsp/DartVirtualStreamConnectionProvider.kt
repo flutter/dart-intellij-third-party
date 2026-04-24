@@ -159,7 +159,8 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                 }
                 }
             } catch (e: JsonRpcException) {
-                if (e.cause is IOException && e.cause!!.message == "Pipe broken") {
+                val cause = e.cause
+                if (cause is IOException && cause.message == "Pipe broken") {
                     logger.info("Pipe broken while listening for lsp4ij messages (normal during shutdown)")
                 } else {
                     logger.error("Error listening for lsp4ij messages", e)
