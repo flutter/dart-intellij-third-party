@@ -4,6 +4,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.google.dart.server.ResponseListener
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
@@ -14,10 +15,12 @@ import org.eclipse.lsp4j.jsonrpc.json.StreamMessageProducer
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
+import org.eclipse.lsp4j.jsonrpc.JsonRpcException
 
 class DartVirtualStreamConnectionProvider(private val project: Project) : StreamConnectionProvider {
     companion object {
@@ -43,6 +46,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     // There are non-lsp4ij requests that are sent as LSP-over-legacy, but we don't need to forward responses for those
     // requests to lsp4ij since lsp4ij was not the originator.
     private val pendingLegacyIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private var responseListener: ResponseListener? = null
 
     override fun start() {
         logger.info("Starting DartVirtualStreamConnectionProvider")
@@ -52,7 +56,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
         ApplicationManager.getApplication().executeOnPooledThread {
             // Listen for analysis server responses.
-            dartAnalysisService.addResponseListener { response ->
+            responseListener = ResponseListener { response ->
                 val jsonObject = JsonParser.parseString(response).asJsonObject
 
                 var lspPayload: JsonObject? = null
@@ -81,16 +85,18 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                     producer?.enqueueResponse(lspPayload.toString())
                 }
             }
+            dartAnalysisService.addResponseListener(responseListener!!)
 
             println("Finished setting up DAS listening")
 
             // Listen for lsp4ij messages.
             val requestReader = StreamMessageProducer(virtualServerLspInputStream, JSON_HANDLER)
-            requestReader.listen { message ->
-                println("reader received: $message")
+            try {
+                requestReader.listen { message ->
+                    println("reader received: $message")
 
-                if (message is RequestMessage) {
-                    when (val method = message.method) {
+                    if (message is RequestMessage) {
+                        when (val method = message.method) {
                         "initialize" -> {
                             // Write a response to lsp4ij pretending to initialize a server.
                             val capabilities = ServerCapabilities()
@@ -133,6 +139,13 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                 } else {
                     logger.info("Ignored unrecognized message type from lsp4ij request: $message")
                 }
+                }
+            } catch (e: JsonRpcException) {
+                if (e.cause is IOException && e.cause!!.message == "Pipe broken") {
+                    logger.info("Pipe broken while listening for lsp4ij messages (normal during shutdown)")
+                } else {
+                    logger.error("Error listening for lsp4ij messages", e)
+                }
             }
         }
     }
@@ -165,5 +178,18 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     override fun stop() {
         println("Stopping DartVirtualStreamConnectionProvider")
 
+        val dartAnalysisService = DartAnalysisServerService.getInstance(project)
+        responseListener?.let { dartAnalysisService.removeResponseListener(it) }
+
+        val producer = DartMessageProducer.getProducer(project)
+        producer?.stop()
+        DartMessageProducer.unregisterProducer(project)
+
+        clientLspInputStream.close()
+        virtualServerLspOutputStream.close()
+        virtualServerLspInputStream.close()
+        clientLspOutputStream.close()
+
+        pendingLegacyIds.clear()
     }
 }
