@@ -37,6 +37,9 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     companion object {
         private val logger = PluginLogger.createLogger(DartVirtualStreamConnectionProvider::class.java)
         private val JSON_HANDLER = MessageJsonHandler(mapOf())
+
+        private const val LSP_MESSAGE_KEY = "lspMessage"
+        private const val LSP_RESPONSE_KEY = "lspResponse"
     }
 
     // Stream for writing LSP responses from the virtual server to the lsp4ij client.
@@ -59,6 +62,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     private val pendingLegacyIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private var responseListener: ResponseListener? = null
 
+
     override fun start() {
         logger.info("Starting DartVirtualStreamConnectionProvider")
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
@@ -71,6 +75,10 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun setupDasResponseListener(dartAnalysisService: DartAnalysisServerService) {
         val listener = ResponseListener { response ->
+            if (!response.contains(LSP_MESSAGE_KEY) && !response.contains(LSP_RESPONSE_KEY)) {
+                return@ResponseListener
+            }
+
             logger.debug("Response received from DAS: $response")
             val jsonObject = JsonParser.parseString(response).asJsonObject
 
@@ -78,8 +86,8 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
             if (jsonObject.has("params")) {
                 val params = jsonObject.get("params").asJsonObject
-                if (params.has("lspMessage")) {
-                    lspPayload = params.get("lspMessage").asJsonObject
+                if (params.has(LSP_MESSAGE_KEY)) {
+                    lspPayload = params.get(LSP_MESSAGE_KEY).asJsonObject
                 }
             }
 
@@ -87,8 +95,8 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                 val topLevelId = if (jsonObject.has("id")) jsonObject.get("id").asString else null
                 if (topLevelId != null && pendingLegacyIds.remove(topLevelId)) {
                     val result = jsonObject.get("result").asJsonObject
-                    if (result.has("lspResponse")) {
-                        lspPayload = result.get("lspResponse").asJsonObject
+                    if (result.has(LSP_RESPONSE_KEY)) {
+                        lspPayload = result.get(LSP_RESPONSE_KEY).asJsonObject
                     }
                 }
             }

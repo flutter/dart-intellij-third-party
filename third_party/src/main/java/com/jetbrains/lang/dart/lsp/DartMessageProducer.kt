@@ -46,6 +46,7 @@ class DartMessageProducer(val jsonHandler: MessageJsonHandler) : MessageProducer
 
     override fun listen(messageConsumer: MessageConsumer?) {
         while (messageConsumer != null && keepRunning) {
+            com.intellij.openapi.progress.ProgressManager.checkCanceled()
             val json = responseQueue.take()
             if (json == POISON_PILL) break
 
