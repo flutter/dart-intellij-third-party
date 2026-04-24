@@ -14,7 +14,6 @@ class DartLanguageServerFactory : LanguageServerFactory {
 
     @NotNull
     override fun createConnectionProvider(project: Project): StreamConnectionProvider {
-        println("ConnectionProvider created println")
         logger.info("ConnectionProvider created logger")
         return DartVirtualStreamConnectionProvider(project)
     }
