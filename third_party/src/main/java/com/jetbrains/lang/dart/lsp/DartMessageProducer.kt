@@ -1,0 +1,63 @@
+package com.jetbrains.lang.dart.lsp
+
+import com.google.gson.JsonParseException
+import com.intellij.openapi.project.Project
+import com.jetbrains.lang.dart.logging.PluginLogger
+import org.eclipse.lsp4j.jsonrpc.JsonRpcException
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer
+import org.eclipse.lsp4j.jsonrpc.MessageIssueException
+import org.eclipse.lsp4j.jsonrpc.MessageProducer
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ConcurrentHashMap
+
+class DartMessageProducer(val jsonHandler: MessageJsonHandler) : MessageProducer {
+    companion object {
+        private val logger = PluginLogger.createLogger(DartMessageProducer::class.java)
+        // Do we need a poison pill in addition to whether this server should be alive?
+
+        // Register this producer.
+        private val projectProducers = ConcurrentHashMap<Project, DartMessageProducer>()
+
+        fun getProducer(project: Project): DartMessageProducer? = projectProducers[project]
+
+        fun registerProducer(project: Project, producer: DartMessageProducer) {
+            projectProducers[project] = producer
+        }
+
+        fun unregisterProducer(project: Project) {
+            projectProducers.remove(project)
+        }
+    }
+
+    // This is queue of responses from the DAS.
+    val responseQueue = LinkedBlockingQueue<String>()
+
+    var keepRunning = true;
+
+    // Enqueue an LSP message to be forwarded to lsp4ij (from the DAS or a virtual representation of the DAS).
+    fun enqueueResponse(json: String) {
+        responseQueue.offer(json)
+    }
+
+    override fun listen(messageConsumer: MessageConsumer?) {
+        while (messageConsumer != null && keepRunning) {
+            val json = responseQueue.take()
+
+            try {
+                val message = jsonHandler.parseMessage(json)
+                if (message != null) {
+                    messageConsumer.consume(message)
+                } else {
+                    logger.warn("Parsed message is null for JSON: $json")
+                }
+            } catch(ex: JsonParseException) {
+                logger.warn("Error parsing JSON message to lsp4ij: $json", ex)
+            } catch(ex: MessageIssueException) {
+                logger.warn("Error sending message to lsp4ij: $json", ex)
+            } catch(ex: JsonRpcException) {
+                logger.warn("Error sending message to lsp4ij: $json", ex)
+            }
+        }
+    }
+}

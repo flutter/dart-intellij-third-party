@@ -271,7 +271,7 @@
   <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
     <server id="dartLanguageServer"
             name="Dart Language Server"
-            factoryClass="com.jetbrains.lang.dart.analyzer.DartLanguageServerFactory">
+            factoryClass="com.jetbrains.lang.dart.lsp.DartLanguageServerFactory">
       <description><![CDATA[
         Some description written in HTML to display it in the LSP consoles view and Language Servers settings.
         ]]>
