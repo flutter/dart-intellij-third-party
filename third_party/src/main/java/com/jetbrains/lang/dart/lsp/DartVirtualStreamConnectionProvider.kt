@@ -65,7 +65,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
         ApplicationManager.getApplication().executeOnPooledThread {
             // Listen for analysis server responses.
-            responseListener = ResponseListener { response ->
+            val responseListener = ResponseListener { response ->
                 logger.debug("Response received from DAS: $response")
                 val jsonObject = JsonParser.parseString(response).asJsonObject
 
@@ -95,7 +95,8 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                     producer?.enqueueResponse(lspPayload.toString())
                 }
             }
-            dartAnalysisService.addResponseListener(responseListener!!)
+            this.responseListener = responseListener
+            dartAnalysisService.addResponseListener(responseListener)
 
             logger.info("Finished setting up DAS listening for lsp4ij")
 
