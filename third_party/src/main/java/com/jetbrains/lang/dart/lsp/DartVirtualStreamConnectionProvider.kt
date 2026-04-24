@@ -50,13 +50,12 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     override fun start() {
         logger.info("Starting DartVirtualStreamConnectionProvider")
-        println("Starting DartVirtualStreamConnectionProvider")
-
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
 
         ApplicationManager.getApplication().executeOnPooledThread {
             // Listen for analysis server responses.
             responseListener = ResponseListener { response ->
+                logger.debug("Response received from DAS: $response")
                 val jsonObject = JsonParser.parseString(response).asJsonObject
 
                 var lspPayload: JsonObject? = null
@@ -87,20 +86,22 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             }
             dartAnalysisService.addResponseListener(responseListener!!)
 
-            println("Finished setting up DAS listening")
+            logger.info("Finished setting up DAS listening for lsp4ij")
 
             // Listen for lsp4ij messages.
             val requestReader = StreamMessageProducer(virtualServerLspInputStream, JSON_HANDLER)
             try {
                 requestReader.listen { message ->
-                    println("reader received: $message")
+                    logger.debug("Message from lsp4ij: $message")
 
                     if (message is RequestMessage) {
                         when (val method = message.method) {
                         "initialize" -> {
                             // Write a response to lsp4ij pretending to initialize a server.
                             val capabilities = ServerCapabilities()
-//                            capabilities.setHoverProvider(true)
+
+                            // TODO(helin24): Enable hover requests.
+                            // capabilities.setHoverProvider(true)
 
                             val initResult = InitializeResult(capabilities)
 
@@ -119,22 +120,22 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
                             sendResponseToClient(response)
                         }
-                        "textDocument/hover" -> {
-                            logger.info("Hover message received: $message")
-                            val legacyRequest = JsonObject()
-                            val legacyId = dartAnalysisService.generateUniqueId()
-                            pendingLegacyIds.add(legacyId)
-                            legacyRequest.addProperty("id", legacyId)
-                            legacyRequest.addProperty("method", "lsp.handle")
-
-                            val params = JsonObject()
-                            params.add("lspMessage", JSON_HANDLER.gson.toJsonTree(message).asJsonObject)
-                            legacyRequest.add("params", params)
-
-                            println("hover request: $legacyRequest")
-                            // Forward to DAS.
-                            dartAnalysisService.sendRequest(legacyId, legacyRequest)
-                        }
+//                        "textDocument/hover" -> {
+//                            logger.info("Hover message received: $message")
+//                            val legacyRequest = JsonObject()
+//                            val legacyId = dartAnalysisService.generateUniqueId()
+//                            pendingLegacyIds.add(legacyId)
+//                            legacyRequest.addProperty("id", legacyId)
+//                            legacyRequest.addProperty("method", "lsp.handle")
+//
+//                            val params = JsonObject()
+//                            params.add("lspMessage", JSON_HANDLER.gson.toJsonTree(message).asJsonObject)
+//                            legacyRequest.add("params", params)
+//
+//                            println("hover request: $legacyRequest")
+//                            // Forward to DAS.
+//                            dartAnalysisService.sendRequest(legacyId, legacyRequest)
+//                        }
                         else -> {
                             logger.info("Ignored unimplemented method from lsp4ij request: $method")
                         }
@@ -157,8 +158,6 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun sendResponseToClient(response: ResponseMessage) {
         val jsonString = JSON_HANDLER.gson.toJson(response)
-        println("Sending response: $jsonString")
-
         enqueueResponse(jsonString)
     }
 
@@ -181,7 +180,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     }
 
     override fun stop() {
-        println("Stopping DartVirtualStreamConnectionProvider")
+        logger.info("Stopping DartVirtualStreamConnectionProvider")
 
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
         responseListener?.let { dartAnalysisService.removeResponseListener(it) }
