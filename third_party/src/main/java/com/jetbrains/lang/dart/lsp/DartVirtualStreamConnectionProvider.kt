@@ -64,108 +64,116 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            // Listen for analysis server responses.
-            val responseListener = ResponseListener { response ->
-                logger.debug("Response received from DAS: $response")
-                val jsonObject = JsonParser.parseString(response).asJsonObject
+            setupDasResponseListener(dartAnalysisService)
+            processLspClientMessages()
+        }
+    }
 
-                var lspPayload: JsonObject? = null
+    private fun setupDasResponseListener(dartAnalysisService: DartAnalysisServerService) {
+        val listener = ResponseListener { response ->
+            logger.debug("Response received from DAS: $response")
+            val jsonObject = JsonParser.parseString(response).asJsonObject
 
-                // Try to extract a message.
-                if (jsonObject.has("params")) {
-                    val params = jsonObject.get("params").asJsonObject
-                    if (params.has("lspMessage")) {
-                        lspPayload = params.get("lspMessage").asJsonObject
-                    }
-                }
+            var lspPayload: JsonObject? = null
 
-                // Try to extract a response.
-                if (lspPayload == null && jsonObject.has("result")) {
-                    val topLevelId = if (jsonObject.has("id")) jsonObject.get("id").asString else null
-                    if (topLevelId != null && pendingLegacyIds.remove(topLevelId)) {
-                        val result = jsonObject.get("result").asJsonObject
-                        if (result.has("lspResponse")) {
-                            lspPayload = result.get("lspResponse").asJsonObject
-                        }
-                    }
-                }
-
-                if (lspPayload != null) {
-                    enqueueResponse(lspPayload.toString())
+            if (jsonObject.has("params")) {
+                val params = jsonObject.get("params").asJsonObject
+                if (params.has("lspMessage")) {
+                    lspPayload = params.get("lspMessage").asJsonObject
                 }
             }
-            this.responseListener = responseListener
-            dartAnalysisService.addResponseListener(responseListener)
 
-            logger.info("Finished setting up DAS listening for lsp4ij")
-
-            // Listen for lsp4ij messages.
-            val requestReader = StreamMessageProducer(virtualServerLspInputStream, JSON_HANDLER)
-            try {
-                requestReader.listen { message ->
-                    logger.debug("Message from lsp4ij: $message")
-
-                    if (message is RequestMessage) {
-                        when (val method = message.method) {
-                        "initialize" -> {
-                            // Write a response to lsp4ij pretending to initialize a server.
-                            val capabilities = ServerCapabilities()
-
-                            // TODO(helin24): Enable hover requests.
-                            // capabilities.setHoverProvider(true)
-
-                            val initResult = InitializeResult(capabilities)
-
-                            val response = ResponseMessage()
-                            response.jsonrpc = "2.0"
-                            response.id = message.id
-                            response.result = initResult
-
-                            sendResponseToClient(response)
-                        }
-                        "shutdown" -> {
-                            val response = ResponseMessage()
-                            response.jsonrpc = "2.0"
-                            response.id = message.id
-                            response.result = null
-
-                            sendResponseToClient(response)
-                        }
-//                        "textDocument/hover" -> {
-//                            logger.info("Hover message received: $message")
-//                            val legacyRequest = JsonObject()
-//                            val legacyId = dartAnalysisService.generateUniqueId()
-//                            pendingLegacyIds.add(legacyId)
-//                            legacyRequest.addProperty("id", legacyId)
-//                            legacyRequest.addProperty("method", "lsp.handle")
-//
-//                            val params = JsonObject()
-//                            params.add("lspMessage", JSON_HANDLER.gson.toJsonTree(message).asJsonObject)
-//                            legacyRequest.add("params", params)
-//
-//                            println("hover request: $legacyRequest")
-//                            // Forward to DAS.
-//                            dartAnalysisService.sendRequest(legacyId, legacyRequest)
-//                        }
-                        else -> {
-                            logger.info("Ignored unimplemented method from lsp4ij request: $method")
-                        }
+            if (lspPayload == null && jsonObject.has("result")) {
+                val topLevelId = if (jsonObject.has("id")) jsonObject.get("id").asString else null
+                if (topLevelId != null && pendingLegacyIds.remove(topLevelId)) {
+                    val result = jsonObject.get("result").asJsonObject
+                    if (result.has("lspResponse")) {
+                        lspPayload = result.get("lspResponse").asJsonObject
                     }
-                } else if (message is NotificationMessage) {
-                    logger.info("Ignored unimplemented method from lsp4ij notification: ${message.method}")
-                } else {
-                    logger.info("Ignored unrecognized message type from lsp4ij request: $message")
                 }
-                }
-            } catch (e: JsonRpcException) {
-                val cause = e.cause
-                if (cause is IOException && cause.message == "Pipe broken") {
-                    logger.info("Pipe broken while listening for lsp4ij messages (normal during shutdown)")
-                } else {
-                    logger.error("Error listening for lsp4ij messages", e)
-                }
+            }
+
+            if (lspPayload != null) {
+                enqueueResponse(lspPayload.toString())
             }
         }
+        this.responseListener = listener
+        dartAnalysisService.addResponseListener(listener)
+        logger.info("Finished setting up DAS listening for lsp4ij")
+    }
+
+    private fun processLspClientMessages() {
+        val requestReader = StreamMessageProducer(virtualServerLspInputStream, JSON_HANDLER)
+        try {
+            requestReader.listen { message ->
+                logger.debug("Message from lsp4ij: $message")
+                when (message) {
+                    is RequestMessage -> handleRequestMessage(message)
+                    is NotificationMessage -> handleNotificationMessage(message)
+                    else -> logger.info("Ignored unrecognized message type from lsp4ij request: $message")
+                }
+            }
+        } catch (e: JsonRpcException) {
+            val cause = e.cause
+            if (cause is IOException && cause.message == "Pipe broken") {
+                logger.info("Pipe broken while listening for lsp4ij messages (normal during shutdown)")
+            } else {
+                logger.error("Error listening for lsp4ij messages", e)
+            }
+        }
+    }
+
+    private fun handleRequestMessage(message: RequestMessage) {
+        val dartAnalysisService = DartAnalysisServerService.getInstance(project)
+        when (val method = message.method) {
+            "initialize" -> handleInitializeRequest(message)
+            "shutdown" -> handleShutdownRequest(message)
+            "textDocument/hover" -> handleHoverRequest(message, dartAnalysisService)
+            else -> logger.info("Ignored unimplemented method from lsp4ij request: $method")
+        }
+    }
+
+    private fun handleNotificationMessage(message: NotificationMessage) {
+        logger.info("Ignored unimplemented method from lsp4ij notification: ${message.method}")
+    }
+
+    private fun handleInitializeRequest(message: RequestMessage) {
+        val capabilities = ServerCapabilities()
+        // TODO(helin24): Enable hover requests.
+        // capabilities.setHoverProvider(true)
+
+        val initResult = InitializeResult(capabilities)
+        val response = ResponseMessage()
+        response.jsonrpc = "2.0"
+        response.id = message.id
+        response.result = initResult
+
+        sendResponseToClient(response)
+    }
+
+    private fun handleShutdownRequest(message: RequestMessage) {
+        val response = ResponseMessage()
+        response.jsonrpc = "2.0"
+        response.id = message.id
+        response.result = null
+
+        sendResponseToClient(response)
+    }
+
+    private fun handleHoverRequest(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
+        logger.info("Hover message received: $message")
+        val legacyRequest = JsonObject()
+        val legacyId = dartAnalysisService.generateUniqueId()
+        pendingLegacyIds.add(legacyId)
+        legacyRequest.addProperty("id", legacyId)
+        legacyRequest.addProperty("method", "lsp.handle")
+
+        val params = JsonObject()
+        params.add("lspMessage", JSON_HANDLER.gson.toJsonTree(message).asJsonObject)
+        legacyRequest.add("params", params)
+
+        // Forward to DAS.
+        dartAnalysisService.sendRequest(legacyId, legacyRequest)
     }
 
     private fun sendResponseToClient(response: ResponseMessage) {
