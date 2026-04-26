@@ -67,7 +67,6 @@ internal class DartActiveLocationChangeHandler(private val dtdService: DartTooli
     val activeLocationNull = paramsObject.getAsJsonObject("eventData")?.getAsJsonObject("textDocument") == null
     if (!activeLocationNull || !activeLocationNullSent) {
       activeLocationNullSent = activeLocationNull
-      logger.info("Sending active location change event: $paramsObject")
       dtdService.sendRequest("postEvent", paramsObject, false) { }
     }
   }
