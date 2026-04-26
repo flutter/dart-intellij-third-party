@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Added
+- Dependency on lsp4ij with basic initialization
 
 ### Changed
 
