@@ -21,11 +21,11 @@ class DartLanguageServerFactory : LanguageServerFactory {
     override fun createConnectionProvider(project: Project): StreamConnectionProvider {
         if (com.intellij.openapi.application.ApplicationManager.getApplication().isUnitTestMode) {
             return object : StreamConnectionProvider {
-                override fun start() {}
-                override fun getInputStream(): java.io.InputStream = java.io.ByteArrayInputStream(ByteArray(0))
-                override fun getOutputStream(): java.io.OutputStream = object : java.io.OutputStream() {
-                    override fun write(b: Int) {}
+                override fun start() {
+                    throw java.io.IOException("LSP server is disabled in unit tests")
                 }
+                override fun getInputStream(): java.io.InputStream? = null
+                override fun getOutputStream(): java.io.OutputStream? = null
                 override fun stop() {}
             }
         }
