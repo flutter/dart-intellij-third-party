@@ -22,6 +22,7 @@
   <depends>com.intellij.modules.xml</depends>
   <depends optional="true" config-file="dart-yaml.xml">org.jetbrains.plugins.yaml</depends>
   <depends optional="true" config-file="dart-copyright.xml">com.intellij.copyright</depends>
+  <depends>com.redhat.devtools.lsp4ij</depends>
 
   <resource-bundle>messages.DartBundle</resource-bundle>
 
@@ -265,6 +266,20 @@
 
   <extensions defaultExtensionNs="org.jetbrains">
     <webServerPathHandler implementation="com.jetbrains.lang.dart.pubServer.PubServerPathHandler"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+    <server id="dartLanguageServer"
+            name="Dart Language Server"
+            factoryClass="com.jetbrains.lang.dart.lsp.DartLanguageServerFactory">
+      <description><![CDATA[
+        Dart Analysis Server
+        ]]>
+      </description>
+    </server>
+
+    <languageMapping language="Dart"
+                     serverId="dartLanguageServer"/>
   </extensions>
 
   <projectListeners>

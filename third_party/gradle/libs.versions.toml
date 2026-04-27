@@ -8,6 +8,7 @@ kotlin = "2.3.21"
 intellijPlatform = "2.15.0"
 changelog = "2.5.0"
 kover = "0.9.8"
+lsp4ij = "0.19.3"
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }

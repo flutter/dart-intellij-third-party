@@ -135,6 +135,7 @@ dependencies {
         bundledModule("intellij.platform.coverage.agent")
         bundledPlugin("org.jetbrains.plugins.yaml")
         bundledPlugin("com.intellij.copyright")
+        plugin("com.redhat.devtools.lsp4ij:${libs.versions.lsp4ij.get()}")
     }
 
     implementation(fileTree("lib") { include("*.jar") })
