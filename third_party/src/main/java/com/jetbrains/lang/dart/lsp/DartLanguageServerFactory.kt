@@ -17,7 +17,9 @@ import org.jetbrains.annotations.NotNull
  *
  * This factory is registered as an extension point for lsp4ij. It provides a
  * [DartVirtualStreamConnectionProvider] which tunnels LSP messages through the legacy
- * Dart Analysis Server via the `lsp.handle` protocol.
+ * Dart Analysis Server via the `lsp.handle` protocol. It also provides a custom
+ * [DartLspClientFeatures] which indirectly provides a MessageProducer for communicating
+ * with the lsp4ij client.
  */
 class DartLanguageServerFactory : LanguageServerFactory {
     companion object {
