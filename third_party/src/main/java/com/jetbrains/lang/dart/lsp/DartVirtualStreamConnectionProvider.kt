@@ -42,6 +42,17 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
         private const val LSP_MESSAGE_KEY = "lspMessage"
         private const val LSP_RESPONSE_KEY = "lspResponse"
+        private const val JSONRPC_VERSION = "2.0"
+    }
+
+    private enum class LspMethod(val method: String) {
+        INITIALIZE("initialize"),
+        SHUTDOWN("shutdown"),
+        HOVER("textDocument/hover");
+
+        companion object {
+            fun fromMethod(method: String): LspMethod? = values().find { it.method == method }
+        }
     }
 
     // Stream for writing LSP responses from the virtual server to the lsp4ij client.
@@ -145,11 +156,11 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun handleRequestMessage(message: RequestMessage) {
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
-        when (val method = message.method) {
-            "initialize" -> handleInitializeRequest(message)
-            "shutdown" -> handleShutdownRequest(message)
-            "textDocument/hover" -> handleHoverRequest(message, dartAnalysisService)
-            else -> logger.info("Ignored unimplemented method from lsp4ij request: $method")
+        when (val method = LspMethod.fromMethod(message.method)) {
+            LspMethod.INITIALIZE -> handleInitializeRequest(message)
+            LspMethod.SHUTDOWN -> handleShutdownRequest(message)
+            LspMethod.HOVER -> handleHoverRequest(message, dartAnalysisService)
+            null -> logger.info("Ignored unimplemented method from lsp4ij request: ${message.method}")
         }
     }
 
@@ -163,21 +174,11 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         // capabilities.setHoverProvider(true)
 
         val initResult = InitializeResult(capabilities)
-        val response = ResponseMessage()
-        response.jsonrpc = "2.0"
-        response.id = message.id
-        response.result = initResult
-
-        sendResponseToClient(response)
+        sendSuccessResponse(message.id, initResult)
     }
 
     private fun handleShutdownRequest(message: RequestMessage) {
-        val response = ResponseMessage()
-        response.jsonrpc = "2.0"
-        response.id = message.id
-        response.result = null
-
-        sendResponseToClient(response)
+        sendSuccessResponse(message.id, null)
     }
 
     private fun handleHoverRequest(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
@@ -199,6 +200,14 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     private fun sendResponseToClient(response: ResponseMessage) {
         val jsonString = JSON_HANDLER.gson.toJson(response)
         enqueueResponse(jsonString)
+    }
+
+    private fun sendSuccessResponse(messageId: String?, result: Any?) {
+        val response = ResponseMessage()
+        response.jsonrpc = JSONRPC_VERSION
+        response.id = messageId
+        response.result = result
+        sendResponseToClient(response)
     }
 
     private fun enqueueResponse(jsonString: String) {
@@ -239,11 +248,13 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         // Wait for the client message thread to terminate.
         // This is primarily needed for legacy unit tests to prevent ThreadLeakTracker from failing tests
         // due to background threads that haven't fully terminated yet.
-        clientMessageFuture?.let {
-            try {
-                it.get(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
-            } catch (e: Exception) {
-                logger.warn("Failed to wait for client message thread to terminate", e)
+        if (ApplicationManager.getApplication().isUnitTestMode) {
+            clientMessageFuture?.let {
+                try {
+                    it.get(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                } catch (e: Exception) {
+                    logger.warn("Failed to wait for client message thread to terminate", e)
+                }
             }
         }
 
