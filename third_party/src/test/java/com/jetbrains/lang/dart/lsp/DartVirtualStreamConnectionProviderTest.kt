@@ -34,6 +34,16 @@ class DartVirtualStreamConnectionProviderTest : DartCodeInsightFixtureTestCase()
         provider.start()
     }
 
+    private fun sendRequest(request: RequestMessage) {
+        val json = jsonHandler.gson.toJson(request)
+        val header = "Content-Length: ${json.toByteArray(Charsets.UTF_8).size}\r\n\r\n"
+
+        val outputStream = provider.getOutputStream() ?: throw AssertionError("Provider output stream is null")
+        outputStream.write(header.toByteArray(Charsets.UTF_8))
+        outputStream.write(json.toByteArray(Charsets.UTF_8))
+        outputStream.flush()
+    }
+
     fun testInitializeRequest() {
         val request = RequestMessage().apply {
             jsonrpc = "2.0"
@@ -41,15 +51,7 @@ class DartVirtualStreamConnectionProviderTest : DartCodeInsightFixtureTestCase()
             method = "initialize"
         }
 
-        val json = jsonHandler.gson.toJson(request)
-        val header = "Content-Length: ${json.toByteArray(Charsets.UTF_8).size}\r\n\r\n"
-
-        val outputStream = provider.getOutputStream()
-        assertNotNull("Provider output stream is null", outputStream)
-        
-        outputStream!!.write(header.toByteArray(Charsets.UTF_8))
-        outputStream.write(json.toByteArray(Charsets.UTF_8))
-        outputStream.flush()
+        sendRequest(request)
 
         val responseJson = producer.responseQueue.poll(5, TimeUnit.SECONDS)
         assertNotNull("No response received from provider", responseJson)
@@ -70,15 +72,7 @@ class DartVirtualStreamConnectionProviderTest : DartCodeInsightFixtureTestCase()
             method = "shutdown"
         }
 
-        val json = jsonHandler.gson.toJson(request)
-        val header = "Content-Length: ${json.toByteArray(Charsets.UTF_8).size}\r\n\r\n"
-
-        val outputStream = provider.getOutputStream()
-        assertNotNull("Provider output stream is null", outputStream)
-        
-        outputStream!!.write(header.toByteArray(Charsets.UTF_8))
-        outputStream.write(json.toByteArray(Charsets.UTF_8))
-        outputStream.flush()
+        sendRequest(request)
 
         val responseJson = producer.responseQueue.poll(5, TimeUnit.SECONDS)
         assertNotNull("No response received from provider", responseJson)
