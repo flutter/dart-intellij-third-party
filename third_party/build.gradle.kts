@@ -54,7 +54,7 @@ intellijPlatform {
             }
             version = if (commitHash.isNotEmpty()) "$baseVersion-${commitHash.take(7)}" else baseVersion
         } else {
-            version = providers.gradleProperty("pluginVersion")
+            version = changelog.getLatest().version
         }
 
         name = providers.gradleProperty("pluginName")
