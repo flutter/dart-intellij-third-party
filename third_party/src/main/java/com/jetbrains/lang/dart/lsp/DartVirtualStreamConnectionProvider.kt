@@ -14,6 +14,7 @@ import com.intellij.openapi.util.Disposer
 import com.google.dart.server.ResponseListener
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
+import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.ServerCapabilities
@@ -43,16 +44,6 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         private const val LSP_MESSAGE_KEY = "lspMessage"
         private const val LSP_RESPONSE_KEY = "lspResponse"
         private const val JSONRPC_VERSION = "2.0"
-    }
-
-    private enum class LspMethod(val method: String) {
-        INITIALIZE("initialize"),
-        SHUTDOWN("shutdown"),
-        HOVER("textDocument/hover");
-
-        companion object {
-            fun fromMethod(method: String): LspMethod? = values().find { it.method == method }
-        }
     }
 
     // Stream for writing LSP responses from the virtual server to the lsp4ij client.
@@ -170,8 +161,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun handleInitializeRequest(message: RequestMessage) {
         val capabilities = ServerCapabilities()
-        // TODO(helin24): Enable hover requests.
-        // capabilities.setHoverProvider(true)
+        capabilities.setHoverProvider(DartConfigurable.isExperimentalLspFeaturesEnabled(project))
 
         val initResult = InitializeResult(capabilities)
         sendSuccessResponse(message.id, initResult)

@@ -33,7 +33,12 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
+import com.redhat.devtools.lsp4ij.LanguageServerManager;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import org.jetbrains.annotations.Nls;
+import com.jetbrains.lang.dart.lsp.LspMethod;
+import com.jetbrains.lang.dart.lsp.DartLspConstants;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -71,6 +76,8 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
 
   private CheckboxTreeTable myModulesCheckboxTreeTable;
   private JBLabel myErrorLabel;
+  private JBCheckBox myExperimentalLspFeaturesCheckBox;
+  private static final String DART_LSP_EXPERIMENTAL_ENABLED = "dart.lsp.experimental.enabled";
 
   private final @NotNull Project myProject;
   private final boolean myShowModulesPanel;
@@ -86,6 +93,12 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     initDartSdkControls();
     initModulesPanel();
     myErrorLabel.setIcon(AllIcons.Actions.Lightning);
+
+    String lspFeatures = LspMethod.Companion.getExperimentalFeatures().stream()
+      .map(LspMethod::getPresentableName)
+      .filter(Objects::nonNull)
+      .collect(Collectors.joining(", "));
+    myExperimentalLspFeaturesCheckBox.setText("Turn on experimental LSP features (" + lspFeatures + ")");
   }
 
   private void initEnableDartSupportCheckBox() {
@@ -234,6 +247,8 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
 
     if (myPortField.getNumber() != getWebdevPort(myProject)) return true;
 
+    if (myExperimentalLspFeaturesCheckBox.isSelected() != isExperimentalLspFeaturesEnabled(myProject)) return true;
+
     if (myShowModulesPanel) {
       final Module[] selectedModules = myModulesCheckboxTreeTable.getCheckedNodes(Module.class);
       if (selectedModules.length != myModulesWithDartSdkLibAttachedInitial.size()) return true;
@@ -278,6 +293,8 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     mySdkUpdateChannelCombo.setSelectedItem(sdkUpdateOption);
 
     myPortField.setNumber(getWebdevPort(myProject));
+
+    myExperimentalLspFeaturesCheckBox.setSelected(isExperimentalLspFeaturesEnabled(myProject));
 
     if (myShowModulesPanel) {
       final CheckedTreeNode rootNode = (CheckedTreeNode)myModulesCheckboxTreeTable.getTree().getModel().getRoot();
@@ -339,6 +356,16 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
         }
 
         setWebdevPort(myProject, myPortField.getNumber());
+
+        boolean initialExperimentalEnabled = isExperimentalLspFeaturesEnabled(myProject);
+        boolean currentExperimentalEnabled = myExperimentalLspFeaturesCheckBox.isSelected();
+        setExperimentalLspFeaturesEnabled(myProject, currentExperimentalEnabled);
+        if (initialExperimentalEnabled != currentExperimentalEnabled) {
+          var manager = LanguageServerManager.getInstance(myProject);
+          if (manager.getServerStatus(DartLspConstants.DART_LANGUAGE_SERVER_ID) == ServerStatus.started) {
+            manager.start(DartLspConstants.DART_LANGUAGE_SERVER_ID);
+          }
+        }
       }
       else {
         if (!myModulesWithDartSdkLibAttachedInitial.isEmpty() && mySdkInitial != null) {
@@ -470,5 +497,13 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
 
   private static void setWebdevPort(@NotNull Project project, int port) {
     PropertiesComponent.getInstance(project).setValue(WEBDEV_PORT_PROPERTY_NAME, port, WEBDEV_PORT_DEFAULT);
+  }
+
+  public static boolean isExperimentalLspFeaturesEnabled(@NotNull Project project) {
+    return PropertiesComponent.getInstance(project).getBoolean(DART_LSP_EXPERIMENTAL_ENABLED, true);
+  }
+
+  private static void setExperimentalLspFeaturesEnabled(@NotNull Project project, boolean enabled) {
+    PropertiesComponent.getInstance(project).setValue(DART_LSP_EXPERIMENTAL_ENABLED, enabled, true);
   }
 }
