@@ -54,7 +54,7 @@ intellijPlatform {
             }
             version = if (commitHash.isNotEmpty()) "$baseVersion-${commitHash.take(7)}" else baseVersion
         } else {
-            version = changelog.getLatest().version
+            version = providers.gradleProperty("pluginVersion")
         }
 
         name = providers.gradleProperty("pluginName")
@@ -135,7 +135,6 @@ dependencies {
         bundledModule("intellij.platform.coverage.agent")
         bundledPlugin("org.jetbrains.plugins.yaml")
         bundledPlugin("com.intellij.copyright")
-        plugin("com.redhat.devtools.lsp4ij:${libs.versions.lsp4ij.get()}")
     }
 
     implementation(fileTree("lib") { include("*.jar") })

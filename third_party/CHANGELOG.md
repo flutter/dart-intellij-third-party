@@ -8,19 +8,6 @@
 
 ### Fixed
 
-## 505.0.0
-
-### Added
-- Support for the Dart primary constructors language feature (#330)
-- Dependency on lsp4ij with basic initialization (#348)
-
-### Changed
-
-### Removed
-
-### Fixed
-- Avoid potential exceptions by wrapping project creation in a WriteAction (#332)
-
 ## 504.0.0
 
 ### Added

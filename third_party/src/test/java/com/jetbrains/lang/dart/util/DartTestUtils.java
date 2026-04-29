@@ -24,10 +24,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 import org.junit.Assert;
 
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.jetbrains.lang.dart.lsp.DartLspConstants;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,12 +106,6 @@ public final class DartTestUtils {
     // sets access to anything from src/test/testData and below
     //
     VfsRootAccess.allowRootAccess(disposable, BASE_TEST_DATA_PATH);
-
-    LanguageServerDefinition definition =
-      LanguageServersRegistry.getInstance().getServerDefinition(DartLspConstants.DART_LANGUAGE_SERVER_ID);
-    if (definition != null) {
-      definition.setEnabled(false, module.getProject());
-    }
 
     ApplicationManager.getApplication().runWriteAction(() -> {
       Disposer.register(disposable, DartSdkLibUtil.configureDartSdkAndReturnUndoingDisposable(module.getProject(), sdkHome));

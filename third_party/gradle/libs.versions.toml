@@ -2,13 +2,12 @@
 # https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
 
 [versions]
-guava = "33.6.0-jre"
+guava = "33.3.1-jre"
 junit = "4.13.2"
-kotlin = "2.3.21"
-intellijPlatform = "2.15.0"
-changelog = "2.5.0"
-kover = "0.9.8"
-lsp4ij = "0.19.3"
+kotlin = "2.2.21"
+intellijPlatform = "2.10.5"
+changelog = "2.2.0"
+kover = "0.9.4"
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
