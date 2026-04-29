@@ -98,7 +98,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
       .map(LspMethod::getPresentableName)
       .filter(Objects::nonNull)
       .collect(Collectors.joining(", "));
-    myExperimentalLspFeaturesCheckBox.setText("Turn on experimental LSP features (" + lspFeatures + ")");
+    myExperimentalLspFeaturesCheckBox.setText(DartBundle.message("settings.page.checkbox.experimental.lsp.features", lspFeatures));
   }
 
   private void initEnableDartSupportCheckBox() {
@@ -331,6 +331,9 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   @Override
   public void apply() {
     // similar to DartModuleBuilder.setupSdk()
+    final boolean initialExperimentalEnabled = isExperimentalLspFeaturesEnabled(myProject);
+    final boolean currentExperimentalEnabled = myExperimentalLspFeaturesCheckBox.isSelected();
+
     final Runnable runnable = () -> {
       if (myEnableDartSupportCheckBox.isSelected()) {
         final String sdkHomePath = getTextFromCombo(mySdkPathComboWithBrowse);
@@ -356,16 +359,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
         }
 
         setWebdevPort(myProject, myPortField.getNumber());
-
-        boolean initialExperimentalEnabled = isExperimentalLspFeaturesEnabled(myProject);
-        boolean currentExperimentalEnabled = myExperimentalLspFeaturesCheckBox.isSelected();
         setExperimentalLspFeaturesEnabled(myProject, currentExperimentalEnabled);
-        if (initialExperimentalEnabled != currentExperimentalEnabled) {
-          var manager = LanguageServerManager.getInstance(myProject);
-          if (manager.getServerStatus(DartLspConstants.DART_LANGUAGE_SERVER_ID) == ServerStatus.started) {
-            manager.start(DartLspConstants.DART_LANGUAGE_SERVER_ID);
-          }
-        }
       }
       else {
         if (!myModulesWithDartSdkLibAttachedInitial.isEmpty() && mySdkInitial != null) {
@@ -375,6 +369,13 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     };
 
     ApplicationManager.getApplication().runWriteAction(runnable);
+
+    if (myEnableDartSupportCheckBox.isSelected() && initialExperimentalEnabled != currentExperimentalEnabled) {
+      var manager = LanguageServerManager.getInstance(myProject);
+      if (manager.getServerStatus(DartLspConstants.DART_LANGUAGE_SERVER_ID) == ServerStatus.started) {
+        manager.start(DartLspConstants.DART_LANGUAGE_SERVER_ID);
+      }
+    }
 
     reset(); // because we rely on remembering initial state
   }
