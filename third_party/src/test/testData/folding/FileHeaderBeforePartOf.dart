@@ -1,3 +1,3 @@
 <fold text='/.../' expand='false'>//
 //</fold>
-part of foo;
+part of foo;<caret>
