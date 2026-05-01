@@ -5,6 +5,7 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.options.SettingsEditor;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.io.FileUtil;
@@ -56,21 +57,34 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
   private void initDartProjectsCombo(final @NotNull Project project) {
     myDartProjectCombo.setRenderer(SimpleListCellRenderer.create("", NameAndPath::getPresentableText));
 
-    if (!project.isDefault()) {
+    if (project.isDefault()) return;
+
+    ReadAction.nonBlocking(() -> {
+      SortedSet<NameAndPath> items = new TreeSet<>();
       for (VirtualFile pubspecFile : FilenameIndex.getVirtualFilesByName(PUBSPEC_YAML, GlobalSearchScope.projectScope(project))) {
-        myComboItems.add(new NameAndPath(PubspecYamlUtil.getDartProjectName(pubspecFile), pubspecFile.getParent().getPath()));
+        ProgressManager.checkCanceled();
+        items.add(new NameAndPath(PubspecYamlUtil.getDartProjectName(pubspecFile), pubspecFile.getParent().getPath()));
       }
 
-      if (myComboItems.isEmpty()) {
+      if (items.isEmpty()) {
         for (VirtualFile contentRoot : ProjectRootManager.getInstance(project).getContentRoots()) {
+          ProgressManager.checkCanceled();
           if (FileTypeIndex.containsFileOfType(DartFileType.INSTANCE, GlobalSearchScopesCore.directoryScope(project, contentRoot, true))) {
-            myComboItems.add(new NameAndPath(null, contentRoot.getPath()));
+            items.add(new NameAndPath(null, contentRoot.getPath()));
           }
         }
       }
-    }
-
-    myDartProjectCombo.setModel(new DefaultComboBoxModel<>(myComboItems.toArray(NameAndPath[]::new)));
+      return items;
+    })
+      .finishOnUiThread(ModalityState.any(), items -> {
+        final Object selectedItem = myDartProjectCombo.getSelectedItem();
+        myComboItems.addAll(items);
+        myDartProjectCombo.setModel(new DefaultComboBoxModel<>(myComboItems.toArray(NameAndPath[]::new)));
+        if (selectedItem != null) {
+          myDartProjectCombo.setSelectedItem(selectedItem);
+        }
+      })
+      .submit(AppExecutorUtil.getAppExecutorService());
   }
 
   @Override
