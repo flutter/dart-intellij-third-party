@@ -1,12 +1,13 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.sdk;
 
-import com.intellij.icons.AllIcons;
+import com.intellij.openapi.Disposable;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.Pair;
@@ -27,7 +28,6 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
-import javax.swing.plaf.basic.BasicComboBoxEditor;
 import javax.swing.text.JTextComponent;
 import java.io.File;
 import java.util.ArrayList;
@@ -68,7 +68,8 @@ public final class DartSdkUtil {
 
   public static void initDartSdkControls(final @Nullable Project project,
                                          final @NotNull   DartComboBoxWithBrowseButton<String> dartSdkCombo,
-                                         final @NotNull JBLabel versionLabel) {
+                                         final @NotNull JBLabel versionLabel,
+                                         final @NotNull Disposable parentDisposable) {
     dartSdkCombo.addBrowseFolderListener(DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"),
                                          project,
                                          FileChooserDescriptorFactory.createSingleFolderDescriptor()
@@ -98,21 +99,25 @@ public final class DartSdkUtil {
       }
     }
 
-    updateVersionLabelAsync(dartSdkCombo, versionLabel);
+    updateVersionLabelAsync(dartSdkCombo, versionLabel, parentDisposable);
 
     final JTextComponent editorComponent = (JTextComponent)dartSdkCombo.getEditor().getEditorComponent();
-    editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
+    final DocumentAdapter listener = new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
-        updateVersionLabelAsync(dartSdkCombo, versionLabel);
+        updateVersionLabelAsync(dartSdkCombo, versionLabel, parentDisposable);
       }
-    });
+    };
+    editorComponent.getDocument().addDocumentListener(listener);
+    Disposer.register(parentDisposable, () -> editorComponent.getDocument().removeDocumentListener(listener));
   }
 
   private static void updateVersionLabelAsync(final @NotNull DartComboBoxWithBrowseButton<String> dartSdkCombo,
-                                              final @NotNull JBLabel versionLabel) {
+                                              final @NotNull JBLabel versionLabel,
+                                              final @NotNull Disposable parentDisposable) {
     final String sdkHomePath = getItemFromCombo(dartSdkCombo);
     ReadAction.nonBlocking(() -> getSdkVersion(sdkHomePath))
+      .expireWith(parentDisposable)
       .finishOnUiThread(ModalityState.any(), version -> versionLabel.setText(version == null ? "" : version))
       .submit(AppExecutorUtil.getAppExecutorService());
   }
