@@ -165,18 +165,21 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     myLoadingTemplatesPanel.add(asyncProcessIcon, new GridConstraints());
     asyncProcessIcon.resume();
 
+    final String comboSdkPath = mySdkPathComboWithBrowse.getEditor().getItem().toString().trim();
+    final String sdkPath = FileUtil.toSystemIndependentName(comboSdkPath);
+
     ApplicationManager.getApplication().executeOnPooledThread(() -> {
-      final String comboSdkPath = mySdkPathComboWithBrowse.getEditor().getItem().toString().trim();
-      final String sdkPath = FileUtil.toSystemIndependentName(comboSdkPath);
       DartProjectTemplate.loadTemplatesAsync(sdkPath, templates -> {
-        asyncProcessIcon.suspend();
-        myLoadingTemplatesPanel.remove(asyncProcessIcon);
-        Disposer.dispose(asyncProcessIcon);
+        ApplicationManager.getApplication().invokeLater(() -> {
+          asyncProcessIcon.suspend();
+          myLoadingTemplatesPanel.remove(asyncProcessIcon);
+          Disposer.dispose(asyncProcessIcon);
 
-        myDartCreateTemplates = templates;
-        myDartCreateTemplatesSdkPath = comboSdkPath;
+          myDartCreateTemplates = templates;
+          myDartCreateTemplatesSdkPath = comboSdkPath;
 
-        onSdkPathChanged();
+          onSdkPathChanged();
+        }, ModalityState.any());
       });
     });
   }
