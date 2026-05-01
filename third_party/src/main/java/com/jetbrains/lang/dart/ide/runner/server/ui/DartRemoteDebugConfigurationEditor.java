@@ -1,13 +1,12 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.runner.server.ui;
 
-import com.intellij.icons.AllIcons;
-import com.intellij.openapi.fileChooser.FileChooser;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectRootManager;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -17,17 +16,17 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
 import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.fields.ExtendableTextField;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.ide.runner.server.DartRemoteDebugConfiguration;
 import com.jetbrains.lang.dart.ide.runner.server.DartRemoteDebugParameters;
+import com.jetbrains.lang.dart.ui.DartComboBoxWithBrowseButton;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.swing.plaf.basic.BasicComboBoxEditor;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -36,7 +35,7 @@ import static com.jetbrains.lang.dart.util.PubspecYamlUtil.PUBSPEC_YAML;
 public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemoteDebugConfiguration> {
 
   private JPanel myMainPanel;
-  private ComboBox<NameAndPath> myDartProjectCombo;
+  private DartComboBoxWithBrowseButton<NameAndPath> myDartProjectCombo;
   private JBLabel myHintLabel;
 
   private final Project myProject;
@@ -44,7 +43,12 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
 
   public DartRemoteDebugConfigurationEditor(final @NotNull Project project) {
     myProject = project;
-    installBrowseExtension();
+    myDartProjectCombo.addBrowseFolderListener(DartBundle.message("button.browse.dialog.title.select.dart.project.path"),
+                                               myProject,
+                                               FileChooserDescriptorFactory.createSingleFolderDescriptor()
+                                                 .withTitle(DartBundle.message("button.browse.dialog.title.select.dart.project.path")),
+                                               this::resolveNameAndPath,
+                                               this::applySelectedProjectPath);
     initDartProjectsCombo(project);
     myHintLabel.setCopyable(true);
   }
@@ -83,15 +87,22 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
   private void setSelectedProjectPath(final @NotNull String projectPath) {
     if (projectPath.isEmpty()) return;
 
+    ReadAction.nonBlocking(() -> resolveNameAndPath(projectPath))
+      .finishOnUiThread(ModalityState.any(), this::applySelectedProjectPath)
+      .submit(AppExecutorUtil.getAppExecutorService());
+  }
+
+  private @NotNull NameAndPath resolveNameAndPath(final @NotNull String projectPath) {
     final VirtualFile pubspecFile = LocalFileSystem.getInstance().findFileByPath(projectPath + "/" + PUBSPEC_YAML);
     final String projectName = pubspecFile == null ? null : PubspecYamlUtil.getDartProjectName(pubspecFile);
-    final NameAndPath item = new NameAndPath(projectName, projectPath);
+    return new NameAndPath(projectName, projectPath);
+  }
 
+  private void applySelectedProjectPath(final @NotNull NameAndPath item) {
     if (!myComboItems.contains(item)) {
       myComboItems.add(item);
       myDartProjectCombo.setModel(new DefaultComboBoxModel<>(myComboItems.toArray(NameAndPath[]::new)));
     }
-
     myDartProjectCombo.setSelectedItem(item);
   }
 
@@ -103,57 +114,8 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
   }
 
   private void createUIComponents() {
-    myDartProjectCombo = new ComboBox<>();
+    myDartProjectCombo = new DartComboBoxWithBrowseButton<>();
   }
-
-  private void installBrowseExtension() {
-    ExtendableTextField editor = new ExtendableTextField();
-    editor.addExtension(
-      ExtendableTextField.Extension.create(
-        AllIcons.General.OpenDisk,
-        AllIcons.General.OpenDiskHover,
-        DartBundle.message("button.browse.dialog.title.select.dart.project.path"),
-        () -> {
-          var descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
-            .withTitle(DartBundle.message("button.browse.dialog.title.select.dart.project.path"));
-          VirtualFile file = FileChooser.chooseFile(descriptor, myDartProjectCombo, myProject, null);
-          if (file != null) {
-            setSelectedProjectPath(FileUtil.toSystemIndependentName(file.getPath()));
-          }
-        }));
-    editor.setBorder(null);
-    myDartProjectCombo.setEditable(true);
-    myDartProjectCombo.setEditor(new ComboBoxEditor() {
-      @Override
-      public java.awt.Component getEditorComponent() {
-        return editor;
-      }
-
-      @Override
-      public void setItem(Object anObject) {
-        editor.setText(anObject == null ? "" : anObject.toString());
-      }
-
-      @Override
-      public Object getItem() {
-        return editor.getText();
-      }
-
-      @Override
-      public void selectAll() {
-        editor.selectAll();
-      }
-
-      @Override
-      public void addActionListener(java.awt.event.ActionListener l) {
-        editor.addActionListener(l);
-      }
-
-      @Override
-      public void removeActionListener(java.awt.event.ActionListener l) {
-        editor.removeActionListener(l);
-      }
-    });  }
 
   private static class NameAndPath implements Comparable<NameAndPath> {
     private final @Nullable String myName;

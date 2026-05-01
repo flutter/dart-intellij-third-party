@@ -3,25 +3,24 @@ package com.jetbrains.lang.dart.sdk;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.util.PropertiesComponent;
-import com.intellij.openapi.fileChooser.FileChooser;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.Strings;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBLabel;
-import com.intellij.ui.components.fields.ExtendableTextComponent;
-import com.intellij.ui.components.fields.ExtendableTextField;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.SmartList;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.system.CpuArch;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.ui.DartComboBoxWithBrowseButton;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -68,40 +67,22 @@ public final class DartSdkUtil {
   }
 
   public static void initDartSdkControls(final @Nullable Project project,
-                                         final @NotNull ComboBox<String> dartSdkCombo,
+                                         final @NotNull   DartComboBoxWithBrowseButton<String> dartSdkCombo,
                                          final @NotNull JBLabel versionLabel) {
-    dartSdkCombo.setEditable(true);
-
-    final ExtendableTextComponent.Extension browseExtension =
-      ExtendableTextComponent.Extension.create(
-        AllIcons.General.OpenDisk,
-        AllIcons.General.OpenDiskHover,
-        DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"),
-        () -> {
-          var descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
-            .withTitle(DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"));
-          VirtualFile file = FileChooser.chooseFile(descriptor, dartSdkCombo, project, null);
-          if (file != null) {
-            String path = FileUtil.toSystemDependentName(file.getPath());
-            if (!path.isEmpty() && !isDartSdkHome(path)) {
-              final String probablySdkPath = path + "/dart-sdk";
-              if (isDartSdkHome(probablySdkPath)) {
-                path = FileUtil.toSystemDependentName(probablySdkPath);
-              }
-            }
-            dartSdkCombo.getEditor().setItem(path);
-          }
-        });
-
-    dartSdkCombo.setEditor(new BasicComboBoxEditor() {
-      @Override
-      protected JTextField createEditorComponent() {
-        ExtendableTextField editor = new ExtendableTextField();
-        editor.addExtension(browseExtension);
-        editor.setBorder(null);
-        return editor;
-      }
-    });
+    dartSdkCombo.addBrowseFolderListener(DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"),
+                                         project,
+                                         FileChooserDescriptorFactory.createSingleFolderDescriptor()
+                                           .withTitle(DartBundle.message("button.browse.dialog.title.select.dart.sdk.path")),
+                                         path -> {
+                                           if (!path.isEmpty() && !isDartSdkHome(path)) {
+                                             final String probablySdkPath = path + "/dart-sdk";
+                                             if (isDartSdkHome(probablySdkPath)) {
+                                               return probablySdkPath;
+                                             }
+                                           }
+                                           return path;
+                                         },
+                                         path -> dartSdkCombo.getEditor().setItem(FileUtil.toSystemDependentName(path)));
 
     addKnownPathsToCombo(dartSdkCombo, DART_SDK_KNOWN_PATHS, DartSdkUtil::isDartSdkHome);
     if (getItemFromCombo(dartSdkCombo).isEmpty()) {
@@ -117,19 +98,23 @@ public final class DartSdkUtil {
       }
     }
 
-    final String sdkHomePath = getItemFromCombo(dartSdkCombo);
-    final String sdkVersion = getSdkVersion(sdkHomePath);
-    versionLabel.setText(sdkVersion == null ? "" : sdkVersion);
+    updateVersionLabelAsync(dartSdkCombo, versionLabel);
 
     final JTextComponent editorComponent = (JTextComponent)dartSdkCombo.getEditor().getEditorComponent();
     editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
-        final String sdkHomePath = getItemFromCombo(dartSdkCombo);
-        final String sdkVersion = getSdkVersion(sdkHomePath);
-        versionLabel.setText(sdkVersion == null ? "" : sdkVersion);
+        updateVersionLabelAsync(dartSdkCombo, versionLabel);
       }
     });
+  }
+
+  private static void updateVersionLabelAsync(final @NotNull DartComboBoxWithBrowseButton<String> dartSdkCombo,
+                                              final @NotNull JBLabel versionLabel) {
+    final String sdkHomePath = getItemFromCombo(dartSdkCombo);
+    ReadAction.nonBlocking(() -> getSdkVersion(sdkHomePath))
+      .finishOnUiThread(ModalityState.any(), version -> versionLabel.setText(version == null ? "" : version))
+      .submit(AppExecutorUtil.getAppExecutorService());
   }
 
   private static @NotNull String getItemFromCombo(final @NotNull JComboBox<?> combo) {

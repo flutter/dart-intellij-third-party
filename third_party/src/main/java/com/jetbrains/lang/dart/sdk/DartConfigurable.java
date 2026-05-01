@@ -51,6 +51,8 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.ExpandVetoException;
 import java.util.*;
 
+import com.jetbrains.lang.dart.ui.DartComboBoxWithBrowseButton;
+
 public final class DartConfigurable implements SearchableConfigurable, NoScroll {
   public static final int WEBDEV_PORT_DEFAULT = 53322;
   private static final String WEBDEV_PORT_PROPERTY_NAME = "dart.webdev.port";
@@ -61,7 +63,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   private JBCheckBox myEnableDartSupportCheckBox;
 
   private JPanel mySettingsPanel;
-  private ComboBox<String> mySdkPathComboWithBrowse;
+  private DartComboBoxWithBrowseButton<String> mySdkPathComboWithBrowse;
   private JBLabel myVersionLabel;
   private JBCheckBox myCheckSdkUpdateCheckBox;
   // disabled and unchecked, shown in UI instead of myCheckSdkUpdateCheckBox if selected Dart SDK is a part of a Flutter SDK
@@ -437,7 +439,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   }
 
   private void createUIComponents() {
-    mySdkPathComboWithBrowse = new ComboBox<>();
+    mySdkPathComboWithBrowse = new DartComboBoxWithBrowseButton<>();
 
     final CheckboxTree.CheckboxTreeCellRenderer checkboxTreeCellRenderer = new CheckboxTree.CheckboxTreeCellRenderer() {
       @Override
