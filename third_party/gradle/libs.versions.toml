@@ -4,9 +4,7 @@
 [versions]
 guava = "33.6.0-jre"
 junit = "4.13.2"
-# Bumping to 2.3.21 is blocked on an `ideaVersion` update: 
-# https://github.com/flutter/dart-intellij-third-party/issues/352
-kotlin = "2.2.21"
+kotlin = "2.3.21"
 intellijPlatform = "2.15.0"
 changelog = "2.5.0"
 kover = "0.9.8"

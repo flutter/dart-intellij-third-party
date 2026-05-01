@@ -3,4 +3,4 @@
  */</fold>
 import "dart:core";
 
-class A{}
+class A{}<caret>
