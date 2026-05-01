@@ -124,7 +124,7 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
   protected void applyEditorTo(final @NotNull DartRemoteDebugConfiguration config) {
     final DartRemoteDebugParameters params = config.getParameters();
     final Object selectedItem = myDartProjectCombo.getSelectedItem();
-    params.setDartProjectPath(selectedItem instanceof NameAndPath ? ((NameAndPath)selectedItem).myPath : selectedItem == null ? "" : selectedItem.toString().trim());
+    params.setDartProjectPath(selectedItem == null ? "" : selectedItem.toString().trim());
   }
 
   private void createUIComponents() {
