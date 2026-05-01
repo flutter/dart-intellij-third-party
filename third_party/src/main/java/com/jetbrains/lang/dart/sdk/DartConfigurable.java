@@ -357,7 +357,8 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
           for (VirtualFile file : FileEditorManager.getInstance(myProject).getOpenFiles()) {
             PsiFile psiFile = psiManager.findFile(file);
             if (psiFile != null) {
-              daemonCodeAnalyzer.restart(psiFile);
+              // Eventually update this with real reason
+              daemonCodeAnalyzer.restart(psiFile, "Restarting.... reason unknown");
             }
           }
 
