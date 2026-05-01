@@ -4,6 +4,7 @@ package com.jetbrains.lang.dart.projectWizard;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.ide.util.projectWizard.SettingsStep;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
@@ -15,7 +16,6 @@ import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.platform.ProjectGeneratorPeer;
-import com.intellij.platform.WebProjectGenerator;
 import com.intellij.ui.ColorUtil;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.JBColor;
@@ -38,7 +38,7 @@ import java.awt.*;
 import java.util.List;
 import java.util.stream.IntStream;
 
-public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizardData> {
+public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizardData>, Disposable {
   private static final String DART_PROJECT_TEMPLATE = "DART_PROJECT_TEMPLATE";
   private static final String CREATE_SAMPLE_UNCHECKED = "CREATE_SAMPLE_UNCHECKED";
 
@@ -61,15 +61,19 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   private String myDartCreateTemplatesSdkPath; //used to expire the above cache if the sdk is changed
 
   private String mySdkPathValidationError;
+  private Runnable myCheckValid;
 
   public DartGeneratorPeer() {
     // set initial values before initDartSdkControls() because listeners should not be triggered on initialization
     mySdkPathComboWithBrowse.setEditable(true);
 
     // now setup controls
-    DartSdkUtil.initDartSdkControls(null, mySdkPathComboWithBrowse, myVersionLabel);
+    DartSdkUtil.initDartSdkControls(null, mySdkPathComboWithBrowse, myVersionLabel, this);
 
-    myCreateSampleProjectCheckBox.addActionListener(e -> myTemplatesList.setEnabled(myCreateSampleProjectCheckBox.isSelected()));
+    myCreateSampleProjectCheckBox.addActionListener(e -> {
+      myTemplatesList.setEnabled(myCreateSampleProjectCheckBox.isSelected());
+      fireCheckValid();
+    });
     String selectedTemplateName = PropertiesComponent.getInstance().getValue(DART_PROJECT_TEMPLATE);
     myCreateSampleProjectCheckBox.setSelected(!CREATE_SAMPLE_UNCHECKED.equals(selectedTemplateName));
 
@@ -87,6 +91,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
         return component;
       }
     });
+    myTemplatesList.addListSelectionListener(e -> fireCheckValid());
 
     myErrorLabel.setIcon(AllIcons.Actions.Lightning);
     myErrorLabel.setVisible(false);
@@ -96,12 +101,14 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     myTemplatesList.setEnabled(false);
 
     final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
-    editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
+    final DocumentAdapter listener = new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
         onSdkPathChanged();
       }
-    });
+    };
+    editorComponent.getDocument().addDocumentListener(listener);
+    Disposer.register(this, () -> editorComponent.getDocument().removeDocumentListener(listener));
 
     onSdkPathChanged();
   }
@@ -119,6 +126,8 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
         if (myIntellijLiveValidationEnabled) {
           validateInIntelliJ();
         }
+
+        fireCheckValid();
 
         if (errorMessage != null) {
           clearTemplates();
@@ -227,6 +236,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
   @Override
   public @NotNull JComponent getComponent(@NotNull TextFieldWithBrowseButton myLocationField, @NotNull Runnable checkValid) {
+    myCheckValid = checkValid;
     return myMainPanel;
   }
 
@@ -290,12 +300,14 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
   private void enableIntellijLiveValidation() {
     final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
-    editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
+    final DocumentAdapter listener = new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
         validateInIntelliJ();
       }
-    });
+    };
+    editorComponent.getDocument().addDocumentListener(listener);
+    Disposer.register(this, () -> editorComponent.getDocument().removeDocumentListener(listener));
 
     myCreateSampleProjectCheckBox.addActionListener(e -> validateInIntelliJ());
     myTemplatesList.addListSelectionListener(e -> validateInIntelliJ());
@@ -306,18 +318,14 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     return false;
   }
 
-  @Override
-  public void addSettingsStateListener(final @NotNull WebProjectGenerator.SettingsStateListener stateListener) {
-    final JTextComponent editorComponent = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
-    editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
-      @Override
-      protected void textChanged(final @NotNull DocumentEvent e) {
-        stateListener.stateChanged(validate() == null);
-      }
-    });
+  private void fireCheckValid() {
+    if (myCheckValid != null) {
+      myCheckValid.run();
+    }
+  }
 
-    myCreateSampleProjectCheckBox.addActionListener(e -> stateListener.stateChanged(validate() == null));
-    myTemplatesList.addListSelectionListener(e -> stateListener.stateChanged(validate() == null));
+  @Override
+  public void dispose() {
   }
 
   private void createUIComponents() {
