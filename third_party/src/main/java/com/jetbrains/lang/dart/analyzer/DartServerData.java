@@ -15,6 +15,8 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.Strings;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.psi.impl.source.resolve.ResolveCache;
 import com.intellij.psi.search.SearchScope;
 import com.intellij.testFramework.LightVirtualFile;
@@ -407,7 +409,12 @@ public final class DartServerData {
       // but it will cache RemoteAnalysisServerImpl$ServerResponseReaderThread in FileStatusMap.threads and as a result,
       // DartAnalysisServerService.myProject will be leaked in tests
       ApplicationManager.getApplication()
-        .invokeLater(() -> DaemonCodeAnalyzer.getInstance(project).restart(),
+        .invokeLater(() -> {
+          PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
+          if (psiFile != null) {
+            DaemonCodeAnalyzer.getInstance(project).restart(psiFile);
+          }
+        },
                      ModalityState.nonModal(),
                      myService.getDisposedCondition());
     }

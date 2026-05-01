@@ -8,6 +8,7 @@ import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.module.ModuleType;
@@ -25,7 +26,10 @@ import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.IdeFocusManager;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.ui.*;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
@@ -347,7 +351,15 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
           DartSdkUtil.updateKnownSdkPaths(myProject, sdkHomePath);
 
           DartSdkLibUtil.ensureDartSdkConfigured(myProject, sdkHomePath);
-          DaemonCodeAnalyzer.getInstance(myProject).restart();
+
+          PsiManager psiManager = PsiManager.getInstance(myProject);
+          DaemonCodeAnalyzer daemonCodeAnalyzer = DaemonCodeAnalyzer.getInstance(myProject);
+          for (VirtualFile file : FileEditorManager.getInstance(myProject).getOpenFiles()) {
+            PsiFile psiFile = psiManager.findFile(file);
+            if (psiFile != null) {
+              daemonCodeAnalyzer.restart(psiFile);
+            }
+          }
 
           final Module[] modules = myShowModulesPanel
                                    ? myModulesCheckboxTreeTable.getCheckedNodes(Module.class)
