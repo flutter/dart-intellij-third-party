@@ -136,6 +136,7 @@ dependencies {
         bundledPlugin("org.jetbrains.plugins.yaml")
         bundledPlugin("com.intellij.copyright")
         plugin("com.redhat.devtools.lsp4ij:${libs.versions.lsp4ij.get()}")
+        plugin("io.flutter:91.0.0")
     }
 
     implementation(fileTree("lib") { include("*.jar") })
