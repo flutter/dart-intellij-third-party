@@ -19,10 +19,10 @@ import javax.swing.plaf.basic.BasicComboBoxEditor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-public class DartComboBoxWithBrowseButton<T> extends ComboBox<T> {
+public class BasicComboBoxWithBrowseButton<T> extends ComboBox<T> {
   private final ExtendableTextField myEditor = new ExtendableTextField();
 
-  public DartComboBoxWithBrowseButton() {
+  public BasicComboBoxWithBrowseButton() {
     setEditable(true);
     myEditor.setBorder(null);
     setEditor(new BasicComboBoxEditor() {
