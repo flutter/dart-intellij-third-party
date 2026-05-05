@@ -351,16 +351,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
           DartSdkUtil.updateKnownSdkPaths(myProject, sdkHomePath);
 
           DartSdkLibUtil.ensureDartSdkConfigured(myProject, sdkHomePath);
-
-          PsiManager psiManager = PsiManager.getInstance(myProject);
-          DaemonCodeAnalyzer daemonCodeAnalyzer = DaemonCodeAnalyzer.getInstance(myProject);
-          for (VirtualFile file : FileEditorManager.getInstance(myProject).getOpenFiles()) {
-            PsiFile psiFile = psiManager.findFile(file);
-            if (psiFile != null) {
-              // Eventually update this with real reason
-              daemonCodeAnalyzer.restart(psiFile, "Restarting after configuration change");
-            }
-          }
+          DaemonCodeAnalyzer.getInstance(myProject).restart();
 
           final Module[] modules = myShowModulesPanel
                                    ? myModulesCheckboxTreeTable.getCheckedNodes(Module.class)
