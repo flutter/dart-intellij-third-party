@@ -41,7 +41,7 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
 import com.jetbrains.lang.dart.lsp.DartLspConstants;
 import com.jetbrains.lang.dart.lsp.LspMethod;
-import com.jetbrains.lang.dart.ui.DartComboBoxWithBrowseButton;
+import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import org.jetbrains.annotations.Nls;
@@ -68,7 +68,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
   private JBCheckBox myEnableDartSupportCheckBox;
 
   private JPanel mySettingsPanel;
-  private DartComboBoxWithBrowseButton<String> mySdkPathComboWithBrowse;
+  private BasicComboBoxWithBrowseButton<String> mySdkPathComboWithBrowse;
   private JBLabel myVersionLabel;
   private JBCheckBox myCheckSdkUpdateCheckBox;
   // disabled and unchecked, shown in UI instead of myCheckSdkUpdateCheckBox if selected Dart SDK is a part of a Flutter SDK
@@ -358,7 +358,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
             PsiFile psiFile = psiManager.findFile(file);
             if (psiFile != null) {
               // Eventually update this with real reason
-              daemonCodeAnalyzer.restart(psiFile, "Restarting.... reason unknown");
+              daemonCodeAnalyzer.restart(psiFile, "Restarting after configuration change");
             }
           }
 
@@ -407,6 +407,9 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
   @Override
   public void dispose() {
+    // No-op: this class implements Disposable solely to act as a parent node in the Disposer tree.
+    // All actual resource cleanup (e.g., DocumentListeners) is handled by child Disposables
+    // registered with this instance and triggered via Disposer.dispose(this) in disposeUIResources().
   }
 
   private void updateControlsEnabledState() {
@@ -460,7 +463,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
   }
 
   private void createUIComponents() {
-    mySdkPathComboWithBrowse = new DartComboBoxWithBrowseButton<>();
+    mySdkPathComboWithBrowse = new BasicComboBoxWithBrowseButton<>();
 
     final CheckboxTree.CheckboxTreeCellRenderer checkboxTreeCellRenderer = new CheckboxTree.CheckboxTreeCellRenderer() {
       @Override

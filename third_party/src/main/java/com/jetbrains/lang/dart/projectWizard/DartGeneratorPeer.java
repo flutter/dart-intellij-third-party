@@ -27,7 +27,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.ui.AsyncProcessIcon;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
-import com.jetbrains.lang.dart.ui.DartComboBoxWithBrowseButton;
+import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,7 +43,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   private static final String CREATE_SAMPLE_UNCHECKED = "CREATE_SAMPLE_UNCHECKED";
 
   private JPanel myMainPanel;
-  private DartComboBoxWithBrowseButton<String> mySdkPathComboWithBrowse;
+  private BasicComboBoxWithBrowseButton<String> mySdkPathComboWithBrowse;
   private JBLabel myVersionLabel;
 
   private JPanel myTemplatesPanel;
@@ -333,6 +333,6 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   }
 
   private void createUIComponents() {
-    mySdkPathComboWithBrowse = new DartComboBoxWithBrowseButton<>();
+    mySdkPathComboWithBrowse = new BasicComboBoxWithBrowseButton<>();
   }
 }

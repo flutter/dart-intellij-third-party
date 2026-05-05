@@ -22,7 +22,7 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.ide.runner.server.DartRemoteDebugConfiguration;
 import com.jetbrains.lang.dart.ide.runner.server.DartRemoteDebugParameters;
-import com.jetbrains.lang.dart.ui.DartComboBoxWithBrowseButton;
+import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,7 +36,7 @@ import static com.jetbrains.lang.dart.util.PubspecYamlUtil.PUBSPEC_YAML;
 public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemoteDebugConfiguration> {
 
   private JPanel myMainPanel;
-  private DartComboBoxWithBrowseButton<NameAndPath> myDartProjectCombo;
+  private BasicComboBoxWithBrowseButton<NameAndPath> myDartProjectCombo;
   private JBLabel myHintLabel;
 
   private final Project myProject;
@@ -128,7 +128,7 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
   }
 
   private void createUIComponents() {
-    myDartProjectCombo = new DartComboBoxWithBrowseButton<>();
+    myDartProjectCombo = new BasicComboBoxWithBrowseButton<>();
   }
 
   private static class NameAndPath implements Comparable<NameAndPath> {

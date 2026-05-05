@@ -21,7 +21,7 @@ import com.intellij.util.SmartList;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.system.CpuArch;
 import com.jetbrains.lang.dart.DartBundle;
-import com.jetbrains.lang.dart.ui.DartComboBoxWithBrowseButton;
+import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -67,7 +67,7 @@ public final class DartSdkUtil {
   }
 
   public static void initDartSdkControls(final @Nullable Project project,
-                                         final @NotNull   DartComboBoxWithBrowseButton<String> dartSdkCombo,
+                                         final @NotNull BasicComboBoxWithBrowseButton<String> dartSdkCombo,
                                          final @NotNull JBLabel versionLabel,
                                          final @NotNull Disposable parentDisposable) {
     dartSdkCombo.addBrowseFolderListener(DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"),
@@ -112,7 +112,7 @@ public final class DartSdkUtil {
     Disposer.register(parentDisposable, () -> editorComponent.getDocument().removeDocumentListener(listener));
   }
 
-  private static void updateVersionLabelAsync(final @NotNull DartComboBoxWithBrowseButton<String> dartSdkCombo,
+  private static void updateVersionLabelAsync(final @NotNull BasicComboBoxWithBrowseButton<String> dartSdkCombo,
                                               final @NotNull JBLabel versionLabel,
                                               final @NotNull Disposable parentDisposable) {
     final String sdkHomePath = getItemFromCombo(dartSdkCombo);
@@ -122,7 +122,7 @@ public final class DartSdkUtil {
       .submit(AppExecutorUtil.getAppExecutorService());
   }
 
-  private static @NotNull String getItemFromCombo(final @NotNull JComboBox<?> combo) {
+  private static @NotNull String getItemFromCombo(final @NotNull JComboBox<String> combo) {
     return combo.getEditor().getItem().toString().trim();
   }
 
@@ -134,7 +134,7 @@ public final class DartSdkUtil {
     return null;
   }
 
-  private static void addKnownPathsToCombo(final @NotNull JComboBox combo,
+  private static void addKnownPathsToCombo(final @NotNull JComboBox<String> combo,
                                            final @NotNull String propertyKey,
                                            final @NotNull Predicate<? super String> pathChecker) {
     final SmartList<String> validPathsForUI = new SmartList<>();
