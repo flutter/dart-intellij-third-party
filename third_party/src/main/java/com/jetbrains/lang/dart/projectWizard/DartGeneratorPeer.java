@@ -171,7 +171,7 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     myLoadedTemplatesPanel.setVisible(false);
 
     final AsyncProcessIcon asyncProcessIcon = new AsyncProcessIcon("Dart project templates loading");
-    myLoadingTemplatesPanel.add(asyncProcessIcon, new GridConstraints());
+    myLoadingTemplatesPanel.add(asyncProcessIcon, new GridConstraints());// defaults are ok: row = 0, column = 0
     asyncProcessIcon.resume();
 
     final String comboSdkPath = mySdkPathComboWithBrowse.getEditor().getItem().toString().trim();
@@ -187,6 +187,8 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
           myDartCreateTemplates = templates;
           myDartCreateTemplatesSdkPath = comboSdkPath;
 
+          // it's better to call onSdkPathChanged() but not showTemplates()
+          // directly as sdk path could have been changed during this long calculation
           onSdkPathChanged();
         }, ModalityState.any());
       });
@@ -199,6 +201,8 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
     if (myLoadedTemplatesPanel.isVisible() &&
         currentModel.getSize() == templates.size() &&
         IntStream.range(0, templates.size()).allMatch(i -> templates.get(i).getName().equals(currentModel.getElementAt(i).getName()))) {
+      // already showing the right list
+
       return;
     }
 
