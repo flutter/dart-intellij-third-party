@@ -61,7 +61,6 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   private String myDartCreateTemplatesSdkPath; //used to expire the above cache if the sdk is changed
 
   private String mySdkPathValidationError;
-  private Runnable myCheckValid;
 
   public DartGeneratorPeer() {
     // set initial values before initDartSdkControls() because listeners should not be triggered on initialization
@@ -72,7 +71,6 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
     myCreateSampleProjectCheckBox.addActionListener(e -> {
       myTemplatesList.setEnabled(myCreateSampleProjectCheckBox.isSelected());
-      fireCheckValid();
     });
     String selectedTemplateName = PropertiesComponent.getInstance().getValue(DART_PROJECT_TEMPLATE);
     myCreateSampleProjectCheckBox.setSelected(!CREATE_SAMPLE_UNCHECKED.equals(selectedTemplateName));
@@ -91,7 +89,6 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
         return component;
       }
     });
-    myTemplatesList.addListSelectionListener(e -> fireCheckValid());
 
     myErrorLabel.setIcon(AllIcons.Actions.Lightning);
     myErrorLabel.setVisible(false);
@@ -126,8 +123,6 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
         if (myIntellijLiveValidationEnabled) {
           validateInIntelliJ();
         }
-
-        fireCheckValid();
 
         if (errorMessage != null) {
           clearTemplates();
@@ -240,7 +235,6 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
 
   @Override
   public @NotNull JComponent getComponent(@NotNull TextFieldWithBrowseButton myLocationField, @NotNull Runnable checkValid) {
-    myCheckValid = checkValid;
     return myMainPanel;
   }
 
@@ -320,12 +314,6 @@ public class DartGeneratorPeer implements ProjectGeneratorPeer<DartProjectWizard
   @Override
   public boolean isBackgroundJobRunning() {
     return false;
-  }
-
-  private void fireCheckValid() {
-    if (myCheckValid != null) {
-      myCheckValid.run();
-    }
   }
 
   @Override
