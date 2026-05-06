@@ -20,6 +20,9 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.projectWizard.DartModuleBuilder
 import com.jetbrains.lang.dart.sdk.DartSdk
+import com.jetbrains.lang.dart.analytics.Analytics
+import com.jetbrains.lang.dart.analytics.SettingsData
+import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import kotlinx.coroutines.launch
@@ -56,6 +59,10 @@ class DartStartupActivity : ProjectActivity {
     serviceScope.launch {
       startAnalysisServerIfNeeded(project)
     }
+
+    serviceScope.launch {
+      reportSettingsAnalytics(project)
+    }
   }
 
   private suspend fun startAnalysisServerIfNeeded(project: Project) {
@@ -74,6 +81,19 @@ class DartStartupActivity : ProjectActivity {
     if (Registry.`is`("dart.launch.dtd.and.devtools", false)) {
       DartToolingDaemonService.getInstance(project).startService()
     }
+  }
+
+  private fun reportSettingsAnalytics(project: Project) {
+    val sdk = DartSdk.getDartSdk(project)
+    val dartSupportEnabled = sdk != null && ModuleManager.getInstance(project).modules.any { DartSdkLibUtil.isDartSdkEnabled(it) }
+
+    if (!dartSupportEnabled) return
+
+    val settingsData = SettingsData(project)
+    settingsData["experimentalLspFeaturesEnabled"] = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
+    settingsData["sdkVersion"] = sdk.version
+
+    Analytics.report(settingsData)
   }
 }
 
