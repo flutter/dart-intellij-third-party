@@ -7,6 +7,7 @@
 ### Removed
 
 ### Fixed
+- Avoid potential NullPointerExceptions in the indexer when recovering from malformed class declarations (#375)
 
 ## 505.0.0
 

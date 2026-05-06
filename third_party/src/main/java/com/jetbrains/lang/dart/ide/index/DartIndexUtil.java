@@ -51,6 +51,9 @@ public final class DartIndexUtil {
       PsiElement[] children = psiFile.getChildren();
 
       for (DartComponentName componentName : DartControlFlowUtil.getSimpleDeclarations(children, null, false)) {
+        if (componentName == null) {
+          continue;
+        }
         final String name = componentName.getName();
         if (name == null) {
           continue;
