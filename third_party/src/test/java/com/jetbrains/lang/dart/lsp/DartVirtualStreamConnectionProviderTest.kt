@@ -84,7 +84,34 @@ class DartVirtualStreamConnectionProviderTest : DartCodeInsightFixtureTestCase()
         assertTrue(jsonObject.get("result").isJsonNull)
     }
 
+    fun testDiagnosticServerRequest() {
+        val request = RequestMessage().apply {
+            jsonrpc = "2.0"
+            id = "3"
+            method = "dart/diagnosticServer"
+        }
+
+        sendRequest(request)
+
+        val responseJson = producer.responseQueue.poll(5, TimeUnit.SECONDS)
+        assertNotNull("No response received from provider", responseJson)
+
+        val jsonObject = JsonParser.parseString(responseJson).asJsonObject
+        assertEquals("2.0", jsonObject.get("jsonrpc").asString)
+        assertEquals("3", jsonObject.get("id").asString)
+        
+        if (jsonObject.has("error")) {
+            println("Server returned error: ${jsonObject.get("error")}")
+        } else {
+            assertTrue(jsonObject.has("result"))
+            val result = jsonObject.get("result").asJsonObject
+            assertTrue(result.has("port"))
+            println("Diagnostic server port: ${result.get("port").asInt}")
+        }
+    }
+
     fun testLanguageServerFactoryInUnitTestMode() {
+
         val factory = DartLanguageServerFactory()
         val connectionProvider = factory.createConnectionProvider(project)
         

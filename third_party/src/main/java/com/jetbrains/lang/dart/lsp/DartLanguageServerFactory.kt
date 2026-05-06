@@ -10,7 +10,9 @@ import com.jetbrains.lang.dart.logging.PluginLogger
 import com.redhat.devtools.lsp4ij.LanguageServerFactory
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
+import org.eclipse.lsp4j.services.LanguageServer
 import org.jetbrains.annotations.NotNull
+
 
 /**
  * Factory for creating the Dart Language Server connection.
@@ -46,4 +48,9 @@ class DartLanguageServerFactory : LanguageServerFactory {
     override fun createClientFeatures(): LSPClientFeatures {
         return DartLspClientFeatures()
     }
+
+    override fun getServerInterface(): Class<out LanguageServer> {
+        return DartLanguageServer::class.java
+    }
 }
+
