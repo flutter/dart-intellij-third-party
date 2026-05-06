@@ -3,12 +3,14 @@ package com.jetbrains.lang.dart.navigation;
 
 import com.intellij.navigation.ChooseByNameContributor;
 import com.intellij.navigation.NavigationItem;
+import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.ArrayUtil;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.ide.DartSymbolContributor;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Test the Dart "go to symbol" functionality.
@@ -42,10 +44,30 @@ public class DartGoToSymbolTest extends DartCodeInsightFixtureTestCase {
                                  """);
 
     DartSymbolContributor contributor = new DartSymbolContributor();
-    String[] allNames = contributor.getNames(getProject(), false);
-    assertFalse(ArrayUtil.contains("fooBarBaz0", allNames));
-    assertFalse(ArrayUtil.contains("FooBarBaz1", allNames));
-    assertFalse(ArrayUtil.contains("fooBarBaz8", allNames));
+    List<String> allNames = new ArrayList<>();
+    contributor.processNames(allNames::add, GlobalSearchScope.allScope(getProject()), null);
+    assertFalse(allNames.contains("fooBarBaz0"));
+    assertFalse(allNames.contains("FooBarBaz1"));
+    assertFalse(allNames.contains("fooBarBaz8"));
     assertNamesFound(contributor, "fooBarBaz1", "fooBarBaz2", "fooBarBaz3", "fooBarBaz4", "fooBarBaz5", "fooBarBaz6", "fooBarBaz7");
+  }
+
+  public void testGoToSymbolMalformedClass() {
+    myFixture.addFileToProject("malformed.dart",
+                               """
+                               class {
+                                 int x;
+                               }
+                               class <caret>Foo {
+                                 int y;
+                               }
+                               """);
+
+    DartSymbolContributor contributor = new DartSymbolContributor();
+    // This will trigger indexing and should not throw a NullPointerException.
+    // See: https://github.com/flutter/dart-intellij-third-party/issues/375
+    List<String> names = new ArrayList<>();
+    contributor.processNames(names::add, GlobalSearchScope.allScope(getProject()), null);
+    assertTrue(names.contains("Foo"));
   }
 }

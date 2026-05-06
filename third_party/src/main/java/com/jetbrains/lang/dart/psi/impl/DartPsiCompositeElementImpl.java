@@ -100,7 +100,7 @@ public class DartPsiCompositeElementImpl extends ASTWrapperPsiElement implements
 
       if (child instanceof DartTypeParameters) {
         for (DartTypeParameter typeParameter : ((DartTypeParameters)child).getTypeParameterList()) {
-          result.add(typeParameter.getComponentName());
+          ContainerUtil.addIfNotNull(result, typeParameter.getComponentName());
         }
       }
 
@@ -123,7 +123,7 @@ public class DartPsiCompositeElementImpl extends ASTWrapperPsiElement implements
       }
       final DartVarAccessDeclaration varDeclaration = forInPart == null ? null : forInPart.getVarAccessDeclaration();
       if (varDeclaration != null) {
-        result.add(varDeclaration.getComponentName());
+        ContainerUtil.addIfNotNull(result, varDeclaration.getComponentName());
       }
       final DartVarDeclarationList varDeclarationList = loopParts == null ? null : loopParts.getVarDeclarationList();
       if (varDeclarationList != null) {
