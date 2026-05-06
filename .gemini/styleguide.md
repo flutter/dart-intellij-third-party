@@ -56,3 +56,4 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - **DRY:** Identify blocks of code that are 90%+ identical to existing utility methods in this repo and flag them for duplication.
 - **Meaningful Naming:** Variables should describe their intent (e.g., `timeoutInMs` instead of `t`).
 - **Copyrights:** All new Dart, Java and Kotlin files should include a copyright header.
+- **Changelog Entries:** Enforce that there is a changelog entry for all new code and pull requests. Entries must strictly match the existing grammatical style using descriptive, state-based phrases (typically starting with gerunds, nouns, or verbs like *Avoid* / *Support* / *Log* / *Prevent*) rather than starting with the imperative verb *Fix* or *Add*.
