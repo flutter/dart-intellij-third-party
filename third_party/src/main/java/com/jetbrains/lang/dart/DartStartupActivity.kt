@@ -83,15 +83,20 @@ class DartStartupActivity : ProjectActivity {
     }
   }
 
-  private fun reportSettingsAnalytics(project: Project) {
-    val sdk = DartSdk.getDartSdk(project)
-    val dartSupportEnabled = sdk != null && ModuleManager.getInstance(project).modules.any { DartSdkLibUtil.isDartSdkEnabled(it) }
+  private suspend fun reportSettingsAnalytics(project: Project) {
+    val (dartSupportEnabled, sdkVersion, experimentalLspFeaturesEnabled) = readAction {
+      val sdk = DartSdk.getDartSdk(project)
+      val enabled = sdk != null && ModuleManager.getInstance(project).modules.any { DartSdkLibUtil.isDartSdkEnabled(it) }
+      val version = sdk?.version ?: "unknown"
+      val experimentalEnabled = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
+      Triple(enabled, version, experimentalEnabled)
+    }
 
     if (!dartSupportEnabled) return
 
     val settingsData = SettingsData(project)
-    settingsData["experimentalLspFeaturesEnabled"] = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
-    settingsData["sdkVersion"] = sdk.version
+    settingsData["experimentalLspFeaturesEnabled"] = experimentalLspFeaturesEnabled
+    settingsData["sdkVersion"] = sdkVersion
 
     Analytics.report(settingsData)
   }
