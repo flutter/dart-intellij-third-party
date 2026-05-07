@@ -2603,7 +2603,6 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   /**
-
    * Subscribe for verbose analysis server `server.log` notifications.
    */
   @SuppressWarnings("unused") // for Flutter plugin
