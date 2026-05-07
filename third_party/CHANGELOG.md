@@ -7,6 +7,7 @@
 ### Removed
 
 ### Fixed
+- Avoid AssertionErrors / UI crashes when navigating subclasses, superclasses, or overriding methods by migrating from deprecated `PsiElementListNavigator` to modern `PsiTargetNavigator`.
 - Avoid potential NullPointerExceptions in the indexer when recovering from malformed class declarations (#375)
 
 ## 505.0.0
