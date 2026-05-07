@@ -68,7 +68,6 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     private var isStopping = false
     private var clientMessageFuture: java.util.concurrent.Future<*>? = null
 
-
     override fun start() {
         logger.info("Starting DartVirtualStreamConnectionProvider")
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
@@ -147,15 +146,19 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun handleRequestMessage(message: RequestMessage) {
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
-        when (val method = LspMethod.fromMethod(message.method)) {
+        val lspMethod = LspMethod.fromMethod(message.method)
+        if (lspMethod == null) {
+            logger.info("Ignored unimplemented method from lsp4ij request: ${message.method}")
+            return
+        }
+
+        when (lspMethod) {
             LspMethod.INITIALIZE -> handleInitializeRequest(message)
             LspMethod.SHUTDOWN -> handleShutdownRequest(message)
-            LspMethod.HOVER -> handleHoverRequest(message, dartAnalysisService)
-            LspMethod.DIAGNOSTIC_SERVER -> handleDiagnosticServerRequest(message, dartAnalysisService)
-            null -> logger.info("Ignored unimplemented method from lsp4ij request: ${message.method}")
+            LspMethod.HOVER, LspMethod.DIAGNOSTIC_SERVER -> forwardLspRequestToDas(message, dartAnalysisService)
         }
-    }
 
+    }
 
     private fun handleNotificationMessage(message: NotificationMessage) {
         logger.info("Ignored unimplemented method from lsp4ij notification: ${message.method}")
@@ -173,8 +176,8 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         sendSuccessResponse(message.id, null)
     }
 
-    private fun handleHoverRequest(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
-        logger.info("Hover message received: $message")
+
+    private fun forwardLspRequestToDas(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
         val legacyRequest = JsonObject()
         val legacyId = dartAnalysisService.generateUniqueId()
         pendingLegacyIds.add(legacyId)
@@ -188,23 +191,6 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         // Forward to DAS.
         dartAnalysisService.sendRequest(legacyId, legacyRequest)
     }
-
-    private fun handleDiagnosticServerRequest(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
-        logger.info("Diagnostic server message received: $message")
-        val legacyRequest = JsonObject()
-        val legacyId = dartAnalysisService.generateUniqueId()
-        pendingLegacyIds.add(legacyId)
-        legacyRequest.addProperty("id", legacyId)
-        legacyRequest.addProperty("method", "lsp.handle")
-
-        val params = JsonObject()
-        params.add("lspMessage", JSON_HANDLER.gson.toJsonTree(message).asJsonObject)
-        legacyRequest.add("params", params)
-
-        // Forward to DAS.
-        dartAnalysisService.sendRequest(legacyId, legacyRequest)
-    }
-
 
     private fun sendResponseToClient(response: ResponseMessage) {
         val jsonString = JSON_HANDLER.gson.toJson(response)
