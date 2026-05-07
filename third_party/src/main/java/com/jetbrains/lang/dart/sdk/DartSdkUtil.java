@@ -1,24 +1,27 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.sdk;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.ide.util.PropertiesComponent;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.ComponentWithBrowseButton;
-import com.intellij.openapi.ui.TextComponentAccessor;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.Strings;
-import com.intellij.ui.ComboboxWithBrowseButton;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ArrayUtilRt;
 import com.intellij.util.SmartList;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.system.CpuArch;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -64,11 +67,26 @@ public final class DartSdkUtil {
   }
 
   public static void initDartSdkControls(final @Nullable Project project,
-                                         final @NotNull ComboboxWithBrowseButton dartSdkPathComponent,
-                                         final @NotNull JBLabel versionLabel) {
-    dartSdkPathComponent.getComboBox().setEditable(true);
-    addKnownPathsToCombo(dartSdkPathComponent.getComboBox(), DART_SDK_KNOWN_PATHS, DartSdkUtil::isDartSdkHome);
-    if (getItemFromCombo(dartSdkPathComponent.getComboBox()).isEmpty()) {
+                                         final @NotNull BasicComboBoxWithBrowseButton<String> dartSdkCombo,
+                                         final @NotNull JBLabel versionLabel,
+                                         final @NotNull Disposable parentDisposable) {
+    dartSdkCombo.addBrowseFolderListener(DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"),
+                                         project,
+                                         FileChooserDescriptorFactory.createSingleFolderDescriptor()
+                                           .withTitle(DartBundle.message("button.browse.dialog.title.select.dart.sdk.path")),
+                                         path -> {
+                                           if (!path.isEmpty() && !isDartSdkHome(path)) {
+                                             final String probablySdkPath = path + "/dart-sdk";
+                                             if (isDartSdkHome(probablySdkPath)) {
+                                               return probablySdkPath;
+                                             }
+                                           }
+                                           return path;
+                                         },
+                                         path -> dartSdkCombo.getEditor().setItem(FileUtil.toSystemDependentName(path)));
+
+    addKnownPathsToCombo(dartSdkCombo, DART_SDK_KNOWN_PATHS, DartSdkUtil::isDartSdkHome);
+    if (getItemFromCombo(dartSdkCombo).isEmpty()) {
       // Suggest default path according to https://dart.dev/get-dart.
       // No need to check folder presence here; even if it doesn't exist - that's the best we can suggest
       @NlsSafe String path = SystemInfo.isMac ? CpuArch.isArm64() ? "/opt/homebrew/opt/dart/libexec"
@@ -77,52 +95,34 @@ public final class DartSdkUtil {
                                                                      : SystemInfo.isLinux ? "/usr/lib/dart"
                                                                                           : null;
       if (path != null) {
-        dartSdkPathComponent.getComboBox().getEditor().setItem(path);
+        dartSdkCombo.getEditor().setItem(path);
       }
     }
 
-    final String sdkHomePath = getItemFromCombo(dartSdkPathComponent.getComboBox());
-    final String sdkVersion = getSdkVersion(sdkHomePath);
-    versionLabel.setText(sdkVersion == null ? "" : sdkVersion);
+    updateVersionLabelAsync(dartSdkCombo, versionLabel, parentDisposable);
 
-    final TextComponentAccessor<JComboBox> textComponentAccessor = new TextComponentAccessor<>() {
-      @Override
-      public String getText(final JComboBox component) {
-        return getItemFromCombo(component);
-      }
-
-      @Override
-      public void setText(final @NotNull JComboBox component, final @NotNull String text) {
-        if (!text.isEmpty() && !isDartSdkHome(text)) {
-          final String probablySdkPath = text + "/dart-sdk";
-          if (isDartSdkHome(probablySdkPath)) {
-            component.getEditor().setItem(FileUtil.toSystemDependentName(probablySdkPath));
-            return;
-          }
-        }
-
-        component.getEditor().setItem(FileUtil.toSystemDependentName(text));
-      }
-    };
-
-    var descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor().withTitle(DartBundle.message("button.browse.dialog.title.select.dart.sdk.path"));
-    var browseFolderListener = new ComponentWithBrowseButton.BrowseFolderActionListener<>(dartSdkPathComponent, project, descriptor, textComponentAccessor);
-    dartSdkPathComponent.addActionListener(browseFolderListener);
-
-    final JTextComponent editorComponent = (JTextComponent)dartSdkPathComponent.getComboBox().getEditor().getEditorComponent();
-    editorComponent.getDocument().addDocumentListener(new DocumentAdapter() {
+    final JTextComponent editorComponent = (JTextComponent)dartSdkCombo.getEditor().getEditorComponent();
+    final DocumentAdapter listener = new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
-        final String sdkHomePath = getItemFromCombo(dartSdkPathComponent.getComboBox());
-        if(e.getType() == DocumentEvent.EventType.INSERT){
-          final String sdkVersion = getSdkVersion(sdkHomePath);
-          versionLabel.setText(sdkVersion == null ? "" : sdkVersion);
-        }
+        updateVersionLabelAsync(dartSdkCombo, versionLabel, parentDisposable);
       }
-    });
+    };
+    editorComponent.getDocument().addDocumentListener(listener);
+    Disposer.register(parentDisposable, () -> editorComponent.getDocument().removeDocumentListener(listener));
   }
 
-  private static @NotNull String getItemFromCombo(final @NotNull JComboBox combo) {
+  private static void updateVersionLabelAsync(final @NotNull BasicComboBoxWithBrowseButton<String> dartSdkCombo,
+                                              final @NotNull JBLabel versionLabel,
+                                              final @NotNull Disposable parentDisposable) {
+    final String sdkHomePath = getItemFromCombo(dartSdkCombo);
+    ReadAction.nonBlocking(() -> getSdkVersion(sdkHomePath))
+      .expireWith(parentDisposable)
+      .finishOnUiThread(ModalityState.any(), version -> versionLabel.setText(version == null ? "" : version))
+      .submit(AppExecutorUtil.getAppExecutorService());
+  }
+
+  private static @NotNull String getItemFromCombo(final @NotNull JComboBox<String> combo) {
     return combo.getEditor().getItem().toString().trim();
   }
 
@@ -134,7 +134,7 @@ public final class DartSdkUtil {
     return null;
   }
 
-  private static void addKnownPathsToCombo(final @NotNull JComboBox combo,
+  private static void addKnownPathsToCombo(final @NotNull JComboBox<String> combo,
                                            final @NotNull String propertyKey,
                                            final @NotNull Predicate<? super String> pathChecker) {
     final SmartList<String> validPathsForUI = new SmartList<>();

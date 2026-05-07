@@ -5,17 +5,20 @@ import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.actions.ShowSettingsUtilImpl;
 import com.intellij.ide.util.PropertiesComponent;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.module.ModuleType;
 import com.intellij.openapi.options.Configurable.NoScroll;
 import com.intellij.openapi.options.SearchableConfigurable;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
@@ -23,7 +26,10 @@ import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.IdeFocusManager;
+import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.ui.*;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
@@ -33,12 +39,12 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
+import com.jetbrains.lang.dart.lsp.DartLspConstants;
+import com.jetbrains.lang.dart.lsp.LspMethod;
+import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import org.jetbrains.annotations.Nls;
-import com.jetbrains.lang.dart.lsp.LspMethod;
-import com.jetbrains.lang.dart.lsp.DartLspConstants;
-import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -50,8 +56,9 @@ import javax.swing.text.JTextComponent;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.ExpandVetoException;
 import java.util.*;
+import java.util.stream.Collectors;
 
-public final class DartConfigurable implements SearchableConfigurable, NoScroll {
+public final class DartConfigurable implements SearchableConfigurable, NoScroll, Disposable {
   public static final int WEBDEV_PORT_DEFAULT = 53322;
   private static final String WEBDEV_PORT_PROPERTY_NAME = "dart.webdev.port";
 
@@ -61,7 +68,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   private JBCheckBox myEnableDartSupportCheckBox;
 
   private JPanel mySettingsPanel;
-  private ComboboxWithBrowseButton mySdkPathComboWithBrowse;
+  private BasicComboBoxWithBrowseButton<String> mySdkPathComboWithBrowse;
   private JBLabel myVersionLabel;
   private JBCheckBox myCheckSdkUpdateCheckBox;
   // disabled and unchecked, shown in UI instead of myCheckSdkUpdateCheckBox if selected Dart SDK is a part of a Flutter SDK
@@ -113,10 +120,10 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   }
 
   private void initDartSdkControls() {
-    DartSdkUtil.initDartSdkControls(myProject, mySdkPathComboWithBrowse, myVersionLabel);
+    DartSdkUtil.initDartSdkControls(myProject, mySdkPathComboWithBrowse, myVersionLabel, this);
 
-    final JTextComponent sdkEditor = (JTextComponent)mySdkPathComboWithBrowse.getComboBox().getEditor().getEditorComponent();
-    sdkEditor.getDocument().addDocumentListener(new DocumentAdapter() {
+    final JTextComponent sdkEditor = (JTextComponent)mySdkPathComboWithBrowse.getEditor().getEditorComponent();
+    final DocumentAdapter listener = new DocumentAdapter() {
       @Override
       protected void textChanged(final @NotNull DocumentEvent e) {
         final String sdkHomePath = getTextFromCombo(mySdkPathComboWithBrowse);
@@ -130,7 +137,9 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
         updateControlsEnabledState();
         updateErrorLabel();
       }
-    });
+    };
+    sdkEditor.getDocument().addDocumentListener(listener);
+    Disposer.register(this, () -> sdkEditor.getDocument().removeDocumentListener(listener));
 
     myCheckSdkUpdateCheckBox.addActionListener(e -> {
       final boolean enabled = myCheckSdkUpdateCheckBox.isSelected() && myCheckSdkUpdateCheckBox.isEnabled();
@@ -264,8 +273,8 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     return false;
   }
 
-  private static @NotNull String getTextFromCombo(final @NotNull ComboboxWithBrowseButton combo) {
-    return FileUtilRt.toSystemIndependentName(combo.getComboBox().getEditor().getItem().toString().trim());
+  private static @NotNull String getTextFromCombo(final @NotNull ComboBox<?> combo) {
+    return FileUtilRt.toSystemIndependentName(combo.getEditor().getItem().toString().trim());
   }
 
   @Override
@@ -283,9 +292,9 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
     // reset UI
     myEnableDartSupportCheckBox.setSelected(myDartSupportEnabledInitial);
     @NlsSafe String sdkInitialPath = mySdkInitial == null ? "" : FileUtilRt.toSystemDependentName(mySdkInitial.getHomePath());
-    mySdkPathComboWithBrowse.getComboBox().getEditor().setItem(sdkInitialPath);
+    mySdkPathComboWithBrowse.getEditor().setItem(sdkInitialPath);
     if (!sdkInitialPath.isEmpty()) {
-      ensureComboModelContainsCurrentItem(mySdkPathComboWithBrowse.getComboBox());
+      ensureComboModelContainsCurrentItem(mySdkPathComboWithBrowse);
     }
 
     final DartSdkUpdateOption sdkUpdateOption = DartSdkUpdateOption.getDartSdkUpdateOption();
@@ -384,6 +393,14 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   public void disposeUIResources() {
     mySdkInitial = null;
     myModulesWithDartSdkLibAttachedInitial.clear();
+    Disposer.dispose(this);
+  }
+
+  @Override
+  public void dispose() {
+    // No-op: this class implements Disposable solely to act as a parent node in the Disposer tree.
+    // All actual resource cleanup (e.g., DocumentListeners) is handled by child Disposables
+    // registered with this instance and triggered via Disposer.dispose(this) in disposeUIResources().
   }
 
   private void updateControlsEnabledState() {
@@ -437,7 +454,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll 
   }
 
   private void createUIComponents() {
-    mySdkPathComboWithBrowse = new ComboboxWithBrowseButton(new ComboBox<>());
+    mySdkPathComboWithBrowse = new BasicComboBoxWithBrowseButton<>();
 
     final CheckboxTree.CheckboxTreeCellRenderer checkboxTreeCellRenderer = new CheckboxTree.CheckboxTreeCellRenderer() {
       @Override

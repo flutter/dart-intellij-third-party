@@ -13,7 +13,7 @@ permissions:
 jobs:
   # Job 1: Build Plugin
   build-plugin:
-    runs-on: ubuntu-large
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6 # Use the latest stable version of actions/checkout
@@ -34,8 +34,7 @@ jobs:
     needs: build-plugin
     strategy:
       matrix:
-        # TODO(https://github.com/flutter/dart-intellij-third-party/pull/33) Fix and enable execution on Windows
-        os: [ubuntu-large, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
@@ -57,9 +56,10 @@ jobs:
     needs: build-plugin
     strategy:
       matrix:
-        # TODO(pq): temporarily reduced to address IO exceptions (https://github.com/flutter/dart-intellij-third-party/issues/220)
-        # os: [ ubuntu-large, macos-latest, windows-latest ]
+        # Note that `ubuntu-large` is required here lest we hit IO exceptions on linux (see, e.g., https://github.com/flutter/dart-intellij-third-party/issues/220)
         os: [ ubuntu-large ]
+        # If we can address IO failures on other platforms, we might widen the matrix too
+        # os: [ ubuntu-large, macos-latest, windows-latest ]
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code

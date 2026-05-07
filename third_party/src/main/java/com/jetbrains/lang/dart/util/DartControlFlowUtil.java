@@ -2,7 +2,12 @@
 package com.jetbrains.lang.dart.util;
 
 import com.intellij.psi.PsiElement;
-import com.jetbrains.lang.dart.psi.*;
+import com.intellij.util.containers.ContainerUtil;
+import com.jetbrains.lang.dart.psi.DartComponent;
+import com.jetbrains.lang.dart.psi.DartComponentName;
+import com.jetbrains.lang.dart.psi.DartVarAccessDeclaration;
+import com.jetbrains.lang.dart.psi.DartVarDeclarationList;
+import com.jetbrains.lang.dart.psi.DartVarDeclarationListPart;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
@@ -25,7 +30,7 @@ public final class DartControlFlowUtil {
       else if (child instanceof DartComponent) {
         boolean isFieldOrVar = child instanceof DartVarAccessDeclaration || child instanceof DartVarDeclarationListPart;
         if (!isFieldOrVar) {
-          result.add(((DartComponent)child).getComponentName());
+          ContainerUtil.addIfNotNull(result, ((DartComponent)child).getComponentName());
         }
       }
     }
@@ -33,9 +38,12 @@ public final class DartControlFlowUtil {
   }
 
   public static void addFromVarDeclarationList(Set<? super DartComponentName> result, DartVarDeclarationList declarationList) {
-    result.add(declarationList.getVarAccessDeclaration().getComponentName());
+    DartVarAccessDeclaration varAccessDeclaration = declarationList.getVarAccessDeclaration();
+    if (varAccessDeclaration != null) {
+      ContainerUtil.addIfNotNull(result, varAccessDeclaration.getComponentName());
+    }
     for (DartVarDeclarationListPart declarationListPart : declarationList.getVarDeclarationListPartList()) {
-      result.add(declarationListPart.getComponentName());
+      ContainerUtil.addIfNotNull(result, declarationListPart.getComponentName());
     }
   }
 }
