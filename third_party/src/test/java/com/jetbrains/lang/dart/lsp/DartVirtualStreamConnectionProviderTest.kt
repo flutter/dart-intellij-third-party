@@ -5,9 +5,11 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+
 import com.google.gson.JsonParser
 import com.intellij.openapi.util.Disposer
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage
 import java.util.concurrent.TimeUnit
@@ -91,27 +93,86 @@ class DartVirtualStreamConnectionProviderTest : DartCodeInsightFixtureTestCase()
             method = "dart/diagnosticServer"
         }
 
-        sendRequest(request)
+        var capturedRequest: String? = null
+        val mockServer = createMockServer { json -> capturedRequest = json }
 
-        val responseJson = producer.responseQueue.poll(5, TimeUnit.SECONDS)
-        assertNotNull("No response received from provider", responseJson)
+        val dartAnalysisService = DartAnalysisServerService.getInstance(project)
+        dartAnalysisService.setServer(mockServer)
 
-        val jsonObject = JsonParser.parseString(responseJson).asJsonObject
-        assertEquals("2.0", jsonObject.get("jsonrpc").asString)
-        assertEquals("3", jsonObject.get("id").asString)
-        
-        if (jsonObject.has("error")) {
-            println("Server returned error: ${jsonObject.get("error")}")
-        } else {
-            assertTrue(jsonObject.has("result"))
-            val result = jsonObject.get("result").asJsonObject
-            assertTrue(result.has("port"))
-            println("Diagnostic server port: ${result.get("port").asInt}")
+        try {
+            // Send initialize request first to put server in initialized state
+            val initRequest = RequestMessage().apply {
+                jsonrpc = "2.0"
+                id = "1"
+                method = "initialize"
+            }
+            sendRequest(initRequest)
+            producer.responseQueue.poll(5, TimeUnit.SECONDS) // consume response
+
+            sendRequest(request)
+
+            // Wait for the request to be captured
+            var attempts = 0
+            while (capturedRequest == null && attempts < 50) {
+                Thread.sleep(100)
+                attempts++
+            }
+
+            assertNotNull("No request captured by listener", capturedRequest)
+
+            val jsonObject = JsonParser.parseString(capturedRequest).asJsonObject
+            assertEquals("lsp.handle", jsonObject.get("method").asString)
+
+            val params = jsonObject.get("params").asJsonObject
+            assertTrue(params.has("lspMessage"))
+
+            val lspMessage = params.get("lspMessage").asJsonObject
+            assertEquals("2.0", lspMessage.get("jsonrpc").asString)
+            assertEquals("3", lspMessage.get("id").asString)
+            assertEquals("dart/diagnosticServer", lspMessage.get("method").asString)
+        } finally {
+            dartAnalysisService.setServer(null)
+        }
+    }
+
+    private fun createMockServer(onRequestSent: (String) -> Unit): com.google.dart.server.internal.remote.RemoteAnalysisServerImpl {
+        val stubSocket = object : com.google.dart.server.AnalysisServerSocket {
+            override fun getErrorStream(): com.google.dart.server.internal.remote.ByteLineReaderStream? = null
+            override fun getRequestSink(): com.google.dart.server.internal.remote.RequestSink? = null
+            override fun getResponseStream(): com.google.dart.server.internal.remote.ResponseStream? = null
+            override fun isOpen(): Boolean = false
+            override fun start() {}
+            override fun stop() {}
+        }
+
+        return object : com.google.dart.server.internal.remote.RemoteAnalysisServerImpl(stubSocket) {
+            override fun generateUniqueId(): String = "123"
+
+            override fun sendRequestToServer(id: String, request: com.google.gson.JsonObject) {
+                onRequestSent(request.toString())
+            }
+
+            override fun sendRequestToServer(id: String, request: com.google.gson.JsonObject, consumer: com.google.dart.server.Consumer) {
+                onRequestSent(request.toString())
+            }
+
+            override fun server_openUrlRequest(url: String?) {}
+
+            override fun server_showMessageRequest(
+                messageType: String?,
+                message: String?,
+                messageActions: MutableList<org.dartlang.analysis.server.protocol.MessageAction>?,
+                consumer: com.google.dart.server.ShowMessageRequestConsumer?
+            ) {}
+
+            override fun lsp_workspaceApplyEdit(
+                params: org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams?,
+                consumer: com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer?
+            ) {}
         }
     }
 
     fun testLanguageServerFactoryInUnitTestMode() {
-
         val factory = DartLanguageServerFactory()
         val connectionProvider = factory.createConnectionProvider(project)
         

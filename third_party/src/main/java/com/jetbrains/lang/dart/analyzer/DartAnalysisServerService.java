@@ -2597,7 +2597,13 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
+  @com.google.common.annotations.VisibleForTesting
+  public void setServer(@Nullable RemoteAnalysisServerImpl server) {
+    myServer = server;
+  }
+
   /**
+
    * Subscribe for verbose analysis server `server.log` notifications.
    */
   @SuppressWarnings("unused") // for Flutter plugin

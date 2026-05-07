@@ -13,7 +13,6 @@ import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
 import org.eclipse.lsp4j.services.LanguageServer
 import org.jetbrains.annotations.NotNull
 
-
 /**
  * Factory for creating the Dart Language Server connection.
  *
@@ -53,4 +52,3 @@ class DartLanguageServerFactory : LanguageServerFactory {
         return DartLanguageServer::class.java
     }
 }
-
