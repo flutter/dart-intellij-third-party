@@ -5,6 +5,7 @@ import com.intellij.codeInsight.daemon.DaemonBundle;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
 import com.intellij.codeInsight.daemon.impl.PsiElementListNavigator;
+import com.intellij.codeInsight.navigation.PsiTargetNavigator;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.util.DefaultPsiElementCellRenderer;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
@@ -84,8 +85,9 @@ public final class DartServerImplementationsMarkerProvider implements LineMarker
                             DartInheritorsSearcher.getSubClasses(name.getProject(), GlobalSearchScope.allScope(name.getProject()), items);
                     String popupTitle = DaemonBundle.message("navigation.title.subclass", name.getName(), components.size(), "");
                     String findUsagesTitle = DartBundle.message("tab.title.subclasses.of.0", name.getName());
-                    PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(components), popupTitle, findUsagesTitle,
-                            new DefaultPsiElementCellRenderer());
+                    new PsiTargetNavigator<>(DartResolveUtil.getComponentNameArray(components))
+                            .tabTitle(findUsagesTitle)
+                            .navigate(e, popupTitle, name.getProject());
                 },
                 GutterIconRenderer.Alignment.RIGHT,
                 () -> accessibleName
@@ -114,8 +116,9 @@ public final class DartServerImplementationsMarkerProvider implements LineMarker
                             DartInheritorsSearcher.getSubMembers(name.getProject(), GlobalSearchScope.allScope(name.getProject()), items);
                     String popupTitle = DaemonBundle.message("navigation.title.overrider.method", name.getName(), components.size());
                     String findUsagesTitle = DartBundle.message("tab.title.overriding.methods.of.0", name.getName());
-                    PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(components), popupTitle, findUsagesTitle,
-                            new DefaultPsiElementCellRenderer());
+                    new PsiTargetNavigator<>(DartResolveUtil.getComponentNameArray(components))
+                            .tabTitle(findUsagesTitle)
+                            .navigate(e, popupTitle, name.getProject());
                 },
                 GutterIconRenderer.Alignment.RIGHT,
                 () -> accessibleName

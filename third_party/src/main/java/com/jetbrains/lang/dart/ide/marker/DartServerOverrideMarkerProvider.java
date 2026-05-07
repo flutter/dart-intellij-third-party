@@ -4,9 +4,8 @@ package com.jetbrains.lang.dart.ide.marker;
 import com.intellij.codeInsight.daemon.DaemonBundle;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
-import com.intellij.codeInsight.daemon.impl.PsiElementListNavigator;
+import com.intellij.codeInsight.navigation.PsiTargetNavigator;
 import com.intellij.icons.AllIcons;
-import com.intellij.ide.util.DefaultPsiElementCellRenderer;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -113,10 +112,9 @@ public final class DartServerOverrideMarkerProvider implements LineMarkerProvide
                 superComponents.add(superclassComponent);
             }
             superComponents.addAll(interfaceComponents);
-            PsiElementListNavigator.openTargets(e, DartResolveUtil.getComponentNameArray(superComponents),
-                    DaemonBundle.message("navigation.title.super.method", name),
-                    DaemonBundle.message("navigation.findUsages.title.super.method", name),
-                    new DefaultPsiElementCellRenderer());
+            new PsiTargetNavigator<>(DartResolveUtil.getComponentNameArray(superComponents))
+                    .tabTitle(DaemonBundle.message("navigation.findUsages.title.super.method", name))
+                    .navigate(e, DaemonBundle.message("navigation.title.super.method", name), componentName.getProject());
         }, GutterIconRenderer.Alignment.LEFT, () -> accessibleName);
     }
 

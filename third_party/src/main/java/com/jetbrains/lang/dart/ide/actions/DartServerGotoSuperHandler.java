@@ -2,8 +2,7 @@
 package com.jetbrains.lang.dart.ide.actions;
 
 import com.intellij.codeInsight.CodeInsightBundle;
-import com.intellij.codeInsight.daemon.impl.PsiElementListNavigator;
-import com.intellij.ide.util.DefaultPsiElementCellRenderer;
+import com.intellij.codeInsight.navigation.PsiTargetNavigator;
 import com.intellij.lang.LanguageCodeInsightActionHandler;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
@@ -72,7 +71,8 @@ public final class DartServerGotoSuperHandler implements LanguageCodeInsightActi
     }
     // open DartComponent(s)
     final NavigatablePsiElement[] targets = DartResolveUtil.getComponentNameArray(supers);
-    PsiElementListNavigator.openTargets(editor, targets, title, null, new DefaultPsiElementCellRenderer());
+    new PsiTargetNavigator<>(targets)
+        .navigate(editor, title);
   }
 
   @Override
