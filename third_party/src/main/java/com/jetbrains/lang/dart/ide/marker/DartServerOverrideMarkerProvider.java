@@ -112,7 +112,7 @@ public final class DartServerOverrideMarkerProvider implements LineMarkerProvide
                 superComponents.add(superclassComponent);
             }
             superComponents.addAll(interfaceComponents);
-            new PsiTargetNavigator<>(DartResolveUtil.getComponentNameArray(superComponents))
+            new PsiTargetNavigator<>(() -> DartResolveUtil.getComponentNames(superComponents))
                     .tabTitle(DaemonBundle.message("navigation.findUsages.title.super.method", name))
                     .navigate(e, DaemonBundle.message("navigation.title.super.method", name), componentName.getProject());
         }, GutterIconRenderer.Alignment.LEFT, () -> accessibleName);

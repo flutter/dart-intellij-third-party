@@ -7,7 +7,6 @@ import com.intellij.lang.LanguageCodeInsightActionHandler;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.NavigatablePsiElement;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -37,30 +36,6 @@ public final class DartServerGotoSuperHandler implements LanguageCodeInsightActi
       return;
     }
     final boolean isInClass = inComponent instanceof DartClass;
-    // ask for the super type hierarchy
-    final VirtualFile virtualFile = psiFile.getVirtualFile();
-    final int offset = inComponent.getComponentName().getTextRange().getStartOffset();
-    final List<TypeHierarchyItem> items = DartAnalysisServerService.getInstance(project).search_getTypeHierarchy(virtualFile, offset, true);
-    // build list of DartComponent(s)
-    final List<DartComponent> supers = new ArrayList<>();
-    if (!items.isEmpty()) {
-      TypeHierarchyItem seed = items.getFirst();
-      {
-        final Integer superIndex = seed.getSuperclass();
-        if (superIndex != null) {
-          final TypeHierarchyItem superItem = items.get(superIndex);
-          addSuperComponent(project, supers, isInClass, superItem);
-        }
-      }
-      for (int superIndex : seed.getMixins()) {
-        final TypeHierarchyItem superItem = items.get(superIndex);
-        addSuperComponent(project, supers, isInClass, superItem);
-      }
-      for (int superIndex : seed.getInterfaces()) {
-        final TypeHierarchyItem superItem = items.get(superIndex);
-        addSuperComponent(project, supers, isInClass, superItem);
-      }
-    }
     // prepare the title
     final String title;
     if (isInClass) {
@@ -69,10 +44,37 @@ public final class DartServerGotoSuperHandler implements LanguageCodeInsightActi
     else {
       title = CodeInsightBundle.message("goto.super.method.chooser.title");
     }
+
+    final VirtualFile virtualFile = psiFile.getVirtualFile();
+    final int offset = inComponent.getComponentName().getTextRange().getStartOffset();
+
+    // ask for the super type hierarchy
+    new PsiTargetNavigator<>(() -> {
+        final List<TypeHierarchyItem> items = DartAnalysisServerService.getInstance(project).search_getTypeHierarchy(virtualFile, offset, true);
+        // build list of DartComponent(s)
+        final List<DartComponent> supers = new ArrayList<>();
+        if (!items.isEmpty()) {
+          TypeHierarchyItem seed = items.getFirst();
+          {
+            final Integer superIndex = seed.getSuperclass();
+            if (superIndex != null) {
+              final TypeHierarchyItem superItem = items.get(superIndex);
+              addSuperComponent(project, supers, isInClass, superItem);
+            }
+          }
+          for (int superIndex : seed.getMixins()) {
+            final TypeHierarchyItem superItem = items.get(superIndex);
+            addSuperComponent(project, supers, isInClass, superItem);
+          }
+          for (int superIndex : seed.getInterfaces()) {
+            final TypeHierarchyItem superItem = items.get(superIndex);
+            addSuperComponent(project, supers, isInClass, superItem);
+          }
+        }
+        return DartResolveUtil.getComponentNames(supers);
+    })
     // open DartComponent(s)
-    final NavigatablePsiElement[] targets = DartResolveUtil.getComponentNameArray(supers);
-    new PsiTargetNavigator<>(targets)
-        .navigate(editor, title);
+    .navigate(editor, title);
   }
 
   @Override
