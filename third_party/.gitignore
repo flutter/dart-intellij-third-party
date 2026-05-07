@@ -36,9 +36,6 @@ gradle-app.setting
 # Cache of project
 .gradletasknamecache
 
-# windows file
-gradlew.bat
-
 # Java heap dump
 *.hprof
 
