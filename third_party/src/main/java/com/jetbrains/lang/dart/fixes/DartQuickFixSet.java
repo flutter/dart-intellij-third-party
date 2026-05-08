@@ -85,6 +85,7 @@ public class DartQuickFixSet {
       if (fixes == null || fixes.isEmpty()) return;
 
       int index = 0;
+      List<SourceChange> ignoreFixes = new ArrayList<>(3);
       for (AnalysisErrorFixes fix : fixes) {
         if (!Objects.equals(fix.getError().getCode(), myErrorCode)) continue;
 
@@ -96,13 +97,23 @@ public class DartQuickFixSet {
           String changeId = sourceChange.getId();
           if (changeId != null && changeId.startsWith(DART_FIX_IGNORE_PREFIX)) {
             myProblemGroup.addIgnoreFix(sourceChange);
+            ignoreFixes.add(sourceChange);
           }
           else {
-            myQuickFixes.get(index).setSourceChange(sourceChange);
-            index++;
-            if (index == MAX_QUICK_FIXES) return;
+            if (index < MAX_QUICK_FIXES) {
+              myQuickFixes.get(index).setSourceChange(sourceChange);
+              index++;
+            }
           }
         }
+      }
+
+      for (SourceChange ignoreFix : ignoreFixes) {
+        if (index == MAX_QUICK_FIXES) {
+          break;
+        }
+        myQuickFixes.get(index).setSourceChange(ignoreFix);
+        index++;
       }
     };
 
