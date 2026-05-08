@@ -3,6 +3,8 @@ package com.jetbrains.lang.dart.analyzer;
 
 import com.google.common.collect.EvictingQueue;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.google.common.annotations.VisibleForTesting;
+
 import com.google.dart.server.*;
 import com.google.dart.server.generated.AnalysisServer;
 import com.google.dart.server.internal.remote.DebugPrintStream;
@@ -2595,6 +2597,12 @@ public final class DartAnalysisServerService implements Disposable {
     if (server != null) {
       server.sendRequestToServer(id, request, consumer);
     }
+  }
+
+  @VisibleForTesting
+
+  public void setServer(@Nullable RemoteAnalysisServerImpl server) {
+    myServer = server;
   }
 
   /**

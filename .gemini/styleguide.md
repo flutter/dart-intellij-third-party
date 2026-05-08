@@ -42,6 +42,7 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - **Scope Functions:** Use `.let`, `.apply`, and `.also` correctly to reduce temporary variables.
 - **Null Safety:** NEVER use the double-bang `!!` operator. Use `?.`, `?:`, or `if (x != null)`.
 - **Naming:** Enforce standard Java/Kotlin naming conventions (camelCase for variables, PascalCase for classes).
+- Use imports instead of fully qualified names.
 
 ### Java (Modern)
 - Use **Switch Expressions** instead of multi-line `if/else` or old `switch` statements.
@@ -50,6 +51,7 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - Prefer **Composition over Inheritance** for plugin components.
 - Avoid using reflection without a strong justification.
 - Avoid stray `TODO` or `FIXME` comments without justification.
+- Use imports instead of fully qualified names.
 
 ## 4. Code Quality & Maintainability
 - **Single Responsibility:** Methods should ideally be 10-20 lines. If a method exceeds 30 lines, suggest a refactor.

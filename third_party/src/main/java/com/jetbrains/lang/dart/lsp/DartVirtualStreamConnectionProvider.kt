@@ -68,7 +68,6 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     private var isStopping = false
     private var clientMessageFuture: java.util.concurrent.Future<*>? = null
 
-
     override fun start() {
         logger.info("Starting DartVirtualStreamConnectionProvider")
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
@@ -147,12 +146,18 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun handleRequestMessage(message: RequestMessage) {
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
-        when (val method = LspMethod.fromMethod(message.method)) {
+        val lspMethod = LspMethod.fromMethod(message.method)
+        if (lspMethod == null) {
+            logger.info("Ignored unimplemented method from lsp4ij request: ${message.method}")
+            return
+        }
+
+        when (lspMethod) {
             LspMethod.INITIALIZE -> handleInitializeRequest(message)
             LspMethod.SHUTDOWN -> handleShutdownRequest(message)
-            LspMethod.HOVER -> handleHoverRequest(message, dartAnalysisService)
-            null -> logger.info("Ignored unimplemented method from lsp4ij request: ${message.method}")
+            LspMethod.HOVER, LspMethod.DIAGNOSTIC_SERVER -> forwardLspRequestToDas(message, dartAnalysisService)
         }
+
     }
 
     private fun handleNotificationMessage(message: NotificationMessage) {
@@ -171,8 +176,8 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         sendSuccessResponse(message.id, null)
     }
 
-    private fun handleHoverRequest(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
-        logger.info("Hover message received: $message")
+
+    private fun forwardLspRequestToDas(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
         val legacyRequest = JsonObject()
         val legacyId = dartAnalysisService.generateUniqueId()
         pendingLegacyIds.add(legacyId)

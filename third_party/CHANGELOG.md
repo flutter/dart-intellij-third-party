@@ -1,6 +1,8 @@
 ## Unreleased
 
 ### Added
+- Hover implemented with lsp4ij and experimental features setting (#357)
+- Retrieving diagnostics server with lsp4ij (#391)
 
 ### Changed
 
