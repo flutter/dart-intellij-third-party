@@ -10,6 +10,18 @@ import com.google.gson.JsonParser
 import com.intellij.openapi.util.Disposer
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
+import com.google.dart.server.AnalysisServerSocket
+import com.google.gson.JsonObject
+import com.google.dart.server.Consumer
+import com.google.dart.server.ShowMessageRequestConsumer
+import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
+import com.google.dart.server.internal.remote.ByteLineReaderStream
+import com.google.dart.server.internal.remote.RequestSink
+import com.google.dart.server.internal.remote.ResponseStream
+import org.dartlang.analysis.server.protocol.MessageAction
+import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
+
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage
 import java.util.concurrent.TimeUnit
@@ -135,24 +147,24 @@ class DartVirtualStreamConnectionProviderTest : DartCodeInsightFixtureTestCase()
         }
     }
 
-    private fun createMockServer(onRequestSent: (String) -> Unit): com.google.dart.server.internal.remote.RemoteAnalysisServerImpl {
-        val stubSocket = object : com.google.dart.server.AnalysisServerSocket {
-            override fun getErrorStream(): com.google.dart.server.internal.remote.ByteLineReaderStream? = null
-            override fun getRequestSink(): com.google.dart.server.internal.remote.RequestSink? = null
-            override fun getResponseStream(): com.google.dart.server.internal.remote.ResponseStream? = null
+    private fun createMockServer(onRequestSent: (String) -> Unit): RemoteAnalysisServerImpl {
+        val stubSocket = object : AnalysisServerSocket {
+            override fun getErrorStream(): ByteLineReaderStream? = null
+            override fun getRequestSink(): RequestSink? = null
+            override fun getResponseStream(): ResponseStream? = null
             override fun isOpen(): Boolean = false
             override fun start() {}
             override fun stop() {}
         }
 
-        return object : com.google.dart.server.internal.remote.RemoteAnalysisServerImpl(stubSocket) {
+        return object : RemoteAnalysisServerImpl(stubSocket) {
             override fun generateUniqueId(): String = "123"
 
-            override fun sendRequestToServer(id: String, request: com.google.gson.JsonObject) {
+            override fun sendRequestToServer(id: String, request: JsonObject) {
                 onRequestSent(request.toString())
             }
 
-            override fun sendRequestToServer(id: String, request: com.google.gson.JsonObject, consumer: com.google.dart.server.Consumer) {
+            override fun sendRequestToServer(id: String, request: JsonObject, consumer: Consumer) {
                 onRequestSent(request.toString())
             }
 
@@ -161,13 +173,13 @@ class DartVirtualStreamConnectionProviderTest : DartCodeInsightFixtureTestCase()
             override fun server_showMessageRequest(
                 messageType: String?,
                 message: String?,
-                messageActions: MutableList<org.dartlang.analysis.server.protocol.MessageAction>?,
-                consumer: com.google.dart.server.ShowMessageRequestConsumer?
+                messageActions: MutableList<MessageAction>?,
+                consumer: ShowMessageRequestConsumer?
             ) {}
 
             override fun lsp_workspaceApplyEdit(
-                params: org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams?,
-                consumer: com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer?
+                params: DartLspApplyWorkspaceEditParams?,
+                consumer: DartLspWorkspaceApplyEditRequestConsumer?
             ) {}
         }
     }
