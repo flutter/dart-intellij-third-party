@@ -76,10 +76,10 @@ public class DartQuickFixSet {
       fix.setSourceChange(null);
     }
 
-    long startTime = System.currentTimeMillis();
+    long startTime = System.nanoTime();
 
     final Consumer<List<AnalysisErrorFixes>> consumer = fixes -> {
-      long durationMs = System.currentTimeMillis() - startTime;
+      long durationMs = (System.nanoTime() - startTime) / 1_000_000;
 
       FixData fixData = AnalyticsData.forFix("dart.legacy_fix", myPsiManager.getProject());
       fixData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
