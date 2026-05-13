@@ -42,13 +42,13 @@ public class DartQuickAssistSet {
       return lastSourceChanges;
     }
 
-    long startTime = System.currentTimeMillis();
+    long startTime = System.nanoTime();
 
     final DartAnalysisServerService service = DartAnalysisServerService.getInstance(psiFile.getProject());
     service.updateFilesContent();
     lastSourceChanges = service.edit_getAssists(psiFile.getVirtualFile(), offset, length);
 
-    long durationMs = System.currentTimeMillis() - startTime;
+    long durationMs = (System.nanoTime() - startTime) / 1_000_000;
 
     AssistData assistData = AnalyticsData.forAssist("dart.legacy_assist", psiFile.getProject());
     assistData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
