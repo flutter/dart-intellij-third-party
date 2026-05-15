@@ -1048,7 +1048,7 @@ public interface AnalysisServer {
    *        protocol (see the "lsp" domain). LSP notifications are automatically enabled when the
    *        client sets this capability.
    */
-  public void server_setClientCapabilities(List<String> requests, boolean supportsUris, boolean supportsWorkspaceApplyEdits);
+  public void server_setClientCapabilities(List<String> requests, boolean supportsUris, boolean supportsWorkspaceApplyEdits, boolean lspCodeActionsEnabled);
 
   /**
    * {@code server.setSubscriptions}

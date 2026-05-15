@@ -66,6 +66,7 @@ import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
 import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
@@ -2235,9 +2236,11 @@ public final class DartAnalysisServerService implements Disposable {
         startedServer.analysis_updateOptions(new AnalysisOptions(true, true, true, true, false, true, false));
         boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
         boolean supportsWorkspaceApplyEdits = isDartSdkVersionSufficientForWorkspaceApplyEdits(mySdkVersion);
+        boolean lspCodeActionsEnabled = DartConfigurable.isExperimentalLspFeaturesEnabled(myProject);
         startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
                                                    supportsUris,
-                                                   supportsWorkspaceApplyEdits);
+                                                   supportsWorkspaceApplyEdits,
+                                                   lspCodeActionsEnabled);
 
         myServer = startedServer;
 

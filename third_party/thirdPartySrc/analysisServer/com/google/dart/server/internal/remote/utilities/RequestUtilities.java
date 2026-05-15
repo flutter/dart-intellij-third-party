@@ -1051,7 +1051,8 @@ public class RequestUtilities {
   public static JsonObject generateClientCapabilities(String idValue,
                                                       List<String> requests,
                                                       boolean supportsUris,
-                                                      boolean supportsWorkspaceApplyEdits) {
+                                                      boolean supportsWorkspaceApplyEdits,
+                                                      boolean lspCodeActionsEnabled) {
     JsonObject params = new JsonObject();
     params.add(REQUESTS, buildJsonElement(requests));
     if (supportsUris) {
@@ -1069,18 +1070,20 @@ public class RequestUtilities {
       JsonObject lspCapabilities = new JsonObject();
       lspCapabilities.add("workspace", workspace);
 
-      JsonObject codeActionLiteralSupport = new JsonObject();
-      JsonObject codeActionKind = new JsonObject();
-      codeActionKind.add("valueSet", buildJsonElement(List.of("quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports")));
-      codeActionLiteralSupport.add("codeActionKind", codeActionKind);
+      if (lspCodeActionsEnabled) {
+        JsonObject codeActionLiteralSupport = new JsonObject();
+        JsonObject codeActionKind = new JsonObject();
+        codeActionKind.add("valueSet", buildJsonElement(List.of("quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports")));
+        codeActionLiteralSupport.add("codeActionKind", codeActionKind);
 
-      JsonObject codeAction = new JsonObject();
-      codeAction.add("codeActionLiteralSupport", codeActionLiteralSupport);
+        JsonObject codeAction = new JsonObject();
+        codeAction.add("codeActionLiteralSupport", codeActionLiteralSupport);
 
-      JsonObject textDocument = new JsonObject();
-      textDocument.add("codeAction", codeAction);
+        JsonObject textDocument = new JsonObject();
+        textDocument.add("codeAction", codeAction);
 
-      lspCapabilities.add("textDocument", textDocument);
+        lspCapabilities.add("textDocument", textDocument);
+      }
 
       params.add("lspCapabilities", lspCapabilities);
     }
