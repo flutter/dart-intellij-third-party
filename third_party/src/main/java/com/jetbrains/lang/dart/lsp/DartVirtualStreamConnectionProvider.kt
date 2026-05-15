@@ -107,14 +107,20 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     }
 
     private fun extractLspPayload(jsonObject: JsonObject): JsonObject? {
+        logger.info("extractLspPayload inspecting jsonObject: $jsonObject")
         if (jsonObject.has("params")) {
             val params = jsonObject.get("params").asJsonObject
             if (params.has(LSP_MESSAGE_KEY)) {
                 val msgObj = params.get(LSP_MESSAGE_KEY).asJsonObject
                 if (msgObj.getAsJsonPrimitive("method")?.asString == "workspace/applyEdit") {
+                    if (!hasActiveExecuteCommand()) {
+                        logger.info("Ignored workspace/applyEdit message from DAS (handled by legacy bridge for DTD/DevTools)")
+                        return null
+                    }
                     val lspReqId = msgObj.get("id").asString
                     val dasReqId = jsonObject.get("id").asString
                     pendingApplyEditIds[lspReqId] = dasReqId
+                    logger.info("Registered pendingApplyEditId: lspReqId=$lspReqId -> dasReqId=$dasReqId")
                 }
                 logger.debug("extractLspPayload: Extracted LSP notification/message from DAS: $msgObj")
                 return msgObj
@@ -125,18 +131,21 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         if (topLevelId != null) {
             val lspIdElement = pendingLegacyIds[topLevelId]
             if (lspIdElement != null) {
+                logger.info("extractLspPayload found pending legacy ID: topLevelId=$topLevelId, lspId=$lspIdElement")
                 if (jsonObject.has("result")) {
                     pendingLegacyIds.remove(topLevelId)
+                    pendingExecuteCommandIds.remove(topLevelId)
                     val result = jsonObject.get("result").asJsonObject
                     if (result.has(LSP_RESPONSE_KEY)) {
                         val resultPayload = result.get(LSP_RESPONSE_KEY).asJsonObject
-                        logger.debug("extractLspPayload: Extracted successful LSP response for legacyId=$topLevelId (lspId=$lspIdElement): $resultPayload")
+                        logger.info("Successfully extracted LSP response payload for legacyId $topLevelId (lspId=$lspIdElement): $resultPayload")
                         return resultPayload
                     } else {
                         logger.debug("extractLspPayload: DAS response has result but is missing '$LSP_RESPONSE_KEY': $jsonObject")
                     }
                 } else if (jsonObject.has("error")) {
                     pendingLegacyIds.remove(topLevelId)
+                    pendingExecuteCommandIds.remove(topLevelId)
                     val error = jsonObject.get("error").asJsonObject
                     logger.warn("Received legacy error from DAS for legacyId=$topLevelId (lspId=$lspIdElement): $error")
                     val lspErrorResponse = JsonObject()
@@ -386,7 +395,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             logger.warn("DartLspProjectService does not have a registered producer for project: ${project.name}")
             return
         }
-
+        logger.info("Enqueuing response string to DartMessageProducer: $jsonString")
         producer.enqueueResponse(jsonString)
     }
 
