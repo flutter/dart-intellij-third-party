@@ -90,25 +90,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
             logger.debug("Response received from DAS: $response")
             val jsonObject = JsonParser.parseString(response).asJsonObject
-
-            var lspPayload: JsonObject? = null
-
-            if (jsonObject.has("params")) {
-                val params = jsonObject.get("params").asJsonObject
-                if (params.has(LSP_MESSAGE_KEY)) {
-                    lspPayload = params.get(LSP_MESSAGE_KEY).asJsonObject
-                }
-            }
-
-            if (lspPayload == null && jsonObject.has("result")) {
-                val topLevelId = if (jsonObject.has("id")) jsonObject.get("id").asString else null
-                if (topLevelId != null && pendingLegacyIds.remove(topLevelId)) {
-                    val result = jsonObject.get("result").asJsonObject
-                    if (result.has(LSP_RESPONSE_KEY)) {
-                        lspPayload = result.get(LSP_RESPONSE_KEY).asJsonObject
-                    }
-                }
-            }
+            val lspPayload = extractLspPayload(jsonObject)
 
             if (lspPayload != null) {
                 enqueueResponse(lspPayload.toString())
@@ -117,6 +99,32 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         this.responseListener = listener
         dartAnalysisService.addResponseListener(listener)
         logger.info("Finished setting up DAS listening for lsp4ij")
+    }
+
+    private fun extractLspPayload(jsonObject: JsonObject): JsonObject? {
+        if (jsonObject.has("params")) {
+            val params = jsonObject.get("params").asJsonObject
+            if (params.has(LSP_MESSAGE_KEY)) {
+                val msgObj = params.get(LSP_MESSAGE_KEY).asJsonObject
+                if (msgObj.getAsJsonPrimitive("method")?.asString == "workspace/applyEdit") {
+                    logger.debug("Ignored workspace/applyEdit message from DAS (handled by legacy bridge)")
+                    return null
+                }
+                return msgObj
+            }
+        }
+
+        if (jsonObject.has("result")) {
+            val topLevelId = if (jsonObject.has("id")) jsonObject.get("id").asString else null
+            if (topLevelId != null && pendingLegacyIds.remove(topLevelId)) {
+                val result = jsonObject.get("result").asJsonObject
+                if (result.has(LSP_RESPONSE_KEY)) {
+                    return result.get(LSP_RESPONSE_KEY).asJsonObject
+                }
+            }
+        }
+
+        return null
     }
 
     private fun processLspClientMessages() {
