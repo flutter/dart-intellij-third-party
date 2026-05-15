@@ -96,7 +96,12 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             if (jsonObject.has("params")) {
                 val params = jsonObject.get("params").asJsonObject
                 if (params.has(LSP_MESSAGE_KEY)) {
-                    lspPayload = params.get(LSP_MESSAGE_KEY).asJsonObject
+                    val msgObj = params.get(LSP_MESSAGE_KEY).asJsonObject
+                    if (msgObj.has("method") && msgObj.get("method").asString == "workspace/applyEdit") {
+                        logger.debug("Ignored workspace/applyEdit message from DAS on main branch (handled by legacy bridge)")
+                    } else {
+                        lspPayload = msgObj
+                    }
                 }
             }
 
