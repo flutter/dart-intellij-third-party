@@ -219,6 +219,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         val responseElement = JsonObject()
         responseElement.addProperty("id", dasReqId)
         responseElement.add("result", resultJsonElement)
+        logger.info("Formulated responseElement for DAS: $responseElement")
 
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
         dartAnalysisService.sendResponse(responseElement)
