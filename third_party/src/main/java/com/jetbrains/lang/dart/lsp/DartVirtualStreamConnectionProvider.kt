@@ -213,11 +213,11 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         logger.info("Handling lsp4ij response: $lspReqId matching dasReqId $dasReqId")
 
         val lspResponseElement = JSON_HANDLER.gson.toJsonTree(message).asJsonObject
-        if ((!lspResponseElement.has("result") || lspResponseElement.get("result").isJsonNull) && message.result != null) {
+        if (message.error == null) {
             val manualResultObj = JsonObject()
             manualResultObj.addProperty("applied", true)
             lspResponseElement.add("result", manualResultObj)
-            logger.info("Manually injected ApplyWorkspaceEditResponse into lspResponseElement: $lspResponseElement")
+            logger.info("Manually set ApplyWorkspaceEditResponse applied=true for lspResponseElement: $lspResponseElement")
         }
         val resultJsonElement = JsonObject()
         resultJsonElement.add("lspResponse", lspResponseElement)
