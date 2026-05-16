@@ -172,21 +172,19 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         if (message.method == "$/cancelRequest") {
             val cancelParamsObj = JSON_HANDLER.gson.toJsonTree(message.params).asJsonObject
             val lspIdToCancel = if (cancelParamsObj.has("id")) cancelParamsObj.get("id").asString else null
-            if (lspIdToCancel != null) {
-                val legacyIdToCancel = pendingLegacyIds.remove(lspIdToCancel)
-                if (legacyIdToCancel != null) {
-                    logger.info("Forwarding $/cancelRequest for lspId=$lspIdToCancel as legacy server.cancelRequest for legacyId=$legacyIdToCancel")
-                    val cancelReqId = DartAnalysisServerService.getInstance(project).generateUniqueId()
-                    val cancelReq = JsonObject()
-                    cancelReq.addProperty("id", cancelReqId)
-                    cancelReq.addProperty("method", "server.cancelRequest")
-                    val paramsObj = JsonObject()
-                    paramsObj.addProperty("id", legacyIdToCancel)
-                    cancelReq.add("params", paramsObj)
-                    DartAnalysisServerService.getInstance(project).sendRequest(cancelReqId, cancelReq)
-                }
-            }
-            return
+            if (lspIdToCancel == null) return
+
+            val legacyIdToCancel = pendingLegacyIds.remove(lspIdToCancel) ?: return
+
+            logger.info("Forwarding $/cancelRequest for lspId=$lspIdToCancel as legacy server.cancelRequest for legacyId=$legacyIdToCancel")
+            val cancelReqId = DartAnalysisServerService.getInstance(project).generateUniqueId()
+            val cancelReq = JsonObject()
+            cancelReq.addProperty("id", cancelReqId)
+            cancelReq.addProperty("method", "server.cancelRequest")
+            val paramsObj = JsonObject()
+            paramsObj.addProperty("id", legacyIdToCancel)
+            cancelReq.add("params", paramsObj)
+            DartAnalysisServerService.getInstance(project).sendRequest(cancelReqId, cancelReq)
         }
         logger.info("Ignored unimplemented method from lsp4ij notification: ${message.method}")
     }
@@ -209,7 +207,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         val lspId = rawId.toString()
         val legacyRequest = JsonObject()
         val legacyId = dartAnalysisService.generateUniqueId()
-        pendingLegacyIds.put(lspId, legacyId)
+        pendingLegacyIds[lspId] = legacyId
         legacyRequest.addProperty("id", legacyId)
         legacyRequest.addProperty("method", "lsp.handle")
 
