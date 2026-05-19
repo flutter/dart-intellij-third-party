@@ -17,6 +17,7 @@ import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.fixes.DartQuickFix;
 import com.jetbrains.lang.dart.psi.DartFile;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -78,6 +79,10 @@ public class DartQuickAssistIntention implements IntentionAction, Comparable<Int
 
   @Override
   public boolean isAvailable(@NotNull Project project, Editor editor, PsiFile psiFile) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+
     if (editor == null || psiFile == null) {
       // not sure this can ever happen
       return false;
