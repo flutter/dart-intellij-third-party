@@ -170,7 +170,10 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun handleNotificationMessage(message: NotificationMessage) {
         if (message.method == "$/cancelRequest") {
-            val cancelParamsObj = JSON_HANDLER.gson.toJsonTree(message.params).asJsonObject
+            val params = message.params ?: return
+            val jsonElement = JSON_HANDLER.gson.toJsonTree(params)
+            if (!jsonElement.isJsonObject) return
+            val cancelParamsObj = jsonElement.asJsonObject
             val lspIdToCancel = if (cancelParamsObj.has("id")) cancelParamsObj.get("id").asString else null
             if (lspIdToCancel == null) return
 
@@ -185,8 +188,9 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             paramsObj.addProperty("id", legacyIdToCancel)
             cancelReq.add("params", paramsObj)
             DartAnalysisServerService.getInstance(project).sendRequest(cancelReqId, cancelReq)
+        } else {
+            logger.info("Ignored unimplemented method from lsp4ij notification: ${message.method}")
         }
-        logger.info("Ignored unimplemented method from lsp4ij notification: ${message.method}")
     }
 
     private fun handleInitializeRequest(message: RequestMessage) {
