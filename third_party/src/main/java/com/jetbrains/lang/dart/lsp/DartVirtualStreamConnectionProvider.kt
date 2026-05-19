@@ -190,6 +190,9 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             paramsObj.addProperty("id", legacyIdToCancel)
             cancelReq.add("params", paramsObj)
             DartAnalysisServerService.getInstance(project).sendRequest(cancelReqId, cancelReq)
+        } else if (message.method == "exit") {
+            logger.info("Received exit notification from lsp4ij, stopping connection provider")
+            stop()
         } else {
             logger.info("Ignored unimplemented method from lsp4ij notification: ${message.method}")
         }
