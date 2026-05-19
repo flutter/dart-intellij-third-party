@@ -210,7 +210,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun forwardLspRequestToDas(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
         val rawId = message.id ?: return
-        val lspId = rawId.toString()
+        val lspId = JSON_HANDLER.gson.toJsonTree(rawId).asString
         val legacyRequest = JsonObject()
         val legacyId = dartAnalysisService.generateUniqueId()
         pendingLegacyIds[legacyId] = lspId
