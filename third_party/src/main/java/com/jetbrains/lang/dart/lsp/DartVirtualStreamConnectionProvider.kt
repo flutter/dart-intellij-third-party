@@ -116,7 +116,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
         if (jsonObject.has("result")) {
             val topLevelId = if (jsonObject.has("id")) jsonObject.get("id").asString else null
-            if (topLevelId != null && pendingLegacyIds.values.remove(topLevelId)) {
+            if (topLevelId != null && pendingLegacyIds.remove(topLevelId) != null) {
                 val result = jsonObject.get("result").asJsonObject
                 if (result.has(LSP_RESPONSE_KEY)) {
                     return result.get(LSP_RESPONSE_KEY).asJsonObject
@@ -177,7 +177,9 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             val lspIdToCancel = if (cancelParamsObj.has("id")) cancelParamsObj.get("id").asString else null
             if (lspIdToCancel == null) return
 
-            val legacyIdToCancel = pendingLegacyIds.remove(lspIdToCancel) ?: return
+            val entry = pendingLegacyIds.entries.firstOrNull { it.value == lspIdToCancel } ?: return
+            val legacyIdToCancel = entry.key
+            pendingLegacyIds.remove(legacyIdToCancel)
 
             logger.info("Forwarding $/cancelRequest for lspId=$lspIdToCancel as legacy server.cancelRequest for legacyId=$legacyIdToCancel")
             val cancelReqId = DartAnalysisServerService.getInstance(project).generateUniqueId()
@@ -211,7 +213,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         val lspId = rawId.toString()
         val legacyRequest = JsonObject()
         val legacyId = dartAnalysisService.generateUniqueId()
-        pendingLegacyIds[lspId] = legacyId
+        pendingLegacyIds[legacyId] = lspId
         legacyRequest.addProperty("id", legacyId)
         legacyRequest.addProperty("method", "lsp.handle")
 
