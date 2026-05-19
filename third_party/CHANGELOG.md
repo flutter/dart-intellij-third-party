@@ -11,6 +11,8 @@
 ### Fixed
 - Avoid AssertionErrors / UI crashes when navigating subclasses, superclasses, or overriding methods by migrating from deprecated `PsiElementListNavigator` to modern `PsiTargetNavigator`.
 - Avoid potential NullPointerExceptions in the indexer when recovering from malformed class declarations (#375)
+- Prevent duplicate application of `workspace/applyEdit` messages not from lsp4ij  (#409)
+- Forward cancelRequest for LSP-over-legacy requests (#410)
 
 ## 505.0.0
 
