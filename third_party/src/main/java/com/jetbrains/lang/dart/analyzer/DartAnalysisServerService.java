@@ -194,6 +194,7 @@ public final class DartAnalysisServerService implements Disposable {
   private final @NotNull List<AnalysisServerListener> myAdditionalServerListeners = new SmartList<>();
   private final @NotNull List<RequestListener> myRequestListeners = new SmartList<>();
   private final @NotNull List<ResponseListener> myResponseListeners = new SmartList<>();
+  private final @NotNull List<AnalysisServerStatusListener> myStatusListeners = new SmartList<>();
   private final @NotNull List<DartQuickAssistIntentionListener> myQuickAssistIntentionListeners = new SmartList<>();
   private final @NotNull List<DartQuickFixListener> myQuickFixListeners = new SmartList<>();
 
@@ -635,6 +636,22 @@ public final class DartAnalysisServerService implements Disposable {
     myResponseListeners.remove(responseListener);
     if (myServer != null) {
       myServer.removeResponseListener(responseListener);
+    }
+  }
+
+  public void addStatusListener(final @NotNull AnalysisServerStatusListener statusListener) {
+    if (!myStatusListeners.contains(statusListener)) {
+      myStatusListeners.add(statusListener);
+      if (myServer != null && isServerProcessActive()) {
+        myServer.addStatusListener(statusListener);
+      }
+    }
+  }
+
+  public void removeStatusListener(final @NotNull AnalysisServerStatusListener statusListener) {
+    myStatusListeners.remove(statusListener);
+    if (myServer != null) {
+      myServer.removeStatusListener(statusListener);
     }
   }
 
@@ -2208,6 +2225,9 @@ public final class DartAnalysisServerService implements Disposable {
         }
         for (ResponseListener listener : myResponseListeners) {
           startedServer.addResponseListener(listener);
+        }
+        for (AnalysisServerStatusListener listener : myStatusListeners) {
+          startedServer.addStatusListener(listener);
         }
 
         myHaveShownInitialProgress = false;

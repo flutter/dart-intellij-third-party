@@ -54,6 +54,8 @@ public interface AnalysisServer {
    */
   public void addStatusListener(AnalysisServerStatusListener listener);
 
+  public void removeStatusListener(AnalysisServerStatusListener listener);
+
   /**
    * {@code analysis.getErrors}
    *

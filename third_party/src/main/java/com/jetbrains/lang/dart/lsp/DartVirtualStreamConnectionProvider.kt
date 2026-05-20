@@ -12,6 +12,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.google.dart.server.AnalysisServerStatusListener
 import com.google.dart.server.ResponseListener
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
@@ -62,6 +63,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     private val pendingExecuteCommandIds = ConcurrentHashMap.newKeySet<String>()
     private val pendingApplyEditIds = ConcurrentHashMap<String, String>()
     private var responseListener: ResponseListener? = null
+    private var statusListener: AnalysisServerStatusListener? = null
     @Volatile private var isStopping = false
     private var clientMessageFuture: java.util.concurrent.Future<*>? = null
 
@@ -79,6 +81,15 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         Disposer.register(project) {
             stop()
         }
+
+        val statusListener = AnalysisServerStatusListener { isAlive ->
+            if (!isAlive) {
+                logger.info("Legacy Dart Analysis Server died (isAlive=false), stopping LSP virtual connection provider")
+                stop()
+            }
+        }
+        this.statusListener = statusListener
+        dartAnalysisService.addStatusListener(statusListener)
 
         clientMessageFuture = ApplicationManager.getApplication().executeOnPooledThread {
             setupDasResponseListener(dartAnalysisService)
@@ -420,6 +431,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
         responseListener?.let { dartAnalysisService.removeResponseListener(it) }
+        statusListener?.let { dartAnalysisService.removeStatusListener(it) }
 
         val service = project.getService(DartLspProjectService::class.java)
         service.producer?.stop()

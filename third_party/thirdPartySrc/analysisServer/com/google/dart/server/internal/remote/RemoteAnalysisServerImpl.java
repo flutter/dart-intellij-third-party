@@ -302,6 +302,11 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   }
 
   @Override
+  public void removeStatusListener(AnalysisServerStatusListener listener) {
+    statusListenerList.remove(listener);
+  }
+
+  @Override
   public void analysis_getErrors(String file, GetErrorsConsumer consumer) {
     String id = generateUniqueId();
     sendRequestToServer(id, RequestUtilities.generateAnalysisGetErrors(id, file), consumer);
