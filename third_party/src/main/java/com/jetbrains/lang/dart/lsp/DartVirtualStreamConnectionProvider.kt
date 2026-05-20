@@ -184,8 +184,8 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                         is ResponseMessage -> handleResponseMessage(message)
                         else -> logger.debug("Ignored unrecognized message type from lsp4ij request: $message")
                     }
-                } catch (e: Exception) {
-                    logger.error("Error processing LSP message from lsp4ij: $message", e)
+                } catch (t: Throwable) {
+                    logger.error("Unhandled error processing LSP message from lsp4ij: $message", t)
                 }
                 }
             }
