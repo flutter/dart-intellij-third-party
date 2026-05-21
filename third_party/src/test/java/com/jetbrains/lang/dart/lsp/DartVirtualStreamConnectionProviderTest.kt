@@ -152,7 +152,7 @@ class DartVirtualStreamConnectionProviderTest : DartCodeInsightFixtureTestCase()
             override fun getErrorStream(): ByteLineReaderStream? = null
             override fun getRequestSink(): RequestSink? = null
             override fun getResponseStream(): ResponseStream? = null
-            override fun isOpen(): Boolean = false
+            override fun isOpen(): Boolean = true
             override fun start() {}
             override fun stop() {}
         }
