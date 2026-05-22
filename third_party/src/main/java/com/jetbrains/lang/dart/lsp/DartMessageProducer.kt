@@ -55,8 +55,8 @@ class DartMessageProducer(val jsonHandler: MessageJsonHandler) : MessageProducer
                 if (message != null) {
                     try {
                         messageConsumer.consume(message)
-                    } catch (t: Throwable) {
-                        logger.error("Error consuming parsed LSP message: $json", t)
+                    } catch (e: Exception) {
+                        logger.error("Error consuming parsed LSP message: $json", e)
                     }
                 } else {
                     logger.warn("Parsed message is null for JSON: $json")
@@ -67,8 +67,8 @@ class DartMessageProducer(val jsonHandler: MessageJsonHandler) : MessageProducer
                 logger.warn("Error sending message to lsp4ij: $json", ex)
             } catch(ex: JsonRpcException) {
                 logger.warn("Error sending message to lsp4ij: $json", ex)
-            } catch(t: Throwable) {
-                logger.error("Unexpected error in message producer loop for JSON: $json", t)
+            } catch(e: Exception) {
+                logger.error("Unexpected error in message producer loop for JSON: $json", e)
             }
         }
     }

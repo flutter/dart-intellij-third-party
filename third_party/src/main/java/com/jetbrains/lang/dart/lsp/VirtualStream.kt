@@ -11,63 +11,84 @@ import java.io.OutputStream
 import java.util.concurrent.LinkedBlockingQueue
 
 /**
- * A thread-safe circular byte queue that replaces standard PipedInputStream/PipedOutputStream.
+ * A high-performance thread-safe circular byte queue that replaces PipedInputStream/PipedOutputStream.
+ * Uses chunks of ByteArrays to prevent GC pressure and boxing overhead when handling large payloads.
  * This class is entirely thread-agnostic and is immune to thread pool worker thread terminations.
  */
 class VirtualStream : InputStream() {
-    private val queue = LinkedBlockingQueue<Int>()
+    companion object {
+        // Reference-identical poison pill to cleanly signal EOF
+        private val POISON_PILL = ByteArray(0)
+    }
+
+    private val queue = LinkedBlockingQueue<ByteArray>()
     @Volatile private var closed = false
+
+    // Buffer tracking state for the current chunk being read
+    private var currentBuffer: ByteArray? = null
+    private var currentPos = 0
 
     val outputStream = object : OutputStream() {
         override fun write(b: Int) {
             if (closed) throw IOException("Stream closed")
-            queue.put(b)
+            queue.put(byteArrayOf(b.toByte()))
         }
 
         override fun write(b: ByteArray, off: Int, len: Int) {
             if (closed) throw IOException("Stream closed")
-            for (i in 0 until len) {
-                queue.put(b[off + i].toInt() and 0xFF)
+            if (len > 0) {
+                queue.put(b.copyOfRange(off, off + len))
             }
         }
 
         override fun close() {
             closed = true
-            queue.put(-1) // EOF poison pill
+            queue.put(POISON_PILL)
         }
     }
 
     override fun read(): Int {
-        if (closed && queue.isEmpty()) return -1
-        val b = queue.take()
-        if (b == -1) {
-            closed = true
-            return -1
+        if (closed && currentBuffer == null) return -1
+        val buffer = getOrFetchBuffer() ?: return -1
+        val b = buffer[currentPos++].toInt() and 0xFF
+        if (currentPos >= buffer.size) {
+            currentBuffer = null
         }
         return b
     }
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
         if (len == 0) return 0
-        val first = read()
-        if (first == -1) return -1
-        b[off] = first.toByte()
-        var bytesRead = 1
-        while (bytesRead < len) {
-            val next = queue.poll() ?: break
-            if (next == -1) {
-                closed = true
-                queue.put(-1)
-                break
-            }
-            b[off + bytesRead] = next.toByte()
-            bytesRead++
+        if (closed && currentBuffer == null && queue.isEmpty()) return -1
+
+        val buffer = getOrFetchBuffer() ?: return -1
+        val available = buffer.size - currentPos
+        val bytesToCopy = Math.min(len, available)
+        System.arraycopy(buffer, currentPos, b, off, bytesToCopy)
+        currentPos += bytesToCopy
+        if (currentPos >= buffer.size) {
+            currentBuffer = null
         }
-        return bytesRead
+        return bytesToCopy
+    }
+
+    private fun getOrFetchBuffer(): ByteArray? {
+        var buffer = currentBuffer
+        if (buffer == null) {
+            val next = queue.take()
+            if (next === POISON_PILL || next.isEmpty()) {
+                closed = true
+                return null
+            }
+            buffer = next
+            currentBuffer = next
+            currentPos = 0
+        }
+        return buffer
     }
 
     override fun close() {
         closed = true
-        queue.put(-1)
+        queue.put(POISON_PILL)
     }
 }
