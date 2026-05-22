@@ -22,7 +22,8 @@ class VirtualStream : InputStream() {
     }
 
     private val queue = LinkedBlockingQueue<ByteArray>()
-    @Volatile private var closed = false
+    @Volatile private var writeClosed = false
+    @Volatile private var readClosed = false
 
     // Buffer tracking state for the current chunk being read
     private var currentBuffer: ByteArray? = null
@@ -30,25 +31,27 @@ class VirtualStream : InputStream() {
 
     val outputStream = object : OutputStream() {
         override fun write(b: Int) {
-            if (closed) throw IOException("Stream closed")
+            if (writeClosed) throw IOException("Stream closed")
             queue.put(byteArrayOf(b.toByte()))
         }
 
         override fun write(b: ByteArray, off: Int, len: Int) {
-            if (closed) throw IOException("Stream closed")
+            if (writeClosed) throw IOException("Stream closed")
             if (len > 0) {
                 queue.put(b.copyOfRange(off, off + len))
             }
         }
 
         override fun close() {
-            closed = true
-            queue.put(POISON_PILL)
+            if (!writeClosed) {
+                writeClosed = true
+                queue.put(POISON_PILL)
+            }
         }
     }
 
     override fun read(): Int {
-        if (closed && currentBuffer == null) return -1
+        if (readClosed) return -1
         val buffer = getOrFetchBuffer() ?: return -1
         val b = buffer[currentPos++].toInt() and 0xFF
         if (currentPos >= buffer.size) {
@@ -59,7 +62,7 @@ class VirtualStream : InputStream() {
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
         if (len == 0) return 0
-        if (closed && currentBuffer == null && queue.isEmpty()) return -1
+        if (readClosed) return -1
 
         val buffer = getOrFetchBuffer() ?: return -1
         val available = buffer.size - currentPos
@@ -75,9 +78,12 @@ class VirtualStream : InputStream() {
     private fun getOrFetchBuffer(): ByteArray? {
         var buffer = currentBuffer
         if (buffer == null) {
+            if (readClosed) {
+                return null
+            }
             val next = queue.take()
-            if (next === POISON_PILL || next.isEmpty()) {
-                closed = true
+            if (next === POISON_PILL) {
+                readClosed = true
                 return null
             }
             buffer = next
@@ -88,7 +94,6 @@ class VirtualStream : InputStream() {
     }
 
     override fun close() {
-        closed = true
-        queue.put(POISON_PILL)
+        outputStream.close()
     }
 }

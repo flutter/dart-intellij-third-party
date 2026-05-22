@@ -5,6 +5,7 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.intellij.openapi.Disposable
@@ -26,8 +27,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
+import java.util.concurrent.ConcurrentHashMap
 import org.eclipse.lsp4j.jsonrpc.JsonRpcException
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode
@@ -57,7 +57,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     // This stores IDs that have been used by lsp4ij for LSP-over-legacy requests to DAS.
     // There are non-lsp4ij requests that are sent as LSP-over-legacy, but we don't need to forward responses for those
     // requests to lsp4ij since lsp4ij was not the originator.
-    private val pendingLegacyIds = java.util.concurrent.ConcurrentHashMap<String, com.google.gson.JsonElement>()
+    private val pendingLegacyIds = ConcurrentHashMap<String, JsonElement>()
     private var responseListener: ResponseListener? = null
     @Volatile private var isStopping = false
     private var clientMessageFuture: java.util.concurrent.Future<*>? = null
