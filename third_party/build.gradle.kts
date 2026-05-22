@@ -233,7 +233,7 @@ tasks {
 
                 // If filters are specified, check if they target DAS tests. Otherwise, default to true.
                 if (allPatterns.isNotEmpty()) {
-                    allPatterns.any { it.contains("analysisServer") }
+                    allPatterns.any { allPatterns.any { it.contains("analysisServer") || it.contains("com.jetbrains.dart") } }
                 } else {
                     true
                 }
