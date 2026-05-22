@@ -59,6 +59,7 @@ jobs:
           path: |
             **/build/reports/
             **/build/test-results/
+          if-no-files-found: ignore
 
   # Job 3: Verify Plugin
   verify-plugin:
