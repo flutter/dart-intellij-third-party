@@ -46,6 +46,7 @@ class DartStartupActivity : ProjectActivity {
       // See: https://github.com/flutter/dart-intellij-third-party/issues/149
       val exclusionsByModule = readAction {
         val exclusions = mutableMapOf<Module, MutableMap<VirtualFile, MutableSet<String>>>()
+        val exclusionsCache = mutableMapOf<Module, Set<String>>()
         val pubspecYamlFiles = FilenameIndex.getVirtualFilesByName(PubspecYamlUtil.PUBSPEC_YAML, GlobalSearchScope.projectScope(project))
         for (file in pubspecYamlFiles) {
           // Allow the platform to cancel this background scanning task if the user starts typing
@@ -55,8 +56,12 @@ class DartStartupActivity : ProjectActivity {
           val contentRoot = ProjectFileIndex.getInstance(project).getContentRootForFile(root) ?: continue
           val rootUrl = root.url
 
-          val urlsToExclude = getExclusionUrls(rootUrl) -
+          // Cache already-excluded roots per module to prevent redundant lookups in monorepos
+          val existingExclusions = exclusionsCache.getOrPut(module) {
             module.rootManager.excludeRootUrls.toSet()
+          }
+
+          val urlsToExclude = getExclusionUrls(rootUrl) - existingExclusions
           if (urlsToExclude.isNotEmpty()) {
             exclusions.getOrPut(module) { mutableMapOf() }
               .getOrPut(contentRoot) { mutableSetOf() }
