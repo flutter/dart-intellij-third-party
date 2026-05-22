@@ -47,13 +47,14 @@ class DartStartupActivity : ProjectActivity {
       val exclusionsByModule = readAction {
         val exclusions = mutableMapOf<Module, MutableMap<VirtualFile, MutableSet<String>>>()
         val exclusionsCache = mutableMapOf<Module, Set<String>>()
+        val fileIndex = ProjectFileIndex.getInstance(project)
         val pubspecYamlFiles = FilenameIndex.getVirtualFilesByName(PubspecYamlUtil.PUBSPEC_YAML, GlobalSearchScope.projectScope(project))
         for (file in pubspecYamlFiles) {
           // Allow the platform to cancel this background scanning task if the user starts typing
           ProgressManager.checkCanceled()
           val module = ModuleUtilCore.findModuleForFile(file, project) ?: continue
           val root = file.parent ?: continue
-          val contentRoot = ProjectFileIndex.getInstance(project).getContentRootForFile(root) ?: continue
+          val contentRoot = fileIndex.getContentRootForFile(root) ?: continue
           val rootUrl = root.url
 
           // Cache already-excluded roots per module to prevent redundant lookups in monorepos
