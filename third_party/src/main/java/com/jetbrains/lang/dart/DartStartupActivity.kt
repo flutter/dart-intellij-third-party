@@ -92,7 +92,16 @@ class DartStartupActivity : ProjectActivity {
 
             // Commit all models together in a single global rootsChanged transaction
             if (modelsToCommit.isNotEmpty()) {
-              ModifiableModelCommitter.multiCommit(modelsToCommit, project.moduleManager.getModifiableModel())
+              val moduleModel = project.moduleManager.getModifiableModel()
+              var committed = false
+              try {
+                ModifiableModelCommitter.multiCommit(modelsToCommit, moduleModel)
+                committed = true
+              } finally {
+                if (!committed) {
+                  moduleModel.dispose()
+                }
+              }
             }
           } finally {
             // Guarantee cleanup of any uncommitted models to prevent memory/resource leaks
