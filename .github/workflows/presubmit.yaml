@@ -51,6 +51,15 @@ jobs:
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
         working-directory: third_party
 
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}
+          path: |
+            **/build/reports/
+            **/build/test-results/
+
   # Job 3: Verify Plugin
   verify-plugin:
     needs: build-plugin
