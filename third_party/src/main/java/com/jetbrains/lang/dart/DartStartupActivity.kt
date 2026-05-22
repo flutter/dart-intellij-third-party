@@ -117,9 +117,8 @@ class DartStartupActivity : ProjectActivity {
             }
           }
         }
+        DartFileListener.scheduleDartPackageRootsUpdate(project)
       }
-
-      DartFileListener.scheduleDartPackageRootsUpdate(project)
     }
 
     serviceScope.launch {
