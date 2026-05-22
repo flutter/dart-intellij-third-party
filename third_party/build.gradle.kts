@@ -224,7 +224,25 @@ tasks {
         }
 
         doFirst {
-            if (showDartHomeWarning) {
+            val isRunningAnalysisServerTests = try {
+                // --tests command-line filters are internal to Gradle. We retrieve them
+                // via reflection to avoid compiling against internal Gradle classes.
+                val cmdLinePatternsMethod = filter.javaClass.getMethod("getCommandLineIncludePatterns")
+                val cmdLinePatterns = cmdLinePatternsMethod.invoke(filter) as? Set<*>
+                val allPatterns = filter.includePatterns + (cmdLinePatterns?.filterIsInstance<String>() ?: emptySet())
+
+                // If filters are specified, check if they target DAS tests. Otherwise, default to true.
+                if (allPatterns.isNotEmpty()) {
+                    allPatterns.any { it.contains("analysisServer") }
+                } else {
+                    true
+                }
+            } catch (_: Exception) {
+                // Fallback: assume DAS tests might run if reflection fails.
+                true
+            }
+
+            if (showDartHomeWarning && isRunningAnalysisServerTests) {
                 logger.error("DART_HOME environment variable is not set. Dart Analysis Server tests will fail.")
             }
         }
