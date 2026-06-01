@@ -28,6 +28,14 @@ plugins {
 // Read ideaVersion from gradle.properties
 val ideaVersion = providers.gradleProperty("ideaVersion").get()
 
+val commitHash = System.getenv("KOKORO_GIT_COMMIT")?.take(7) ?: try {
+    providers.exec {
+        commandLine("git", "rev-parse", "--short", "HEAD")
+    }.standardOutput.asText.get().trim().take(7)
+} catch (e: Exception) {
+    ""
+}
+
 // Configure project's dependencies
 repositories {
     mavenCentral()
@@ -44,15 +52,7 @@ intellijPlatform {
             val nextMajorVersion = latestVersion.substringBefore('.').toInt() + 1
             val datestamp = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
             val baseVersion = "$nextMajorVersion.0.0-dev.$datestamp"
-
-            val commitHash = System.getenv("KOKORO_GIT_COMMIT") ?: try {
-                providers.exec {
-                    commandLine("git", "rev-parse", "--short", "HEAD")
-                }.standardOutput.asText.get().trim()
-            } catch (e: Exception) {
-                ""
-            }
-            version = if (commitHash.isNotEmpty()) "$baseVersion-${commitHash.take(7)}" else baseVersion
+            version = if (commitHash.isNotEmpty()) "$baseVersion-$commitHash" else baseVersion
         } else {
             version = changelog.getLatest().version
         }
@@ -282,12 +282,29 @@ abstract class PrintVersionTask : org.gradle.api.DefaultTask() {
     @get:org.gradle.api.tasks.Input
     abstract val pluginVersion: org.gradle.api.provider.Property<String>
 
+    @get:org.gradle.api.tasks.Internal
+    abstract val archiveFileName: org.gradle.api.provider.Property<String>
+
     @org.gradle.api.tasks.TaskAction
     fun action() {
-        println(pluginVersion.get())
+        println("Plugin Version: ${pluginVersion.get()}")
+        println("Archive File Name: ${archiveFileName.get()}")
     }
 }
 
 tasks.register<PrintVersionTask>("printVersion") {
     pluginVersion.set(intellijPlatform.pluginConfiguration.version)
+    val buildPluginTask = tasks.named<Zip>("buildPlugin")
+    archiveFileName.set(buildPluginTask.flatMap { it.archiveFileName })
+}
+
+tasks.named<Zip>("buildPlugin") {
+    val v = intellijPlatform.pluginConfiguration.version
+    archiveFileName.set(v.map { versionStr ->
+        if (commitHash.isNotEmpty() && !versionStr.contains(commitHash)) {
+            "Dart-$versionStr-$commitHash.zip"
+        } else {
+            "Dart-$versionStr.zip"
+        }
+    })
 }
