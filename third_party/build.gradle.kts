@@ -28,7 +28,7 @@ plugins {
 // Read ideaVersion from gradle.properties
 val ideaVersion = providers.gradleProperty("ideaVersion").get()
 
-val commitHash = System.getenv("KOKORO_GIT_COMMIT")?.take(7) ?: try {
+val commitHash = System.getenv("KOKORO_GIT_COMMIT")?.takeIf { it.isNotBlank() }?.take(7) ?: try {
     providers.exec {
         commandLine("git", "rev-parse", "--short", "HEAD")
     }.standardOutput.asText.get().trim().take(7)
