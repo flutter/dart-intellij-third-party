@@ -1,13 +1,9 @@
-/*
- * Copyright 2026 The Chromium Authors. All rights reserved.
- * Use of this source code is governed by a BSD-style license that can be
- * found in the LICENSE file.
- */
-
-package com.jetbrains.lang.dart.dtd
+package com.jetbrains.dart.dartToolingDaemon
 
 import com.google.gson.JsonObject
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jetbrains.lang.dart.dtd.DTDProcess
+import com.jetbrains.lang.dart.dtd.DTDProcessListener
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.DartTestUtils
 import java.util.UUID
