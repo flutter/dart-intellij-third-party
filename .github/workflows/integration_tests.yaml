@@ -1,4 +1,4 @@
-name: das tests
+name: integration tests
 
 on:
   pull_request:
@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  dart-analysis-server-tests:
-    name: DAS Tests (${{ matrix.os }})
+  integration-tests:
+    name: Integration Tests (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -37,15 +37,15 @@ jobs:
         with:
           sdk: ${{ matrix.dart-version }}
 
-      - name: Run Dart Analysis Server Tests
-        run: ./gradlew :test --tests "com.jetbrains.dart.analysisServer.*"
+      - name: Run Integration Tests
+        run: ./gradlew :test --tests "com.jetbrains.dart.*"
         working-directory: third_party
 
       - name: Upload test results
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: das-test-results
+          name: integration-test-results
           path: |
             **/build/reports/
             **/build/test-results/
