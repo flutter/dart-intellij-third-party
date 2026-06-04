@@ -37,6 +37,7 @@ class WebSocket(private val uri: URI) {
         }
     }
 
+    @Synchronized
     @Throws(WebSocketException::class)
     fun send(text: String) {
         val webSocket = jdkWebSocket ?: throw WebSocketException("WebSocket is not connected")
