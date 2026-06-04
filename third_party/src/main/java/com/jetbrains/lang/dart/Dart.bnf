@@ -339,7 +339,7 @@ newConstructorDeclaration ::= metadata* 'augment'? ('external' | 'const')* 'new'
 thisDeclaration ::= 'this' initializers? (';' | block) {pin=1}
 private class_member_recover ::= !(<<nonStrictID>> | 'this' | 'operator' | '(' | '@' | 'abstract' | 'base' | 'class' | 'const' | 'covariant' |
                                  'enum' | 'export' | 'extension' | 'external' | 'factory' | 'final' | 'get' | 'import' | 'interface' |
-                                 'late' | 'library' | 'mixin' | 'part' | 'sealed' | 'set' | 'static' | 'typedef' | 'var' | 'void' | '}')
+                                 'late' | 'library' | 'mixin' | 'new' | 'part' | 'sealed' | 'set' | 'static' | 'typedef' | 'var' | 'void' | '}')
 
 private functionBodyOrNative ::= 'native' functionBody
                                | functionNative
@@ -368,7 +368,7 @@ superCallOrFieldInitializer ::= (superExpression | thisExpression) ('.' (referen
 private super_call_or_field_initializer_recover ::= !(<<nonStrictID>> | 'sync' | 'async' | '=>' | '{' | 'operator' |
                                                     '(' | ',' | ':' | ';' | '@' | 'abstract' | 'base' | 'class' | 'const' | 'covariant' |
                                                     'enum' | 'export' | 'extension' | 'external' | 'factory' | 'final' | 'get' | 'import' |
-                                                    'interface' | 'late' | 'library' | 'mixin' | 'native' | 'part' | 'sealed' | 'set' |
+                                                    'interface' | 'late' | 'library' | 'mixin' | 'native' | 'new' | 'part' | 'sealed' | 'set' |
                                                     'static' | 'typedef' | 'var' | 'void' | '}' )
 
 functionTypeAlias ::= metadata* 'augment'? 'typedef' functionPrefix typeParameters? formalParameterList ';'? |

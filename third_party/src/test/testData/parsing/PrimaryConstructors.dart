@@ -50,4 +50,25 @@ class C10 {
   final int v;
   @meta const new(int v) : v = v;
 }
+
+class E {
+  E? parent;
+}
+
+class D extends E {
+  E expression;
+  D.d(this.expression) {
+    expression.parent = this;
+  }
+
+  new(this.expression) {
+    expression.parent = this;
+  }
+
+  void foo() {
+    expression.parent = this;
+  }
+}
+
 // EOF
+

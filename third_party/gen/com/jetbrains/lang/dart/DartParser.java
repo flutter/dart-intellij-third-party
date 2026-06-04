@@ -1102,7 +1102,7 @@ public class DartParser implements PsiParser, LightPsiParser {
 
   // <<nonStrictID>> | 'this' | 'operator' | '(' | '@' | 'abstract' | 'base' | 'class' | 'const' | 'covariant' |
   //                                  'enum' | 'export' | 'extension' | 'external' | 'factory' | 'final' | 'get' | 'import' | 'interface' |
-  //                                  'late' | 'library' | 'mixin' | 'part' | 'sealed' | 'set' | 'static' | 'typedef' | 'var' | 'void' | '}'
+  //                                  'late' | 'library' | 'mixin' | 'new' | 'part' | 'sealed' | 'set' | 'static' | 'typedef' | 'var' | 'void' | '}'
   private static boolean class_member_recover_0(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "class_member_recover_0")) return false;
     boolean r;
@@ -1129,6 +1129,7 @@ public class DartParser implements PsiParser, LightPsiParser {
     if (!r) r = consumeToken(b, LATE);
     if (!r) r = consumeToken(b, LIBRARY);
     if (!r) r = consumeToken(b, MIXIN);
+    if (!r) r = consumeToken(b, NEW);
     if (!r) r = consumeToken(b, PART);
     if (!r) r = consumeToken(b, SEALED);
     if (!r) r = consumeToken(b, SET);
@@ -8617,7 +8618,7 @@ public class DartParser implements PsiParser, LightPsiParser {
   // <<nonStrictID>> | 'sync' | 'async' | '=>' | '{' | 'operator' |
   //                                                     '(' | ',' | ':' | ';' | '@' | 'abstract' | 'base' | 'class' | 'const' | 'covariant' |
   //                                                     'enum' | 'export' | 'extension' | 'external' | 'factory' | 'final' | 'get' | 'import' |
-  //                                                     'interface' | 'late' | 'library' | 'mixin' | 'native' | 'part' | 'sealed' | 'set' |
+  //                                                     'interface' | 'late' | 'library' | 'mixin' | 'native' | 'new' | 'part' | 'sealed' | 'set' |
   //                                                     'static' | 'typedef' | 'var' | 'void' | '}'
   private static boolean super_call_or_field_initializer_recover_0(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "super_call_or_field_initializer_recover_0")) return false;
@@ -8652,6 +8653,7 @@ public class DartParser implements PsiParser, LightPsiParser {
     if (!r) r = consumeToken(b, LIBRARY);
     if (!r) r = consumeToken(b, MIXIN);
     if (!r) r = consumeToken(b, NATIVE);
+    if (!r) r = consumeToken(b, NEW);
     if (!r) r = consumeToken(b, PART);
     if (!r) r = consumeToken(b, SEALED);
     if (!r) r = consumeToken(b, SET);
