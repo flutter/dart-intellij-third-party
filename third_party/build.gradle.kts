@@ -301,7 +301,9 @@ tasks.register<PrintVersionTask>("printVersion") {
 tasks.named<Zip>("buildPlugin") {
     val v = intellijPlatform.pluginConfiguration.version
     archiveFileName.set(v.map { versionStr ->
-        if (commitHash.isNotEmpty() && !versionStr.contains(commitHash)) {
+        if (project.hasProperty("dev")) {
+            "Dart.zip"
+        } else if (commitHash.isNotEmpty() && !versionStr.contains(commitHash)) {
             "Dart-$versionStr-$commitHash.zip"
         } else {
             "Dart-$versionStr.zip"
