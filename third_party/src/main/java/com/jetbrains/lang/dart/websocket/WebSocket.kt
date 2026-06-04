@@ -1,3 +1,9 @@
+/*
+ * Copyright 2026 The Chromium Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file.
+ */
+
 package com.jetbrains.lang.dart.websocket
 
 import java.net.URI
@@ -9,19 +15,12 @@ import java.util.concurrent.TimeUnit
 
 class WebSocket(private val uri: URI) {
 
-  // This should be a singleton
-  private val httpClient: HttpClient = HttpClient.newHttpClient()
-
-  // @Volatile is needed because we need memory visibility
   @Volatile
   private var jdkWebSocket: WebSocket? = null
 
-  // No concurrent read and write can happen because connect is happening after assigning
-  // this value. So its prudent
   @Volatile
   var eventHandler: WebSocketEventHandler? = null
 
-  // Building JDK's Websocket is async (unlike weberknecht). We get a future, and we need to block it to get the Websocket.
   @Throws(WebSocketException::class)
   fun connect() {
     val listener = JdkListener()
@@ -33,7 +32,6 @@ class WebSocket(private val uri: URI) {
     }
 
     jdkWebSocket = try {
-      // onOpen fires before get
       future.toCompletableFuture().get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
     catch (e: Exception) {
@@ -43,10 +41,9 @@ class WebSocket(private val uri: URI) {
 
   @Throws(WebSocketException::class)
   fun send(text: String) {
-    val ws = jdkWebSocket ?: throw WebSocketException("WebSocket is not connected")
+    val webSocket = jdkWebSocket ?: throw WebSocketException("WebSocket is not connected")
     try {
-      ws.sendText(text, true).toCompletableFuture().get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-      // This is mimicking the behavior of Weberknecht, we don't really need to block it
+      webSocket.sendText(text, true).toCompletableFuture().get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
     }
     catch (e: Exception) {
       throw WebSocketException("Failed to send WebSocket message", e)
@@ -61,8 +58,6 @@ class WebSocket(private val uri: URI) {
       eventHandler?.onOpen()
     }
 
-    // In RFC 6455, it is stated that The fragments of one message MUST NOT be interleaved between the
-    // fragments of another message unless an extension has been negotiated that can interpret the interleaving.
     override fun onText(webSocket: WebSocket, data: CharSequence, last: Boolean): CompletionStage<*>? {
       pendingText.append(data)
       if (last) {
@@ -73,7 +68,7 @@ class WebSocket(private val uri: URI) {
       return null
     }
 
-    // We could optimally use the statusCode and the reason for logging purposes
+    // We could use the statusCode and the reason for logging purposes
     override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
       pendingText.clear()
       eventHandler?.onClose()
@@ -94,5 +89,7 @@ class WebSocket(private val uri: URI) {
   private companion object {
     const val CONNECT_TIMEOUT_SECONDS = 10L
     const val SEND_TIMEOUT_SECONDS = 10L
+
+    private val httpClient: HttpClient = HttpClient.newHttpClient()
   }
 }
