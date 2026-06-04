@@ -12,11 +12,13 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.google.dart.server.AnalysisServerStatusListener
 import com.google.dart.server.ResponseListener
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
+import org.eclipse.lsp4j.ExecuteCommandOptions
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
@@ -58,17 +60,36 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     // There are non-lsp4ij requests that are sent as LSP-over-legacy, but we don't need to forward responses for those
     // requests to lsp4ij since lsp4ij was not the originator.
     private val pendingLegacyIds = ConcurrentHashMap<String, JsonElement>()
+    private val pendingExecuteCommandIds = ConcurrentHashMap.newKeySet<String>()
+    private val pendingApplyEditIds = ConcurrentHashMap<String, String>()
     private var responseListener: ResponseListener? = null
+    private var statusListener: AnalysisServerStatusListener? = null
     @Volatile private var isStopping = false
     private var clientMessageFuture: java.util.concurrent.Future<*>? = null
+
+    fun hasActiveExecuteCommand(): Boolean {
+        return !pendingExecuteCommandIds.isEmpty()
+    }
 
     override fun start() {
         logger.info("Starting DartVirtualStreamConnectionProvider")
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
 
+        val service = project.getService(DartLspProjectService::class.java)
+        service.connectionProvider = this
+
         Disposer.register(project) {
             stop()
         }
+
+        val statusListener = AnalysisServerStatusListener { isAlive ->
+            if (!isAlive) {
+                logger.info("Legacy Dart Analysis Server died (isAlive=false), stopping LSP virtual connection provider")
+                stop()
+            }
+        }
+        this.statusListener = statusListener
+        dartAnalysisService.addStatusListener(statusListener)
 
         clientMessageFuture = ApplicationManager.getApplication().executeOnPooledThread {
             setupDasResponseListener(dartAnalysisService)
@@ -87,6 +108,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             val lspPayload = extractLspPayload(jsonObject)
 
             if (lspPayload != null) {
+                logger.info("Enqueuing payload to lsp4ij: $lspPayload")
                 enqueueResponse(lspPayload.toString())
             }
         }
@@ -96,13 +118,20 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
     }
 
     private fun extractLspPayload(jsonObject: JsonObject): JsonObject? {
+        logger.info("extractLspPayload inspecting jsonObject: $jsonObject")
         if (jsonObject.has("params")) {
             val params = jsonObject.get("params").asJsonObject
             if (params.has(LSP_MESSAGE_KEY)) {
                 val msgObj = params.get(LSP_MESSAGE_KEY).asJsonObject
                 if (msgObj.getAsJsonPrimitive("method")?.asString == "workspace/applyEdit") {
-                    logger.debug("Ignored workspace/applyEdit message from DAS (handled by legacy bridge)")
-                    return null
+                    if (!hasActiveExecuteCommand()) {
+                        logger.info("Ignored workspace/applyEdit message from DAS (handled by legacy bridge for DTD/DevTools)")
+                        return null
+                    }
+                    val lspReqId = msgObj.get("id").asString
+                    val dasReqId = jsonObject.get("id").asString
+                    pendingApplyEditIds[lspReqId] = dasReqId
+                    logger.info("Registered pendingApplyEditId: lspReqId=$lspReqId -> dasReqId=$dasReqId")
                 }
                 logger.debug("extractLspPayload: Extracted LSP notification/message from DAS: $msgObj")
                 return msgObj
@@ -113,18 +142,21 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         if (topLevelId != null) {
             val lspIdElement = pendingLegacyIds[topLevelId]
             if (lspIdElement != null) {
+                logger.info("extractLspPayload found pending legacy ID: topLevelId=$topLevelId, lspId=$lspIdElement")
                 if (jsonObject.has("result")) {
                     pendingLegacyIds.remove(topLevelId)
+                    pendingExecuteCommandIds.remove(topLevelId)
                     val result = jsonObject.get("result").asJsonObject
                     if (result.has(LSP_RESPONSE_KEY)) {
                         val resultPayload = result.get(LSP_RESPONSE_KEY).asJsonObject
-                        logger.debug("extractLspPayload: Extracted successful LSP response for legacyId=$topLevelId (lspId=$lspIdElement): $resultPayload")
+                        logger.info("Successfully extracted LSP response payload for legacyId $topLevelId (lspId=$lspIdElement): $resultPayload")
                         return resultPayload
                     } else {
                         logger.debug("extractLspPayload: DAS response has result but is missing '$LSP_RESPONSE_KEY': $jsonObject")
                     }
                 } else if (jsonObject.has("error")) {
                     pendingLegacyIds.remove(topLevelId)
+                    pendingExecuteCommandIds.remove(topLevelId)
                     val error = jsonObject.get("error").asJsonObject
                     logger.warn("Received legacy error from DAS for legacyId=$topLevelId (lspId=$lspIdElement): $error")
                     val lspErrorResponse = JsonObject()
@@ -160,10 +192,12 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
                     when (message) {
                         is RequestMessage -> handleRequestMessage(message)
                         is NotificationMessage -> handleNotificationMessage(message)
+                        is ResponseMessage -> handleResponseMessage(message)
                         else -> logger.debug("Ignored unrecognized message type from lsp4ij request: $message")
                     }
-                } catch (e: Exception) {
-                    logger.error("Error processing LSP message from lsp4ij: $message", e)
+                } catch (t: Throwable) {
+                    logger.error("Unhandled error processing LSP message from lsp4ij: $message", t)
+                }
                 }
             }
         } catch (e: JsonRpcException) {
@@ -182,6 +216,32 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         }
     }
 
+    private fun handleResponseMessage(message: ResponseMessage) {
+        val rawId = message.id
+        logger.info("Received response message from lsp4ij: id='$rawId' (type=${rawId?.javaClass?.name}), pendingApplyEditIds=$pendingApplyEditIds")
+        val lspReqId = rawId?.toString() ?: return
+        val dasReqId = pendingApplyEditIds.remove(lspReqId) ?: return
+        logger.info("Handling lsp4ij response: $lspReqId matching dasReqId $dasReqId")
+
+        val lspResponseElement = JSON_HANDLER.gson.toJsonTree(message).asJsonObject
+        if (message.error == null) {
+            val manualResultObj = JsonObject()
+            manualResultObj.addProperty("applied", true)
+            lspResponseElement.add("result", manualResultObj)
+            logger.info("Manually set ApplyWorkspaceEditResponse applied=true for lspResponseElement: $lspResponseElement")
+        }
+        val resultJsonElement = JsonObject()
+        resultJsonElement.add("lspResponse", lspResponseElement)
+
+        val responseElement = JsonObject()
+        responseElement.addProperty("id", dasReqId)
+        responseElement.add("result", resultJsonElement)
+        logger.info("Formulated responseElement for DAS: $responseElement")
+
+        val dartAnalysisService = DartAnalysisServerService.getInstance(project)
+        dartAnalysisService.sendResponse(responseElement)
+    }
+
     private fun handleRequestMessage(message: RequestMessage) {
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
         val lspMethod = LspMethod.fromMethod(message.method)
@@ -193,7 +253,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         when (lspMethod) {
             LspMethod.INITIALIZE -> handleInitializeRequest(message)
             LspMethod.SHUTDOWN -> handleShutdownRequest(message)
-            LspMethod.HOVER, LspMethod.DIAGNOSTIC_SERVER -> forwardLspRequestToDas(message, dartAnalysisService)
+            LspMethod.HOVER, LspMethod.DIAGNOSTIC_SERVER, LspMethod.CODE_ACTION, LspMethod.EXECUTE_COMMAND -> forwardLspRequestToDas(message, dartAnalysisService)
         }
 
     }
@@ -236,7 +296,32 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
     private fun handleInitializeRequest(message: RequestMessage) {
         val capabilities = ServerCapabilities()
-        capabilities.setHoverProvider(DartConfigurable.isExperimentalLspFeaturesEnabled(project))
+        val experimentalEnabled = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
+        capabilities.setHoverProvider(experimentalEnabled)
+        capabilities.setCodeActionProvider(experimentalEnabled)
+        if (experimentalEnabled) {
+            val supportedCommands = listOf(
+                "dart.edit.codeAction.apply",
+                "dart.edit.sortMembers",
+                "dart.edit.organizeImports",
+                "dart.edit.fixAll",
+                "dart.edit.fixAllInWorkspace",
+                "dart.edit.fixAllInWorkspace.preview",
+                "dart.edit.sendWorkspaceEdit",
+                "dart.logAction",
+                "refactor.perform",
+                "refactor.validate",
+                "dart.refactor.add_constructor_name",
+                "dart.refactor_add.import_prefix",
+                "dart.refactor.convert_all_formal_parameters_to_named",
+                "dart.refactor.convert_selected_formal_parameters_to_named",
+                "dart.refactor.move_selected_formal_parameters_left",
+                "dart.refactor.move_top_level_to_file",
+                "dart.refactor.remove_constructor_name",
+                "dart.refactor.remove_import_prefix"
+            )
+            capabilities.executeCommandProvider = ExecuteCommandOptions(supportedCommands)
+        }
 
         val initResult = InitializeResult(capabilities)
         sendSuccessResponse(message.id, initResult)
@@ -250,6 +335,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
 
     private fun forwardLspRequestToDas(message: RequestMessage, dartAnalysisService: DartAnalysisServerService) {
+        dartAnalysisService.updateFilesContent()
         val rawId = message.id ?: return
         val lspIdElement = JSON_HANDLER.gson.toJsonTree(rawId)
 
@@ -262,11 +348,31 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
         val legacyRequest = JsonObject()
         val legacyId = dartAnalysisService.generateUniqueId()
         pendingLegacyIds[legacyId] = lspIdElement
+        if (message.method == "workspace/executeCommand") {
+            pendingExecuteCommandIds.add(legacyId)
+        }
         legacyRequest.addProperty("id", legacyId)
         legacyRequest.addProperty("method", "lsp.handle")
 
+        val lspMessageJson = JSON_HANDLER.gson.toJsonTree(message).asJsonObject
+        if (message.method == "workspace/executeCommand") {
+            val paramsObj = lspMessageJson.getAsJsonObject("params")
+            if (paramsObj != null && paramsObj.has("command") && paramsObj.get("command").asString == "dart.edit.codeAction.apply") {
+                val argsArray = paramsObj.getAsJsonArray("arguments")
+                if (argsArray != null && argsArray.size() > 0) {
+                    val argObj = argsArray.get(0).asJsonObject
+                    if (argObj != null && argObj.has("textDocument")) {
+                        val textDocObj = argObj.getAsJsonObject("textDocument")
+                        if (textDocObj != null && !textDocObj.has("version")) {
+                            textDocObj.add("version", com.google.gson.JsonNull.INSTANCE)
+                        }
+                    }
+                }
+            }
+        }
+
         val params = JsonObject()
-        params.add("lspMessage", JSON_HANDLER.gson.toJsonTree(message).asJsonObject)
+        params.add("lspMessage", lspMessageJson)
         legacyRequest.add("params", params)
 
         try {
@@ -307,7 +413,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
             logger.warn("DartLspProjectService does not have a registered producer for project: ${project.name}")
             return
         }
-
+        logger.info("Enqueuing response string to DartMessageProducer: $jsonString")
         producer.enqueueResponse(jsonString)
     }
 
@@ -325,6 +431,7 @@ class DartVirtualStreamConnectionProvider(private val project: Project) : Stream
 
         val dartAnalysisService = DartAnalysisServerService.getInstance(project)
         responseListener?.let { dartAnalysisService.removeResponseListener(it) }
+        statusListener?.let { dartAnalysisService.removeStatusListener(it) }
 
         val service = project.getService(DartLspProjectService::class.java)
         service.producer?.stop()

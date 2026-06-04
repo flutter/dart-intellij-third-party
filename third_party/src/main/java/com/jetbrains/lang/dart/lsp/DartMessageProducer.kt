@@ -51,8 +51,10 @@ class DartMessageProducer(val jsonHandler: MessageJsonHandler) : MessageProducer
             if (json == POISON_PILL) break
 
             try {
+                logger.info("DartMessageProducer parsing JSON from queue: $json")
                 val message = jsonHandler.parseMessage(json)
                 if (message != null) {
+                    logger.info("DartMessageProducer consuming message: $message")
                     try {
                         messageConsumer.consume(message)
                     } catch (e: Exception) {
@@ -67,7 +69,7 @@ class DartMessageProducer(val jsonHandler: MessageJsonHandler) : MessageProducer
                 logger.warn("Error sending message to lsp4ij: $json", ex)
             } catch(ex: JsonRpcException) {
                 logger.warn("Error sending message to lsp4ij: $json", ex)
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 logger.error("Unexpected error in message producer loop for JSON: $json", e)
             }
         }

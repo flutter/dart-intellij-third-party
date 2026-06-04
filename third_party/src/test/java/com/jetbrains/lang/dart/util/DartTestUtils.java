@@ -9,6 +9,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.*;
+import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
@@ -116,6 +117,7 @@ public final class DartTestUtils {
     if (definition != null) {
       definition.setEnabled(false, module.getProject());
     }
+    PropertiesComponent.getInstance(module.getProject()).setValue("dart.lsp.experimental.enabled", false, true);
 
     ApplicationManager.getApplication().runWriteAction(() -> {
       Disposer.register(disposable, DartSdkLibUtil.configureDartSdkAndReturnUndoingDisposable(module.getProject(), sdkHome));

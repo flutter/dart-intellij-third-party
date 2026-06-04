@@ -30,6 +30,7 @@ import com.jetbrains.lang.dart.analyzer.DartFileInfoKt;
 import com.jetbrains.lang.dart.analyzer.DartLocalFileInfo;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.assists.DartSourceEditException;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.dartlang.analysis.server.protocol.SourceFileEdit;
@@ -147,6 +148,10 @@ public final class DartQuickFix implements IntentionAction, Comparable<Intention
 
   @Override
   public boolean isAvailable(final @NotNull Project project, final Editor editor, final PsiFile psiFile) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+
     if (editor == null || psiFile == null) {
       // not sure this can ever happen
       return false;

@@ -66,6 +66,7 @@ import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
 import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
@@ -193,6 +194,7 @@ public final class DartAnalysisServerService implements Disposable {
   private final @NotNull List<AnalysisServerListener> myAdditionalServerListeners = new SmartList<>();
   private final @NotNull List<RequestListener> myRequestListeners = new SmartList<>();
   private final @NotNull List<ResponseListener> myResponseListeners = new SmartList<>();
+  private final @NotNull List<AnalysisServerStatusListener> myStatusListeners = new SmartList<>();
   private final @NotNull List<DartQuickAssistIntentionListener> myQuickAssistIntentionListeners = new SmartList<>();
   private final @NotNull List<DartQuickFixListener> myQuickFixListeners = new SmartList<>();
 
@@ -634,6 +636,22 @@ public final class DartAnalysisServerService implements Disposable {
     myResponseListeners.remove(responseListener);
     if (myServer != null) {
       myServer.removeResponseListener(responseListener);
+    }
+  }
+
+  public void addStatusListener(final @NotNull AnalysisServerStatusListener statusListener) {
+    if (!myStatusListeners.contains(statusListener)) {
+      myStatusListeners.add(statusListener);
+      if (myServer != null && isServerProcessActive()) {
+        myServer.addStatusListener(statusListener);
+      }
+    }
+  }
+
+  public void removeStatusListener(final @NotNull AnalysisServerStatusListener statusListener) {
+    myStatusListeners.remove(statusListener);
+    if (myServer != null) {
+      myServer.removeStatusListener(statusListener);
     }
   }
 
@@ -2208,6 +2226,9 @@ public final class DartAnalysisServerService implements Disposable {
         for (ResponseListener listener : myResponseListeners) {
           startedServer.addResponseListener(listener);
         }
+        for (AnalysisServerStatusListener listener : myStatusListeners) {
+          startedServer.addStatusListener(listener);
+        }
 
         myHaveShownInitialProgress = false;
         startedServer.addStatusListener(isAlive -> {
@@ -2235,9 +2256,11 @@ public final class DartAnalysisServerService implements Disposable {
         startedServer.analysis_updateOptions(new AnalysisOptions(true, true, true, true, false, true, false));
         boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
         boolean supportsWorkspaceApplyEdits = isDartSdkVersionSufficientForWorkspaceApplyEdits(mySdkVersion);
+        boolean lspCodeActionsEnabled = DartConfigurable.isExperimentalLspFeaturesEnabled(myProject);
         startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
                                                    supportsUris,
-                                                   supportsWorkspaceApplyEdits);
+                                                   supportsWorkspaceApplyEdits,
+                                                   lspCodeActionsEnabled);
 
         myServer = startedServer;
 
@@ -2585,6 +2608,13 @@ public final class DartAnalysisServerService implements Disposable {
     final RemoteAnalysisServerImpl server = myServer;
     if (server != null) {
       server.sendRequestToServer(id, request);
+    }
+  }
+
+  public void sendResponse(JsonObject response) {
+    final RemoteAnalysisServerImpl server = myServer;
+    if (server != null) {
+      server.sendResponseToServer(response);
     }
   }
 

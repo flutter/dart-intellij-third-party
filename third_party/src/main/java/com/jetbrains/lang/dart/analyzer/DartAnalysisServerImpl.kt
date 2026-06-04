@@ -16,6 +16,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.jetbrains.lang.dart.DartBundle
+import com.jetbrains.lang.dart.sdk.DartConfigurable
 import kotlinx.coroutines.launch
 import org.dartlang.analysis.server.protocol.*
 
@@ -53,6 +54,9 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
   }
 
   override fun lsp_workspaceApplyEdit(params: DartLspApplyWorkspaceEditParams, consumer: DartLspWorkspaceApplyEditRequestConsumer) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return
+    }
     DartAnalysisServerService.getInstance(project).serviceScope.launch {
       val label: @NlsSafe String? = params.label
       val commandName: String = label ?: DartBundle.message("code.changes.by.dart.analysis.server")

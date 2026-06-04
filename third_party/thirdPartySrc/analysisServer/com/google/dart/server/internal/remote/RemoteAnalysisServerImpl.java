@@ -302,6 +302,11 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   }
 
   @Override
+  public void removeStatusListener(AnalysisServerStatusListener listener) {
+    statusListenerList.remove(listener);
+  }
+
+  @Override
   public void analysis_getErrors(String file, GetErrorsConsumer consumer) {
     String id = generateUniqueId();
     sendRequestToServer(id, RequestUtilities.generateAnalysisGetErrors(id, file), consumer);
@@ -698,12 +703,12 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   }
 
   @Override
-  public void server_setClientCapabilities(List<String> requests, boolean supportsUris, boolean supportsWorkspaceApplyEdits) {
+  public void server_setClientCapabilities(List<String> requests, boolean supportsUris, boolean supportsWorkspaceApplyEdits, boolean lspCodeActionsEnabled) {
     String id = generateUniqueId();
     if (requests == null) {
       requests = StringUtilities.EMPTY_LIST;
     }
-    sendRequestToServer(id, RequestUtilities.generateClientCapabilities(id, requests, supportsUris, supportsWorkspaceApplyEdits));
+    sendRequestToServer(id, RequestUtilities.generateClientCapabilities(id, requests, supportsUris, supportsWorkspaceApplyEdits, lspCodeActionsEnabled));
   }
 
   @Override

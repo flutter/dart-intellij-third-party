@@ -12,9 +12,11 @@ import com.intellij.openapi.project.Project
 @Service(Service.Level.PROJECT)
 class DartLspProjectService(private val project: Project) : Disposable {
     var producer: DartMessageProducer? = null
+    var connectionProvider: DartVirtualStreamConnectionProvider? = null
 
     override fun dispose() {
         producer?.stop()
         producer = null
+        connectionProvider = null
     }
 }
