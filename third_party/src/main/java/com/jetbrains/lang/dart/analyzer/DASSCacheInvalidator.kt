@@ -4,6 +4,7 @@ import com.intellij.ide.caches.CachesInvalidator
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.SystemInfoRt
 import com.jetbrains.lang.dart.DartBundle
+import com.intellij.openapi.util.io.FileUtil
 import java.io.File
 
 /**
@@ -26,7 +27,7 @@ private class DASSCacheInvalidator : CachesInvalidator() {
         }
         val dartServerCacheDirectory = getDartServerCacheDirectory()
         if (dartServerCacheDirectory != null && dartServerCacheDirectory.exists()) {
-            dartServerCacheDirectory.deleteRecursively()
+            FileUtil.asyncDelete(dartServerCacheDirectory)
         }
     }
 

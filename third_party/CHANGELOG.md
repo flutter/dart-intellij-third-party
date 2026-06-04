@@ -19,6 +19,7 @@
 ### Removed
 
 ### Fixed
+- Avoid UI thread freezes during 'Invalidate Caches' by performing dartServer cache deletion asynchronously (#106)
 - Avoid UI thread freezes by moving DTD process creation to a pooled thread (#437)
 - Avoid UI thread freezes during project startup by batch-updating module root directory exclusions for `pubspec.yaml` files (#149)
 - Avoid AssertionErrors / UI crashes when navigating subclasses, superclasses, or overriding methods by migrating from deprecated `PsiElementListNavigator` to modern `PsiTargetNavigator`.
