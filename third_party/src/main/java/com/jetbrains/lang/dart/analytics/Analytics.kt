@@ -226,7 +226,14 @@ private object AnalyticsConfigurationManager {
           }
         }
       }
-      dtdProcess.start(sdk)
+      ApplicationManager.getApplication().executeOnPooledThread {
+        try {
+          dtdProcess.start(sdk)
+        } catch (e: Exception) {
+          logger.warn("Failed to start DTD process", e)
+          initLatch.countDown()
+        }
+      }
     }
 
     try {
