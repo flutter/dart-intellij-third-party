@@ -8,88 +8,85 @@ package com.jetbrains.lang.dart.websocket
 
 import java.net.URI
 import java.net.http.HttpClient
-import java.net.http.WebSocket
+import java.net.http.WebSocket as JdkWebSocket
 import java.nio.ByteBuffer
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.TimeUnit
 
 class WebSocket(private val uri: URI) {
 
-  @Volatile
-  private var jdkWebSocket: WebSocket? = null
+    @Volatile
+    private var jdkWebSocket: JdkWebSocket? = null
 
-  @Volatile
-  var eventHandler: WebSocketEventHandler? = null
+    @Volatile
+    var eventHandler: WebSocketEventHandler? = null
 
-  @Throws(WebSocketException::class)
-  fun connect() {
-    val listener = JdkListener()
-    val future: CompletionStage<WebSocket> = try {
-      httpClient.newWebSocketBuilder().buildAsync(uri, listener)
-    }
-    catch (e: Exception) {
-      throw WebSocketException("Failed to start WebSocket handshake to $uri", e)
-    }
+    @Throws(WebSocketException::class)
+    fun connect() {
+        val listener = JdkListener()
+        val future: CompletionStage<JdkWebSocket> = try {
+            httpClient.newWebSocketBuilder().buildAsync(uri, listener)
+        } catch (e: Exception) {
+            throw WebSocketException("Failed to start WebSocket handshake to $uri", e)
+        }
 
-    jdkWebSocket = try {
-      future.toCompletableFuture().get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-    }
-    catch (e: Exception) {
-      throw WebSocketException("WebSocket handshake to $uri failed", e)
-    }
-  }
-
-  @Throws(WebSocketException::class)
-  fun send(text: String) {
-    val webSocket = jdkWebSocket ?: throw WebSocketException("WebSocket is not connected")
-    try {
-      webSocket.sendText(text, true).toCompletableFuture().get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-    }
-    catch (e: Exception) {
-      throw WebSocketException("Failed to send WebSocket message", e)
-    }
-  }
-
-  private inner class JdkListener : WebSocket.Listener {
-    private val pendingText = StringBuilder()
-
-    override fun onOpen(webSocket: WebSocket) {
-      webSocket.request(Long.MAX_VALUE)
-      eventHandler?.onOpen()
+        jdkWebSocket = try {
+            future.toCompletableFuture().get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            throw WebSocketException("WebSocket handshake to $uri failed", e)
+        }
     }
 
-    override fun onText(webSocket: WebSocket, data: CharSequence, last: Boolean): CompletionStage<*>? {
-      pendingText.append(data)
-      if (last) {
-        val complete = pendingText.toString()
-        pendingText.setLength(0)
-        eventHandler?.onMessage(WebSocketMessage(complete))
-      }
-      return null
+    @Throws(WebSocketException::class)
+    fun send(text: String) {
+        val webSocket = jdkWebSocket ?: throw WebSocketException("WebSocket is not connected")
+        try {
+            webSocket.sendText(text, true).toCompletableFuture().get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            throw WebSocketException("Failed to send WebSocket message", e)
+        }
     }
 
-    // We could use the statusCode and the reason for logging purposes
-    override fun onClose(webSocket: WebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
-      pendingText.clear()
-      eventHandler?.onClose()
-      return null
+    private inner class JdkListener : JdkWebSocket.Listener {
+        private val pendingText = StringBuilder()
+
+        override fun onOpen(webSocket: JdkWebSocket) {
+            webSocket.request(Long.MAX_VALUE)
+            eventHandler?.onOpen()
+        }
+
+        override fun onText(webSocket: JdkWebSocket, data: CharSequence, last: Boolean): CompletionStage<*>? {
+            pendingText.append(data)
+            if (last) {
+                val complete = pendingText.toString()
+                pendingText.setLength(0)
+                eventHandler?.onMessage(WebSocketMessage(complete))
+            }
+            return null
+        }
+
+        // We could use the statusCode and the reason for logging purposes
+        override fun onClose(webSocket: JdkWebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
+            pendingText.clear()
+            eventHandler?.onClose()
+            return null
+        }
+
+        override fun onPing(webSocket: JdkWebSocket, message: ByteBuffer): CompletionStage<*>? {
+            eventHandler?.onPing()
+            return null
+        }
+
+        override fun onPong(webSocket: JdkWebSocket, message: ByteBuffer): CompletionStage<*>? {
+            eventHandler?.onPong()
+            return null
+        }
     }
 
-    override fun onPing(webSocket: WebSocket, message: ByteBuffer): CompletionStage<*>? {
-      eventHandler?.onPing()
-      return null
+    private companion object {
+        const val CONNECT_TIMEOUT_SECONDS = 10L
+        const val SEND_TIMEOUT_SECONDS = 10L
+
+        private val httpClient: HttpClient = HttpClient.newHttpClient()
     }
-
-    override fun onPong(webSocket: WebSocket, message: ByteBuffer): CompletionStage<*>? {
-      eventHandler?.onPong()
-      return null
-    }
-  }
-
-  private companion object {
-    const val CONNECT_TIMEOUT_SECONDS = 10L
-    const val SEND_TIMEOUT_SECONDS = 10L
-
-    private val httpClient: HttpClient = HttpClient.newHttpClient()
-  }
 }
