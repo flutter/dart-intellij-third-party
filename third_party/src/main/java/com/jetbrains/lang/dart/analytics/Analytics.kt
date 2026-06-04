@@ -229,8 +229,8 @@ private object AnalyticsConfigurationManager {
       ApplicationManager.getApplication().executeOnPooledThread {
         try {
           dtdProcess.start(sdk)
-        } catch (e: Exception) {
-          logger.warn("Failed to start DTD process", e)
+        } catch (t: Throwable) {
+          logger.warn("Failed to start DTD process", t)
           initLatch.countDown()
         }
       }
