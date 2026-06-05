@@ -26,6 +26,30 @@ import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * DartBridgeLspServer acts as a lightweight translation bridge between the JetBrains LSP client
+ * (which expects a standard LSP server) and the legacy Dart Analysis Server (DAS) running in legacy mode.
+ *
+ * ## Request Flow
+ * When the JetBrains client sends an LSP request (e.g., [hover]), the bridge intercepts it,
+ * wraps it in a legacy DAS `lsp.handle` request, and forwards it to the existing DAS instance.
+ * When DAS responds, the bridge extracts the nested LSP response and completes the future returned to the client.
+ *
+ * ## Migration Strategy: Shared vs LSP-Only Handlers
+ * DAS contains two sets of LSP handlers:
+ * 1. **Shared Handlers** (e.g., Hover, Formatting): These are registered in DAS even when running in legacy mode.
+ *    We can forward these requests directly to DAS via `lsp.handle`.
+ * 2. **LSP-Only Handlers** (e.g., Go to Definition, Completion): These are NOT registered in legacy DAS.
+ *    If we forward them, DAS will return `MethodNotFound`. To support these, the bridge must manually
+ *    intercept the LSP request, translate it to a legacy DAS request (e.g., `analysis.getNavigation` for Definition),
+ *    and translate the legacy response back to LSP classes.
+ *
+ * ## Document Synchronization
+ * Standard LSP document sync notifications ([didOpen], [didChange], [didClose]) are ignored in this bridge.
+ * The legacy Dart plugin already handles robust file content synchronization via `analysis.updateContent`.
+ * Since DAS shares the same in-memory overlay filesystem between legacy and LSP handlers, the shared LSP handlers
+ * (like Hover) will automatically see the up-to-date content synced by the legacy plugin.
+ */
 class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDocumentService, WorkspaceService, LanguageClientAware {
     companion object {
         private val logger = PluginLogger.createLogger(DartBridgeLspServer::class.java)
@@ -195,33 +219,43 @@ class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDo
     // Implement other TextDocumentService methods as needed, returning unsupported or forwarding.
     
     override fun didOpen(params: DidOpenTextDocumentParams) {
-        forwardNotification("textDocument/didOpen", params)
+        // Ignored. Document synchronization is handled by the legacy DartAnalysisServerService.
     }
 
     override fun didChange(params: DidChangeTextDocumentParams) {
-        forwardNotification("textDocument/didChange", params)
+        // Ignored. Document synchronization is handled by the legacy DartAnalysisServerService.
     }
 
     override fun didClose(params: DidCloseTextDocumentParams) {
-        forwardNotification("textDocument/didClose", params)
+        // Ignored. Document synchronization is handled by the legacy DartAnalysisServerService.
     }
 
     override fun didSave(params: DidSaveTextDocumentParams) {
-        forwardNotification("textDocument/didSave", params)
+        // Ignored. Document synchronization is handled by the legacy DartAnalysisServerService.
     }
 
     // --- WorkspaceService Implementation ---
 
     override fun didChangeConfiguration(params: DidChangeConfigurationParams) {
-        forwardNotification("workspace/didChangeConfiguration", params)
+        // Ignored. Configuration is managed by the legacy plugin settings.
     }
 
     override fun didChangeWatchedFiles(params: DidChangeWatchedFilesParams) {
-        forwardNotification("workspace/didChangeWatchedFiles", params)
+        // Ignored. File watching is handled by the legacy plugin.
     }
 
     // --- Helper Methods for Forwarding ---
 
+    /**
+     * Forwards an LSP request to the legacy DAS.
+     *
+     * It wraps the LSP request in a legacy DAS `lsp.handle` request.
+     * We register a [PendingRequest] associated with the [legacyId] so that when DAS returns
+     * the response, we can match it, extract the inner LSP response payload, and complete the future.
+     *
+     * Note: We use the same [legacyId] for both the outer legacy request and the inner LSP request
+     * to simplify tracking and matching.
+     */
     private fun <T> forwardRequest(method: String, params: Any, responseClass: Class<T>): CompletableFuture<T> {
         val future = CompletableFuture<T>()
         
@@ -266,6 +300,14 @@ class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDo
         return future
     }
 
+    /**
+     * Forwards an LSP notification to the legacy DAS.
+     *
+     * It wraps the LSP notification in a legacy DAS `lsp.handle` request.
+     * Since LSP notifications do not expect a response, we do not register a future to track it.
+     * DAS will still return a dummy legacy response acknowledging the `lsp.handle` request,
+     * which we will receive and safely ignore (as no pending request will match its ID).
+     */
     private fun forwardNotification(method: String, params: Any) {
         val legacyId = das.generateUniqueId()
         val lspNotification = JsonObject().apply {
