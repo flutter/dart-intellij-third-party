@@ -41,6 +41,7 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
 import com.jetbrains.lang.dart.lsp.LspMethod;
 import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
+import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -336,7 +337,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
   @Override
   public void apply() {
-    // similar to DartModuleBuilder.setupSdk()
+    final boolean initialExperimentalEnabled = isExperimentalLspFeaturesEnabled(myProject);
     final boolean currentExperimentalEnabled = myExperimentalLspFeaturesCheckBox.isSelected();
 
     final Runnable runnable = () -> {
@@ -375,6 +376,11 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
     ApplicationManager.getApplication().runWriteAction(runnable);
 
+    if (myEnableDartSupportCheckBox.isSelected() && initialExperimentalEnabled != currentExperimentalEnabled) {
+      DartBridgeLspServerManager bridgeManager = myProject.getService(DartBridgeLspServerManager.class);
+      bridgeManager.stopBridgeServer();
+      bridgeManager.startBridgeServer();
+    }
 
     reset(); // because we rely on remembering initial state
   }
