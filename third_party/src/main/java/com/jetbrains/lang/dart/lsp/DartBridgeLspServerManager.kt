@@ -43,7 +43,8 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
     init {
         Disposer.register(project, this)
         try {
-            // Bind to a random free port on localhost.
+            // Bind to a random free port on localhost. The OS will assign an available port.
+            // This port is then queried by DartLspServerDescriptor to tell the JetBrains LSP client where to connect.
             serverSocket = ServerSocket(0)
             logger.info("Bridge LSP Server socket listening on port $port")
             startListening()
@@ -53,6 +54,7 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
     }
 
     private fun startListening() {
+        // Start a background thread to listen for incoming connections from the JetBrains LSP client.
         listenFuture = ApplicationManager.getApplication().executeOnPooledThread {
             while (serverSocket?.isClosed == false) {
                 try {
@@ -69,6 +71,7 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
             }
         }
     }
+
 
     private fun handleClientConnection(socket: Socket) {
         // Close existing connection if any.

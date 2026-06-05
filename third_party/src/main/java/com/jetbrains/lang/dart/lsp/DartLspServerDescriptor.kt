@@ -31,6 +31,10 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         get() {
             val manager = project.getService(DartBridgeLspServerManager::class.java)
             val port = manager.port
+            // The JetBrains LSP framework calls this getter to determine how to connect to the server.
+            // We return a Socket channel pointing to the random port allocated by our Bridge Manager.
+            // 'startProcess = false' tells the platform that the server process is already running 
+            // (managed by DartBridgeLspServerManager) and it should only establish a socket connection.
             if (port == -1) {
                 return LspCommunicationChannel.Socket(0, startProcess = false)
             }
