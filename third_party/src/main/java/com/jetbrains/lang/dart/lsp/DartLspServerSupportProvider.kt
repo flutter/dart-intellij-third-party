@@ -7,10 +7,9 @@ package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
 import com.intellij.platform.lsp.dart.api.LspServerSupportProvider
 import com.intellij.platform.lsp.dart.api.LspServerSupportProvider.LspServerStarter
-import com.jetbrains.lang.dart.sdk.DartConfigurable
-import com.jetbrains.lang.dart.sdk.DartSdk
 
 /**
  * Entry point registered in plugin.xml to declare the JetBrains native LSP server provider for Dart.
@@ -24,10 +23,11 @@ import com.jetbrains.lang.dart.sdk.DartSdk
  */
 class DartLspServerSupportProvider : LspServerSupportProvider {
     override fun fileOpened(project: Project, file: VirtualFile, serverStarter: LspServerStarter) {
-        if (DartConfigurable.isExperimentalLspFeaturesEnabled(project) &&
-            file.extension == "dart" && 
-            DartSdk.getDartSdk(project) != null) {
-            serverStarter.ensureServerStarted(DartLspServerDescriptor(project))
-        }
+        // Ignored. The LSP server lifecycle is managed by DartAnalysisServerService.
+    }
+
+    override fun createLspWidgetItems(project: Project, currentFile: VirtualFile?): List<LanguageServiceWidgetItem> {
+        // Hide the status bar widget for the Dart (Bridge) server.
+        return emptyList()
     }
 }

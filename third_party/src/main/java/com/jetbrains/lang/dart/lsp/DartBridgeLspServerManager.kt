@@ -17,6 +17,10 @@ import java.io.IOException
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Future
+import com.intellij.platform.lsp.dart.api.LspServerManager
+import com.intellij.platform.lsp.dart.api.ensureServerStarted
+import com.intellij.platform.lsp.dart.api.stopServers
+
 
 /**
  * Project-level service that manages the lifecycle of the LSP bridge server.
@@ -42,15 +46,42 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
 
     init {
         Disposer.register(project, this)
+    }
+
+    fun startBridgeServer() {
+        if (serverSocket != null) {
+            logger.warn("Bridge LSP Server is already running")
+            return
+        }
         try {
             // Bind to a random free port on localhost. The OS will assign an available port.
             // This port is then queried by DartLspServerDescriptor to tell the JetBrains LSP client where to connect.
             serverSocket = ServerSocket(0)
             logger.info("Bridge LSP Server socket listening on port $port")
             startListening()
+            
+            // Manually trigger the JetBrains LSP client to connect to our bridge.
+            // This replaces the automatic file-opened trigger.
+            LspServerManager.getInstance(project).ensureServerStarted<DartLspServerSupportProvider>(DartLspServerDescriptor(project))
+            logger.info("Triggered LSP client start via ensureServerStarted")
         } catch (e: IOException) {
             logger.error("Failed to start Bridge ServerSocket", e)
         }
+    }
+
+    fun stopBridgeServer() {
+        logger.info("Stopping Bridge LSP Server")
+        // Disconnect the JetBrains LSP client.
+        LspServerManager.getInstance(project).stopServers<DartLspServerSupportProvider>()
+        
+        serverSocket?.close()
+        serverSocket = null
+        
+        listenFuture?.cancel(true)
+        listenFuture = null
+        
+        activeConnection?.close()
+        activeConnection = null
     }
 
     private fun startListening() {
@@ -97,9 +128,7 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
 
     override fun dispose() {
         logger.info("Disposing DartBridgeLspServerManager")
-        serverSocket?.close()
-        listenFuture?.cancel(true)
-        activeConnection?.close()
+        stopBridgeServer()
     }
 
     private inner class ActiveConnection(
