@@ -78,6 +78,8 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
+
 
 import java.io.File;
 import java.net.URI;
@@ -2260,6 +2262,9 @@ public final class DartAnalysisServerService implements Disposable {
         if (dtdUri != null) {
           connectToDtd(dtdUri);
         }
+
+        // Start the LSP Bridge Server
+        myProject.getService(DartBridgeLspServerManager.class).startBridgeServer();
       }
       catch (Exception e) {
         stopServer();
@@ -2312,6 +2317,8 @@ public final class DartAnalysisServerService implements Disposable {
 
   void stopServer() {
     synchronized (myLock) {
+      // Stop the LSP Bridge Server
+      myProject.getService(DartBridgeLspServerManager.class).stopBridgeServer();
       if (myServer != null) {
         LOG.debug("stopping server");
         myServer.removeAnalysisServerListener(myAnalysisServerListener);
