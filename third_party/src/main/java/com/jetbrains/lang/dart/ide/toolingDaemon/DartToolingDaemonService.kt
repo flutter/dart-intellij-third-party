@@ -51,6 +51,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   private lateinit var dtdProcessHandler: KillableProcessHandler
   private var serviceRunning = false
 
+  @Volatile
   var listener: DartToolingDaemonServiceListener? = null
 
   private lateinit var webSocket: WebSocket

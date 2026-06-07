@@ -11,7 +11,6 @@ import com.jetbrains.lang.dart.util.DartTestUtils
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlin.io.path.createTempDirectory
 
 class DartToolingDaemonServiceTest : BasePlatformTestCase() {
 
@@ -25,14 +24,14 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         DartTestUtils.configureDartSdk(module, myFixture.projectDisposable, true)
-        val tempDir = createTempDirectory("dtd_test_root").toFile()
-        ModuleRootModificationUtil.addContentRoot(module, tempDir.absolutePath)
+        val tempDir = myFixture.tempDirFixture.findOrCreateDir("dtd_test_root")
+        ModuleRootModificationUtil.addContentRoot(module, tempDir.path)
     }
 
     override fun tearDown() {
         try {
             if (::dartToolingDaemonService.isInitialized) {
-                dartToolingDaemonService.dispose()
+                dartToolingDaemonService.listener = null
             }
         } finally {
             super.tearDown()
@@ -69,9 +68,10 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
             UIUtil.dispatchAllInvocationEvents()
         }
 
-        val getActiveLocationId = idOfRequest(sentRequestsById, "a registerService request for Editor.getActiveLocation") {
-            it.isRegisterService("Editor", "getActiveLocation")
-        }
+        val getActiveLocationId =
+            idOfRequest(sentRequestsById, "a registerService request for Editor.getActiveLocation") {
+                it.isRegisterService("Editor", "getActiveLocation")
+            }
         val navigateToCodeId = idOfRequest(sentRequestsById, "a registerService request for Editor.navigateToCode") {
             it.isRegisterService("Editor", "navigateToCode")
         }
