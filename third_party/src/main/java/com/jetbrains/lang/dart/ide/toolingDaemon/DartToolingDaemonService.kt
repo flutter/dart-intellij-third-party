@@ -166,6 +166,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     consumerMap[id] = consumer
 
     val requestString = request.toString()
+    listener?.onWebSocketRequest(id, method, requestString)
     logger.debug("--> $requestString")
     webSocket.send(requestString)
   }
@@ -405,4 +406,5 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
 
 interface DartToolingDaemonServiceListener {
   fun onWebSocketMessage(text: String) {}
+  fun onWebSocketRequest(id: Int, method: String, text: String) {}
 }
