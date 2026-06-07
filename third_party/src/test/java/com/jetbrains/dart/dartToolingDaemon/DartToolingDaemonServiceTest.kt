@@ -39,9 +39,9 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
 
     fun testInitializationRequestsAreSentOnWebSocketOpen() {
         val allRequestsAcknowledged = CountDownLatch(3)
-        val getActiveLocationRegistered = AtomicBoolean(false)
-        val navigateToCodeRegistered = AtomicBoolean(false)
-        val workspaceRootsSet = AtomicBoolean(false)
+        var getActiveLocationRegistered = false
+        var navigateToCodeRegistered = false
+        var workspaceRootsSet = false
 
         dartToolingDaemonService = DartToolingDaemonService.getInstance(project)
         dartToolingDaemonService.listener = object : DartToolingDaemonServiceListener {
@@ -52,9 +52,9 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
                 if (result["type"]?.asString == "Success") {
                     val id = json["id"]?.asInt
                     when (id) {
-                        1 -> getActiveLocationRegistered.set(true)
-                        2 -> navigateToCodeRegistered.set(true)
-                        3 -> workspaceRootsSet.set(true)
+                        1 -> getActiveLocationRegistered = true
+                        2 -> navigateToCodeRegistered = true
+                        3 -> workspaceRootsSet = true
                     }
                     allRequestsAcknowledged.countDown()
                 }
@@ -71,8 +71,8 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
             )
             UIUtil.dispatchAllInvocationEvents()
         }
-        assertTrue("Editor.getActiveLocation should be registered", getActiveLocationRegistered.get())
-        assertTrue("Editor.navigateToCode should be registered", navigateToCodeRegistered.get())
-        assertTrue("IDE workspace roots should be set", workspaceRootsSet.get())
+        assertTrue("Editor.getActiveLocation should be registered", getActiveLocationRegistered)
+        assertTrue("Editor.navigateToCode should be registered", navigateToCodeRegistered)
+        assertTrue("IDE workspace roots should be set", workspaceRootsSet)
     }
 }
