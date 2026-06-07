@@ -51,6 +51,8 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   private lateinit var dtdProcessHandler: KillableProcessHandler
   private var serviceRunning = false
 
+  var listener: DartToolingDaemonServiceListener? = null
+
   private lateinit var webSocket: WebSocket
   var webSocketReady: Boolean = false
     private set
@@ -349,6 +351,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     override fun onMessage(message: WebSocketMessage) {
       val text = message.text
       logger.debug("<-- $text")
+      listener?.onWebSocketMessage(text)
 
       val json: JsonObject = try {
         JsonParser.parseString(text) as JsonObject
@@ -398,4 +401,8 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     private const val MIN_SDK_VERSION: String = "3.4"
     private val logger = PluginLogger.createLogger(DartToolingDaemonService::class.java)
   }
+}
+
+interface DartToolingDaemonServiceListener {
+  fun onWebSocketMessage(text: String) {}
 }
