@@ -9,7 +9,6 @@ import com.intellij.util.ui.UIUtil
 import com.jetbrains.lang.dart.util.DartTestUtils
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.createTempDirectory
 
 class DartToolingDaemonServiceTest : BasePlatformTestCase() {
