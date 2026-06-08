@@ -101,10 +101,6 @@ sourceSets {
             srcDir("gen")
             srcDir("thirdPartySrc/analysisServer")
             srcDir("thirdPartySrc/vmServiceDrivers")
-            srcDir("platform-lsp/src")
-        }
-        resources {
-            srcDir("platform-lsp/resources")
         }
     }
 }
