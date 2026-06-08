@@ -512,7 +512,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
     return PropertiesComponent.getInstance(project).getBoolean(DART_LSP_EXPERIMENTAL_ENABLED, true);
   }
 
-  private static void setExperimentalLspFeaturesEnabled(@NotNull Project project, boolean enabled) {
+  public static void setExperimentalLspFeaturesEnabled(@NotNull Project project, boolean enabled) {
     PropertiesComponent.getInstance(project).setValue(DART_LSP_EXPERIMENTAL_ENABLED, enabled, true);
   }
 }
