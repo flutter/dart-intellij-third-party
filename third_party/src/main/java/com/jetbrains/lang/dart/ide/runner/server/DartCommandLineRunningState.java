@@ -34,6 +34,7 @@ import com.jetbrains.lang.dart.ide.runner.DartRelativePathsConsoleFilter;
 import com.jetbrains.lang.dart.ide.runner.base.DartRunConfiguration;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -171,6 +172,11 @@ public class DartCommandLineRunningState extends CommandLineState {
   }
 
   protected void setupExePath(@NotNull GeneralCommandLine commandLine, @NotNull DartSdk sdk) {
+    if (DartWslUtil.isWslSdkPath(sdk.getHomePath())) {
+      final String linuxExePath = DartWslUtil.getLinuxDartExePath(sdk.getHomePath());
+      DartWslUtil.configureWslExecution(commandLine, linuxExePath);
+      return;
+    }
     commandLine.setExePath(DartSdkUtil.getDartExePath(sdk));
   }
 
@@ -241,7 +247,14 @@ public class DartCommandLineRunningState extends CommandLineState {
       throw new ExecutionException(e);
     }
 
-    commandLine.addParameter(FileUtil.toSystemDependentName(dartFile.getPath()));
+    final DartSdk sdk = DartSdk.getDartSdk(getEnvironment().getProject());
+    if (sdk != null && DartWslUtil.isWslSdkPath(sdk.getHomePath())) {
+      String linuxPath = DartWslUtil.toLinuxPathFromWindows(dartFile.getPath());
+      commandLine.addParameter(linuxPath != null ? linuxPath : dartFile.getPath());
+    }
+    else {
+      commandLine.addParameter(FileUtil.toSystemDependentName(dartFile.getPath()));
+    }
   }
 
   protected void addVmOption(@NotNull DartSdk sdk, @NotNull GeneralCommandLine commandLine, @NotNull String option) {

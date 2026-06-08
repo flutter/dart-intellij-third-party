@@ -14,6 +14,7 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.util.io.URLUtil;
 import com.jetbrains.lang.dart.ide.runner.server.OpenDartObservatoryUrlAction;
 import com.jetbrains.lang.dart.sdk.DartSdk;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -56,7 +57,14 @@ public class DartConsoleFilter implements Filter {
     final VirtualFile file = switch (info.type) {
       case FILE -> {
         String path = URLUtil.unescapePercentSequences(info.path);
-        if (SystemInfo.isWindows) {
+        // When Dart runs in WSL, file paths are Linux-style even on Windows
+        if (mySdk != null && DartWslUtil.isWslSdkPath(mySdk.getHomePath())) {
+          String distroName = DartWslUtil.getWslDistroName(mySdk.getHomePath());
+          String uncPath = DartWslUtil.toWindowsUncPath(path, distroName);
+          yield uncPath != null ? LocalFileSystem.getInstance().findFileByPath(uncPath)
+                                : LocalFileSystem.getInstance().findFileByPath(path);
+        }
+        else if (SystemInfo.isWindows) {
           path = StringUtil.trimLeading(path, '/');
         }
         yield LocalFileSystem.getInstance().findFileByPath(path);

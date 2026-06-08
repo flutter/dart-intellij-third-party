@@ -47,6 +47,7 @@ import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceEv
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceStackFrame;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceSuspendContext;
 import com.jetbrains.lang.dart.ide.runner.server.webdev.DartDaemonParserUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import com.jetbrains.lang.dart.util.DartBazelFileUtil;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
@@ -568,6 +569,17 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
     else {
       result.add(uriByIde);
       result.add(threeSlashize(new File(filePath).toURI().toString()));
+    }
+
+    // WSL: also add a Linux-style file URI for Dart running in WSL
+    if (uriByIde.startsWith(DartUrlResolver.FILE_PREFIX) && myCurrentWorkingDirectory != null) {
+      com.jetbrains.lang.dart.sdk.DartSdk dartSdk = com.jetbrains.lang.dart.sdk.DartSdk.getDartSdk(getSession().getProject());
+      if (dartSdk != null && DartWslUtil.isWslSdkPath(dartSdk.getHomePath())) {
+        String linuxPath = DartWslUtil.toLinuxPath(filePath);
+        if (linuxPath != null) {
+          result.add("file:///" + linuxPath);
+        }
+      }
     }
 
     // package: (if applicable)

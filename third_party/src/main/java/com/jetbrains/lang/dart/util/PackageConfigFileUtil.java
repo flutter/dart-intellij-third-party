@@ -20,6 +20,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.io.URLUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -179,8 +180,14 @@ public final class PackageConfigFileUtil {
     if (uri.startsWith("file:/")) {
       final String pathAfterSlashes = StringUtil.trimEnd(StringUtil.trimLeading(StringUtil.trimStart(uri, "file:/"), '/'), "/");
       if (SystemInfo.isWindows && !ApplicationManager.getApplication().isUnitTestMode()) {
+        // Check if this is a Linux path from WSL (no Windows drive letter)
         if (pathAfterSlashes.length() > 2 && OSAgnosticPathUtil.startsWithWindowsDrive(pathAfterSlashes)) {
           return pathAfterSlashes;
+        }
+        // WSL: when DAS runs inside WSL, it produces Linux-style file URIs
+        // Convert them to UNC WSL paths that the Windows host can access
+        if (DartWslUtil.isWslAvailable() && pathAfterSlashes.startsWith("/")) {
+          return DartWslUtil.toWindowsUncPath(pathAfterSlashes);
         }
       }
       else {

@@ -41,6 +41,7 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
 import com.jetbrains.lang.dart.lsp.LspMethod;
 import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -271,7 +272,12 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
   }
 
   private static @NotNull String getTextFromCombo(final @NotNull ComboBox<?> combo) {
-    return FileUtilRt.toSystemIndependentName(combo.getEditor().getItem().toString().trim());
+    String path = combo.getEditor().getItem().toString().trim();
+    // WSL paths use backslashes in Windows but are Linux paths internally
+    if (DartWslUtil.isWslSdkPath(path)) {
+      return path; // Keep WSL UNC paths as-is
+    }
+    return FileUtilRt.toSystemIndependentName(path);
   }
 
   @Override
@@ -288,7 +294,11 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
     // reset UI
     myEnableDartSupportCheckBox.setSelected(myDartSupportEnabledInitial);
-    @NlsSafe String sdkInitialPath = mySdkInitial == null ? "" : FileUtilRt.toSystemDependentName(mySdkInitial.getHomePath());
+    @NlsSafe String sdkInitialPath = mySdkInitial == null ? "" : (
+      DartWslUtil.isWslSdkPath(mySdkInitial.getHomePath())
+        ? mySdkInitial.getHomePath()
+        : FileUtilRt.toSystemDependentName(mySdkInitial.getHomePath())
+    );
     mySdkPathComboWithBrowse.getEditor().setItem(sdkInitialPath);
     if (!sdkInitialPath.isEmpty()) {
       ensureComboModelContainsCurrentItem(mySdkPathComboWithBrowse);

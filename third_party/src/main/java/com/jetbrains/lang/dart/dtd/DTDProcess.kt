@@ -25,6 +25,7 @@ import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonRequestHandler
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
+import com.jetbrains.lang.dart.sdk.DartWslUtil
 import com.jetbrains.lang.dart.websocket.WebSocketEventHandler
 import com.jetbrains.lang.dart.websocket.WebSocketException
 import com.jetbrains.lang.dart.websocket.WebSocketMessage
@@ -126,10 +127,16 @@ class DTDProcess {
 
   fun start(sdk: DartSdk) {
     val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
-    commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
-    commandLine.charset = StandardCharsets.UTF_8
-    commandLine.addParameter("tooling-daemon")
-    commandLine.addParameter("--machine")
+    if (DartWslUtil.isWslSdkPath(sdk.homePath)) {
+      val linuxExePath = DartWslUtil.getLinuxDartExePath(sdk.homePath)
+      DartWslUtil.configureWslExecution(commandLine, linuxExePath, "tooling-daemon", "--machine")
+    }
+    else {
+      commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
+      commandLine.charset = StandardCharsets.UTF_8
+      commandLine.addParameter("tooling-daemon")
+      commandLine.addParameter("--machine")
+    }
     Analytics.updateEnvironment(commandLine)
 
     osProcessHandler = object : KillableProcessHandler(commandLine) {

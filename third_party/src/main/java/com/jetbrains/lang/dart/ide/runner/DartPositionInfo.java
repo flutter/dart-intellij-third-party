@@ -6,6 +6,7 @@ import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -219,12 +220,15 @@ public class DartPositionInfo {
   }
 
   // trim all leading slashes on windows or all except one on Mac/Linux
+  // When running Dart in WSL, paths are Linux-style even on Windows
   private static int getPathStartIndex(final @NotNull String text) {
     if (text.isEmpty() || text.charAt(0) != '/') return 0;
 
     int index = 0;
     while (index < text.length() && text.charAt(index) == '/') index++;
 
+    // In WSL mode, keep one leading slash (Linux path)
+    if (SystemInfo.isWindows && DartWslUtil.isWslAvailable()) return index - 1;
     return SystemInfo.isWindows ? index : index - 1;
   }
 }

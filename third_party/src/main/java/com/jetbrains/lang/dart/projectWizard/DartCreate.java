@@ -16,6 +16,7 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -60,11 +61,21 @@ public class DartCreate {
                                              @Nullable String workingDirectory,
                                              int timeoutInSeconds,
                                              String... parameters) throws ExecutionException {
-    final GeneralCommandLine command = new GeneralCommandLine()
-      .withExePath(DartSdkUtil.getDartExePath(sdkRoot))
-      .withWorkDirectory(workingDirectory);
+    final GeneralCommandLine command = new GeneralCommandLine();
 
-    command.addParameter("create");
+    if (DartWslUtil.isWslSdkPath(sdkRoot)) {
+      String linuxExePath = DartWslUtil.getLinuxDartExePath(sdkRoot);
+      DartWslUtil.configureWslExecution(command, linuxExePath, "create");
+    }
+    else {
+      command.setExePath(DartSdkUtil.getDartExePath(sdkRoot));
+      command.addParameter("create");
+    }
+
+    if (workingDirectory != null) {
+      command.withWorkDirectory(workingDirectory);
+    }
+
     command.addParameters(parameters);
 
     Analytics.updateEnvironment(command);

@@ -455,7 +455,13 @@ public final class VmServiceWrapper implements Disposable {
     String url = file.getUrl();
     LOG.info("in getResolvedUri. url: " + url);
 
+    // When Dart runs in WSL, file URIs use Linux paths (file:///home/...)
+    // which already have three slashes, so we should not modify them
     if (SystemInfo.isWindows) {
+      if (url.startsWith("file:///") && url.length() > 10 && url.charAt(9) == '/') {
+        // Likely a WSL Linux path like file:///home/user/...
+        return url;
+      }
       // Dart and the VM service use three /'s in file URIs: https://api.dart.dev/stable/2.16.1/dart-core/Uri-class.html.
       return url.replace("file://", "file:///");
     }

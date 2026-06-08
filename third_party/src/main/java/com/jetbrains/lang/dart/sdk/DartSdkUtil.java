@@ -90,8 +90,12 @@ public final class DartSdkUtil {
       // Suggest default path according to https://dart.dev/get-dart.
       // No need to check folder presence here; even if it doesn't exist - that's the best we can suggest
       @NlsSafe String path = SystemInfo.isMac ? CpuArch.isArm64() ? "/opt/homebrew/opt/dart/libexec"
-                                                                  : "/usr/local/opt/dart/libexec"
-                                              : SystemInfo.isWindows ? "C:\\tools\\dart-sdk"
+                                                                   : "/usr/local/opt/dart/libexec"
+                                              : SystemInfo.isWindows ? (
+                                                DartWslUtil.isWslAvailable()
+                                                  ? DartWslUtil.toWindowsUncPath("/usr/lib/dart")
+                                                  : "C:\\tools\\dart-sdk"
+                                              )
                                                                      : SystemInfo.isLinux ? "/usr/lib/dart"
                                                                                           : null;
       if (path != null) {
@@ -180,6 +184,7 @@ public final class DartSdkUtil {
   public static @Nullable @NlsContexts.Label String getErrorMessageIfWrongSdkRootPath(final @NotNull String sdkRootPath) {
     if (sdkRootPath.isEmpty()) return DartBundle.message("error.path.to.sdk.not.specified");
 
+    // For WSL SDK paths, java.io.File can access \\wsl.localhost\... UNC paths on Windows
     final File sdkRoot = new File(sdkRootPath);
     if (!sdkRoot.isDirectory()) return DartBundle.message("error.folder.specified.as.sdk.not.exists");
 
@@ -193,6 +198,9 @@ public final class DartSdkUtil {
   }
 
   public static @NotNull String getDartExePath(@NotNull String sdkRoot) {
+    if (DartWslUtil.isWslSdkPath(sdkRoot)) {
+      return DartWslUtil.getLinuxDartExePath(sdkRoot);
+    }
     return sdkRoot + (SystemInfo.isWindows ? "/bin/dart.exe" : "/bin/dart");
   }
 }

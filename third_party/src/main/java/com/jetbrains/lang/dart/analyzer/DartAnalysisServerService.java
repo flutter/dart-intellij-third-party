@@ -69,6 +69,7 @@ import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
@@ -2112,28 +2113,37 @@ public final class DartAnalysisServerService implements Disposable {
     synchronized (myLock) {
       mySdkHome = sdk.getHomePath();
 
-      final String runtimePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk));
+      final boolean isWslSdk = DartWslUtil.isWslSdkPath(mySdkHome);
+      final String runtimePath = isWslSdk
+        ? DartWslUtil.getLinuxDartExePath(mySdkHome)
+        : FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk));
 
       // If true, then the DAS will be started via `dart language-server`, instead of `dart .../analysis_server.dart.snapshot`
       final boolean useDartLangServerCall = isDartSdkVersionSufficientForDartLangServer(sdk);
 
-      String analysisServerPath = FileUtil.toSystemDependentName(mySdkHome + "/bin/snapshots/analysis_server.dart.snapshot");
+      String linuxSdkHome = isWslSdk ? DartWslUtil.toLinuxPath(mySdkHome) : null;
+      String analysisServerPath = isWslSdk && linuxSdkHome != null
+        ? linuxSdkHome + "/bin/snapshots/analysis_server.dart.snapshot"
+        : FileUtil.toSystemDependentName(mySdkHome + "/bin/snapshots/analysis_server.dart.snapshot");
       analysisServerPath = System.getProperty("dart.server.path", analysisServerPath);
 
       String dasStartupErrorMessage = "";
-      final File runtimePathFile = new File(runtimePath);
-      final File dasSnapshotFile = new File(analysisServerPath);
-      if (!runtimePathFile.exists()) {
-        dasStartupErrorMessage = DartBundle.message("dart.vm.file.does.not.exist.at.0", runtimePath);
-      }
-      else if (!useDartLangServerCall && !dasSnapshotFile.exists()) {
-        dasStartupErrorMessage = DartBundle.message("analysis.server.snapshot.file.does.not.exist.at.0", analysisServerPath);
-      }
-      else if (!runtimePathFile.canExecute()) {
-        dasStartupErrorMessage = DartBundle.message("dart.vm.file.is.not.executable.at.0", runtimePath);
-      }
-      else if (!useDartLangServerCall && !dasSnapshotFile.canRead()) {
-        dasStartupErrorMessage = DartBundle.message("analysis.server.snapshot.file.is.not.readable.at.0", analysisServerPath);
+      // For WSL SDKs, skip local file system checks - the binary runs inside WSL
+      if (!isWslSdk) {
+        final File runtimePathFile = new File(runtimePath);
+        final File dasSnapshotFile = new File(analysisServerPath);
+        if (!runtimePathFile.exists()) {
+          dasStartupErrorMessage = DartBundle.message("dart.vm.file.does.not.exist.at.0", runtimePath);
+        }
+        else if (!useDartLangServerCall && !dasSnapshotFile.exists()) {
+          dasStartupErrorMessage = DartBundle.message("analysis.server.snapshot.file.does.not.exist.at.0", analysisServerPath);
+        }
+        else if (!runtimePathFile.canExecute()) {
+          dasStartupErrorMessage = DartBundle.message("dart.vm.file.is.not.executable.at.0", runtimePath);
+        }
+        else if (!useDartLangServerCall && !dasSnapshotFile.canRead()) {
+          dasStartupErrorMessage = DartBundle.message("analysis.server.snapshot.file.is.not.readable.at.0", analysisServerPath);
+        }
       }
 
       if (!dasStartupErrorMessage.isEmpty()) {
@@ -2178,9 +2188,27 @@ public final class DartAnalysisServerService implements Disposable {
       }
 
       String firstArgument = useDartLangServerCall ? "language-server" : analysisServerPath;
-      myServerSocket =
-        new StdioServerSocket(runtimePath, StringUtil.split(vmArgsRaw, " "), firstArgument, StringUtil.split(serverArgsRaw, " "),
-                              debugStream);
+      if (isWslSdk) {
+        // For WSL, launch via wsl.exe with the Linux dart binary
+        String wslRuntimePath = "wsl";
+        List<String> wslArgs = new ArrayList<>();
+        wslArgs.add(runtimePath); // e.g., /usr/lib/dart/bin/dart
+        if (!vmArgsRaw.isEmpty()) {
+          wslArgs.addAll(StringUtil.split(vmArgsRaw, " "));
+        }
+        wslArgs.add(firstArgument);
+        if (!serverArgsRaw.isEmpty()) {
+          wslArgs.addAll(StringUtil.split(serverArgsRaw, " "));
+        }
+        myServerSocket =
+          new StdioServerSocket(wslRuntimePath, Collections.emptyList(), wslArgs.get(0),
+                                wslArgs.subList(1, wslArgs.size()), debugStream);
+      }
+      else {
+        myServerSocket =
+          new StdioServerSocket(runtimePath, StringUtil.split(vmArgsRaw, " "), firstArgument, StringUtil.split(serverArgsRaw, " "),
+                                debugStream);
+      }
       myServerSocket.setClientId(getClientId());
       myServerSocket.setClientVersion(getClientVersion());
 
@@ -2659,10 +2687,22 @@ public final class DartAnalysisServerService implements Disposable {
   public String getLocalFileUri(@NotNull String localFilePath) {
     if (!isDartSdkVersionSufficientForFileUri(mySdkVersion)) {
       // prior to Dart SDK 3.4, the protocol required file paths instead of URIs
+      if (DartWslUtil.isWslSdkPath(mySdkHome)) {
+        // For WSL SDKs, return Linux-style paths for older SDK versions
+        String linuxPath = DartWslUtil.toLinuxPath(localFilePath);
+        return linuxPath != null ? linuxPath : localFilePath;
+      }
       return FileUtil.toSystemDependentName(localFilePath);
     }
 
-    String escapedPath = URLUtil.encodePath(FileUtil.toSystemIndependentName(localFilePath));
+    // For WSL SDKs, convert Windows paths to Linux paths before creating the URI
+    String pathForUri = localFilePath;
+    if (DartWslUtil.isWslSdkPath(mySdkHome)) {
+      String linuxPath = DartWslUtil.toLinuxPathFromWindows(localFilePath);
+      if (linuxPath != null) pathForUri = linuxPath;
+    }
+
+    String escapedPath = URLUtil.encodePath(FileUtil.toSystemIndependentName(pathForUri));
     String url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath);
     URI uri = VfsUtil.toUri(url);
     return uri != null ? uri.toString() : url;
