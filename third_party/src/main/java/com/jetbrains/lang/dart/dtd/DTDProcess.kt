@@ -66,6 +66,7 @@ class DTDProcess {
       webSocket.eventHandler = object : WebSocketEventHandler {
         override fun onClose() {
           listener?.onWebSocketClose()
+          listener = null
         }
 
         override fun onMessage(message: WebSocketMessage) {
@@ -140,6 +141,13 @@ class DTDProcess {
   }
 
   fun terminate() {
+    if (::webSocket.isInitialized) {
+      try {
+        webSocket.close()
+      } catch (e: Exception) {
+        logger.warn("Failed to close DTD web socket", e)
+      }
+    }
     if (::osProcessHandler.isInitialized && !osProcessHandler.isProcessTerminated) {
       ApplicationManager.getApplication().executeOnPooledThread {
         if (!osProcessHandler.isProcessTerminated) {
@@ -147,6 +155,7 @@ class DTDProcess {
         }
       }
     }
+    listener = null
   }
 
   private fun onProcessStarted(uri: String?, secret: String?) {

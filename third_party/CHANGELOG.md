@@ -8,6 +8,7 @@
 
 ### Fixed
 - Support Go to Declaration and symbol resolution for 'new' constructor syntax (#63510)
+- Prevent memory leak by closing DTD WebSocket connections and clearing listeners when disposing projects (#449)
 
 ## 506.0.0
 
