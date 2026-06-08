@@ -24,6 +24,8 @@
   <depends optional="true" config-file="dart-copyright.xml">com.intellij.copyright</depends>
   <depends>com.redhat.devtools.lsp4ij</depends>
 
+  <include path="/dart-lsp-impl.xml" />
+
   <resource-bundle>messages.DartBundle</resource-bundle>
 
   <extensionPoints>
