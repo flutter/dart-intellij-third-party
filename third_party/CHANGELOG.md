@@ -7,7 +7,7 @@
 ### Removed
 
 ### Fixed
-- Fix Go to Declaration and symbol resolution for `new` constructor syntax (#450)
+- Support Go to Declaration and symbol resolution for 'new' constructor syntax (#63510)
 
 ## 506.0.0
 
