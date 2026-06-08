@@ -17,6 +17,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.util.PathUtil;
 import com.intellij.util.SmartList;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
 import junit.framework.TestCase;
@@ -108,7 +109,7 @@ public final class DartTestUtils {
     //
     VfsRootAccess.allowRootAccess(disposable, BASE_TEST_DATA_PATH);
 
-    com.jetbrains.lang.dart.sdk.DartConfigurable.setExperimentalLspFeaturesEnabled(module.getProject(), false);
+    DartConfigurable.setExperimentalLspFeaturesEnabled(module.getProject(), false);
 
     ApplicationManager.getApplication().runWriteAction(() -> {
       Disposer.register(disposable, DartSdkLibUtil.configureDartSdkAndReturnUndoingDisposable(module.getProject(), sdkHome));
