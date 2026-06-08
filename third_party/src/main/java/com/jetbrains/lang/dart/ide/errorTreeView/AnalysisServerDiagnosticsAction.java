@@ -15,15 +15,12 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
-import com.jetbrains.lang.dart.sdk.DartConfigurable;
-import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
-  private static final String MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION = "3.13.0-106.0.dev";
 
 
   public AnalysisServerDiagnosticsAction() {
