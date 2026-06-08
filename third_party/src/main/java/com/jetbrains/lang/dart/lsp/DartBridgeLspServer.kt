@@ -124,7 +124,8 @@ class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDo
         }
 
         // Check if it's a response to a request.
-        val topLevelId = if (jsonObject.has("id")) jsonObject.get("id").asString else null
+        val idElement = jsonObject.get("id")
+        val topLevelId = if (idElement != null && idElement.isJsonPrimitive) idElement.asString else null
         if (topLevelId != null) {
             val pending = pendingRequests.remove(topLevelId)
             if (pending != null) {

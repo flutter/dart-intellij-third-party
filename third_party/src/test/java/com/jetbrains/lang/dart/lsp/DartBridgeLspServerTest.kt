@@ -41,7 +41,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val das = DartAnalysisServerService.getInstance(project)
 
         // Stub the version of the test SDK to a modern version (e.g. 3.0.0) to bypass version sufficiency check
-        val sdk = com.jetbrains.lang.dart.sdk.DartSdk.getDartSdk(project)!!
+        val sdk = requireNotNull(com.jetbrains.lang.dart.sdk.DartSdk.getDartSdk(project)) { "Dart SDK not found" }
         originalSdkVersion = sdk.version
         val sdkClass = com.jetbrains.lang.dart.sdk.DartSdk::class.java
         val sdkVersionField = sdkClass.getDeclaredField("myVersion").apply { isAccessible = true }
@@ -96,6 +96,9 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
     override fun tearDown() {
         try {
+            if (::bridgeServer.isInitialized) {
+                bridgeServer.stop()
+            }
             val das = DartAnalysisServerService.getInstance(project)
             das.setServer(null)
             
