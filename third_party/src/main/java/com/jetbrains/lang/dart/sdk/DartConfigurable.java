@@ -337,7 +337,6 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
   @Override
   public void apply() {
     // similar to DartModuleBuilder.setupSdk()
-    final boolean initialExperimentalEnabled = isExperimentalLspFeaturesEnabled(myProject);
     final boolean currentExperimentalEnabled = myExperimentalLspFeaturesCheckBox.isSelected();
 
     final Runnable runnable = () -> {
