@@ -5,7 +5,10 @@ import java.util.List;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElement;
 
-public interface DartNewConstructorDeclaration extends DartPsiCompositeElement {
+public interface DartNewConstructorDeclaration extends DartComponent {
+
+  @NotNull
+  List<DartComponentName> getComponentNameList();
 
   @Nullable
   DartComponentName getComponentName();

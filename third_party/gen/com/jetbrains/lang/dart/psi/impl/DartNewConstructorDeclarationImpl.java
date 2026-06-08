@@ -11,7 +11,7 @@ import static com.jetbrains.lang.dart.DartTokenTypes.*;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.util.DartPsiImplUtil;
 
-public class DartNewConstructorDeclarationImpl extends DartPsiCompositeElementImpl implements DartNewConstructorDeclaration {
+public class DartNewConstructorDeclarationImpl extends AbstractDartComponentImpl implements DartNewConstructorDeclaration {
 
   public DartNewConstructorDeclarationImpl(@NotNull ASTNode node) {
     super(node);
@@ -28,9 +28,15 @@ public class DartNewConstructorDeclarationImpl extends DartPsiCompositeElementIm
   }
 
   @Override
+  @NotNull
+  public List<DartComponentName> getComponentNameList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, DartComponentName.class);
+  }
+
+  @Override
   @Nullable
   public DartComponentName getComponentName() {
-    return findChildByClass(DartComponentName.class);
+    return DartPsiImplUtil.getComponentName(this);
   }
 
   @Override
