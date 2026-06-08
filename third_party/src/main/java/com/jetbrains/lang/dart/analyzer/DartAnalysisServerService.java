@@ -2318,7 +2318,10 @@ public final class DartAnalysisServerService implements Disposable {
   void stopServer() {
     synchronized (myLock) {
       // Stop the LSP Bridge Server
-      myProject.getService(DartBridgeLspServerManager.class).stopBridgeServer();
+      DartBridgeLspServerManager bridgeManager = myProject.getServiceIfCreated(DartBridgeLspServerManager.class);
+      if (bridgeManager != null) {
+        bridgeManager.stopBridgeServer();
+      }
       if (myServer != null) {
         LOG.debug("stopping server");
         myServer.removeAnalysisServerListener(myAnalysisServerListener);

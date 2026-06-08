@@ -44,9 +44,6 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
     val port: Int
         get() = serverSocket?.localPort ?: -1
 
-    init {
-        Disposer.register(project, this)
-    }
 
     fun startBridgeServer() {
         if (serverSocket != null) {
@@ -56,7 +53,7 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
         try {
             // Bind to a random free port on localhost. The OS will assign an available port.
             // This port is then queried by DartLspServerDescriptor to tell the JetBrains LSP client where to connect.
-            serverSocket = ServerSocket(0)
+            serverSocket = ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())
             logger.info("Bridge LSP Server socket listening on port $port")
             startListening()
             
@@ -108,8 +105,9 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
         // Close existing connection if any.
         activeConnection?.close()
 
+        var bridgeServer: DartBridgeLspServer? = null
         try {
-            val bridgeServer = DartBridgeLspServer(project)
+            bridgeServer = DartBridgeLspServer(project)
             val launcher = Launcher.createLauncher(bridgeServer, LanguageClient::class.java, socket.getInputStream(), socket.getOutputStream())
             
             bridgeServer.connect(launcher.remoteProxy)
@@ -118,6 +116,7 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
             activeConnection = ActiveConnection(socket, bridgeServer, startListeningFuture)
         } catch (e: Exception) {
             logger.error("Failed to handle client connection", e)
+            bridgeServer?.stop()
             try {
                 socket.close()
             } catch (ex: IOException) {
