@@ -23,8 +23,7 @@
   <depends optional="true" config-file="dart-yaml.xml">org.jetbrains.plugins.yaml</depends>
   <depends optional="true" config-file="dart-copyright.xml">com.intellij.copyright</depends>
   <depends>com.redhat.devtools.lsp4ij</depends>
-
-  <include path="/dart-lsp-impl.xml" />
+  <depends optional="true" config-file="dart-lsp-impl.xml">com.redhat.devtools.lsp4ij</depends>
 
   <resource-bundle>messages.DartBundle</resource-bundle>
 
