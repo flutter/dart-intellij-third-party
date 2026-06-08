@@ -240,11 +240,13 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   }
 
   override fun dispose() {
-    if (::webSocket.isInitialized) {
-      try {
-        webSocket.close()
-      } catch (e: Exception) {
-        logger.warn("Failed to close DTD web socket", e)
+   if (::webSocket.isInitialized) {
+      ApplicationManager.getApplication().executeOnPooledThread {
+        try {
+          webSocket.close()
+        } catch (e: Exception) {
+          logger.warn("Failed to close DTD web socket", e)
+        }
       }
     }
     if (::dtdProcessHandler.isInitialized && !dtdProcessHandler.isProcessTerminated) {

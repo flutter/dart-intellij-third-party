@@ -58,7 +58,7 @@ class DTDProcess {
   private val eventDispatcher: EventDispatcher<DartToolingDaemonListener> =
     EventDispatcher.create(DartToolingDaemonListener::class.java)
 
-  var listener: DTDProcessListener? = null
+  @Volatile var listener: DTDProcessListener? = null
 
   private fun connectToWebSocket(uri: String) {
     try {
@@ -142,10 +142,12 @@ class DTDProcess {
 
   fun terminate() {
     if (::webSocket.isInitialized) {
-      try {
-        webSocket.close()
-      } catch (e: Exception) {
-        logger.warn("Failed to close DTD web socket", e)
+      ApplicationManager.getApplication().executeOnPooledThread {
+        try {
+          webSocket.close()
+        } catch (e: Exception) {
+          logger.warn("Failed to close DTD web socket", e)
+        }
       }
     }
     if (::osProcessHandler.isInitialized && !osProcessHandler.isProcessTerminated) {
