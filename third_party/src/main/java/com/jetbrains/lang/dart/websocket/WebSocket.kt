@@ -33,8 +33,7 @@ class WebSocket(private val uri: URI) {
         } catch (e: Exception) {
             throw WebSocketException("Failed to start WebSocket handshake to $uri", e)
         }
-
-        jdkWebSocket = try {
+        try {
             future.toCompletableFuture().get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } catch (e: Exception) {
             throw WebSocketException("WebSocket handshake to $uri failed", e)
@@ -56,6 +55,7 @@ class WebSocket(private val uri: URI) {
         private val pendingText = StringBuilder()
 
         override fun onOpen(webSocket: JdkWebSocket) {
+            jdkWebSocket = webSocket
             webSocket.request(Long.MAX_VALUE)
             eventHandler?.onOpen()
         }
