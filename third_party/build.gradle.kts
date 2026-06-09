@@ -110,6 +110,7 @@ intellijPlatform {
         )
         verificationReportsFormats = VerifyPluginTask.VerificationReportsFormats.ALL
         subsystemsToCheck = VerifyPluginTask.Subsystems.ALL
+        ignoredProblemsFile.set(project.file("verify-ignore-problems.txt"))
         ides {
             recommended()
         }

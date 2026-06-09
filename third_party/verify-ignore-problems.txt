@@ -1,0 +1,2 @@
+# Ignore all verification issues originating from the copied platform LSP package
+::.*com\.intellij\.platform\.lsp\.dart\.impl\..*
