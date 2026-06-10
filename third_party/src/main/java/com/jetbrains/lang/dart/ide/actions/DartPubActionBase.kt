@@ -185,7 +185,8 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
   companion object {
     const val PUB_ENV_VAR_NAME: String = "PUB_ENVIRONMENT"
 
-    private const val GROUP_DISPLAY_ID: @NonNls String = "Dart Pub Tool"
+    @NonNls
+    private const val GROUP_DISPLAY_ID = "Dart Pub Tool"
     private val PUB_TOOL_WINDOW_CONTENT_INFO_KEY = Key.create<PubToolWindowContentInfo>("PUB_TOOL_WINDOW_CONTENT_INFO_KEY")
 
     private val ourInProgress = AtomicBoolean(false)

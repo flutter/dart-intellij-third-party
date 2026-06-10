@@ -117,6 +117,9 @@ java {
 }
 
 dependencies {
+    compileOnly("org.jetbrains:annotations:24.1.0")
+    testCompileOnly("org.jetbrains:annotations:24.1.0")
+
     intellijPlatform {
         // intellijIdea can be found here:
         // https://www.jetbrains.com/idea/download/other.html

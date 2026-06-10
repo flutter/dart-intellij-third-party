@@ -21,7 +21,7 @@ public class DartSelectWordTest extends BasePlatformTestCase {
       super.setUp();
       DartTestUtils.configureDartSdk(getModule(), myFixture.getProjectDisposable(), false);
     }
-  private void doTest(@NotNull final String before, final String @NotNull ... after) {
+  private void doTest(@NotNull final String before, @NotNull final String... after) {
     myFixture.configureByText("file.dart", before);
     final DataContext dataContext = DataManager.getInstance().getDataContext(myFixture.getEditor().getComponent());
     final SelectWordHandler handler = new SelectWordHandler(null);
