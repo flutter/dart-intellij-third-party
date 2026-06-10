@@ -51,6 +51,22 @@ class WebSocket(private val uri: URI) {
         }
     }
 
+    @Throws(WebSocketException::class)
+    fun close() {
+        val webSocket = jdkWebSocket ?: return
+        try {
+            webSocket.sendClose(JdkWebSocket.NORMAL_CLOSURE, "Normal Closure")
+                .toCompletableFuture().get(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            if (e is InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            throw WebSocketException("Failed to close WebSocket gracefully", e)
+        }
+    }
+
+
+
     private inner class JdkListener : JdkWebSocket.Listener {
         private val pendingText = StringBuilder()
 
@@ -91,7 +107,7 @@ class WebSocket(private val uri: URI) {
     private companion object {
         const val CONNECT_TIMEOUT_SECONDS = 10L
         const val SEND_TIMEOUT_SECONDS = 10L
-
+        const val CLOSE_TIMEOUT_SECONDS = 10L
         private val httpClient: HttpClient = HttpClient.newHttpClient()
     }
 }
