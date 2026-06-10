@@ -28,14 +28,18 @@ class WebSocket(private val uri: URI) {
     @Throws(WebSocketException::class)
     fun connect() {
         val listener = JdkListener()
-        val future: CompletionStage<JdkWebSocket> = try {
-            httpClient.newWebSocketBuilder().buildAsync(uri, listener)
+        val future = try {
+            httpClient.newWebSocketBuilder().buildAsync(uri, listener).toCompletableFuture()
         } catch (e: Exception) {
             throw WebSocketException("Failed to start WebSocket handshake to $uri", e)
         }
         try {
-            future.toCompletableFuture().get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            future.get(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } catch (e: Exception) {
+            future.cancel(true)
+            if (e is InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
             throw WebSocketException("WebSocket handshake to $uri failed", e)
         }
     }
@@ -44,28 +48,35 @@ class WebSocket(private val uri: URI) {
     @Throws(WebSocketException::class)
     fun send(text: String) {
         val webSocket = jdkWebSocket ?: throw WebSocketException("WebSocket is not connected")
+        val future = webSocket.sendText(text, true).toCompletableFuture()
         try {
-            webSocket.sendText(text, true).toCompletableFuture().get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            future.get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } catch (e: Exception) {
+            future.cancel(true)
+            if (e is InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
             throw WebSocketException("Failed to send WebSocket message", e)
         }
     }
 
+    @Synchronized
     @Throws(WebSocketException::class)
     fun close() {
         val webSocket = jdkWebSocket ?: return
+        val future = webSocket.sendClose(JdkWebSocket.NORMAL_CLOSURE, "Normal Closure").toCompletableFuture()
         try {
-            webSocket.sendClose(JdkWebSocket.NORMAL_CLOSURE, "Normal Closure")
-                .toCompletableFuture().get(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            future.get(CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         } catch (e: Exception) {
+            future.cancel(true)
             if (e is InterruptedException) {
                 Thread.currentThread().interrupt()
             }
             throw WebSocketException("Failed to close WebSocket gracefully", e)
+        } finally {
+            jdkWebSocket = null
         }
     }
-
-
 
     private inner class JdkListener : JdkWebSocket.Listener {
         private val pendingText = StringBuilder()
@@ -89,8 +100,15 @@ class WebSocket(private val uri: URI) {
         // We could use the statusCode and the reason for logging purposes
         override fun onClose(webSocket: JdkWebSocket, statusCode: Int, reason: String): CompletionStage<*>? {
             pendingText.clear()
+            jdkWebSocket = null
             eventHandler?.onClose()
             return null
+        }
+
+        override fun onError(webSocket: JdkWebSocket, error: Throwable) {
+            pendingText.clear()
+            jdkWebSocket = null
+            eventHandler?.onClose()
         }
 
         override fun onPing(webSocket: JdkWebSocket, message: ByteBuffer): CompletionStage<*>? {
