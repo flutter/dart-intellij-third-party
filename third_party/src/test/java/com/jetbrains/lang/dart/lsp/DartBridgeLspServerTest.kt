@@ -65,6 +65,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             
             override fun generateUniqueId(): String = "123"
 
+            override fun isSocketOpen(): Boolean = true
+
             override fun sendRequestToServer(id: String, request: JsonObject) {
                 capturedRequests.add(request)
             }
