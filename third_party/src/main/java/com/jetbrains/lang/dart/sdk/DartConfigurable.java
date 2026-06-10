@@ -39,11 +39,8 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
-import com.jetbrains.lang.dart.lsp.DartLspConstants;
 import com.jetbrains.lang.dart.lsp.LspMethod;
 import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
-import com.redhat.devtools.lsp4ij.LanguageServerManager;
-import com.redhat.devtools.lsp4ij.ServerStatus;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -340,7 +337,6 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
   @Override
   public void apply() {
     // similar to DartModuleBuilder.setupSdk()
-    final boolean initialExperimentalEnabled = isExperimentalLspFeaturesEnabled(myProject);
     final boolean currentExperimentalEnabled = myExperimentalLspFeaturesCheckBox.isSelected();
 
     final Runnable runnable = () -> {
@@ -379,12 +375,6 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
     ApplicationManager.getApplication().runWriteAction(runnable);
 
-    if (myEnableDartSupportCheckBox.isSelected() && initialExperimentalEnabled != currentExperimentalEnabled) {
-      var manager = LanguageServerManager.getInstance(myProject);
-      if (manager.getServerStatus(DartLspConstants.DART_LANGUAGE_SERVER_ID) == ServerStatus.started) {
-        manager.start(DartLspConstants.DART_LANGUAGE_SERVER_ID);
-      }
-    }
 
     reset(); // because we rely on remembering initial state
   }
@@ -521,7 +511,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
     return PropertiesComponent.getInstance(project).getBoolean(DART_LSP_EXPERIMENTAL_ENABLED, true);
   }
 
-  private static void setExperimentalLspFeaturesEnabled(@NotNull Project project, boolean enabled) {
+  public static void setExperimentalLspFeaturesEnabled(@NotNull Project project, boolean enabled) {
     PropertiesComponent.getInstance(project).setValue(DART_LSP_EXPERIMENTAL_ENABLED, enabled, true);
   }
 }

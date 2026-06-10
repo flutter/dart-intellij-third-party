@@ -70,4 +70,26 @@ public class DartGoToSymbolTest extends DartCodeInsightFixtureTestCase {
     contributor.processNames(names::add, GlobalSearchScope.allScope(getProject()), null);
     assertTrue(names.contains("Foo"));
   }
+
+  public void testGoToSymbolPrimaryConstructors() {
+    myFixture.addFileToProject("constructors.dart",
+                               """
+                               class Foo1 {
+                                 new();
+                               }
+                               class Foo2 {
+                                 Foo2.new();
+                               }
+                               class Foo3 {
+                                 new named();
+                               }
+                               """);
+
+    DartSymbolContributor contributor = new DartSymbolContributor();
+    List<String> names = new ArrayList<>();
+    contributor.processNames(names::add, GlobalSearchScope.allScope(getProject()), null);
+    assertTrue(names.contains("Foo1"));
+    assertTrue(names.contains("Foo2"));
+    assertTrue(names.contains("named"));
+  }
 }
