@@ -160,6 +160,11 @@ public final class DartPsiImplUtil {
     return list.size() == 2 ? list.get(1) : list.size() == 1 ? list.get(0) : null;
   }
 
+  public static @Nullable DartComponentName getComponentName(@NotNull DartNewConstructorDeclaration element) {
+    final List<DartComponentName> list = element.getComponentNameList();
+    return list.size() == 2 ? list.get(1) : list.size() == 1 ? list.get(0) : null;
+  }
+
   public static @Nullable DartReferenceExpression getReferenceExpression(final @NotNull DartType dartType) {
     final DartSimpleType simpleType = dartType.getSimpleType();
     return simpleType == null ? null : simpleType.getReferenceExpression();

@@ -15,18 +15,12 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
-import com.jetbrains.lang.dart.lsp.DartLanguageServer;
-import com.jetbrains.lang.dart.sdk.DartConfigurable;
-import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
-import com.jetbrains.lang.dart.lsp.DartLspConstants;
-import com.redhat.devtools.lsp4ij.LanguageServerManager;
 
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
-  private static final String MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION = "3.13.0-106.0.dev";
 
 
   public AnalysisServerDiagnosticsAction() {
@@ -54,14 +48,7 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
   }
 
   void run(final @NotNull Project project, @Nullable AnActionEvent event) {
-    String sdkVersion = DartAnalysisServerService.getInstance(project).getSdkVersion();
-    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project) &&
-        DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION) >= 0) {
-
-      useLspOverLegacy(project);
-    } else {
-      fallbackToLegacy(project);
-    }
+    fallbackToLegacy(project);
 
     if (event != null) {
       Analytics.report(AnalyticsData.forAction(this, event));
@@ -73,26 +60,6 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
     }
   }
 
-  private void useLspOverLegacy(@NotNull Project project) {
-    LanguageServerManager.getInstance(project)
-      .getLanguageServer(DartLspConstants.DART_LANGUAGE_SERVER_ID)
-
-      .thenAccept(item -> {
-        if (item != null && item.getServer() instanceof DartLanguageServer dartServer) {
-          dartServer.diagnosticServer()
-            .thenAccept(result -> BrowserUtil.browse("http://localhost:" + result.getPort() + "/status"))
-            .exceptionally(ex -> {
-              String title = DartBundle.message("analysis.server.show.diagnostics.error");
-              Notification notification = new Notification("Dart Analysis Server", title, ex.getMessage(), NotificationType.ERROR);
-              Notifications.Bus.notify(notification);
-              return null;
-            });
-        }
-        else {
-          fallbackToLegacy(project);
-        }
-      });
-  }
 
   private void fallbackToLegacy(@NotNull Project project) {
     DartAnalysisServerService server = DartAnalysisServerService.getInstance(project);

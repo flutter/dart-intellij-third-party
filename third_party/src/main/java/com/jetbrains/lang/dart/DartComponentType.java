@@ -101,7 +101,8 @@ public enum DartComponentType {
       return TYPEDEF;
     }
     if (element instanceof DartNamedConstructorDeclaration
-        || element instanceof DartFactoryConstructorDeclaration) {
+        || element instanceof DartFactoryConstructorDeclaration
+        || element instanceof DartNewConstructorDeclaration) {
       return CONSTRUCTOR;
     }
     if (element instanceof DartFunctionFormalParameter

@@ -135,7 +135,6 @@ dependencies {
         bundledModule("intellij.platform.coverage.agent")
         bundledPlugin("org.jetbrains.plugins.yaml")
         bundledPlugin("com.intellij.copyright")
-        plugin("com.redhat.devtools.lsp4ij:${libs.versions.lsp4ij.get()}")
     }
 
     implementation(fileTree("lib") { include("*.jar") })
@@ -301,10 +300,14 @@ tasks.register<PrintVersionTask>("printVersion") {
 tasks.named<Zip>("buildPlugin") {
     val v = intellijPlatform.pluginConfiguration.version
     archiveFileName.set(v.map { versionStr ->
-        if (commitHash.isNotEmpty() && !versionStr.contains(commitHash)) {
-            "Dart-$versionStr-$commitHash.zip"
+        if (project.hasProperty("versionedName")) {
+            if (commitHash.isNotEmpty() && !versionStr.contains(commitHash)) {
+                "Dart-$versionStr-$commitHash.zip"
+            } else {
+                "Dart-$versionStr.zip"
+            }
         } else {
-            "Dart-$versionStr.zip"
+            "Dart.zip"
         }
     })
 }
