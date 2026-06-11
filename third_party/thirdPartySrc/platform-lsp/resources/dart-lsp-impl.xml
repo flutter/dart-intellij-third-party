@@ -1,62 +1,62 @@
 <idea-plugin>
 
   <extensions defaultExtensionNs="com.intellij">
-    <registryKey defaultValue="100" description="LSP server connect timeout" key="lsp.server.connect.timeout"/>
-    <notificationGroup id="LSP window/showMessage"
+    <registryKey defaultValue="100" description="LSP server connect timeout" key="dart.lsp.server.connect.timeout"/>
+    <notificationGroup id="Dart: LSP window/showMessage"
                        displayType="BALLOON"
-                       bundle="messages.LspBundle"
+                       bundle="messages.DartLspBundle"
                        key="notification.group.lsp.message"/>
-    <notificationGroup id="LSP window/logMessage: errors, warnings"
+    <notificationGroup id="Dart: LSP window/logMessage: errors, warnings"
                        displayType="NONE"
-                       bundle="messages.LspBundle"
+                       bundle="messages.DartLspBundle"
                        key="notification.group.lsp.log.errors.warnings"/>
-    <notificationGroup id="LSP window/logMessage: info, log; $/logTrace"
+    <notificationGroup id="Dart: LSP window/logMessage: info, log; $/logTrace"
                        displayType="NONE" isLogByDefault="false"
-                       bundle="messages.LspBundle"
+                       bundle="messages.DartLspBundle"
                        key="notification.group.lsp.log.info.trace"/>
 
     <projectService serviceInterface="com.intellij.platform.lsp.dart.api.LspServerManager"
                     serviceImplementation="com.intellij.platform.lsp.dart.impl.LspServerManagerImpl"/>
 
-    <editorFactoryDocumentListener id="LspDocumentListener"
+    <editorFactoryDocumentListener
                                    implementation="com.intellij.platform.lsp.dart.impl.platformListeners.LspDocumentListener"/>
-    <vfs.asyncListener id="LspFileListener"
+    <vfs.asyncListener
                        implementation="com.intellij.platform.lsp.dart.impl.platformListeners.LspFileListener"/>
 
     <highlightingPassFactory implementation="com.intellij.platform.lsp.dart.impl.features.highlighting.LspHighlightingPassFactory"/>
     <problemFileHighlightFilter implementation="com.intellij.platform.lsp.dart.impl.features.highlighting.LspProblemFileHighlightFilter"/>
-    <enterHandlerDelegate id="LspOnTypeFormattingEnterHandler" order="last"
+    <enterHandlerDelegate order="last"
                           implementation="com.intellij.platform.lsp.dart.impl.features.formatter.LspOnTypeFormattingEnterHandler"/>
-    <editorTypedHandler id="LspTypedActionHandler" order="last"
+    <editorTypedHandler order="last"
                         implementationClass="com.intellij.platform.lsp.dart.impl.features.formatter.LspTypedActionHandler"/>
-    <typedHandler id="LspAutoPopupTypedHandler" order="last"
+    <typedHandler order="last"
                   implementation="com.intellij.platform.lsp.dart.impl.features.completion.LspAutoPopupTypedHandler"/>
-    <typedHandler id="LspParameterInfoTypedHandler" order="last, before LspAutoPopupTypedHandler"
+    <typedHandler order="last, before LspAutoPopupTypedHandler"
                   implementation="com.intellij.platform.lsp.dart.impl.features.parameterInfo.LspParameterInfoTypedHandler"/>
-    <completion.contributor id="LspCompletionContributor"
+    <completion.contributor
                             language="any"
                             order="last, before wordCompletion, before TextMateCompletionContributor"
                             implementationClass="com.intellij.platform.lsp.dart.impl.features.completion.LspCompletionContributor"/>
-    <weigher id="LspCompletionWeigher"
+    <weigher
              key="completion"
              order="after priority, before prefix"
              implementationClass="com.intellij.platform.lsp.dart.impl.features.completion.LspCompletionWeigher"/>
     <codeInsight.codeVisionProvider implementation="com.intellij.platform.lsp.dart.impl.features.codeLens.LspCodeVisionProvider"/>
     <config.codeVisionGroupSettingProvider implementation="com.intellij.platform.lsp.dart.impl.features.codeLens.LspCodeVisionGroupSettingProvider"/>
     <codeInsight.inlayProviderFactory implementation="com.intellij.platform.lsp.dart.impl.features.inlayHint.LspInlayHintsProviderFactory"/>
-    <codeInsight.parameterInfo id="LspParameterInfoHandler" language=""
+    <codeInsight.parameterInfo language=""
                                implementationClass="com.intellij.platform.lsp.dart.impl.features.parameterInfo.LspParameterInfoHandler"/>
-    <psi.implicitReferenceProvider id="LspImplicitReferenceProvider"
+    <psi.implicitReferenceProvider
                                    implementation="com.intellij.platform.lsp.dart.impl.features.navigation.LspImplicitReferenceProvider"/>
-    <psi.implicitReferenceProvider id="LspDocumentLinkReferenceProvider"
+    <psi.implicitReferenceProvider
                                    implementation="com.intellij.platform.lsp.dart.impl.features.navigation.LspDocumentLinkReferenceProvider"/>
-    <lang.symbolTypeProvider id="LspSymbolTypeProvider" implementation="com.intellij.platform.lsp.dart.impl.features.navigation.LspSymbolTypeProvider"/>
+    <lang.symbolTypeProvider implementation="com.intellij.platform.lsp.dart.impl.features.navigation.LspSymbolTypeProvider"/>
     <uiDataRule implementation="com.intellij.platform.lsp.dart.impl.features.usages.LspSearchTargetsRule"/>
     <searcher forClass="com.intellij.find.usages.api.UsageSearchParameters"
               implementationClass="com.intellij.platform.lsp.dart.impl.features.usages.LspUsageSearcher"/>
-    <platform.backend.documentation.targetProvider id="LspDocumentationTargetProvider"
+    <platform.backend.documentation.targetProvider
                                                    implementation="com.intellij.platform.lsp.dart.impl.features.documentation.LspDocumentationTargetProvider"/>
-    <formattingService id="LspFormattingService" implementation="com.intellij.platform.lsp.dart.impl.features.formatter.LspFormattingService"/>
+    <formattingService implementation="com.intellij.platform.lsp.dart.impl.features.formatter.LspFormattingService"/>
     <lang.importOptimizer language="" implementationClass="com.intellij.platform.lsp.dart.impl.features.formatter.LspImportOptimizer" order="last"/>
     <lang.foldingBuilder language="" implementationClass="com.intellij.platform.lsp.dart.impl.features.folding.LspFoldingBuilder"/>
     <gotoSymbolContributor implementation="com.intellij.platform.lsp.dart.impl.features.workspaceSymbol.LspGoToSymbolContributor"/>
@@ -65,7 +65,7 @@
       implementation="com.intellij.platform.lsp.dart.impl.features.workspaceSymbol.LspWorkspaceSymbolEqualityProvider"/>
     <fileBreadcrumbsCollector implementation="com.intellij.platform.lsp.dart.impl.features.documentSymbol.LspFileBreadcrumbsCollector"
                               order="last, after PsiFileBreadcrumbsCollector"/>
-    <platform.lang.lsWidget.itemsProvider id="LspWidgetItemsProvider"
+    <platform.lang.lsWidget.itemsProvider
                                           implementation="com.intellij.platform.lsp.dart.impl.lsWidget.LspWidgetItemsProvider"/>
     <applicationService serviceInterface="com.intellij.platform.lsp.dart.api.lsWidget.LspWidgetInternalService"
                         serviceImplementation="com.intellij.platform.lsp.dart.impl.lsWidget.LspWidgetInternalServiceImpl"/>
@@ -73,7 +73,7 @@
                         serviceImplementation="com.intellij.platform.lsp.dart.impl.util.Lsp4jServiceImpl"/>
     <highlightUsagesHandlerFactory implementation="com.intellij.platform.lsp.dart.impl.features.highlighting.LspHighlightUsagesHandlerFactory"
                                    order="last"/>
-    <registryKey key="lsp.communication.standard.log.file" defaultValue="true"
+    <registryKey key="lsp.communication.standard.log.file" defaultValue="false"
                  description="Write communication logs between the IDE and external language services to idea.log file (effective only if DEBUG-level logging is enabled for the 'com.intellij.platform.lsp.dart' category)."/>
 
     <callHierarchyProvider language=""
@@ -82,28 +82,28 @@
     <typeHierarchyProvider language=""
                            implementationClass="com.intellij.platform.lsp.dart.impl.features.hierarchy.type.LspTypeHierarchyProvider"
                            order="last"/>
-    <extendWordSelectionHandler id="LspWordSelectionHandler"
+    <extendWordSelectionHandler
                                 implementation="com.intellij.platform.lsp.dart.impl.features.selectWord.LspWordSelectionHandler"
                                 order="last"/>
 
     <renameHandler implementation="com.intellij.platform.lsp.dart.impl.features.rename.LspRenameHandler" order="last"/>
 
     <!--@formatter:off-->
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention0</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention1</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention2</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention3</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention4</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention5</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention6</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention7</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention8</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention9</className>  <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention10</className> <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention11</className> <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention12</className> <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention13</className> <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
-    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention14</className> <bundleName>messages.LspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>LspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention0</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention1</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention2</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention3</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention4</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention5</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention6</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention7</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention8</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention9</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention10</className> <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention11</className> <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention12</className> <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention13</className> <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
+    <intentionAction> <className>com.intellij.platform.lsp.dart.impl.features.intention.LspIntention14</className> <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
     <!--@formatter:on-->
   </extensions>
 

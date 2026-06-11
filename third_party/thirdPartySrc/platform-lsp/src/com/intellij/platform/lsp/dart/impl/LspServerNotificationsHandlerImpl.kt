@@ -387,18 +387,18 @@ internal class LspServerNotificationsHandlerImpl(private val lspServer: LspServe
      * Default behavior: show balloon and write to the Notifications tool window.
      * The value of this string must be equal to the `notificationGroup` id in the `intellij.platform.lsp.xml` file.
      */
-    const val SHOW_MESSAGE_NOTIFICATION_GROUP = "LSP window/showMessage"
+    const val SHOW_MESSAGE_NOTIFICATION_GROUP = "Dart: LSP window/showMessage"
 
     /**
      * Default behavior: no balloon, only write to the Notifications tool window.
      * The value of this string must be equal to the `notificationGroup` id in the `intellij.platform.lsp.xml` file.
      */
-    private const val LOG_ERRORS_WARNINGS_NOTIFICATION_GROUP = "LSP window/logMessage: errors, warnings"
+    private const val LOG_ERRORS_WARNINGS_NOTIFICATION_GROUP = "Dart: LSP window/logMessage: errors, warnings"
 
     /**
      * Default behavior: no notification. For development purposes, plugin developers may enable printing to the Notifications tool window.
      * The value of this string must be equal to the `notificationGroup` id in the `intellij.platform.lsp.xml` file.
      */
-    private const val LOG_INFO_TRACE_NOTIFICATION_GROUP = "LSP window/logMessage: info, log; $/logTrace"
+    private const val LOG_INFO_TRACE_NOTIFICATION_GROUP = "Dart: LSP window/logMessage: info, log; $/logTrace"
   }
 }

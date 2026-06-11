@@ -111,7 +111,7 @@ internal abstract class Lsp4jServerConnector protected constructor(private val l
         countDownLatch.countDown()
       }
 
-    val timeoutInSeconds = RegistryManager.getInstance().get("lsp.server.connect.timeout").asInteger()
+    val timeoutInSeconds = RegistryManager.getInstance().get("dart.lsp.server.connect.timeout").asInteger()
     val success = countDownLatch.await(timeoutInSeconds.toLong(), TimeUnit.SECONDS)
     if (!success) {
       throw RuntimeException("'initialized' response not received from the server in $timeoutInSeconds seconds")

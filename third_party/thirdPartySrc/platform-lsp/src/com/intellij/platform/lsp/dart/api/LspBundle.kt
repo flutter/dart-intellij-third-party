@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.PropertyKey
 import java.util.function.Supplier
 
-private const val BUNDLE = "messages.LspBundle"
+private const val BUNDLE = "messages.DartLspBundle"
 
 @ApiStatus.Internal
 object LspBundle {
