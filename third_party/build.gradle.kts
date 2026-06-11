@@ -1,3 +1,6 @@
+import org.gradle.api.tasks.testing.TestDescriptor
+import org.gradle.api.tasks.testing.TestListener
+import org.gradle.api.tasks.testing.TestResult
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.changelog.Changelog
@@ -15,6 +18,20 @@ allprojects {
     }
     tasks.withType<Test> {
         systemProperty("file.encoding", "UTF-8")
+        if (providers.gradleProperty("verboseTests").isPresent) {
+            addTestListener(object : TestListener {
+                override fun beforeSuite(suite: TestDescriptor) {}
+                override fun afterSuite(suite: TestDescriptor, result: TestResult) {}
+                override fun beforeTest(testDescriptor: TestDescriptor) {}
+                override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {
+                    val elapsed = result.endTime - result.startTime
+                    val testName = testDescriptor.className?.let { "$it.${testDescriptor.name}" }
+                        ?: testDescriptor.parent?.name?.let { "$it.${testDescriptor.name}" }
+                        ?: testDescriptor.name
+                    logger.lifecycle("Test $testName took ${elapsed}ms")
+                }
+            })
+        }
     }
 }
 
