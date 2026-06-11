@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
@@ -210,6 +212,21 @@ tasks.named("runTarget") {
 tasks {
 
     test {
+        if (providers.gradleProperty("verboseTests").isPresent) {
+            testLogging {
+                events(
+                    TestLogEvent.STARTED,
+                    TestLogEvent.PASSED,
+                    TestLogEvent.FAILED,
+                    TestLogEvent.SKIPPED,
+                )
+                exceptionFormat = TestExceptionFormat.FULL
+                showExceptions = true
+                showCauses = true
+                showStackTraces = true
+            }
+        }
+
         var showDartHomeWarning = false
         val dartSdkPath = System.getenv("DART_HOME")
         if (dartSdkPath != null) {
