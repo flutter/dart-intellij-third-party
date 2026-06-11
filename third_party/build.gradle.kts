@@ -206,6 +206,21 @@ tasks.named("runTarget") {
 tasks {
 
     test {
+        if (providers.gradleProperty("verboseTests").isPresent) {
+            testLogging {
+                events(
+                    org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED,
+                    org.gradle.api.tasks.testing.logging.TestLogEvent.PASSED,
+                    org.gradle.api.tasks.testing.logging.TestLogEvent.FAILED,
+                    org.gradle.api.tasks.testing.logging.TestLogEvent.SKIPPED,
+                )
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                showExceptions = true
+                showCauses = true
+                showStackTraces = true
+            }
+        }
+
         var showDartHomeWarning = false
         val dartSdkPath = System.getenv("DART_HOME")
         if (dartSdkPath != null) {
