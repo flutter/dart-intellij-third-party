@@ -1,18 +1,18 @@
 ---
 name: patch-copied-lsp-sources
-description: Patch JetBrains LSP sources copied into the Dart plugin to prevent conflicts and ensure proper configuration.
+description: Copy JetBrains LSP sources into the Dart plugin and patch them to prevent conflicts and ensure proper configuration.
 ---
 
 # Patch Copied LSP Sources
 
-Use this skill whenever JetBrains LSP source files are copied or refreshed from `intellij-community` into the `dart-intellij-third-party` plugin. It applies custom adaptations to prevent conflicts with the built-in LSP client of IntelliJ IDEA, renaming resources, fixing notification groups, and setting correct registry key defaults.
+Use this skill whenever JetBrains LSP source files are copied or refreshed from the `intellij-community` repository into the `dart-intellij-third-party` plugin. The skill automates the file copying, packaging them under the isolated `com.intellij.platform.dartlsp` package namespace directly, and applies all necessary adjustments to prevent conflicts with the built-in LSP client of IntelliJ IDEA.
 
-## How to Apply
+## How to Refresh and Apply
 
-To apply the adjustments automatically:
-1. Run the Python patch script located in the `scripts` directory from the repository root:
+To copy the sources from `intellij-community` and apply the adjustments automatically:
+1. Run the Python patch script located in the `scripts` directory from the repository root, passing the path to the local `intellij-community` repository as a positional argument:
    ```bash
-   python3 .agents/skills/patch-copied-lsp-sources/scripts/patch.py
+   python3 .agents/skills/patch-copied-lsp-sources/scripts/patch.py /path/to/intellij-community
    ```
 2. Verify the changes using `git diff`.
 3. Verify that the project compiles:
@@ -20,13 +20,19 @@ To apply the adjustments automatically:
    ./gradlew clean compileKotlin --no-build-cache
    ```
 
+> [!NOTE]
+> If you only need to re-apply the patches to the existing files in the workspace (without copying fresh files from `intellij-community`), you can run the script without any arguments:
+> ```bash
+> python3 .agents/skills/patch-copied-lsp-sources/scripts/patch.py
+> ```
+
 ## Record of Adjustments Applied
 
 Here is the details of the changes made by the patch script:
 
-1. **Package Namespace Rename**:
-   - Rename package namespace `com.intellij.platform.lsp.dart` to `com.intellij.platform.dartlsp` across all `.kt`, `.java`, and `.xml` source files.
-   - Moves source directory `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/lsp/dart` to `com/intellij/platform/dartlsp`. This isolates the classes completely from the native IDE classloader, avoiding split-package collisions and accidental wrong-namespace imports.
+1. **Direct Package Copy & Rename**:
+   - Copies files directly from `platform/lsp/src/com/intellij/platform/lsp` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`.
+   - Rename package namespace references from `com.intellij.platform.lsp` to `com.intellij.platform.dartlsp` across all `.kt`, `.java`, and `.xml` source files to avoid split-package classloader collisions and wrong-namespace imports.
 
 2. **Registry Key & Timeout Key**:
    - Rename key `lsp.server.connect.timeout` to `dart.lsp.server.connect.timeout` in `dart-lsp-impl.xml` and `Lsp4jServerConnector.kt` to avoid conflicting with IntelliJ IDEA's default LSP settings.

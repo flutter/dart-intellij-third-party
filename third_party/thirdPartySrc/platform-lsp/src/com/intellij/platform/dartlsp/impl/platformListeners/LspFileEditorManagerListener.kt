@@ -6,8 +6,8 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.dartlsp.impl.documentSync.LspOpenedFilesService
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
+import com.intellij.platform.dartlsp.impl.documentSync.LspOpenedFilesService
 
 internal class LspFileEditorManagerListener : FileEditorManagerListener {
   override fun fileOpened(fileEditorManager: FileEditorManager, file: VirtualFile) {

@@ -5,8 +5,8 @@ import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.extensions.ExtensionPointName.Companion.create
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
 import com.intellij.platform.dartlsp.api.lsWidget.LspServerWidgetItem
+import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 

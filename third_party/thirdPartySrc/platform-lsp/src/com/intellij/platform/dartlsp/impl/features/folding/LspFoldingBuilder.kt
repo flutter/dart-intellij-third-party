@@ -13,7 +13,6 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import org.eclipse.lsp4j.FoldingRangeKind
 
-
 internal class LspFoldingBuilder : FoldingBuilderEx(), DumbAware {
   override fun buildFoldRegions(root: PsiElement, document: Document, quick: Boolean): Array<FoldingDescriptor> {
     // LspFoldingBuilder.buildFoldRegions can be called as part of nested CompositeFoldingBuilder

@@ -18,11 +18,11 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.platform.dartlsp.api.LspBundle
 import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
 import com.intellij.platform.dartlsp.impl.util.LspWorkspaceEditApplier
 import com.intellij.platform.dartlsp.util.getOffsetInDocument
+import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.platform.util.progress.reportRawProgress
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

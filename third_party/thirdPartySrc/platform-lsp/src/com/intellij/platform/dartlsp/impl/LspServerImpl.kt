@@ -29,13 +29,13 @@ import com.intellij.platform.dartlsp.impl.connector.Lsp4jServerConnectorSocket
 import com.intellij.platform.dartlsp.impl.connector.Lsp4jServerConnectorStdio
 import com.intellij.platform.dartlsp.impl.connector.LspInitializationException
 import com.intellij.platform.dartlsp.impl.documentSync.LspDocumentSyncManager
-import com.intellij.platform.dartlsp.impl.fileEvents.LspWatchedFiles
 import com.intellij.platform.dartlsp.impl.features.highlighting.DiagnosticAndQuickFixes
 import com.intellij.platform.dartlsp.impl.features.highlighting.LspDocumentLink
 import com.intellij.platform.dartlsp.impl.features.highlighting.LspHighlightingApplier
 import com.intellij.platform.dartlsp.impl.features.highlighting.LspSemanticToken
 import com.intellij.platform.dartlsp.impl.features.highlightingCommon.LspCachedHighlighting
 import com.intellij.platform.dartlsp.impl.features.highlightingCommon.LspHighlightingCacheRegistry
+import com.intellij.platform.dartlsp.impl.fileEvents.LspWatchedFiles
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.text.nullize

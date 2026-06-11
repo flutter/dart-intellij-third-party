@@ -12,11 +12,6 @@ import com.intellij.openapi.util.NlsActions
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.lang.lsWidget.LanguageServicePopupSection
-import com.intellij.platform.lang.lsWidget.LanguageServicePopupSection.ForCurrentFile
-import com.intellij.platform.lang.lsWidget.LanguageServicePopupSection.Other
-import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
-import com.intellij.platform.lang.lsWidget.OpenSettingsAction
 import com.intellij.platform.dartlsp.api.LspBundle
 import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.LspServerManager
@@ -24,6 +19,11 @@ import com.intellij.platform.dartlsp.api.LspServerState.Initializing
 import com.intellij.platform.dartlsp.api.LspServerState.Running
 import com.intellij.platform.dartlsp.api.LspServerState.ShutdownNormally
 import com.intellij.platform.dartlsp.api.LspServerState.ShutdownUnexpectedly
+import com.intellij.platform.lang.lsWidget.LanguageServicePopupSection
+import com.intellij.platform.lang.lsWidget.LanguageServicePopupSection.ForCurrentFile
+import com.intellij.platform.lang.lsWidget.LanguageServicePopupSection.Other
+import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
+import com.intellij.platform.lang.lsWidget.OpenSettingsAction
 import com.intellij.util.containers.addIfNotNull
 import javax.swing.Icon
 

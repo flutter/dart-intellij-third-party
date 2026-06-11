@@ -82,5 +82,3 @@ internal class LspDocumentListener : DocumentListener {
       .submit(AppExecutorUtil.getAppExecutorService())
   }
 }
-
-

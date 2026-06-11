@@ -10,13 +10,13 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.project.DumbAware
-import com.intellij.platform.lang.lsWidget.impl.fus.LanguageServiceWidgetActionKind
-import com.intellij.platform.lang.lsWidget.impl.fus.LanguageServiceWidgetUsagesCollector
 import com.intellij.platform.dartlsp.api.LspBundle
 import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.lsWidget.LspWidgetInternalService
 import com.intellij.platform.dartlsp.impl.LspServerImpl
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
+import com.intellij.platform.lang.lsWidget.impl.fus.LanguageServiceWidgetActionKind
+import com.intellij.platform.lang.lsWidget.impl.fus.LanguageServiceWidgetUsagesCollector
 import com.intellij.testFramework.LightVirtualFile
 
 /**

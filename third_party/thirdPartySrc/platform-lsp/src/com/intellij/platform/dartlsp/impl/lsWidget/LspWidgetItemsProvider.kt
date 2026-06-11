@@ -3,12 +3,12 @@ package com.intellij.platform.dartlsp.impl.lsWidget
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
-import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItemsProvider
 import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.LspServerManager
 import com.intellij.platform.dartlsp.api.LspServerManagerListener
 import com.intellij.platform.dartlsp.api.LspServerSupportProvider
+import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
+import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItemsProvider
 
 internal class LspWidgetItemsProvider : LanguageServiceWidgetItemsProvider() {
 

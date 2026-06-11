@@ -5,8 +5,8 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileDocumentManagerListener
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.ProjectManager
-import com.intellij.platform.dartlsp.impl.documentSync.LspOpenedFilesService
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
+import com.intellij.platform.dartlsp.impl.documentSync.LspOpenedFilesService
 
 internal class LspFileDocumentManagerListener : FileDocumentManagerListener {
 

@@ -8,6 +8,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.application
 import com.intellij.util.io.sanitizeFileName
 import kotlinx.coroutines.CoroutineScope
+import org.jetbrains.annotations.TestOnly
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -16,7 +17,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.div
-import org.jetbrains.annotations.TestOnly
 import kotlin.math.min
 
 private val LOG = logger<LanguageServiceLoggerService>()

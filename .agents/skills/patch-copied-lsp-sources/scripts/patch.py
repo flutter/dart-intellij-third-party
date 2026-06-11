@@ -1,12 +1,26 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import re
 import shutil
 import sys
 
 def main():
-    if len(sys.argv) > 1:
-        base_dir = os.path.abspath(sys.argv[1])
+    parser = argparse.ArgumentParser(description="Copy and patch JetBrains LSP sources into the Dart plugin.")
+    parser.add_argument(
+        "intellij_path",
+        nargs="?",
+        help="Path to the local clone of the 'intellij-community' repository. If provided, sources will be copied first."
+    )
+    parser.add_argument(
+        "--repo-root",
+        help="Path to the dart-intellij-third-party repository root (defaults to resolving relative to this script)."
+    )
+    args = parser.parse_args()
+
+    # Resolve base_dir
+    if args.repo_root:
+        base_dir = os.path.abspath(args.repo_root)
     else:
         # Default to the repository root relative to this script's location
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,20 +34,48 @@ def main():
         print(f"Error: {base_dir} does not contain a 'third_party' folder.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Applying JetBrains LSP patch with package rename to: {base_dir}")
+    # 1. Copy sources if intellij_path is provided
+    if args.intellij_path:
+        intellij_community_path = os.path.abspath(args.intellij_path)
+        print(f"Copying sources from: {intellij_community_path}")
 
-    # 1. Rename com/intellij/platform/lsp/dart to com/intellij/platform/dartlsp
-    old_pkg_dir = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/lsp/dart")
-    new_pkg_dir = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp")
-    parent_lsp_dir = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/lsp")
+        src_lsp_code = os.path.join(intellij_community_path, "platform/lsp/src/com/intellij/platform/lsp")
+        src_lsp_resources = os.path.join(intellij_community_path, "platform/lsp/resources")
 
-    if os.path.exists(old_pkg_dir):
-        if os.path.exists(new_pkg_dir):
-            shutil.rmtree(new_pkg_dir)
-        os.makedirs(os.path.dirname(new_pkg_dir), exist_ok=True)
-        os.rename(old_pkg_dir, new_pkg_dir)
-        if os.path.exists(parent_lsp_dir) and not os.listdir(parent_lsp_dir):
-            os.rmdir(parent_lsp_dir)
+        if not os.path.isdir(src_lsp_code) or not os.path.isdir(src_lsp_resources):
+            print(f"Error: Could not find LSP sources in {intellij_community_path}.", file=sys.stderr)
+            print(f"Expected to find:\n  {src_lsp_code}\n  {src_lsp_resources}", file=sys.stderr)
+            sys.exit(1)
+
+        dst_lsp_code = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp")
+        dst_lsp_resources = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/resources")
+
+        # Clean existing destination directories
+        if os.path.exists(dst_lsp_code):
+            shutil.rmtree(dst_lsp_code)
+        if os.path.exists(dst_lsp_resources):
+            shutil.rmtree(dst_lsp_resources)
+
+        # Copy code directly to com/intellij/platform/dartlsp
+        shutil.copytree(src_lsp_code, dst_lsp_code)
+
+        # Copy resources
+        shutil.copytree(src_lsp_resources, dst_lsp_resources)
+
+        # Rename intellij.platform.lsp.xml to dart-lsp-impl.xml
+        xml_old_path = os.path.join(dst_lsp_resources, "META-INF/intellij.platform.lsp.xml")
+        if not os.path.exists(xml_old_path):
+            xml_old_path = os.path.join(dst_lsp_resources, "intellij.platform.lsp.xml")
+
+        xml_new_path = os.path.join(dst_lsp_resources, "dart-lsp-impl.xml")
+        if os.path.exists(xml_old_path):
+            os.rename(xml_old_path, xml_new_path)
+            # Clean up META-INF if empty
+            meta_inf_dir = os.path.dirname(xml_old_path)
+            if os.path.exists(meta_inf_dir) and not os.listdir(meta_inf_dir):
+                os.rmdir(meta_inf_dir)
+
+    print(f"Applying JetBrains LSP patches and renames in: {base_dir}")
 
     # 2. Rename package references in all files under platform-lsp
     walk_dir = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp")
@@ -43,8 +85,19 @@ def main():
                 file_path = os.path.join(root, file)
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
+                
+                # Check for the original platform package name
+                modified = False
+                if "com.intellij.platform.lsp" in content:
+                    content = content.replace("com.intellij.platform.lsp", "com.intellij.platform.dartlsp")
+                    modified = True
+                
+                # Also fallback to replacing any residual com.intellij.platform.lsp.dart just in case
                 if "com.intellij.platform.lsp.dart" in content:
                     content = content.replace("com.intellij.platform.lsp.dart", "com.intellij.platform.dartlsp")
+                    modified = True
+
+                if modified:
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(content)
 
