@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         dart-version: ['stable']
-        os: [macos-latest]
+        os: [ubuntu-large]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
 
