@@ -20,10 +20,7 @@ class VerboseTestListener : TestListener, Serializable {
     override fun beforeTest(testDescriptor: TestDescriptor) {}
     override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {
         val elapsed = result.endTime - result.startTime
-        val testName = testDescriptor.className?.let { "$it.${testDescriptor.name}" }
-            ?: testDescriptor.parent?.name?.let { "$it.${testDescriptor.name}" }
-            ?: testDescriptor.name
-        Logging.getLogger(Test::class.java).lifecycle("Test $testName took ${elapsed}ms")
+        Logging.getLogger(Test::class.java).lifecycle("took ${elapsed}ms")
     }
 }
 
