@@ -24,7 +24,7 @@ class DTDProcessTest : BasePlatformTestCase() {
         const val STARTUP_TIMEOUT_SECONDS = 5L
         const val RESPONSE_TIMEOUT_SECONDS = 2L
         const val CONCURRENT_REQUESTS_TIMEOUT_SECONDS = 5L
-        const val CONCURRENT_REQUESTS_COUNT = 10
+        const val CONCURRENT_REQUESTS_COUNT = 100
     }
 
     private lateinit var dtdProcess: DTDProcess
