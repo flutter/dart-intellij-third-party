@@ -7,9 +7,9 @@ package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.lsp.dart.api.LspCommunicationChannel
-import com.intellij.platform.lsp.dart.api.ProjectWideLspServerDescriptor
-import com.intellij.platform.lsp.dart.api.customization.*
+import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
+import com.intellij.platform.dartlsp.api.customization.*
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 
 /**

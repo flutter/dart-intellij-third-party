@@ -17,9 +17,9 @@ import java.io.IOException
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Future
-import com.intellij.platform.lsp.dart.api.LspServerManager
-import com.intellij.platform.lsp.dart.api.ensureServerStarted
-import com.intellij.platform.lsp.dart.api.stopServers
+import com.intellij.platform.dartlsp.api.LspServerManager
+import com.intellij.platform.dartlsp.api.ensureServerStarted
+import com.intellij.platform.dartlsp.api.stopServers
 
 
 /**
