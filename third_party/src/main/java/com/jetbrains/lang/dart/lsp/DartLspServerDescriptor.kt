@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.api.customization.*
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 
 /**
@@ -24,7 +25,7 @@ import com.jetbrains.lang.dart.sdk.DartConfigurable
 class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(project, "Dart (Bridge)") {
 
     override fun isSupportedFile(file: VirtualFile): Boolean {
-        return file.extension == "dart"
+        return DartAnalysisServerService.isFileNameRespectedByAnalysisServer(file.name)
     }
 
     override val lspCommunicationChannel: LspCommunicationChannel
