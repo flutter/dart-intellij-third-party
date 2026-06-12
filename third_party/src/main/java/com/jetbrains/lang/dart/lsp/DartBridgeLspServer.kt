@@ -49,6 +49,8 @@ import java.util.concurrent.ConcurrentHashMap
  * The legacy Dart plugin already handles robust file content synchronization via `analysis.updateContent`.
  * Since DAS shares the same in-memory overlay filesystem between legacy and LSP handlers, the shared LSP handlers
  * (like Hover) will automatically see the up-to-date content synced by the legacy plugin.
+ * To ensure the server is fully up to date before processing a request, we also explicitly call
+ * `das.updateFilesContent()` before forwarding any client request.
  */
 class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDocumentService, WorkspaceService, LanguageClientAware {
     companion object {
