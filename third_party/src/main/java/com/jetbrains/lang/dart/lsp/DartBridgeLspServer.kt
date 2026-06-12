@@ -266,6 +266,8 @@ class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDo
             return future
         }
 
+        das.updateFilesContent()
+
         val legacyId = das.generateUniqueId()
         if (legacyId == null) {
             future.completeExceptionally(ResponseErrorException(ResponseError(-32001, "Failed to generate request ID", null)))
