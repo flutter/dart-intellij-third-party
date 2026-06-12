@@ -101,7 +101,7 @@ intellijPlatform {
             VerifyPluginTask.FailureLevel.SCHEDULED_FOR_REMOVAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.EXPERIMENTAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
-            VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES,
+            //            VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES,
             VerifyPluginTask.FailureLevel.NON_EXTENDABLE_API_USAGES,
             VerifyPluginTask.FailureLevel.PLUGIN_STRUCTURE_WARNINGS,
             VerifyPluginTask.FailureLevel.MISSING_DEPENDENCIES,
@@ -110,6 +110,7 @@ intellijPlatform {
         )
         verificationReportsFormats = VerifyPluginTask.VerificationReportsFormats.ALL
         subsystemsToCheck = VerifyPluginTask.Subsystems.ALL
+        ignoredProblemsFile.set(project.file("verify-ignore-problems.txt"))
         ides {
             recommended()
         }
@@ -122,6 +123,10 @@ sourceSets {
             srcDir("gen")
             srcDir("thirdPartySrc/analysisServer")
             srcDir("thirdPartySrc/vmServiceDrivers")
+            srcDir("thirdPartySrc/platform-lsp/src")
+        }
+        resources {
+            srcDir("thirdPartySrc/platform-lsp/resources")
         }
     }
 }

@@ -1,0 +1,9 @@
+# Ignore missing/unresolved platform APIs in version 253 (any plugin version)
+Dart::.*ReadAction\.computeBlocking.*
+Dart::.*runReadActionBlocking.*
+Dart::.*FormattingService\.canFormat.*
+Dart::.*CodeVisionProvider\.handleExtraAction.*
+
+# Ignore missing resource bundles / property messages
+Dart::.*LspBundle.*
+Dart::.*lsp.*

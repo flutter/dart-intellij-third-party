@@ -22,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 
 public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
 
-
   public AnalysisServerDiagnosticsAction() {
     super(DartBundle.messagePointer("analysis.server.show.diagnostics.text"));
   }
@@ -59,7 +58,6 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
       }
     }
   }
-
 
   private void fallbackToLegacy(@NotNull Project project) {
     DartAnalysisServerService server = DartAnalysisServerService.getInstance(project);
