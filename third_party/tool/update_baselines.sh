@@ -17,7 +17,7 @@ echo -e "${BOLD}Running plugin verification...${NC}"
 rm -rf third_party/build/reports/pluginVerifier
 (cd third_party && ./gradlew verifyPlugin)
 
-for version in 251 252 253 261; do
+for version in 253 261; do
   echo -e "${BOLD}Processing baseline for $version...${NC}"
   BASELINE="third_party/tool/baseline/$version/verifier-baseline.txt"
   REPORT=$(find third_party/build/reports/pluginVerifier -path "*-$version.*/report.md" | head -n 1)

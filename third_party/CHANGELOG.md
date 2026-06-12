@@ -5,6 +5,7 @@
 ### Changed
 
 ### Removed
+- Support for platform versions 251 and 252 (#473)
 
 ### Fixed
 - Prevent memory leak by closing DTD WebSocket connections and clearing listeners when disposing projects (#449)
