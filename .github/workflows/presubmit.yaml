@@ -23,7 +23,9 @@ jobs:
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
-          cache: 'gradle' # Cache Gradle dependencies
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build Plugin Action
         run: ./gradlew buildPlugin
@@ -45,7 +47,9 @@ jobs:
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
-          cache: 'gradle' # Cache Gradle dependencies
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Unit Test Action
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
@@ -96,7 +100,9 @@ jobs:
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
-          cache: 'gradle' # Cache Gradle dependencies
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Verify Plugin Actions
         run: |

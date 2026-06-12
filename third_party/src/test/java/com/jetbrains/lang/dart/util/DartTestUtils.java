@@ -17,6 +17,8 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.util.PathUtil;
 import com.intellij.util.SmartList;
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
 import junit.framework.TestCase;
@@ -24,9 +26,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 import org.junit.Assert;
 
-import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import com.jetbrains.lang.dart.lsp.DartLspConstants;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -111,17 +110,18 @@ public final class DartTestUtils {
     //
     VfsRootAccess.allowRootAccess(disposable, BASE_TEST_DATA_PATH);
 
-    LanguageServerDefinition definition =
-      LanguageServersRegistry.getInstance().getServerDefinition(DartLspConstants.DART_LANGUAGE_SERVER_ID);
-    if (definition != null) {
-      definition.setEnabled(false, module.getProject());
-    }
+    DartConfigurable.setExperimentalLspFeaturesEnabled(module.getProject(), false);
 
     ApplicationManager.getApplication().runWriteAction(() -> {
       Disposer.register(disposable, DartSdkLibUtil.configureDartSdkAndReturnUndoingDisposable(module.getProject(), sdkHome));
       Disposer.register(disposable, DartSdkLibUtil.enableDartSdkAndReturnUndoingDisposable(module));
     });
     IndexingTestUtil.waitUntilIndexesAreReady(module.getProject());
+    if (realSdk) {
+      ApplicationManager.getApplication().runReadAction(() -> {
+        DartAnalysisServerService.getInstance(module.getProject()).serverReadyForRequest();
+      });
+    }
   }
 
   public static List<CaretPositionInfo> extractPositionMarkers(@NotNull final Project project, @NotNull final Document document) {
