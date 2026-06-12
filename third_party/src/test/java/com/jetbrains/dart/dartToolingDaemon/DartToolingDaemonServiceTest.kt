@@ -11,7 +11,7 @@ import com.google.gson.JsonParser
 import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
-import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonServiceListener
+import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonWebSocketListener
 import com.intellij.util.ui.UIUtil
 import com.jetbrains.lang.dart.util.DartTestUtils
 import java.util.concurrent.ConcurrentHashMap
@@ -37,7 +37,7 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
     override fun tearDown() {
         try {
             if (::dartToolingDaemonService.isInitialized) {
-                dartToolingDaemonService.listener = null
+                dartToolingDaemonService.stopService()
             }
         } finally {
             super.tearDown()
@@ -50,7 +50,7 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
         val responsesById = ConcurrentHashMap<Int, JsonObject>()
 
         dartToolingDaemonService = DartToolingDaemonService.getInstance(project)
-        dartToolingDaemonService.listener = object : DartToolingDaemonServiceListener {
+        dartToolingDaemonService.webSocketListener = object : DartToolingDaemonWebSocketListener {
             override fun onWebSocketRequest(id: Int, method: String, text: String) {
                 sentRequestsById[id] = JsonParser.parseString(text).asJsonObject
             }

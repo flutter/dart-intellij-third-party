@@ -52,7 +52,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   private var serviceRunning = false
 
   @Volatile
-  var listener: DartToolingDaemonServiceListener? = null
+  var webSocketListener: DartToolingDaemonWebSocketListener? = null
 
   private lateinit var webSocket: WebSocket
   var webSocketReady: Boolean = false
@@ -125,6 +125,33 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     }
   }
 
+  fun stopService() {
+    if (::dtdProcessHandler.isInitialized && !dtdProcessHandler.isProcessTerminated) {
+      ApplicationManager.getApplication().executeOnPooledThread {
+        if (!dtdProcessHandler.isProcessTerminated) {
+          dtdProcessHandler.killProcess()
+        }
+      }
+    }
+    if (::webSocket.isInitialized) {
+      ApplicationManager.getApplication().executeOnPooledThread {
+        try {
+          webSocket.close()
+        } catch (e: Exception) {
+          logger.warn("Failed to close DTD web socket", e)
+        }
+      }
+    }
+    webSocketListener = null
+    serviceRunning = false
+    webSocketReady = false
+    uri = null
+    secret = null
+    lastSentRootUris = emptyList()
+    consumerMap.clear()
+    servicesMap.clear()
+  }
+
   @Suppress("unused") // for the Flutter plugin
   fun registerServiceMethod(service: String, method: String, capabilities: JsonObject, consumer: DartToolingDaemonRequestHandler) {
     val params = JsonObject()
@@ -167,7 +194,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     consumerMap[id] = consumer
 
     val requestString = request.toString()
-    listener?.onWebSocketRequest(id, method, requestString)
+    webSocketListener?.onWebSocketRequest(id, method, requestString)
     logger.debug("--> $requestString")
     webSocket.send(requestString)
   }
@@ -362,7 +389,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     override fun onMessage(message: WebSocketMessage) {
       val text = message.text
       logger.debug("<-- $text")
-      listener?.onWebSocketMessage(text)
+      webSocketListener?.onWebSocketMessage(text)
 
       val json: JsonObject = try {
         JsonParser.parseString(text) as JsonObject
@@ -414,7 +441,9 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   }
 }
 
-interface DartToolingDaemonServiceListener {
+// This is a  test only listener.
+// In case it's needed to be used in production, use publish-subscribe pattern just like the eventDispatcher
+interface DartToolingDaemonWebSocketListener {
   fun onWebSocketMessage(text: String) {}
   fun onWebSocketRequest(id: Int, method: String, text: String) {}
 }
