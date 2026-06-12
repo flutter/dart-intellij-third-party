@@ -296,7 +296,7 @@ object Analytics {
       environment[UnifiedAnalytics.Env.IDE_NAME] = ApplicationInfo.getInstance().versionName
       environment[UnifiedAnalytics.Env.IDE_VERSION] = ApplicationInfo.getInstance().fullVersion
 
-      val plugin = PluginManagerCore.getPlugin(PluginId.getId("Dart"))
+      val plugin = PluginManagerCore.getPlugin(PluginId.getId(DART_PLUGIN_ID))
       if (plugin != null) {
           environment[UnifiedAnalytics.Env.PLUGIN_NAME] = plugin.name
           environment[UnifiedAnalytics.Env.PLUGIN_VERSION] = plugin.version
