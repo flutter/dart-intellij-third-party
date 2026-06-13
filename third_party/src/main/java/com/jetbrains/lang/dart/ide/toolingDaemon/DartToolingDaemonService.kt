@@ -43,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
+import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
 
 @Service(Service.Level.PROJECT)
@@ -126,15 +127,16 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   }
 
   fun stopService() {
+    val pendingShutdownTasks = mutableListOf<Future<*>>()
     if (::dtdProcessHandler.isInitialized && !dtdProcessHandler.isProcessTerminated) {
-      ApplicationManager.getApplication().executeOnPooledThread {
+      pendingShutdownTasks += ApplicationManager.getApplication().executeOnPooledThread {
         if (!dtdProcessHandler.isProcessTerminated) {
           dtdProcessHandler.killProcess()
         }
       }
     }
     if (::webSocket.isInitialized) {
-      ApplicationManager.getApplication().executeOnPooledThread {
+      pendingShutdownTasks += ApplicationManager.getApplication().executeOnPooledThread {
         try {
           webSocket.close()
         } catch (e: Exception) {
@@ -142,6 +144,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
         }
       }
     }
+    pendingShutdownTasks.forEach { it.get() }
     webSocketListener = null
     serviceRunning = false
     webSocketReady = false

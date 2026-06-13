@@ -12,20 +12,18 @@ import com.intellij.openapi.roots.ModuleRootModificationUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonWebSocketListener
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.util.ui.UIUtil
 import com.jetbrains.lang.dart.util.DartTestUtils
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 class DartToolingDaemonServiceTest : BasePlatformTestCase() {
 
     private companion object {
-        const val INITIALIZATION_TIMEOUT_SECONDS = 5L
+        const val INITIALIZATION_TIMEOUT_SECONDS = 5
         const val EXPECTED_REQUEST_COUNT = 3
     }
-
-    private lateinit var dartToolingDaemonService: DartToolingDaemonService
 
     override fun setUp() {
         super.setUp()
@@ -36,9 +34,7 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
 
     override fun tearDown() {
         try {
-            if (::dartToolingDaemonService.isInitialized) {
-                dartToolingDaemonService.stopService()
-            }
+            DartToolingDaemonService.getInstance(project).stopService()
         } finally {
             super.tearDown()
         }
@@ -49,7 +45,7 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
         val sentRequestsById = ConcurrentHashMap<Int, JsonObject>()
         val responsesById = ConcurrentHashMap<Int, JsonObject>()
 
-        dartToolingDaemonService = DartToolingDaemonService.getInstance(project)
+        val dartToolingDaemonService = DartToolingDaemonService.getInstance(project)
         dartToolingDaemonService.webSocketListener = object : DartToolingDaemonWebSocketListener {
             override fun onWebSocketRequest(id: Int, method: String, text: String) {
                 sentRequestsById[id] = JsonParser.parseString(text).asJsonObject
@@ -64,15 +60,12 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
         }
 
         dartToolingDaemonService.startService()
-
-        val deadline = System.currentTimeMillis() + INITIALIZATION_TIMEOUT_SECONDS * 1000
-        while (!allRequestsAcknowledged.await(100, TimeUnit.MILLISECONDS)) {
-            assertTrue(
-                "Did not receive all $EXPECTED_REQUEST_COUNT acknowledgements within ${INITIALIZATION_TIMEOUT_SECONDS}s",
-                System.currentTimeMillis() < deadline
-            )
-            UIUtil.dispatchAllInvocationEvents()
-        }
+        UIUtil.dispatchAllInvocationEvents()
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Did not receive all $EXPECTED_REQUEST_COUNT acknowledgements within ${INITIALIZATION_TIMEOUT_SECONDS}s",
+            { allRequestsAcknowledged.count == 0L },
+            INITIALIZATION_TIMEOUT_SECONDS
+        )
 
         val getActiveLocationId =
             idOfRequest(sentRequestsById, "a registerService request for Editor.getActiveLocation") {
@@ -102,8 +95,8 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
         predicate: (JsonObject) -> Boolean,
     ): Int {
         val entry = sentRequestsById.entries.singleOrNull { (_, request) -> predicate(request) }
-        assertNotNull("Expected exactly one request matching: $description", entry)
-        return entry!!.key
+        requireNotNull(entry) { "Expected exactly one request matching: $description" }
+        return entry.key
     }
 
     private fun JsonObject.isRegisterService(service: String, method: String): Boolean {
