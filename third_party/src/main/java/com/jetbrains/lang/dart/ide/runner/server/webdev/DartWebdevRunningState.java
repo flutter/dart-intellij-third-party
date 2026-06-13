@@ -21,6 +21,7 @@ import com.jetbrains.lang.dart.ide.actions.DartPubActionBase;
 import com.jetbrains.lang.dart.ide.runner.DartRelativePathsConsoleFilter;
 import com.jetbrains.lang.dart.pubServer.DartWebdev;
 import com.jetbrains.lang.dart.sdk.DartSdk;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;

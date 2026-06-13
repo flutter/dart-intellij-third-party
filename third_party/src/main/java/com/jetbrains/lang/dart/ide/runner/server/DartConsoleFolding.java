@@ -18,10 +18,13 @@ import java.util.List;
 public final class DartConsoleFolding extends ConsoleFolding {
 
   private static final String DART_MARKER = SystemInfo.isWindows ? "\\bin\\dart.exe " : "/bin/dart ";
+  private static final String DART_MARKER_LINUX = "/bin/dart ";
   private static final String WEBDEV_RUNNER_MARKER = SystemInfo.isWindows
                                                      ? "\\bin\\pub.bat global run webdev daemon " : "/bin/pub global run webdev daemon ";
+  private static final String WEBDEV_RUNNER_MARKER_LINUX = "/bin/pub global run webdev daemon ";
   private static final String TEST_RUNNER_MARKER = SystemInfo.isWindows
                                                    ? "\\bin\\pub.bat run test -r json " : "/bin/pub run test -r json ";
+  private static final String TEST_RUNNER_MARKER_LINUX = "/bin/pub run test -r json ";
   private static final int MIN_FRAME_DISPLAY_COUNT = 8;
 
   private int myFrameCount = 0;
@@ -47,8 +50,11 @@ public final class DartConsoleFolding extends ConsoleFolding {
     if (line.startsWith(DartConsoleFilter.OBSERVATORY_LISTENING_ON) || line.startsWith(DartConsoleFilter.DART_VM_LISTENING_ON)) return true;
 
     int index = line.indexOf(DART_MARKER);
+    if (index < 0) index = line.indexOf(DART_MARKER_LINUX);
     if (index < 0) index = line.indexOf(TEST_RUNNER_MARKER);
+    if (index < 0) index = line.indexOf(TEST_RUNNER_MARKER_LINUX);
     if (index < 0) index = line.indexOf(WEBDEV_RUNNER_MARKER);
+    if (index < 0) index = line.indexOf(WEBDEV_RUNNER_MARKER_LINUX);
     if (index < 0) return false;
 
     final String probablySdkPath = line.substring(0, index);

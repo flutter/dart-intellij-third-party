@@ -20,6 +20,7 @@ import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
+import com.jetbrains.lang.dart.sdk.DartWslUtil
 import java.nio.charset.StandardCharsets
 
 @Service(Service.Level.PROJECT)
@@ -40,11 +41,18 @@ class DartDevToolsService(private val myProject: Project) : Disposable {
     val sdk = DartSdk.getDartSdk(myProject)?.takeIf { isDartSdkVersionSufficient(it) } ?: return
 
     val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
-    commandLine.charset = StandardCharsets.UTF_8
-    commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
-    commandLine.addParameter("devtools")
-    commandLine.addParameter("--machine")
-    dtdUri?.let { commandLine.addParameter("--dtd-uri=$it") }
+    if (DartWslUtil.isWslSdkPath(sdk.homePath)) {
+      val linuxExePath = DartWslUtil.getLinuxDartExePath(sdk.homePath)
+      DartWslUtil.configureWslExecution(commandLine, linuxExePath, "devtools", "--machine")
+      dtdUri?.let { commandLine.addParameter("--dtd-uri=$it") }
+    }
+    else {
+      commandLine.charset = StandardCharsets.UTF_8
+      commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
+      commandLine.addParameter("devtools")
+      commandLine.addParameter("--machine")
+      dtdUri?.let { commandLine.addParameter("--dtd-uri=$it") }
+    }
 
     Analytics.updateEnvironment(commandLine)
 

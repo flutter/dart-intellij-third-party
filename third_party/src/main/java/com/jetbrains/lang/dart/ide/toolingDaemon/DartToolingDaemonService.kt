@@ -35,6 +35,7 @@ import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
+import com.jetbrains.lang.dart.sdk.DartWslUtil
 import de.roderick.weberknecht.WebSocket
 import de.roderick.weberknecht.WebSocketEventHandler
 import de.roderick.weberknecht.WebSocketException
@@ -85,10 +86,16 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     activeLocationChangeEventSupported = DartAnalysisServerService.isDartSdkVersionSufficientForWorkspaceApplyEdits(sdk.version)
 
     val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
-    commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
-    commandLine.charset = StandardCharsets.UTF_8
-    commandLine.addParameter("tooling-daemon")
-    commandLine.addParameter("--machine")
+    if (DartWslUtil.isWslSdkPath(sdk.homePath)) {
+      val linuxExePath = DartWslUtil.getLinuxDartExePath(sdk.homePath)
+      DartWslUtil.configureWslExecution(commandLine, linuxExePath, "tooling-daemon", "--machine")
+    }
+    else {
+      commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
+      commandLine.charset = StandardCharsets.UTF_8
+      commandLine.addParameter("tooling-daemon")
+      commandLine.addParameter("--machine")
+    }
     Analytics.updateEnvironment(commandLine)
 
     logger.info("Starting Dart Tooling Daemon, sdk ${sdk.version}")

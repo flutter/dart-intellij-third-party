@@ -20,6 +20,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.io.URLUtil;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import com.jetbrains.lang.dart.util.DartBuildFileUtil;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import org.jetbrains.annotations.NotNull;
@@ -85,15 +86,28 @@ public class DartServerRootsHandler {
       newExcludedRootPaths.add(dotIdeaPath);
     }
 
+    final boolean isWslSdk = DartWslUtil.isWslSdkPath(sdk.getHomePath());
+
     for (Module module : DartSdkLibUtil.getModulesWithDartSdkEnabled(myProject)) {
       for (ContentEntry contentEntry : ModuleRootManager.getInstance(module).getContentEntries()) {
         final String contentEntryUrl = contentEntry.getUrl();
         if (contentEntryUrl.startsWith(URLUtil.FILE_PROTOCOL + URLUtil.SCHEME_SEPARATOR)) {
-          newIncludedRootPaths.add(VfsUtilCore.urlToPath(contentEntryUrl));
+          String rootPath = VfsUtilCore.urlToPath(contentEntryUrl);
+          // When running DAS in WSL, convert paths to Linux format
+          if (isWslSdk) {
+            String linuxPath = DartWslUtil.toLinuxPathFromWindows(rootPath);
+            if (linuxPath != null) rootPath = linuxPath;
+          }
+          newIncludedRootPaths.add(rootPath);
           for (String excludedUrl : contentEntry.getExcludeFolderUrls()) {
             // Analysis Server knows about special 'packages' folders, IDE doesn't need to explicitly list them as excluded.
             if (excludedUrl.startsWith(contentEntryUrl) && !excludedUrl.endsWith("/packages")) {
-              newExcludedRootPaths.add(VfsUtilCore.urlToPath(excludedUrl));
+              String excludedPath = VfsUtilCore.urlToPath(excludedUrl);
+              if (isWslSdk) {
+                String linuxPath = DartWslUtil.toLinuxPathFromWindows(excludedPath);
+                if (linuxPath != null) excludedPath = linuxPath;
+              }
+              newExcludedRootPaths.add(excludedPath);
             }
           }
         }

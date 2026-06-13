@@ -8,6 +8,8 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.jetbrains.lang.dart.sdk.DartSdk
+import com.jetbrains.lang.dart.sdk.DartWslUtil
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -34,6 +36,14 @@ fun getDartFileInfo(project: Project, filePathOrUri: String): DartFileInfo = whe
     var path = URI(filePathOrUri).path
     if (SystemInfo.isWindows && path.length >= 3 && path[0] == '/' && OSAgnosticPathUtil.startsWithWindowsDrive(path.substring(1))) {
       path = path.substring(1)
+    }
+    // When DAS runs in WSL, file URIs contain Linux paths even on Windows host.
+    // Convert Linux paths to UNC WSL paths so LocalFileSystem can find them.
+    if (SystemInfo.isWindows && path.startsWith("/") && DartWslUtil.isWslAvailable()) {
+      val sdk = DartSdk.getDartSdk(project)
+      val distroName = sdk?.homePath?.let { DartWslUtil.getWslDistroName(it) }
+      val uncPath = DartWslUtil.toWindowsUncPath(path, distroName)
+      if (uncPath != null) path = uncPath
     }
     DartLocalFileInfo(path)
   }

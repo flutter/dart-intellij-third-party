@@ -15,6 +15,7 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -131,7 +132,22 @@ public class DartCommandLineRunnerParameters implements Cloneable {
       throw new RuntimeConfigurationError(DartBundle.message("path.to.dart.file.not.set"));
     }
 
-    final VirtualFile dartFile = LocalFileSystem.getInstance().findFileByPath(myFilePath);
+    VirtualFile dartFile = LocalFileSystem.getInstance().findFileByPath(myFilePath);
+    // For WSL paths, try converting to UNC path if not found directly
+    if (dartFile == null && DartWslUtil.isWslAvailable()) {
+      String linuxPath = DartWslUtil.toLinuxPath(myFilePath);
+      if (linuxPath != null) {
+        // Already a UNC WSL path, should work
+      }
+      else {
+        // Try converting a Linux-style path to UNC
+        String uncPath = DartWslUtil.toWindowsUncPath(myFilePath);
+        if (uncPath != null) {
+          dartFile = LocalFileSystem.getInstance().findFileByPath(uncPath);
+        }
+      }
+    }
+
     if (dartFile == null) {
       throw new RuntimeConfigurationError(DartBundle.message("dart.file.not.found", FileUtil.toSystemDependentName(myFilePath)));
     }

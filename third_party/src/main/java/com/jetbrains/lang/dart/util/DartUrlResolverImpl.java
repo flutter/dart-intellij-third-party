@@ -21,6 +21,7 @@ import com.jetbrains.lang.dart.ide.index.DartLibraryIndex;
 import com.jetbrains.lang.dart.sdk.DartPackagesLibraryProperties;
 import com.jetbrains.lang.dart.sdk.DartPackagesLibraryType;
 import com.jetbrains.lang.dart.sdk.DartSdk;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -126,6 +127,10 @@ public final class DartUrlResolverImpl extends DartUrlResolver {
 
     if (url.startsWith(FILE_PREFIX)) {
       final String path = StringUtil.trimLeading(url.substring(FILE_PREFIX.length()), '/');
+      // When running Dart in WSL, file URIs contain Linux paths even on Windows host
+      if (SystemInfo.isWindows && myDartSdk != null && DartWslUtil.isWslSdkPath(myDartSdk.getHomePath())) {
+        return LocalFileSystem.getInstance().findFileByPath("/" + path);
+      }
       return LocalFileSystem.getInstance().findFileByPath(SystemInfo.isWindows ? path : ("/" + path));
     }
 

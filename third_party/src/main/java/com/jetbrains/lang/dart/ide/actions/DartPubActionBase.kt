@@ -55,6 +55,7 @@ import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
+import com.jetbrains.lang.dart.sdk.DartWslUtil
 import com.jetbrains.lang.dart.util.ProcessAdapter
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import kotlinx.coroutines.CoroutineScope
@@ -107,20 +108,23 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
     if (sdk == null) return
 
-    val exeFile = File(DartSdkUtil.getDartExePath(sdk))
+    // For WSL SDKs, we skip the local file existence check since the binary runs inside WSL
+    if (!DartWslUtil.isWslSdkPath(sdk.homePath)) {
+      val exeFile = File(DartSdkUtil.getDartExePath(sdk))
 
-    if (!exeFile.isFile) {
-      if (allowModalDialogs) {
-        val answer = Messages.showDialog(module.project,
-                                         DartBundle.message("dart.sdk.bad.dartpub.path", exeFile.path),
-                                         getTitle(pubspecYamlFile),
-                                         arrayOf(DartBundle.message("setup.dart.sdk"), CommonBundle.getCancelButtonText()),
-                                         Messages.OK,
-                                         Messages.getErrorIcon())
-        if (answer == Messages.OK) DartConfigurable.openDartSettings(module.project)
+      if (!exeFile.isFile) {
+        if (allowModalDialogs) {
+          val answer = Messages.showDialog(module.project,
+                                           DartBundle.message("dart.sdk.bad.dartpub.path", exeFile.path),
+                                           getTitle(pubspecYamlFile),
+                                           arrayOf(DartBundle.message("setup.dart.sdk"), CommonBundle.getCancelButtonText()),
+                                           Messages.OK,
+                                           Messages.getErrorIcon())
+          if (answer == Messages.OK) DartConfigurable.openDartSettings(module.project)
+        }
+
+        return
       }
-
-      return
     }
 
     val pubParameters = calculatePubParameters(module.project, pubspecYamlFile)
@@ -192,8 +196,14 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
 
     @JvmStatic
     fun setupPubExePath(commandLine: GeneralCommandLine, dartSdk: DartSdk) {
-      commandLine.withExePath(FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(dartSdk)))
-      commandLine.addParameter("pub")
+      if (DartWslUtil.isWslSdkPath(dartSdk.homePath)) {
+        val linuxExePath = DartWslUtil.getLinuxDartExePath(dartSdk.homePath)
+        DartWslUtil.configureWslExecution(commandLine, linuxExePath, "pub")
+      }
+      else {
+        commandLine.withExePath(FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(dartSdk)))
+        commandLine.addParameter("pub")
+      }
     }
 
     @JvmStatic

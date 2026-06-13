@@ -2,6 +2,7 @@ package com.jetbrains.lang.dart.util;
 
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.OSAgnosticPathUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import org.jetbrains.annotations.NotNull;
 
 public class PathUtil {
@@ -9,6 +10,10 @@ public class PathUtil {
     }
 
     public static boolean isAbsolutePlatformIndependent(@NotNull String path) {
+        // On Windows with WSL, Linux-style absolute paths (starting with /) should also be recognized
+        if (SystemInfo.isWindows && DartWslUtil.isWslAvailable()) {
+            return PathUtil.isWindowsAbsolutePath(path) || PathUtil.isUnixAbsolutePath(path);
+        }
         return (SystemInfo.isWindows && PathUtil.isWindowsAbsolutePath(path))
                 || (!SystemInfo.isWindows && PathUtil.isUnixAbsolutePath(path));
     }

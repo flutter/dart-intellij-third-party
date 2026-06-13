@@ -36,6 +36,7 @@ import com.jetbrains.lang.dart.ide.runner.server.DartCommandLineRunningState;
 import com.jetbrains.lang.dart.ide.runner.util.DartTestLocationProvider;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
+import com.jetbrains.lang.dart.sdk.DartWslUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -156,6 +157,11 @@ public class DartTestRunningState extends DartCommandLineRunningState {
 
   @Override
   protected void setupExePath(@NotNull GeneralCommandLine commandLine, @NotNull DartSdk sdk) {
+    if (DartWslUtil.isWslSdkPath(sdk.getHomePath())) {
+      final String linuxExePath = DartWslUtil.getLinuxDartExePath(sdk.getHomePath());
+      DartWslUtil.configureWslExecution(commandLine, linuxExePath);
+      return;
+    }
     commandLine.setExePath(FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk)));
   }
 
