@@ -43,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
+import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
 
 @Service(Service.Level.PROJECT)
@@ -50,6 +51,9 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
 
   private lateinit var dtdProcessHandler: KillableProcessHandler
   private var serviceRunning = false
+
+  @Volatile
+  var webSocketListener: DartToolingDaemonWebSocketListener? = null
 
   private lateinit var webSocket: WebSocket
   var webSocketReady: Boolean = false
@@ -122,6 +126,35 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     }
   }
 
+  fun stopService() {
+    val pendingShutdownTasks = mutableListOf<Future<*>>()
+    if (::dtdProcessHandler.isInitialized && !dtdProcessHandler.isProcessTerminated) {
+      pendingShutdownTasks += ApplicationManager.getApplication().executeOnPooledThread {
+        if (!dtdProcessHandler.isProcessTerminated) {
+          dtdProcessHandler.killProcess()
+        }
+      }
+    }
+    if (::webSocket.isInitialized) {
+      pendingShutdownTasks += ApplicationManager.getApplication().executeOnPooledThread {
+        try {
+          webSocket.close()
+        } catch (e: Exception) {
+          logger.warn("Failed to close DTD web socket", e)
+        }
+      }
+    }
+    pendingShutdownTasks.forEach { it.get() }
+    webSocketListener = null
+    serviceRunning = false
+    webSocketReady = false
+    uri = null
+    secret = null
+    lastSentRootUris = emptyList()
+    consumerMap.clear()
+    servicesMap.clear()
+  }
+
   @Suppress("unused") // for the Flutter plugin
   fun registerServiceMethod(service: String, method: String, capabilities: JsonObject, consumer: DartToolingDaemonRequestHandler) {
     val params = JsonObject()
@@ -164,6 +197,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     consumerMap[id] = consumer
 
     val requestString = request.toString()
+    webSocketListener?.onWebSocketRequest(id, method, requestString)
     logger.debug("--> $requestString")
     webSocket.send(requestString)
   }
@@ -240,22 +274,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   }
 
   override fun dispose() {
-   if (::webSocket.isInitialized) {
-      ApplicationManager.getApplication().executeOnPooledThread {
-        try {
-          webSocket.close()
-        } catch (e: Exception) {
-          logger.warn("Failed to close DTD web socket", e)
-        }
-      }
-    }
-    if (::dtdProcessHandler.isInitialized && !dtdProcessHandler.isProcessTerminated) {
-      ApplicationManager.getApplication().executeOnPooledThread {
-        if (!dtdProcessHandler.isProcessTerminated) {
-          dtdProcessHandler.killProcess()
-        }
-      }
-    }
+    stopService()
   }
 
   private fun isDartSdkVersionSufficient(sdk: DartSdk): Boolean =
@@ -358,6 +377,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     override fun onMessage(message: WebSocketMessage) {
       val text = message.text
       logger.debug("<-- $text")
+      webSocketListener?.onWebSocketMessage(text)
 
       val json: JsonObject = try {
         JsonParser.parseString(text) as JsonObject
@@ -407,4 +427,11 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     private const val MIN_SDK_VERSION: String = "3.4"
     private val logger = PluginLogger.createLogger(DartToolingDaemonService::class.java)
   }
+}
+
+// This is a  test only listener.
+// In case it's needed to be used in production, use publish-subscribe pattern just like the eventDispatcher
+interface DartToolingDaemonWebSocketListener {
+  fun onWebSocketMessage(text: String) {}
+  fun onWebSocketRequest(id: Int, method: String, text: String) {}
 }
