@@ -30,27 +30,53 @@ fi
 PLUGIN_ID=6351
 CHANNEL="goland-nightly"
 
-echo "Fetching updates for Dart plugin ($PLUGIN_ID) in channel '$CHANNEL'..."
-UPDATES_JSON=$(curl -s "https://plugins.jetbrains.com/api/plugins/$PLUGIN_ID/updates?channel=$CHANNEL")
-
 # Verify jq is available
 if ! command -v jq &> /dev/null; then
   echo "Error: jq is required but not installed."
   exit 1
 fi
 
-UPDATE_COUNT=$(echo "$UPDATES_JSON" | jq '. | length')
-if [ "$UPDATE_COUNT" -eq 0 ]; then
+echo "Scanning all pages to collect updates in channel '$CHANNEL'..."
+
+PAGE=1
+ALL_UPDATES=""
+TOTAL_COUNT=0
+
+while true; do
+  UPDATES_JSON=$(curl -s "https://plugins.jetbrains.com/api/plugins/$PLUGIN_ID/updates?channel=$CHANNEL&page=$PAGE")
+  UPDATE_COUNT=$(echo "$UPDATES_JSON" | jq '. | length')
+  
+  if [ "$UPDATE_COUNT" -eq 0 ]; then
+    break
+  fi
+  
+  TOTAL_COUNT=$((TOTAL_COUNT + UPDATE_COUNT))
+  echo "Page $PAGE: found $UPDATE_COUNT updates (Total collected: $TOTAL_COUNT)."
+  
+  # Append to our list of JSON objects
+  PAGE_UPDATES=$(echo "$UPDATES_JSON" | jq -c '.[] | {id: .id, version: .version, date: (.cdate | tonumber | (./1000) | strftime("%Y-%m-%d"))}')
+  if [ -z "$ALL_UPDATES" ]; then
+    ALL_UPDATES="$PAGE_UPDATES"
+  else
+    ALL_UPDATES="${ALL_UPDATES}
+${PAGE_UPDATES}"
+  fi
+  
+  PAGE=$((PAGE + 1))
+done
+
+if [ "$TOTAL_COUNT" -eq 0 ]; then
   echo "No updates found in '$CHANNEL' channel."
   exit 0
 fi
 
-echo "Found $UPDATE_COUNT updates in channel '$CHANNEL'."
-
-# Get list of objects with id, version, cdate
-UPDATES=$(echo "$UPDATES_JSON" | jq -c '.[] | {id: .id, version: .version, date: (.cdate | tonumber | (./1000) | strftime("%Y-%m-%d"))}')
+echo "Finished scanning. Preparing to process $TOTAL_COUNT updates."
 
 while read -r UPDATE; do
+  if [ -z "$UPDATE" ]; then
+    continue
+  fi
+
   ID=$(echo "$UPDATE" | jq -r '.id')
   VERSION=$(echo "$UPDATE" | jq -r '.version')
   DATE=$(echo "$UPDATE" | jq -r '.date')
@@ -69,6 +95,6 @@ while read -r UPDATE; do
       echo "Failed to delete update ID $ID. HTTP status code: $STATUS_CODE"
     fi
   fi
-done <<< "$UPDATES"
+done <<< "$ALL_UPDATES"
 
-echo "Done."
+echo "Done. Processed $TOTAL_COUNT updates."
