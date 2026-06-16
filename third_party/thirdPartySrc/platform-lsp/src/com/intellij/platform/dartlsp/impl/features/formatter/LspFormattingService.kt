@@ -8,7 +8,7 @@ import com.intellij.formatting.service.FormattingService.Feature
 import com.intellij.injected.editor.VirtualFileWindow
 import com.intellij.lang.ImportOptimizer
 import com.intellij.lang.LanguageFormatting
-import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.impl.DocumentImpl
 import com.intellij.openapi.vfs.VirtualFile
@@ -30,15 +30,13 @@ import org.eclipse.lsp4j.TextEdit
 internal class LspFormattingService : AsyncDocumentFormattingService() {
   override fun getName() = LspBundle.message("lsp.based.formatter")
   override fun getNotificationGroupId() = LspServerNotificationsHandlerImpl.SHOW_MESSAGE_NOTIFICATION_GROUP
-  override fun getFeatures() = setOf(Feature.FORMAT_FRAGMENTS, Feature.OPTIMIZE_IMPORTS)
+  override fun getFeatures() = setOf(Feature.FORMAT_FRAGMENTS/*, Feature.OPTIMIZE_IMPORTS*/)
 
   // No need to save the document, LSP servers work fine with unsaved content
   override fun prepareForFormatting(document: Document, formattingContext: FormattingContext): Unit = Unit
 
-  override fun canFormat(psiFile: PsiFile): Boolean = canFormat(psiFile, *emptyArray<Feature>())
-
-  override fun canFormat(psiFile: PsiFile, vararg features: Feature): Boolean {
-    val goal = LspFormattingGoal.getFormattingGoal(features) ?: return false
+  override fun canFormat(psiFile: PsiFile): Boolean {
+    val goal = LspFormattingGoal.FullFileFormatting
     val lspServer: LspServer? = when (goal) {
       LspFormattingGoal.FullFileFormatting -> findServerToFormatThisFile(psiFile, true)
       LspFormattingGoal.RangeFormatting -> findServerToFormatThisFile(psiFile, false)
@@ -164,10 +162,10 @@ internal class LspFormattingService : AsyncDocumentFormattingService() {
   ) : LspFormattingTask(lspServer, file, formattingRequest) {
     override fun fetchTextEdits(): List<TextEdit> {
       val formattingOptions = createFormattingOptions()
-      val document = runReadActionBlocking { formattingRequest.context.containingFile.fileDocument }
+      val document = runReadAction { formattingRequest.context.containingFile.fileDocument }
 
       return formattingRequest.formattingRanges.flatMap { textRange ->
-        val lspDocuments = runReadActionBlocking {
+        val lspDocuments = runReadAction {
           val range = getLsp4jRange(document, textRange.startOffset, textRange.length)
           lspServer.documentMapping.getDocumentRangesSync(file, document, range)
         }

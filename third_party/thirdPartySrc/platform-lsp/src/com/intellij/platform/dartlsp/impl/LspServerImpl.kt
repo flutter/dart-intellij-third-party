@@ -249,7 +249,7 @@ class LspServerImpl internal constructor(
         val exToLog = (e as? LspInitializationException)?.cause ?: e
         logWarn("Failed to start LSP server", exToLog)
 
-        val lspServerManager = ReadAction.computeBlocking<LspServerManagerImpl?, Throwable> {
+        val lspServerManager = ReadAction.compute<LspServerManagerImpl?, Throwable> {
           if (!project.isDisposed) LspServerManagerImpl.getInstanceImpl(project) else null
         }
         val text = (if (e is LspInitializationException) "$e\nCaused by:\n" else "") + exToLog.stackTraceToString()

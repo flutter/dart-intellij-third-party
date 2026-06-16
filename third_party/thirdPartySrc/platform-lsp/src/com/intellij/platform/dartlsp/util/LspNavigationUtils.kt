@@ -1,7 +1,7 @@
 // Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.platform.dartlsp.util
 
-import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
@@ -68,7 +68,7 @@ fun showLspNavigationPopup(server: LspServer, locations: List<Location>, @Nls ti
         }
         icon = file.fileType.icon
 
-        val document = runReadActionBlocking {
+        val document = runReadAction {
           FileDocumentManager.getInstance().getDocument(file)
         }
         val range = value.range

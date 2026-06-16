@@ -57,7 +57,7 @@
     <platform.backend.documentation.targetProvider
                                                    implementation="com.intellij.platform.dartlsp.impl.features.documentation.LspDocumentationTargetProvider"/>
     <formattingService implementation="com.intellij.platform.dartlsp.impl.features.formatter.LspFormattingService"/>
-    <lang.importOptimizer language="" implementationClass="com.intellij.platform.dartlsp.impl.features.formatter.LspImportOptimizer" order="last"/>
+    <lang.importOptimizer language="Dart" implementationClass="com.intellij.platform.dartlsp.impl.features.formatter.LspImportOptimizer" order="last"/>
     <lang.foldingBuilder language="" implementationClass="com.intellij.platform.dartlsp.impl.features.folding.LspFoldingBuilder"/>
     <gotoSymbolContributor implementation="com.intellij.platform.dartlsp.impl.features.workspaceSymbol.LspGoToSymbolContributor"/>
     <gotoClassContributor implementation="com.intellij.platform.dartlsp.impl.features.workspaceSymbol.LspGoToClassContributor"/>

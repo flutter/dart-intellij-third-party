@@ -14,7 +14,7 @@ internal open class LspServerProcessListenerBase(private val lspServer: LspServe
     val text = "Exit code: ${event.exitCode}\nCommand line: ${event.processHandler}"
     lspServer.logInfo("LSP server process terminated. $text")
 
-    val lspServerManager = ReadAction.computeBlocking<LspServerManagerImpl?, Throwable> {
+    val lspServerManager = ReadAction.compute<LspServerManagerImpl?, Throwable> {
       if (!lspServer.project.isDisposed) LspServerManagerImpl.getInstanceImpl(lspServer.project) else null
     }
     lspServerManager?.handleMaybeUnexpectedServerStop(lspServer, text)

@@ -79,7 +79,7 @@ internal abstract class Lsp4jServerConnector protected constructor(private val l
         }
         finally {
           logger.debug("$descriptor: LSP server listener thread finished")
-          val lspServerManager = ReadAction.computeBlocking<LspServerManagerImpl?, Throwable> {
+          val lspServerManager = ReadAction.compute<LspServerManagerImpl?, Throwable> {
             if (!lspServer.project.isDisposed) LspServerManagerImpl.getInstanceImpl(lspServer.project) else null
           }
           val text = "${descriptor.lspCommunicationChannel.javaClass.simpleName} connection closed"

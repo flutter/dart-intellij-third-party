@@ -117,7 +117,7 @@ private fun doesOtherFormattingServiceWantToWork(psiFile: PsiFile): Boolean =
     it !is LspFormattingService &&
     it !is CoreFormattingService &&
     it.getFeatures().contains(FormattingService.Feature.OPTIMIZE_IMPORTS) &&
-    it.canFormat(psiFile, FormattingService.Feature.OPTIMIZE_IMPORTS) &&
+    //it.canFormat(psiFile, FormattingService.Feature.OPTIMIZE_IMPORTS) &&
     it.getImportOptimizers(psiFile).any { optimizer -> optimizer !is LspImportOptimizer && optimizer.supports(psiFile) }
   }
 

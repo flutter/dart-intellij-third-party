@@ -4,7 +4,7 @@ import com.intellij.find.usages.api.PsiUsage
 import com.intellij.find.usages.api.Usage
 import com.intellij.find.usages.api.UsageSearchParameters
 import com.intellij.find.usages.api.UsageSearcher
-import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.platform.dartlsp.impl.documentMapping
 import com.intellij.platform.dartlsp.impl.mapLocation
@@ -33,9 +33,9 @@ internal class LspUsageSearcher : UsageSearcher {
 private class LspReferencesQuery(private val searchTarget: LspSearchTarget) : AbstractQuery<Usage>() {
   override fun processResults(consumer: Processor<in Usage>): Boolean {
     for (lspServer in searchTarget.lspServers) {
-      val docPosition = runReadActionBlocking {
-        val document = FileDocumentManager.getInstance().getDocument(searchTarget.file) ?: return@runReadActionBlocking null
-        val offset = getOffsetInDocument(document, searchTarget.position) ?: return@runReadActionBlocking null
+      val docPosition = runReadAction {
+        val document = FileDocumentManager.getInstance().getDocument(searchTarget.file) ?: return@runReadAction null
+        val offset = getOffsetInDocument(document, searchTarget.position) ?: return@runReadAction null
         lspServer.documentMapping.getDocumentPosition(searchTarget.file, document, offset)
       } ?: continue
       val documentIdentifier = docPosition.document.id
@@ -49,7 +49,7 @@ private class LspReferencesQuery(private val searchTarget: LspSearchTarget) : Ab
 
       if (resultLocations.isNullOrEmpty()) continue
 
-      runReadActionBlocking {
+      runReadAction {
         val psiManager = PsiManager.getInstance(lspServer.project)
 
         for (resultLocation in resultLocations) {
