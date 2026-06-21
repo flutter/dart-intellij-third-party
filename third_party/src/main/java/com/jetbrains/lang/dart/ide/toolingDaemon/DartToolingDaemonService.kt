@@ -35,10 +35,10 @@ import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
-import de.roderick.weberknecht.WebSocket
-import de.roderick.weberknecht.WebSocketEventHandler
-import de.roderick.weberknecht.WebSocketException
-import de.roderick.weberknecht.WebSocketMessage
+import com.jetbrains.lang.dart.websocket.WebSocket
+import com.jetbrains.lang.dart.websocket.WebSocketEventHandler
+import com.jetbrains.lang.dart.websocket.WebSocketException
+import com.jetbrains.lang.dart.websocket.WebSocketMessage
 import kotlinx.coroutines.CoroutineScope
 import java.net.URI
 import java.nio.charset.StandardCharsets
