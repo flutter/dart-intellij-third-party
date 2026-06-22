@@ -25,7 +25,7 @@ jobs:
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build Plugin Action
         run: ./gradlew buildPlugin
@@ -49,7 +49,7 @@ jobs:
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Unit Test Action
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
@@ -102,7 +102,7 @@ jobs:
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Verify Plugin Actions
         run: |
