@@ -11,6 +11,8 @@ import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.PathUtil;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
 import com.jetbrains.lang.dart.ide.runner.base.DartRunConfigurationBase;
 import com.jetbrains.lang.dart.ide.runner.test.ui.DartTestConfigurationEditorForm;
 import org.jetbrains.annotations.NotNull;
@@ -36,6 +38,7 @@ public class DartTestRunConfiguration extends DartRunConfigurationBase {
 
   @Override
   public @Nullable RunProfileState getState(@NotNull Executor executor, @NotNull ExecutionEnvironment env) throws ExecutionException {
+    Analytics.recordRunOrDebugSession(AnalyticsConstants.MECHANISM_TESTS, executor, getProject());
     return new DartTestRunningState(env);
   }
 

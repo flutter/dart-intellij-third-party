@@ -18,6 +18,8 @@ import com.intellij.util.PathUtil;
 import com.intellij.util.xmlb.SkipDefaultValuesSerializationFilters;
 import com.intellij.util.xmlb.XmlSerializer;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
 import com.jetbrains.lang.dart.ide.runner.server.ui.DartWebdevConfigurationEditorForm;
 import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
@@ -54,6 +56,7 @@ public class DartWebdevConfiguration extends LocatableConfigurationBase<DartWebd
   @Override
   public @Nullable RunProfileState getState(final @NotNull Executor executor,
                                             final @NotNull ExecutionEnvironment env) throws ExecutionException {
+    Analytics.recordRunOrDebugSession(AnalyticsConstants.MECHANISM_WEB, executor, getProject());
     return new DartWebdevRunningState(env);
   }
 

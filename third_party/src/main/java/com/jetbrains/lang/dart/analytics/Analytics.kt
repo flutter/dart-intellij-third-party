@@ -9,7 +9,9 @@ package com.jetbrains.lang.dart.analytics
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.intellij.CommonBundle
+import com.intellij.execution.Executor
 import com.intellij.execution.configurations.GeneralCommandLine
+import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.ide.plugins.PluginManagerCore
@@ -284,6 +286,17 @@ object Analytics {
 
   @JvmStatic
   fun report(data: AnalyticsData) = data.reportTo(reporter)
+
+  @JvmStatic
+  fun recordRunOrDebugSession(mechanism: String, executor: Executor, project: Project?) {
+    val type = if (executor.id == DefaultDebugExecutor.EXECUTOR_ID) {
+      AnalyticsConstants.DEBUG_SESSION_TYPE
+    } else {
+      AnalyticsConstants.RUN_SESSION_TYPE
+    }
+    report(SessionData(type, mechanism, project))
+  }
+
   @JvmStatic
   fun updateEnvironment(commandLine: GeneralCommandLine) {
     updateEnvironment(commandLine.environment)
@@ -325,6 +338,9 @@ class LegacyHoverData(id: String?, project: Project?) :
 
 class SettingsData(project: Project?) :
   AnalyticsData(AnalyticsConstants.SETTINGS_TYPE, "settings", project)
+
+class SessionData(type: String, mechanism: String, project: Project?) :
+  AnalyticsData(type, mechanism, project)
 
 abstract class AnalyticsData(type: String, val id: String?, val project: Project? = null) {
   val data = mutableMapOf<String, Any>()
@@ -415,6 +431,13 @@ object AnalyticsConstants {
   internal const val FIX_TYPE = "fix"
   internal const val LEGACY_HOVER_TYPE = "legacy_hover"
   internal const val SETTINGS_TYPE = "settings"
+  internal const val DEBUG_SESSION_TYPE = "debug_session"
+  internal const val RUN_SESSION_TYPE = "run_session"
+
+  const val MECHANISM_APP = "app"
+  const val MECHANISM_TESTS = "tests"
+  const val MECHANISM_REMOTE = "remote"
+  const val MECHANISM_WEB = "web"
 }
 
 sealed class DataValue<T>(val name: String) {
