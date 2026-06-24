@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         dart-version: ['stable']
-        os: [macos-latest]
+        os: [ubuntu-large]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
 
@@ -38,7 +38,7 @@ jobs:
           sdk: ${{ matrix.dart-version }}
 
       - name: Run Integration Tests
-        run: ./gradlew :test --tests "com.jetbrains.dart.*"
+        run: ./gradlew :test --tests "com.jetbrains.dart.*" -PverboseTests
         working-directory: third_party
 
       - name: Upload test results

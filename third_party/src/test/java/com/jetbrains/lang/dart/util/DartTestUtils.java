@@ -17,6 +17,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.util.PathUtil;
 import com.intellij.util.SmartList;
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
 import junit.framework.TestCase;
@@ -29,9 +30,7 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.jetbrains.lang.dart.lsp.DartLspConstants;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -122,6 +121,11 @@ public final class DartTestUtils {
       Disposer.register(disposable, DartSdkLibUtil.enableDartSdkAndReturnUndoingDisposable(module));
     });
     IndexingTestUtil.waitUntilIndexesAreReady(module.getProject());
+    if (realSdk) {
+      ApplicationManager.getApplication().runReadAction(() -> {
+        DartAnalysisServerService.getInstance(module.getProject()).serverReadyForRequest();
+      });
+    }
   }
 
   public static List<CaretPositionInfo> extractPositionMarkers(@NotNull final Project project, @NotNull final Document document) {

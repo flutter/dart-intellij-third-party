@@ -2375,7 +2375,13 @@ public final class DartAnalysisServerService implements Disposable {
     assert ApplicationManager.getApplication().isUnitTestMode();
 
     long startTime = System.currentTimeMillis();
-    while (isServerProcessActive() && !myServerData.hasAllData_TESTS_ONLY(file)) {
+    // Wait for up to 300ms for the server to start background analysis/indexing if it hasn't yet.
+    while (isServerProcessActive() && !myAnalysisInProgress && !myServerData.hasAllData_TESTS_ONLY(file)) {
+      if (System.currentTimeMillis() > startTime + 300) break;
+      TimeoutUtil.sleep(20);
+    }
+
+    while (isServerProcessActive() && (!myServerData.hasAllData_TESTS_ONLY(file) || myAnalysisInProgress)) {
       if (System.currentTimeMillis() > startTime + ANALYSIS_IN_TESTS_TIMEOUT) return;
       TimeoutUtil.sleep(100);
     }

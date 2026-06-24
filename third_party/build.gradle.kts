@@ -1,10 +1,28 @@
+import java.io.Serializable
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import org.gradle.api.logging.Logging
+import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.TestDescriptor
+import org.gradle.api.tasks.testing.TestListener
+import org.gradle.api.tasks.testing.TestResult
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+
+class VerboseTestListener : TestListener, Serializable {
+    override fun beforeSuite(suite: TestDescriptor) {}
+    override fun afterSuite(suite: TestDescriptor, result: TestResult) {}
+    override fun beforeTest(testDescriptor: TestDescriptor) {}
+    override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {
+        val elapsed = result.endTime - result.startTime
+        Logging.getLogger(Test::class.java).lifecycle("took ${elapsed}ms")
+    }
+}
 
 // Specify UTF-8 for all compilations so we avoid Windows-1252.
 allprojects {
@@ -13,6 +31,9 @@ allprojects {
     }
     tasks.withType<Test> {
         systemProperty("file.encoding", "UTF-8")
+        if (providers.gradleProperty("verboseTests").isPresent) {
+            addTestListener(VerboseTestListener())
+        }
     }
 }
 
@@ -210,6 +231,21 @@ tasks.named("runTarget") {
 tasks {
 
     test {
+        if (providers.gradleProperty("verboseTests").isPresent) {
+            testLogging {
+                events(
+                    TestLogEvent.STARTED,
+                    TestLogEvent.PASSED,
+                    TestLogEvent.FAILED,
+                    TestLogEvent.SKIPPED,
+                )
+                exceptionFormat = TestExceptionFormat.FULL
+                showExceptions = true
+                showCauses = true
+                showStackTraces = true
+            }
+        }
+
         var showDartHomeWarning = false
         val dartSdkPath = System.getenv("DART_HOME")
         if (dartSdkPath != null) {
