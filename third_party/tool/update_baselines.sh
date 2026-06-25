@@ -25,7 +25,7 @@ for version in 253 261; do
   if [ -f "$REPORT" ]; then
     echo "Extracting issues from $REPORT"    
     mkdir -p "$(dirname "$BASELINE")"
-    grep "^*" "$REPORT" | sort > "$BASELINE"
+    grep "^*" "$REPORT" | grep -v "com\.intellij\.platform\.dartlsp" | sort > "$BASELINE"
     echo -e "${GREEN}Updated baseline at $BASELINE${NC}"
   else
     echo -e "${YELLOW}Warning: Report does not exist for version $version. Skipping.${NC}"

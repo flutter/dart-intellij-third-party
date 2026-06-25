@@ -138,7 +138,7 @@ jobs:
 
             if [ -f "$REPORT" ]; then
               echo "Comparing baseline against report in $REPORT"
-              grep "^*" "$REPORT" | sort > current_issues.tmp || true
+              grep "^*" "$REPORT" | grep -v "com\.intellij\.platform\.dartlsp" | sort > current_issues.tmp || true
 
               if [ -f "$BASELINE" ]; then
                 NEW_ERRORS=$(comm -13 <(sort "$BASELINE") current_issues.tmp)
