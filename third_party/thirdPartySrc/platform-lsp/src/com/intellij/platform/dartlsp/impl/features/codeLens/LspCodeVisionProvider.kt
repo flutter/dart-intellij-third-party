@@ -65,4 +65,6 @@ internal class LspCodeVisionProvider : CodeVisionProvider<Unit>, DumbAware {
   override val id: String = LSP_CODE_VISION_PROVIDER_ID
   override val name: String = LspBundle.message("codeLens.LspCodeVisionProvider.name")
   override val singleEntryPerLine: Boolean = false
+
+  override fun handleExtraAction(editor: Editor, textRange: TextRange, entry: CodeVisionEntry, actionId: String) {}
 }
