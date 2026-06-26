@@ -191,6 +191,41 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue("Response contents should contain Hover Content", result.contents.toString().contains("Hover Content"))
     }
 
+    fun testDiagnosticServerRequest() {
+        val future = bridgeServer.diagnosticServer()
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val outerParams = jsonObject.getAsJsonObject("params")
+        val lspMessage = outerParams.getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("dart/diagnosticServer", lspMessage.get("method").asString)
+        assertFalse("lspMessage should not have params when null is passed", lspMessage.has("params"))
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "port": 9123
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(9123, result.port)
+    }
+
     fun testForwardNotification() {
         // Simulate a diagnostics notification from DAS
         val notificationJson = """

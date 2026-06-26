@@ -15,12 +15,16 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.lsp.DartLspService;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
+import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
+  private static final String MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION = "3.13.0-106.0.dev";
 
   public AnalysisServerDiagnosticsAction() {
     super(DartBundle.messagePointer("analysis.server.show.diagnostics.text"));
@@ -47,7 +51,14 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
   }
 
   void run(final @NotNull Project project, @Nullable AnActionEvent event) {
-    fallbackToLegacy(project);
+    String sdkVersion = DartAnalysisServerService.getInstance(project).getSdkVersion();
+    if (!sdkVersion.isEmpty() &&
+        DartConfigurable.isExperimentalLspFeaturesEnabled(project) &&
+        DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION) >= 0) {
+      useLspOverLegacy(project);
+    } else {
+      fallbackToLegacy(project);
+    }
 
     if (event != null) {
       Analytics.report(AnalyticsData.forAction(this, event));
@@ -57,6 +68,23 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
         Analytics.report(AnalyticsData.forAction(actionManager.getId(this), project));
       }
     }
+  }
+
+  private void useLspOverLegacy(@NotNull Project project) {
+    DartLspService.getDiagnosticServerPort(project)
+      .thenAccept(port -> {
+        if (project.isDisposed()) return;
+        if (port != null) {
+          BrowserUtil.browse("http://localhost:" + port + "/status");
+        } else {
+          fallbackToLegacy(project);
+        }
+      })
+      .exceptionally(ex -> {
+        if (project.isDisposed()) return null;
+        fallbackToLegacy(project);
+        return null;
+      });
   }
 
   private void fallbackToLegacy(@NotNull Project project) {
