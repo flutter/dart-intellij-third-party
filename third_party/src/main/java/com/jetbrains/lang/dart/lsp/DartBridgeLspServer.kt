@@ -31,7 +31,6 @@ import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
-import org.eclipse.lsp4j.services.LanguageServer
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
 import java.util.concurrent.CompletableFuture
@@ -63,7 +62,7 @@ import java.util.concurrent.ConcurrentHashMap
  * To ensure the server is fully up to date before processing a request, we also explicitly call
  * `das.updateFilesContent()` before forwarding any client request.
  */
-class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDocumentService, WorkspaceService,
+class DartBridgeLspServer(private val project: Project) : DartLanguageServer, TextDocumentService, WorkspaceService,
     LanguageClientAware {
     companion object {
         private val logger = PluginLogger.createLogger(DartBridgeLspServer::class.java)
@@ -231,6 +230,10 @@ class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDo
         return forwardRequest("textDocument/hover", params, Hover::class.java)
     }
 
+    override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
+        return forwardRequest("dart/diagnosticServer", null, DiagnosticServerResult::class.java)
+    }
+
     // Implement other TextDocumentService methods as needed, returning unsupported or forwarding.
     
     override fun didOpen(params: DidOpenTextDocumentParams) {
@@ -271,7 +274,7 @@ class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDo
      * Note: We use the same [legacyId] for both the outer legacy request and the inner LSP request
      * to simplify tracking and matching.
      */
-    private fun <T> forwardRequest(method: String, params: Any, responseClass: Class<T>): CompletableFuture<T> {
+    private fun <T> forwardRequest(method: String, params: Any?, responseClass: Class<T>): CompletableFuture<T> {
         val future = CompletableFuture<T>()
         
         val ready = runReadAction { das.serverReadyForRequest() }
@@ -295,7 +298,9 @@ class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDo
             addProperty("jsonrpc", JSONRPC_VERSION)
             addProperty("id", legacyId)
             addProperty("method", method)
-            add("params", GSON.toJsonTree(params))
+            if (params != null && params != Unit) {
+                add("params", GSON.toJsonTree(params))
+            }
         }
 
         val legacyRequest = JsonObject().apply {

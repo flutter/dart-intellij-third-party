@@ -7,6 +7,7 @@ package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
@@ -49,6 +50,8 @@ import com.jetbrains.lang.dart.sdk.DartConfigurable
  * 3. The LSP feature customizations (e.g. enabling/disabling hover support dynamically based on settings).
  */
 class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(project, "Dart (Bridge)") {
+
+    override val lsp4jServerClass: Class<out Lsp4jServer> = DartLanguageServer::class.java
 
     override fun isSupportedFile(file: VirtualFile): Boolean {
         return DartAnalysisServerService.isFileNameRespectedByAnalysisServer(file.name)
