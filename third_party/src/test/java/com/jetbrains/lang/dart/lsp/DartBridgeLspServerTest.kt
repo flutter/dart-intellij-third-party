@@ -5,26 +5,31 @@
  */
 package com.jetbrains.lang.dart.lsp
 
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
-import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
-import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
-import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.Consumer
+import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
 import com.google.dart.server.ResponseListener
 import com.google.dart.server.ShowMessageRequestConsumer
-import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
 import com.google.dart.server.internal.remote.ByteLineReaderStream
+import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
-import org.dartlang.analysis.server.protocol.MessageAction
+import com.google.gson.JsonObject
+import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
-import org.eclipse.lsp4j.*
+import org.dartlang.analysis.server.protocol.MessageAction
+import org.eclipse.lsp4j.HoverParams
+import org.eclipse.lsp4j.MessageActionItem
+import org.eclipse.lsp4j.MessageParams
+import org.eclipse.lsp4j.Position
+import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.ShowMessageRequestParams
+import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.services.LanguageClient
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 
 class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 

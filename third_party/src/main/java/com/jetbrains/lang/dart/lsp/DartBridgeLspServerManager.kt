@@ -9,7 +9,9 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Disposer
+import com.intellij.platform.dartlsp.api.LspServerManager
+import com.intellij.platform.dartlsp.api.ensureServerStarted
+import com.intellij.platform.dartlsp.api.stopServers
 import com.jetbrains.lang.dart.logging.PluginLogger
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import org.eclipse.lsp4j.services.LanguageClient
@@ -17,10 +19,6 @@ import java.io.IOException
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Future
-import com.intellij.platform.dartlsp.api.LspServerManager
-import com.intellij.platform.dartlsp.api.ensureServerStarted
-import com.intellij.platform.dartlsp.api.stopServers
-
 
 /**
  * Project-level service that manages the lifecycle of the LSP bridge server.

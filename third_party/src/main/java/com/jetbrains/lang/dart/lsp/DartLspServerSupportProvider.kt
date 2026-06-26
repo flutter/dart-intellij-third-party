@@ -7,9 +7,9 @@ package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
 import com.intellij.platform.dartlsp.api.LspServerSupportProvider
 import com.intellij.platform.dartlsp.api.LspServerSupportProvider.LspServerStarter
+import com.intellij.platform.lang.lsWidget.LanguageServiceWidgetItem
 
 /**
  * Entry point registered in plugin.xml to declare the JetBrains native LSP server provider for Dart.

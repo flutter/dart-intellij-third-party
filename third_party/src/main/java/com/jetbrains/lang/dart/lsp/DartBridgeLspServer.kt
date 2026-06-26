@@ -5,6 +5,7 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.google.dart.server.ResponseListener
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
@@ -12,17 +13,27 @@ import com.google.gson.JsonParser
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
-import com.google.dart.server.ResponseListener
 import com.jetbrains.lang.dart.logging.PluginLogger
-import org.eclipse.lsp4j.*
+import org.eclipse.lsp4j.DidChangeConfigurationParams
+import org.eclipse.lsp4j.DidChangeTextDocumentParams
+import org.eclipse.lsp4j.DidChangeWatchedFilesParams
+import org.eclipse.lsp4j.DidCloseTextDocumentParams
+import org.eclipse.lsp4j.DidOpenTextDocumentParams
+import org.eclipse.lsp4j.DidSaveTextDocumentParams
+import org.eclipse.lsp4j.Hover
+import org.eclipse.lsp4j.HoverParams
+import org.eclipse.lsp4j.InitializeParams
+import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.ServerCapabilities
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
 import org.eclipse.lsp4j.services.LanguageServer
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
-import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
-import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
@@ -52,7 +63,8 @@ import java.util.concurrent.ConcurrentHashMap
  * To ensure the server is fully up to date before processing a request, we also explicitly call
  * `das.updateFilesContent()` before forwarding any client request.
  */
-class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDocumentService, WorkspaceService, LanguageClientAware {
+class DartBridgeLspServer(private val project: Project) : LanguageServer, TextDocumentService, WorkspaceService,
+    LanguageClientAware {
     companion object {
         private val logger = PluginLogger.createLogger(DartBridgeLspServer::class.java)
         private const val LSP_MESSAGE_KEY = "lspMessage"
