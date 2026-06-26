@@ -246,6 +246,24 @@ lsp.rename.action.text=LSP-Based Rename
             with open(code_vision_path, "w", encoding="utf-8") as f:
                 f.write(code_vision_content)
 
+    # 10. Modify LspServerImpl.kt to remove ProjectFileIndex.isInContent check so external library files (pub-cache, SDK) are supported
+    lsp_server_impl_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/LspServerImpl.kt")
+    if os.path.exists(lsp_server_impl_path):
+        with open(lsp_server_impl_path, "r", encoding="utf-8") as f:
+            lsp_server_impl_content = f.read()
+        target_line = "    if (!ProjectFileIndex.getInstance(project).isInContent(file)) return false\n"
+        import_line = "import com.intellij.openapi.roots.ProjectFileIndex\n"
+        modified = False
+        if target_line in lsp_server_impl_content:
+            lsp_server_impl_content = lsp_server_impl_content.replace(target_line, "")
+            modified = True
+        if import_line in lsp_server_impl_content:
+            lsp_server_impl_content = lsp_server_impl_content.replace(import_line, "")
+            modified = True
+        if modified:
+            with open(lsp_server_impl_path, "w", encoding="utf-8") as f:
+                f.write(lsp_server_impl_content)
+
     print("Patch applied successfully!")
 
 if __name__ == "__main__":

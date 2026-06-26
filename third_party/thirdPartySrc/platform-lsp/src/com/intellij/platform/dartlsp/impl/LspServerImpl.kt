@@ -8,7 +8,6 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.ex.DocumentEx
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.Lsp4jServer
@@ -144,7 +143,6 @@ class LspServerImpl internal constructor(
   internal fun isSupportedFile(file: VirtualFile): Boolean {
     if (!file.isInLocalFileSystem) return false
     if (unsupportedFilePaths.contains(file.path)) return false
-    if (!ProjectFileIndex.getInstance(project).isInContent(file)) return false
 
     return descriptor.isSupportedFile(file)
       .also { if (!it) unsupportedFilePaths.add(file.path) }
