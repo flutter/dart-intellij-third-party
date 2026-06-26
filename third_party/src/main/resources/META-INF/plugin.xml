@@ -263,7 +263,7 @@
     <registryKey key="dart.server.additional.arguments" defaultValue="" description="Dart Analysis Server command line arguments"/>
     <registryKey key="dart.projects.without.pubspec" defaultValue="false" description="For special internal Dart projects only"/>
     
-    <platform.lsp.dart.serverSupportProvider implementation="com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider"/>
+    <platform.dartlsp.serverSupportProvider implementation="com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider"/>
   </extensions>
 
   <extensions defaultExtensionNs="org.jetbrains">
