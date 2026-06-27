@@ -17,6 +17,7 @@ import com.intellij.util.io.BaseOutputReader
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.util.DartTestUtils
 import org.dartlang.vm.service.VmService
+import org.dartlang.vm.service.consumer.SuccessConsumer
 import org.dartlang.vm.service.consumer.VMConsumer
 import org.dartlang.vm.service.consumer.VersionConsumer
 import org.dartlang.vm.service.element.RPCError
@@ -45,8 +46,11 @@ class VmServiceTest : BasePlatformTestCase() {
 
   override fun tearDown() {
     try {
-      vmService?.disconnect()
-      processHandler?.killProcess()
+      try {
+        vmService?.disconnect()
+      } finally {
+        processHandler?.killProcess()
+      }
     } finally {
       super.tearDown()
     }
@@ -72,7 +76,7 @@ class VmServiceTest : BasePlatformTestCase() {
 
     // Subscribe to the Isolate stream and expect a Success response.
     val streamSuccess = CountDownLatch(1)
-    service.streamListen(VmService.ISOLATE_STREAM_ID, object : org.dartlang.vm.service.consumer.SuccessConsumer {
+    service.streamListen(VmService.ISOLATE_STREAM_ID, object : SuccessConsumer {
       override fun received(response: org.dartlang.vm.service.element.Success?) = streamSuccess.countDown()
       override fun onError(error: RPCError?) {}
     })
