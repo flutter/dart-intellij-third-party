@@ -10,9 +10,9 @@ echo "kokoro build start"
 
 cd third_party
 
-VERSION=$(./gradlew -q printVersion -Pdev --no-configuration-cache | tail -n 1)
+VERSION=$(run_gradle_with_retry -q printVersion -Pdev --no-configuration-cache | tail -n 1)
 
-./gradlew buildPlugin -Pdev --info
+run_gradle_with_retry buildPlugin -Pdev --info
 
 echo "kokoro build finished"
 
