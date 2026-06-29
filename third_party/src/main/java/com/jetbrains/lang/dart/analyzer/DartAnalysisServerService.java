@@ -2341,8 +2341,10 @@ public final class DartAnalysisServerService implements Disposable {
           connectToDtd(dtdUri);
         }
 
-        // Start the LSP Bridge Server
-        myProject.getService(DartBridgeLspServerManager.class).startBridgeServer();
+        // Start the LSP Bridge Server unless in unit test mode
+        if (!ApplicationManager.getApplication().isUnitTestMode()) {
+          myProject.getService(DartBridgeLspServerManager.class).startBridgeServer();
+        }
       }
       catch (Exception e) {
         stopServer();
