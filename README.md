@@ -107,3 +107,17 @@ Before the move to this repository, the project had 4 working and active branche
 - `master` - the current master for intellij-community, targeting the next version 2025.3
 
 In its original location the project was built with Bazel; however, in github.com/flutter, the project is built using Gradle (see https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html).
+
+## AI Coding Agent Skills
+
+This repository comes with custom configuration and automation skills for AI coding agents (such as Gemini Code Assist / Antigravity).
+
+These skills are located in the [.agents/skills/](.agents/skills/) directory. They are automatically discovered and loaded by agentic workflows when they analyze the workspace.
+
+### Available Workspace Skills:
+* **[Code Review](.agents/skills/code-review/SKILL.md):** Performs a pedantic, multi-perspective code review (covering logic, correctness, resource safety, design, and styleguide compliance) on your uncommitted changes.
+* **[Patch Copied LSP Sources](.agents/skills/patch-copied-lsp-sources/SKILL.md):** Automates copying and patching of JetBrains LSP sources.
+
+### How to use:
+Tell your AI assistant to run the desired skill (e.g. by typing `/code-review` or asking *"Run the code-review skill on my changes"*). The agent will automatically find, load, and follow the instructions in the corresponding `SKILL.md` file.
+
