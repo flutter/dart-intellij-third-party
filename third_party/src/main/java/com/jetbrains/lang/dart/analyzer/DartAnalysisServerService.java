@@ -270,11 +270,11 @@ public final class DartAnalysisServerService implements Disposable {
     return ApplicationInfo.getInstance().getApiVersion();
   }
 
-  private final @NotNull List<AnalysisServerListener> myAdditionalServerListeners = new SmartList<>();
-  private final @NotNull List<RequestListener> myRequestListeners = new SmartList<>();
-  private final @NotNull List<ResponseListener> myResponseListeners = new SmartList<>();
-  private final @NotNull List<DartQuickAssistIntentionListener> myQuickAssistIntentionListeners = new SmartList<>();
-  private final @NotNull List<DartQuickFixListener> myQuickFixListeners = new SmartList<>();
+  private final @NotNull List<AnalysisServerListener> myAdditionalServerListeners = ContainerUtil.createLockFreeCopyOnWriteList();
+  private final @NotNull List<RequestListener> myRequestListeners = ContainerUtil.createLockFreeCopyOnWriteList();
+  private final @NotNull List<ResponseListener> myResponseListeners = ContainerUtil.createLockFreeCopyOnWriteList();
+  private final @NotNull List<DartQuickAssistIntentionListener> myQuickAssistIntentionListeners = ContainerUtil.createLockFreeCopyOnWriteList();
+  private final @NotNull List<DartQuickFixListener> myQuickFixListeners = ContainerUtil.createLockFreeCopyOnWriteList();
 
   private final AnalysisServerListener myAnalysisServerListener = new AnalysisServerListenerAdapter() {
     @Override
