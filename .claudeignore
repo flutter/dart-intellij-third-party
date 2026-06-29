@@ -1,1 +1,9 @@
-.geminiignore
+# Exclude baseline output logs and reports from AI scanning
+third_party/tool/baseline/
+**/build/reports/
+**/build/test-results/
+
+# Exclude large test fixture mock directories
+**/testData/
+**/sample_tests/
+

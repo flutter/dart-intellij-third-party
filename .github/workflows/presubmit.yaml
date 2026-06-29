@@ -12,15 +12,15 @@ permissions:
   contents: read
 
 jobs:
-  # Job 0: Check Agent Skills Documentation
-  check-skills-docs:
+  # Job 0: Validate Agent Configurations
+  validate-agent-configs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Run documentation check
-        run: ./tool/check_agent_skills.sh
+      - name: Run configurations check
+        run: ./tool/validate_agent_configs.sh
 
   # Job 1: Build Plugin
   build-plugin:
