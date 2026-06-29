@@ -91,7 +91,7 @@ jobs:
         uses: actions/checkout@v7 # Use the latest stable version of actions/checkout
 
       - name: Free up disk space (on ubuntu only)
-        if: ${{ matrix.os == 'uubuntu-large' }}
+        if: ${{ matrix.os == 'ubuntu-large' }}
         # Inspired by the https://github.com/marketplace/actions/free-disk-space-ubuntu action
         # See: https://github.com/flutter/dart-intellij-third-party/issues/220
         run: |
