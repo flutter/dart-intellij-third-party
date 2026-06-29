@@ -30,6 +30,10 @@ Perform a multi-pass analysis of the diff:
 ### Pass 2: Resource Management & Efficiency
 - **Leaks:** Check if opened streams, database connections, files, socket connections, or timers/subscriptions are properly closed or disposed of (even in failure paths).
 - **Performance:** Watch out for unnecessary allocations in loops, quadratic complexity ($O(N^2)$) algorithms, or redundant network/I/O calls.
+- **Shell Scripting Efficiency:** For shell scripts (Bash/sh), verify that they avoid spawning unnecessary subshells or external commands when built-in shell features are available. Specifically:
+  - Prefer Bash parameter expansion (e.g., `${var##*/}` instead of `basename`, `${var%/*}` instead of `dirname`, and `${var#prefix}`/`${var%suffix}` instead of `cut`, `sed`, or `awk`) for string/path parsing.
+  - Prefer builtin redirection (e.g., `$(< file)`) over spawning `cat` (e.g., `$(cat file)`) for reading files.
+  - Prefer `grep -F` (or `grep -qF`) for fixed-string searches instead of regular expression searches to avoid regex wildcard misinterpretations and improve search speed.
 
 ### Pass 3: Design, Abstraction & Style
 - **DRY (Don't Repeat Yourself):** Identify copy-pasted blocks or logic that should be refactored into a reusable helper function.
