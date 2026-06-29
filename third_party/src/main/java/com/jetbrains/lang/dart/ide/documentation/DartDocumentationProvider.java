@@ -3,6 +3,7 @@ package com.jetbrains.lang.dart.ide.documentation;
 
 import com.intellij.lang.documentation.DocumentationProvider;
 import com.intellij.navigation.NavigationItem;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -11,22 +12,25 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
+import com.jetbrains.lang.dart.analytics.LegacyHoverData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.completion.DartLookupObject;
-import com.jetbrains.lang.dart.psi.*;
+import com.jetbrains.lang.dart.logging.PluginLogger;
+import com.jetbrains.lang.dart.psi.DartClass;
+import com.jetbrains.lang.dart.psi.DartComponent;
+import com.jetbrains.lang.dart.psi.DartFactoryConstructorDeclaration;
+import com.jetbrains.lang.dart.psi.DartId;
+import com.jetbrains.lang.dart.psi.DartNamedConstructorDeclaration;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
 import org.dartlang.analysis.server.protocol.HoverInformation;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import com.intellij.openapi.diagnostic.Logger;
-import com.jetbrains.lang.dart.logging.PluginLogger;
-import com.jetbrains.lang.dart.analytics.Analytics;
-import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
-import com.jetbrains.lang.dart.analytics.LegacyHoverData;
-import com.jetbrains.lang.dart.analytics.AnalyticsData;
 
 import java.util.Collections;
 import java.util.List;
@@ -37,6 +41,9 @@ public final class DartDocumentationProvider implements DocumentationProvider {
 
   @Override
   public @Nls String generateDoc(final @NotNull PsiElement element, final @Nullable PsiElement originalElement) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(element.getProject())) {
+      return null;
+    }
     long startTime = System.currentTimeMillis();
     // in case of code completion 'element' comes from completion list and has nothing to do with 'originalElement',
     // but for Quick Doc in editor we should prefer building docs for 'originalElement' because such doc has info about propagated type
@@ -87,6 +94,9 @@ public final class DartDocumentationProvider implements DocumentationProvider {
 
   @Override
   public @Nls String getQuickNavigateInfo(final PsiElement element, final PsiElement originalElement) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(element.getProject())) {
+      return null;
+    }
     long startTime = System.currentTimeMillis();
     final PsiElement elementForInfo = resolvesTo(originalElement, element) ? originalElement : element;
     final HoverInformation hover = getSingleHover(elementForInfo);

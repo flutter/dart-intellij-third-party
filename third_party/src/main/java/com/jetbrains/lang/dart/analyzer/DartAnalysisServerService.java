@@ -1,11 +1,38 @@
 // Copyright 2000-2025 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.analyzer;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.EvictingQueue;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.google.common.annotations.VisibleForTesting;
-
-import com.google.dart.server.*;
+import com.google.dart.server.AnalysisServerListener;
+import com.google.dart.server.AnalysisServerListenerAdapter;
+import com.google.dart.server.CreateContextConsumer;
+import com.google.dart.server.DartLspTextDocumentContentConsumer;
+import com.google.dart.server.ExtendedRequestErrorCode;
+import com.google.dart.server.FindElementReferencesConsumer;
+import com.google.dart.server.FormatConsumer;
+import com.google.dart.server.GetAssistsConsumer;
+import com.google.dart.server.GetFixesConsumer;
+import com.google.dart.server.GetHoverConsumer;
+import com.google.dart.server.GetImportedElementsConsumer;
+import com.google.dart.server.GetNavigationConsumer;
+import com.google.dart.server.GetPostfixCompletionConsumer;
+import com.google.dart.server.GetRefactoringConsumer;
+import com.google.dart.server.GetRuntimeCompletionConsumer;
+import com.google.dart.server.GetServerPortConsumer;
+import com.google.dart.server.GetStatementCompletionConsumer;
+import com.google.dart.server.GetSuggestionDetailsConsumer;
+import com.google.dart.server.GetSuggestionDetailsConsumer2;
+import com.google.dart.server.GetSuggestionsConsumer;
+import com.google.dart.server.GetSuggestionsConsumer2;
+import com.google.dart.server.GetTypeHierarchyConsumer;
+import com.google.dart.server.ImportElementsConsumer;
+import com.google.dart.server.ListPostfixCompletionTemplatesConsumer;
+import com.google.dart.server.MapUriConsumer;
+import com.google.dart.server.OrganizeDirectivesConsumer;
+import com.google.dart.server.RequestListener;
+import com.google.dart.server.ResponseListener;
+import com.google.dart.server.SortMembersConsumer;
 import com.google.dart.server.generated.AnalysisServer;
 import com.google.dart.server.internal.remote.DebugPrintStream;
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl;
@@ -48,8 +75,12 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.SearchScope;
-import com.intellij.util.*;
+import com.intellij.util.Alarm;
 import com.intellij.util.Consumer;
+import com.intellij.util.ModalityUiUtil;
+import com.intellij.util.PathUtil;
+import com.intellij.util.SmartList;
+import com.intellij.util.TimeoutUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.URLUtil;
 import com.jetbrains.lang.dart.DartBundle;
@@ -66,6 +97,7 @@ import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
 import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
+import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
@@ -73,7 +105,44 @@ import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import kotlinx.coroutines.CoroutineScope;
-import org.dartlang.analysis.server.protocol.*;
+import org.dartlang.analysis.server.protocol.AddContentOverlay;
+import org.dartlang.analysis.server.protocol.AnalysisError;
+import org.dartlang.analysis.server.protocol.AnalysisErrorFixes;
+import org.dartlang.analysis.server.protocol.AnalysisErrorSeverity;
+import org.dartlang.analysis.server.protocol.AnalysisErrorType;
+import org.dartlang.analysis.server.protocol.AnalysisOptions;
+import org.dartlang.analysis.server.protocol.AnalysisService;
+import org.dartlang.analysis.server.protocol.AnalysisStatus;
+import org.dartlang.analysis.server.protocol.AvailableSuggestionSet;
+import org.dartlang.analysis.server.protocol.ClosingLabel;
+import org.dartlang.analysis.server.protocol.CompletionCaseMatchingMode;
+import org.dartlang.analysis.server.protocol.CompletionService;
+import org.dartlang.analysis.server.protocol.CompletionSuggestion;
+import org.dartlang.analysis.server.protocol.Element;
+import org.dartlang.analysis.server.protocol.HighlightRegion;
+import org.dartlang.analysis.server.protocol.HoverInformation;
+import org.dartlang.analysis.server.protocol.ImplementedClass;
+import org.dartlang.analysis.server.protocol.ImplementedMember;
+import org.dartlang.analysis.server.protocol.ImportedElements;
+import org.dartlang.analysis.server.protocol.IncludedSuggestionRelevanceTag;
+import org.dartlang.analysis.server.protocol.IncludedSuggestionSet;
+import org.dartlang.analysis.server.protocol.NavigationRegion;
+import org.dartlang.analysis.server.protocol.Outline;
+import org.dartlang.analysis.server.protocol.OverrideMember;
+import org.dartlang.analysis.server.protocol.PostfixTemplateDescriptor;
+import org.dartlang.analysis.server.protocol.PubStatus;
+import org.dartlang.analysis.server.protocol.RefactoringOptions;
+import org.dartlang.analysis.server.protocol.RemoveContentOverlay;
+import org.dartlang.analysis.server.protocol.RequestError;
+import org.dartlang.analysis.server.protocol.RequestErrorCode;
+import org.dartlang.analysis.server.protocol.RuntimeCompletionExpression;
+import org.dartlang.analysis.server.protocol.RuntimeCompletionVariable;
+import org.dartlang.analysis.server.protocol.SearchResult;
+import org.dartlang.analysis.server.protocol.ServerService;
+import org.dartlang.analysis.server.protocol.SourceChange;
+import org.dartlang.analysis.server.protocol.SourceEdit;
+import org.dartlang.analysis.server.protocol.SourceFileEdit;
+import org.dartlang.analysis.server.protocol.TypeHierarchyItem;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -81,7 +150,18 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.net.URI;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.MissingResourceException;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -2260,6 +2340,9 @@ public final class DartAnalysisServerService implements Disposable {
         if (dtdUri != null) {
           connectToDtd(dtdUri);
         }
+
+        // Start the LSP Bridge Server
+        myProject.getService(DartBridgeLspServerManager.class).startBridgeServer();
       }
       catch (Exception e) {
         stopServer();
@@ -2312,6 +2395,11 @@ public final class DartAnalysisServerService implements Disposable {
 
   void stopServer() {
     synchronized (myLock) {
+      // Stop the LSP Bridge Server
+      DartBridgeLspServerManager bridgeManager = myProject.getServiceIfCreated(DartBridgeLspServerManager.class);
+      if (bridgeManager != null) {
+        bridgeManager.stopBridgeServer();
+      }
       if (myServer != null) {
         LOG.debug("stopping server");
         myServer.removeAnalysisServerListener(myAnalysisServerListener);

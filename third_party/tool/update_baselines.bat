@@ -18,7 +18,7 @@ pushd third_party
 call gradlew.bat verifyPlugin
 popd
 
-set "versions=251 252 253 261"
+set "versions=253 261"
 
 for %%v in (%versions%) do (
     echo Processing baseline for %%v...

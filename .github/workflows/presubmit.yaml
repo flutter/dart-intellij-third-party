@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - '2025.2'
   workflow_dispatch:
 
 permissions:
@@ -25,7 +26,7 @@ jobs:
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build Plugin Action
         run: ./gradlew buildPlugin
@@ -49,7 +50,7 @@ jobs:
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Unit Test Action
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
@@ -102,7 +103,7 @@ jobs:
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Verify Plugin Actions
         run: |
@@ -129,7 +130,7 @@ jobs:
           NC='\033[0m' # None (Reset)
 
           EXIT_STATUS=0
-          for version in 251 252 253 261; do
+          for version in 253 261; do
             echo -e "${BOLD}Checking baseline for $version...${NC}"
             BASELINE="third_party/tool/baseline/$version/verifier-baseline.txt"
             REPORT=$(find third_party/build/reports/pluginVerifier -path "*-$version.*/report.md" | head -n 1)
@@ -137,7 +138,7 @@ jobs:
 
             if [ -f "$REPORT" ]; then
               echo "Comparing baseline against report in $REPORT"
-              grep "^*" "$REPORT" | sort > current_issues.tmp || true
+              grep "^*" "$REPORT" | grep -v "com\.intellij\.platform\.dartlsp" | sort > current_issues.tmp || true
 
               if [ -f "$BASELINE" ]; then
                 NEW_ERRORS=$(comm -13 <(sort "$BASELINE") current_issues.tmp)

@@ -8,7 +8,6 @@ import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.module.ModuleType;
@@ -26,11 +25,16 @@ import com.intellij.openapi.util.io.FileUtilRt;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.IdeFocusManager;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiManager;
-import com.intellij.ui.*;
+import com.intellij.ui.CheckboxTree;
+import com.intellij.ui.CheckboxTreeListener;
+import com.intellij.ui.CheckboxTreeTable;
+import com.intellij.ui.CheckedTreeNode;
+import com.intellij.ui.ColorUtil;
+import com.intellij.ui.DocumentAdapter;
+import com.intellij.ui.JBColor;
+import com.intellij.ui.PortField;
+import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.treeStructure.treetable.TreeColumnInfo;
@@ -39,20 +43,32 @@ import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
+import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
 import com.jetbrains.lang.dart.lsp.LspMethod;
 import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.Icon;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JPanel;
+import javax.swing.JTree;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeWillExpandListener;
 import javax.swing.text.JTextComponent;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.ExpandVetoException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 public final class DartConfigurable implements SearchableConfigurable, NoScroll, Disposable {
@@ -336,7 +352,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
   @Override
   public void apply() {
-    // similar to DartModuleBuilder.setupSdk()
+    final boolean initialExperimentalEnabled = isExperimentalLspFeaturesEnabled(myProject);
     final boolean currentExperimentalEnabled = myExperimentalLspFeaturesCheckBox.isSelected();
 
     final Runnable runnable = () -> {
@@ -375,6 +391,11 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
     ApplicationManager.getApplication().runWriteAction(runnable);
 
+    if (myEnableDartSupportCheckBox.isSelected() && initialExperimentalEnabled != currentExperimentalEnabled) {
+      DartBridgeLspServerManager bridgeManager = myProject.getService(DartBridgeLspServerManager.class);
+      bridgeManager.stopBridgeServer();
+      bridgeManager.startBridgeServer();
+    }
 
     reset(); // because we rely on remembering initial state
   }
