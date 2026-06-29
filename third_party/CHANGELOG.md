@@ -1,7 +1,7 @@
 ## Unreleased
 
 ### Added
-- Support for IDEA platform 2026.2
+- Support for IDEA platform 2026.2 (#499)
 
 ### Changed
 
