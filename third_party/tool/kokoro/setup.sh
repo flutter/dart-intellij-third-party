@@ -38,12 +38,17 @@ run_gradle_with_retry() {
   local ATTEMPT=1
   local exit_code=0
 
+  local gradlew_cmd="./gradlew"
+  if [[ ! -x "$gradlew_cmd" ]]; then
+    gradlew_cmd="./third_party/gradlew"
+  fi
+
   echo "Gradle retry config: max_retries=$max_retries, total_attempts=$total_attempts, delay_secs=$delay_secs" >&2
 
   while [[ $ATTEMPT -le $total_attempts ]]; do
-    echo "Running ./gradlew ${gradle_args[*]} (Attempt $ATTEMPT of $total_attempts)..." >&2
+    echo "Running $gradlew_cmd ${gradle_args[*]} (Attempt $ATTEMPT of $total_attempts)..." >&2
     
-    if ./gradlew "${gradle_args[@]}"; then
+    if "$gradlew_cmd" "${gradle_args[@]}"; then
       echo "Gradle command completed successfully." >&2
       return 0
     else
