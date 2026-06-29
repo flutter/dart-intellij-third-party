@@ -18,7 +18,7 @@ pushd third_party
 call gradlew.bat verifyPlugin
 popd
 
-set "versions=253 261"
+set "versions=253 261 262"
 
 for %%v in (%versions%) do (
     echo Processing baseline for %%v...
@@ -35,7 +35,7 @@ for %%v in (%versions%) do (
         if not exist "third_party\tool\baseline\%%v" mkdir "third_party\tool\baseline\%%v"
         
         :: Extract lines starting with * and sort them (case-sensitive)
-        powershell -NoProfile -Command "Get-Content -LiteralPath '!REPORT!' | Where-Object { $_ -match '^\*' } | Sort-Object -CaseSensitive | Set-Content -LiteralPath '!BASELINE!'"
+        powershell -NoProfile -Command "Get-Content -LiteralPath '!REPORT!' | Where-Object { $_ -match '^\*' -and $_ -notmatch 'com\.intellij\.platform\.dartlsp' } | Sort-Object -CaseSensitive | Set-Content -LiteralPath '!BASELINE!'"
         
         echo Updated baseline at !BASELINE!
     ) else (
