@@ -55,3 +55,6 @@ Here is the details of the changes made by the patch script:
 
 7. **Intention Directory Names**:
    - Rename the intention descriptions folder `LspIntention` to `DartLspIntention` and update `descriptionDirectoryName` to `DartLspIntention` in `dart-lsp-impl.xml` to prevent collision.
+
+8. **Support External Library Files**:
+   - Remove `if (!ProjectFileIndex.getInstance(project).isInContent(file)) return false` from `LspServerImpl.isSupportedFile(file)` so that the Dart LSP bridge can serve external library files (such as pub-cache packages and Dart SDK libraries like `dart:io`).
