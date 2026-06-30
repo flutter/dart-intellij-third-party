@@ -1,9 +1,20 @@
 ## Unreleased
 
 ### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## 507.0.0
+
+### Added
 - Support for IDEA platform 2026.2 (#499)
 
 ### Changed
+- Hover implemented with JetBrains LSP as an experimental feature (#443)
 
 ### Removed
 - Support for platform versions 251 and 252 (#473)
