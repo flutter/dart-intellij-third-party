@@ -21,6 +21,7 @@
 
 ### Fixed
 - Prevent memory leak by closing DTD WebSocket connections and clearing listeners when disposing projects (#449)
+- Split screen `RunContentDescriptor` error during app run/debug (#506)
 
 ## 506.1.0
 
