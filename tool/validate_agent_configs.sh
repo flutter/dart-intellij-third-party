@@ -41,6 +41,23 @@ for link in $(grep -o '\.agents/skills/[a-zA-Z0-9_-]*/SKILL.md' "$README_FILE" |
     exit_code=1
   fi
 done
+# 3. Check that ignore files (.geminiignore and .claudeignore) are identical and in sync
+GEMINI_IGNORE=".geminiignore"
+CLAUDE_IGNORE=".claudeignore"
+
+if [[ -f "$GEMINI_IGNORE" || -f "$CLAUDE_IGNORE" ]]; then
+  if [[ ! -f "$GEMINI_IGNORE" ]]; then
+    echo "Error: $CLAUDE_IGNORE exists but $GEMINI_IGNORE is missing." >&2
+    exit_code=1
+  elif [[ ! -f "$CLAUDE_IGNORE" ]]; then
+    echo "Error: $GEMINI_IGNORE exists but $CLAUDE_IGNORE is missing." >&2
+    exit_code=1
+  elif ! cmp -s "$GEMINI_IGNORE" "$CLAUDE_IGNORE"; then
+    echo "Error: $GEMINI_IGNORE and $CLAUDE_IGNORE are out of sync." >&2
+    echo "Please ensure both files contain the exact same ignore patterns." >&2
+    exit_code=1
+  fi
+fi
 
 if [[ $exit_code -eq 0 ]]; then
   echo "Success: All AI Agent Skills are correctly documented in $README_FILE."
