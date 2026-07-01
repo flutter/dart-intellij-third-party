@@ -24,10 +24,23 @@ class VerboseTestListener : TestListener, Serializable {
     }
 }
 
-// Specify UTF-8 for all compilations so we avoid Windows-1252.
+// Read javaVersion from gradle.properties
+val javaVersionStr = providers.gradleProperty("javaVersion").get()
+val javaVersionInt = javaVersionStr.toInt()
+val kotlinJvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(javaVersionStr)
+val javaVer = JavaVersion.toVersion(javaVersionStr)
+
 allprojects {
     tasks.withType<JavaCompile> {
+        // Specify UTF-8 for all compilations so we avoid Windows-1252.
         options.encoding = "UTF-8"
+        // Enforce the target bytecode version and standard library API level across all Java compilation tasks.
+        options.release.set(javaVersionInt)
+    }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+        compilerOptions {
+            jvmTarget.set(kotlinJvmTarget)
+        }
     }
     tasks.withType<Test> {
         systemProperty("file.encoding", "UTF-8")
@@ -132,19 +145,17 @@ sourceSets {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        jvmTarget.set(kotlinJvmTarget)
     }
 }
 
 java {
     toolchain {
-        val versionProvider = providers.gradleProperty("javaVersion")
-            .map { it.toInt() }
-            .map { JavaLanguageVersion.of(it) }
-        languageVersion.set(versionProvider)
+        // Dynamically use the running JVM version for the toolchain so Gradle does not search for or download a specific JDK on CI or locally.
+        languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
     }
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = javaVer
+    targetCompatibility = javaVer
 }
 
 dependencies {
