@@ -138,7 +138,10 @@ kotlin {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
+        val versionProvider = providers.gradleProperty("javaVersion")
+            .map { it.toInt() }
+            .map { JavaLanguageVersion.of(it) }
+        languageVersion.set(versionProvider)
     }
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
