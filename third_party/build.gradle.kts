@@ -39,6 +39,7 @@ allprojects {
     }
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         compilerOptions {
+            // Same as above, but for kotlin.
             jvmTarget.set(kotlinJvmTarget)
         }
     }
@@ -151,7 +152,8 @@ kotlin {
 
 java {
     toolchain {
-        // Dynamically use the running JVM version for the toolchain so Gradle does not search for or download a specific JDK on CI or locally.
+        // Dynamically use the running JVM version for the toolchain so Gradle does not search for or download a
+        // specific JDK on CI or locally. (if we set this to a specific version, it's likely to break dev build.)
         languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
     }
     sourceCompatibility = javaVer
