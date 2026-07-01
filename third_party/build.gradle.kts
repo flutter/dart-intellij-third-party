@@ -13,6 +13,8 @@ import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 class VerboseTestListener : TestListener, Serializable {
     override fun beforeSuite(suite: TestDescriptor) {}
@@ -27,7 +29,7 @@ class VerboseTestListener : TestListener, Serializable {
 // Read javaVersion from gradle.properties
 val javaVersionStr = providers.gradleProperty("javaVersion").get()
 val javaVersionInt = javaVersionStr.toInt()
-val kotlinJvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(javaVersionStr)
+val kotlinJvmTarget = JvmTarget.fromTarget(javaVersionStr)
 val javaVer = JavaVersion.toVersion(javaVersionStr)
 
 allprojects {
@@ -37,7 +39,7 @@ allprojects {
         // Enforce the target bytecode version and standard library API level across all Java compilation tasks.
         options.release.set(javaVersionInt)
     }
-    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    tasks.withType<KotlinCompile> {
         compilerOptions {
             // Same as above, but for kotlin.
             jvmTarget.set(kotlinJvmTarget)
