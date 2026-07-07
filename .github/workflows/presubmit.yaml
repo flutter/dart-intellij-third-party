@@ -17,7 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Run documentation check
         run: ./tool/check_agent_skills.sh
@@ -27,16 +29,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7 # Use the latest stable version of actions/checkout
+        with:
+          persist-credentials: false
 
       - name: Set up JDK
-        uses: actions/setup-java@v5 # https://github.com/marketplace/actions/setup-java-jdk
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@90ddb51e90a5fd9ba75f40cf85156b7b41bf76a3 # v6
 
       - name: Build Plugin Action
         run: ./gradlew buildPlugin
@@ -51,23 +55,25 @@ jobs:
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7 # Use the latest stable version of actions/checkout
+        with:
+          persist-credentials: false
 
       - name: Set up JDK
-        uses: actions/setup-java@v5 # https://github.com/marketplace/actions/setup-java-jdk
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@90ddb51e90a5fd9ba75f40cf85156b7b41bf76a3 # v6
 
       - name: Unit Test Action
         run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
         working-directory: third_party
 
       - name: Upload test results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: test-results-${{ matrix.os }}
@@ -88,7 +94,9 @@ jobs:
     runs-on: ${{ matrix.os }} # Use the OS from the matrix
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7 # Use the latest stable version of actions/checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7 # Use the latest stable version of actions/checkout
+        with:
+          persist-credentials: false
 
       - name: Free up disk space (on ubuntu only)
         if: ${{ matrix.os == 'ubuntu-large' }}
@@ -107,13 +115,13 @@ jobs:
           df -h
 
       - name: Set up JDK
-        uses: actions/setup-java@v5 # https://github.com/marketplace/actions/setup-java-jdk
+        uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5
         with:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@90ddb51e90a5fd9ba75f40cf85156b7b41bf76a3 # v6
 
       - name: Verify Plugin Actions
         run: |
@@ -123,7 +131,7 @@ jobs:
           ./gradlew verifyPluginStructure
         working-directory: third_party
       - name: Upload verifier results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: build
