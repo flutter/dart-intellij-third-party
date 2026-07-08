@@ -17,17 +17,16 @@ import com.google.common.collect.Maps;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import de.roderick.weberknecht.WebSocket;
-import de.roderick.weberknecht.WebSocketEventHandler;
-import de.roderick.weberknecht.WebSocketException;
-import de.roderick.weberknecht.WebSocketMessage;
+import com.jetbrains.lang.dart.websocket.WebSocket;
+import com.jetbrains.lang.dart.websocket.WebSocketEventHandler;
+import com.jetbrains.lang.dart.websocket.WebSocketException;
+import com.jetbrains.lang.dart.websocket.WebSocketMessage;
 import org.dartlang.vm.service.consumer.*;
 import org.dartlang.vm.service.element.*;
 import org.dartlang.vm.service.internal.RequestSink;
 import org.dartlang.vm.service.internal.VmServiceConst;
 import org.dartlang.vm.service.internal.WebSocketRequestSink;
 import org.dartlang.vm.service.logging.Logging;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -62,12 +61,7 @@ abstract class VmServiceBase implements VmServiceConst {
     }
 
     // Create web socket and observatory
-    WebSocket webSocket;
-    try {
-      webSocket = new WebSocket(uri);
-    } catch (WebSocketException e) {
-      throw new IOException("Failed to create websocket: " + url, e);
-    }
+    WebSocket webSocket = new WebSocket(uri);
     final VmService vmService = new VmService();
 
     // Setup event handler for forwarding responses
