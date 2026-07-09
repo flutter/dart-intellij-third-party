@@ -100,13 +100,9 @@ abstract class VmServiceBase implements VmServiceConst {
     });
 
     // Establish WebSocket Connection
-    //noinspection TryWithIdenticalCatches
     try {
       webSocket.connect();
     } catch (WebSocketException e) {
-      throw new IOException("Failed to connect: " + url, e);
-    } catch (ArrayIndexOutOfBoundsException e) {
-      // Historical: Weberknecht used to occasionally throw an array index exception if a connect terminates on initial connect.
       throw new IOException("Failed to connect: " + url, e);
     }
     vmService.requestSink = new WebSocketRequestSink(webSocket);
