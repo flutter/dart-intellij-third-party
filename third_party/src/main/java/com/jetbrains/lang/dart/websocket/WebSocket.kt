@@ -14,8 +14,8 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.TimeUnit
 
 /**
- * A thin wrapper around the JDK [java.net.http.WebSocket] that mirrors the API of the
- * Weberknecht library's WebSocket, so usages of Weberknecht can be replaced with this class.
+ * A thin wrapper around the JDK [java.net.http.WebSocket] that originally mirrored the API of the
+ * Weberknecht library's WebSocket to ease replacement.
  */
 class WebSocket(private val uri: URI) {
 
