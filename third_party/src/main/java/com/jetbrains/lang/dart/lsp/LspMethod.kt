@@ -10,10 +10,10 @@ enum class LspMethod(
     val isExperimental: Boolean = false,
     val presentableName: String? = null
 ) {
-    INITIALIZE("initialize"),
-    SHUTDOWN("shutdown"),
+    DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = true, presentableName = "diagnostic server"),
     HOVER("textDocument/hover", isExperimental = true, presentableName = "hover"),
-    DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = true, presentableName = "diagnostic server");
+    INITIALIZE("initialize"),
+    SHUTDOWN("shutdown");
 
     companion object {
         fun fromMethod(method: String): LspMethod? = entries.find { it.method == method }
