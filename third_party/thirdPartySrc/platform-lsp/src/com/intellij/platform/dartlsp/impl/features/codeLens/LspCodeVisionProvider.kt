@@ -16,7 +16,7 @@ import com.intellij.platform.dartlsp.api.customization.LspCodeLensSupport
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
 import java.awt.event.MouseEvent
 
-internal const val LSP_CODE_VISION_PROVIDER_ID: String = "LspCodeVisionProvider"
+internal const val LSP_CODE_VISION_PROVIDER_ID: String = "DartLspCodeVisionProvider"
 
 internal class LspCodeVisionProvider : CodeVisionProvider<Unit>, DumbAware {
   override fun precomputeOnUiThread(editor: Editor) {}

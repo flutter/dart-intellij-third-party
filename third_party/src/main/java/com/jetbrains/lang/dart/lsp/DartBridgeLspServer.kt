@@ -8,15 +8,27 @@ package com.jetbrains.lang.dart.lsp
 import com.google.dart.server.ResponseListener
 import com.google.gson.Gson
 import com.google.gson.JsonElement
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
+import com.google.gson.JsonParseException
 import com.google.gson.JsonParser
+import com.google.gson.TypeAdapter
+import com.google.gson.TypeAdapterFactory
 import com.google.gson.reflect.TypeToken
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonToken
+import com.google.gson.stream.JsonWriter
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import org.dartlang.analysis.server.protocol.AnalysisError
 import org.dartlang.analysis.server.protocol.DiagnosticMessage
+import org.eclipse.lsp4j.ApplyWorkspaceEditParams
+import org.eclipse.lsp4j.ApplyWorkspaceEditResponse
+import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionParams
+import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
@@ -28,6 +40,8 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
 import org.eclipse.lsp4j.DocumentHighlight
 import org.eclipse.lsp4j.DocumentHighlightParams
+import org.eclipse.lsp4j.ExecuteCommandOptions
+import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
@@ -37,14 +51,18 @@ import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
+import org.eclipse.lsp4j.jsonrpc.json.JsonRpcMethod
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
+import org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
+import org.eclipse.lsp4j.services.LanguageServer
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
 import org.eclipse.lsp4j.TypeDefinitionParams
+import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -84,9 +102,102 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         private const val LSP_RESPONSE_KEY = "lspResponse"
         private const val JSONRPC_VERSION = "2.0"
         
-        // We use a JSON handler with default lsp4j configuration to serialize/deserialize lsp4j objects.
-        private val JSON_HANDLER = MessageJsonHandler(mapOf())
-        private val GSON: Gson = JSON_HANDLER.gson
+        // We initialize MessageJsonHandler with all supported LSP service endpoints so that
+        // lsp4j's EitherTypeAdapter automatically registers disambiguation rules for return types
+        // like Either<Command, CodeAction> where both alternatives are JSON objects.
+        private val JSON_HANDLER = run {
+            val supportedMethods = LinkedHashMap<String, JsonRpcMethod>()
+            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(LanguageServer::class.java))
+            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(TextDocumentService::class.java))
+            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(WorkspaceService::class.java))
+            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(LanguageClient::class.java))
+            MessageJsonHandler(supportedMethods)
+        }
+        @JvmField
+        internal val GSON: Gson = JSON_HANDLER.gson.newBuilder()
+            .serializeNulls()
+            .registerTypeAdapterFactory(SmartEitherTypeAdapterFactory())
+            .create()
+
+        /**
+         * Custom TypeAdapterFactory for Either<L, R> to deterministically disambiguate cases
+         * like Either<Command, CodeAction> where both left and right deserialize from a JSON Object.
+         */
+        private class SmartEitherTypeAdapterFactory : TypeAdapterFactory {
+            override fun <T : Any?> create(gson: Gson, typeToken: TypeToken<T>): TypeAdapter<T>? {
+                if (!Either::class.java.isAssignableFrom(typeToken.rawType)) {
+                    return null
+                }
+                val type = typeToken.type
+                val (leftType, rightType) = if (type is ParameterizedType) {
+                    type.actualTypeArguments[0] to type.actualTypeArguments[1]
+                } else {
+                    Any::class.java to Any::class.java
+                }
+                val leftAdapter = gson.getDelegateAdapter(this, TypeToken.get(leftType))
+                val rightAdapter = gson.getDelegateAdapter(this, TypeToken.get(rightType))
+
+                @Suppress("UNCHECKED_CAST")
+                return object : TypeAdapter<Either<Any?, Any?>>() {
+                    override fun write(out: JsonWriter, value: Either<Any?, Any?>?) {
+                        if (value == null) {
+                            out.nullValue()
+                            return
+                        }
+                        if (value.isLeft) {
+                            (leftAdapter as TypeAdapter<Any?>).write(out, value.left)
+                        } else {
+                            (rightAdapter as TypeAdapter<Any?>).write(out, value.right)
+                        }
+                    }
+
+                    override fun read(reader: JsonReader): Either<Any?, Any?>? {
+                        if (reader.peek() == JsonToken.NULL) {
+                            reader.nextNull()
+                            return null
+                        }
+                        val element = JsonParser.parseReader(reader)
+                        if (element.isJsonNull) return null
+
+                        if (element.isJsonObject) {
+                            val obj = element.asJsonObject
+                            val leftRaw = TypeToken.get(leftType).rawType
+                            val rightRaw = TypeToken.get(rightType).rawType
+
+                            // Command has "command" and "title", but never "kind", "edit", or "diagnostics".
+                            if (Command::class.java.isAssignableFrom(leftRaw) && CodeAction::class.java.isAssignableFrom(rightRaw)) {
+                                if (obj.has("command") && !obj.has("kind") && !obj.has("edit") && !obj.has("diagnostics")) {
+                                    val leftVal = leftAdapter.fromJsonTree(element)
+                                    return Either.forLeft(leftVal)
+                                }
+                                val rightVal = rightAdapter.fromJsonTree(element)
+                                return Either.forRight(rightVal)
+                            }
+                            if (CodeAction::class.java.isAssignableFrom(leftRaw) && Command::class.java.isAssignableFrom(rightRaw)) {
+                                if (obj.has("command") && !obj.has("kind") && !obj.has("edit") && !obj.has("diagnostics")) {
+                                    val rightVal = rightAdapter.fromJsonTree(element)
+                                    return Either.forRight(rightVal)
+                                }
+                                val leftVal = leftAdapter.fromJsonTree(element)
+                                return Either.forLeft(leftVal)
+                            }
+                        }
+
+                        try {
+                            val rightVal = rightAdapter.fromJsonTree(element)
+                            if (rightVal != null) return Either.forRight(rightVal)
+                        } catch (_: Exception) {}
+
+                        try {
+                            val leftVal = leftAdapter.fromJsonTree(element)
+                            if (leftVal != null) return Either.forLeft(leftVal)
+                        } catch (_: Exception) {}
+
+                        throw JsonParseException("Could not deserialize Either from \$element")
+                    }
+                } as TypeAdapter<T>
+            }
+        }
     }
 
     private var client: LanguageClient? = null
@@ -195,8 +306,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     private fun forwardNotificationToClient(method: String, msgObj: JsonObject) {
         val client = this.client ?: return
         try {
-            // Parse and forward notifications to the LSP client proxy using lsp4j.
-            // Currently, only 'textDocument/publishDiagnostics' is supported and forwarded.
+            // Parse and forward notifications/requests to the LSP client proxy using lsp4j.
             if (method == "textDocument/publishDiagnostics") {
                 val paramsObj = msgObj.get("params")
                 val params = GSON.fromJson(paramsObj, PublishDiagnosticsParams::class.java)
@@ -205,11 +315,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                     DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, params.uri, it)
                 } ?: emptyList()
                 das.onLspDiagnosticsUpdated(params.uri, errors)
+            } else if (method == "workspace/applyEdit") {
+                val paramsObj = msgObj.get("params")
+                val params = GSON.fromJson(paramsObj, ApplyWorkspaceEditParams::class.java)
+                client.applyEdit(params)
             } else {
-                logger.info("Ignored notification from DAS: $method")
+                logger.info("Ignored notification/request from DAS: $method")
             }
         } catch (e: Exception) {
-            logger.error("Failed to forward notification: $msgObj", e)
+            logger.error("Failed to forward server message: $msgObj", e)
         }
     }
 
@@ -230,6 +344,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setDefinitionProvider(true)
             setTypeDefinitionProvider(true)
             setDocumentHighlightProvider(true)
+            setCodeActionProvider(true)
+            setExecuteCommandProvider(ExecuteCommandOptions())
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -279,6 +395,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest("dart/diagnosticServer", null, DiagnosticServerResult::class.java)
     }
 
+    override fun codeAction(params: CodeActionParams): CompletableFuture<List<Either<Command, CodeAction>>> {
+        val responseType = object : TypeToken<List<Either<Command, CodeAction>>>() {}.type
+        return forwardRequest("textDocument/codeAction", params, responseType)
+    }
+
+    override fun resolveCodeAction(unresolved: CodeAction): CompletableFuture<CodeAction> {
+        return forwardRequest("codeAction/resolve", unresolved, CodeAction::class.java)
+    }
+
     // Implement other TextDocumentService methods as needed, returning unsupported or forwarding.
     
     override fun didOpen(params: DidOpenTextDocumentParams) {
@@ -298,6 +423,66 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     // --- WorkspaceService Implementation ---
+
+    override fun executeCommand(params: ExecuteCommandParams): CompletableFuture<Any> {
+        val rawTree = GSON.toJsonTree(params)
+        logger.info("Client executeCommand called: command=${params.command}, rawParams=$rawTree")
+
+        val forwardedParams = if (params.command == "dart.edit.codeAction.apply" && !params.arguments.isNullOrEmpty()) {
+            val arg0Tree = GSON.toJsonTree(params.arguments[0])
+            if (arg0Tree.isJsonObject) {
+                val obj = arg0Tree.asJsonObject
+                if (obj.has("textDocument") && obj.has("range") && obj.has("kind")) {
+                    val td = obj.get("textDocument")
+                    val normalizedTd = if (td.isJsonObject) {
+                        val tdObj = td.asJsonObject
+                        val nTd = JsonObject()
+                        val uriElem = tdObj.get("uri")
+                        val uriStr = when {
+                            uriElem == null -> ""
+                            uriElem.isJsonPrimitive -> uriElem.asString
+                            uriElem.isJsonObject && uriElem.asJsonObject.has("path") -> {
+                                "file://" + uriElem.asJsonObject.get("path").asString
+                            }
+                            else -> uriElem.toString()
+                        }
+                        nTd.addProperty("uri", uriStr)
+                        if (tdObj.has("version") && !tdObj.get("version").isJsonNull) {
+                            val ver = tdObj.get("version")
+                            if (ver.isJsonPrimitive && ver.asJsonPrimitive.isNumber) {
+                                nTd.addProperty("version", ver.asInt)
+                            } else {
+                                nTd.add("version", JsonNull.INSTANCE)
+                            }
+                        } else {
+                            nTd.add("version", JsonNull.INSTANCE)
+                        }
+                        nTd
+                    } else {
+                        td
+                    }
+                    val normalizedMap = JsonObject().apply {
+                        add("textDocument", normalizedTd)
+                        add("range", obj.get("range"))
+                        add("kind", obj.get("kind"))
+                    }
+                    ExecuteCommandParams(
+                        params.command,
+                        listOf(normalizedMap)
+                    )
+                } else {
+                    params
+                }
+            } else {
+                params
+            }
+        } else {
+            params
+        }
+
+        logger.info("Forwarding executeCommand to DAS: command=${params.command}, unpackedParams=${GSON.toJson(forwardedParams)}")
+        return forwardRequest("workspace/executeCommand", forwardedParams, Any::class.java)
+    }
 
     override fun didChangeConfiguration(params: DidChangeConfigurationParams) {
         // Ignored. Configuration is managed by the legacy plugin settings.
@@ -406,7 +591,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     private inner class PendingRequest<T>(val future: CompletableFuture<T>, val responseType: Type) {
         fun complete(resultPayload: JsonElement) {
             try {
-                val result = GSON.fromJson<T>(resultPayload, responseType)
+                val result: T = GSON.fromJson(resultPayload, responseType)
                 future.complete(result)
             } catch (e: Exception) {
                 future.completeExceptionally(e)
