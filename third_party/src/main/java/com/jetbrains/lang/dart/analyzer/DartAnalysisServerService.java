@@ -180,6 +180,7 @@ public final class DartAnalysisServerService implements Disposable {
   // https://htmlpreview.github.io/?https://github.com/dart-lang/sdk/blob/main/pkg/analysis_server/doc/api.html#request_server.setClientCapabilities
   public static final String MIN_FILE_URI_SDK_VERSION = "3.4.0";
   private static final String MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION = "3.8";
+  public static final String MIN_LSP_CODE_ACTIONS_SDK_VERSION = "3.9.0-122.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -576,6 +577,10 @@ public final class DartAnalysisServerService implements Disposable {
 
   public static boolean isDartSdkVersionSufficientForWorkspaceApplyEdits(@NotNull String sdkVersion) {
     return StringUtil.compareVersionNumbers(sdkVersion, MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspCodeActions(@NotNull String sdkVersion) {
+    return StringUtil.compareVersionNumbers(sdkVersion, MIN_LSP_CODE_ACTIONS_SDK_VERSION) >= 0;
   }
 
   public boolean shouldUseCompletion2() {
