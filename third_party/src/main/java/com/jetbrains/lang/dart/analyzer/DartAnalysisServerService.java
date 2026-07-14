@@ -184,6 +184,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
   public static final String MIN_LSP_CLOSING_LABELS_SDK_VERSION = "3.14.0-219.0.dev";
+  public static final String MIN_LSP_CODE_ACTIONS_SDK_VERSION = "3.9.0-122.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -660,6 +661,10 @@ public final class DartAnalysisServerService implements Disposable {
     }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspClosingLabels(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspCodeActions(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_CODE_ACTIONS_SDK_VERSION) >= 0;
   }
 
   public boolean shouldUseCompletion2() {
