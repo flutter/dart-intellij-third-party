@@ -25,6 +25,7 @@ import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors;
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblem;
 import com.jetbrains.lang.dart.psi.DartSymbolLiteralExpression;
 import com.jetbrains.lang.dart.psi.DartTernaryExpression;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.AnalysisErrorSeverity;
 import org.dartlang.analysis.server.protocol.HighlightRegionType;
@@ -298,8 +299,10 @@ public final class DartAnnotator implements Annotator {
     if (error.getCode() != null) {
       builder = builder.problemGroup(quickFixSet.getProblemGroup());
     }
-    for (DartQuickFix fix : quickFixSet.getQuickFixes()) {
-      builder = builder.withFix(fix);
+    if (!DartConfigurable.isLspCodeActionsEnabled(holder.getCurrentAnnotationSession().getFile().getProject())) {
+      for (DartQuickFix fix : quickFixSet.getQuickFixes()) {
+        builder = builder.withFix(fix);
+      }
     }
     builder.create();
   }
