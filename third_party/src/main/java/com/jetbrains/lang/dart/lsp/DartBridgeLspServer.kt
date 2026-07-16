@@ -331,60 +331,62 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val rawTree = GSON.toJsonTree(params)
         logger.info("Client executeCommand called: command=${params.command}, rawParams=$rawTree")
 
-        val forwardedParams = if (params.command == "dart.edit.codeAction.apply" && !params.arguments.isNullOrEmpty()) {
-            val arg0Tree = GSON.toJsonTree(params.arguments[0])
-            if (arg0Tree.isJsonObject) {
-                val obj = arg0Tree.asJsonObject
-                if (obj.has("textDocument") && obj.has("range") && obj.has("kind")) {
-                    val td = obj.get("textDocument")
-                    val normalizedTd = if (td.isJsonObject) {
-                        val tdObj = td.asJsonObject
-                        val nTd = JsonObject()
-                        val uriElem = tdObj.get("uri")
-                        val uriStr = when {
-                            uriElem == null -> ""
-                            uriElem.isJsonPrimitive -> uriElem.asString
-                            uriElem.isJsonObject && uriElem.asJsonObject.has("path") -> {
-                                "file://" + uriElem.asJsonObject.get("path").asString
-                            }
-                            else -> uriElem.toString()
-                        }
-                        nTd.addProperty("uri", uriStr)
-                        if (tdObj.has("version") && !tdObj.get("version").isJsonNull) {
-                            val ver = tdObj.get("version")
-                            if (ver.isJsonPrimitive && ver.asJsonPrimitive.isNumber) {
-                                nTd.addProperty("version", ver.asInt)
-                            } else {
-                                nTd.add("version", JsonNull.INSTANCE)
-                            }
-                        } else {
-                            nTd.add("version", JsonNull.INSTANCE)
-                        }
-                        nTd
-                    } else {
-                        td
-                    }
-                    val normalizedMap = JsonObject().apply {
-                        add("textDocument", normalizedTd)
-                        add("range", obj.get("range"))
-                        add("kind", obj.get("kind"))
-                    }
-                    ExecuteCommandParams(
-                        params.command,
-                        listOf(normalizedMap)
-                    )
-                } else {
-                    params
-                }
-            } else {
-                params
-            }
-        } else {
-            params
-        }
+        val forwardedParams = normalizeExecuteCommandParams(params)
 
         logger.info("Forwarding executeCommand to DAS: command=${params.command}, unpackedParams=${GSON.toJson(forwardedParams)}")
         return forwardRequest("workspace/executeCommand", forwardedParams, Any::class.java)
+    }
+
+    private fun normalizeExecuteCommandParams(params: ExecuteCommandParams): ExecuteCommandParams {
+        if (params.command != "dart.edit.codeAction.apply" || params.arguments.isNullOrEmpty()) {
+            return params
+        }
+        val arg0Tree = GSON.toJsonTree(params.arguments[0])
+        if (!arg0Tree.isJsonObject) {
+            return params
+        }
+        val obj = arg0Tree.asJsonObject
+        if (!obj.has("textDocument") || !obj.has("range") || !obj.has("kind")) {
+            return params
+        }
+
+        val td = obj.get("textDocument")
+        val normalizedTd = if (td.isJsonObject) {
+            val tdObj = td.asJsonObject
+            val nTd = JsonObject()
+            val uriElem = tdObj.get("uri")
+            val uriStr = when {
+                uriElem == null -> ""
+                uriElem.isJsonPrimitive -> uriElem.asString
+                uriElem.isJsonObject && uriElem.asJsonObject.has("path") -> {
+                    "file://" + uriElem.asJsonObject.get("path").asString
+                }
+                else -> uriElem.toString()
+            }
+            nTd.addProperty("uri", uriStr)
+            if (tdObj.has("version") && !tdObj.get("version").isJsonNull) {
+                val ver = tdObj.get("version")
+                if (ver.isJsonPrimitive && ver.asJsonPrimitive.isNumber) {
+                    nTd.addProperty("version", ver.asInt)
+                } else {
+                    nTd.add("version", JsonNull.INSTANCE)
+                }
+            } else {
+                nTd.add("version", JsonNull.INSTANCE)
+            }
+            nTd
+        } else {
+            td
+        }
+        val normalizedMap = JsonObject().apply {
+            add("textDocument", normalizedTd)
+            add("range", obj.get("range"))
+            add("kind", obj.get("kind"))
+        }
+        return ExecuteCommandParams(
+            params.command,
+            listOf(normalizedMap)
+        )
     }
 
     override fun didChangeConfiguration(params: DidChangeConfigurationParams) {
