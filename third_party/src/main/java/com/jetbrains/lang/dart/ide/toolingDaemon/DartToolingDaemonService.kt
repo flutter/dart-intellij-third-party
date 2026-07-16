@@ -93,6 +93,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     commandLine.charset = StandardCharsets.UTF_8
     commandLine.addParameter("tooling-daemon")
     commandLine.addParameter("--machine")
+    commandLine.addParameter("--ping-interval=15")
     Analytics.updateEnvironment(commandLine)
 
     logger.info("Starting Dart Tooling Daemon, sdk ${sdk.version}")
@@ -300,7 +301,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
       if (serviceRunning) return
 
       // The first line of text is the command issued, which can be ignored.
-      val text = event.text.trim().takeUnless { it.endsWith(" tooling-daemon --machine") }
+      val text = event.text.trim().takeUnless { it.endsWith(" tooling-daemon --machine --ping-interval=15") }
                  ?: return
 
       var uri: String? = null
