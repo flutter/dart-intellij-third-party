@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Added
+- Retrieving diagnostics server with JetBrains LSP (#493)
 
 ### Changed
 
