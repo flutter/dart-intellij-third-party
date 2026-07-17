@@ -4,7 +4,7 @@
  * found in the LICENSE file.
  */
 
-package com.jetbrains.dart.dartToolingDaemon
+package com.jetbrains.lang.dart.ide.dtd
 
 import com.jetbrains.lang.dart.ide.toolingDaemon.isDtdCommandLine
 import junit.framework.TestCase
