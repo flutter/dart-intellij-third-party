@@ -11,7 +11,6 @@ import com.intellij.openapi.util.io.FileUtil
 import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
-import java.nio.charset.StandardCharsets
 
 private val DTD_COMMAND_LINE_PARAMETERS = listOf(
   "tooling-daemon",
@@ -24,7 +23,7 @@ private val DTD_COMMAND_LINE_SUFFIX = DTD_COMMAND_LINE_PARAMETERS.joinToString(s
 internal fun createDtdCommandLine(sdk: DartSdk): GeneralCommandLine {
   val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
   commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
-  commandLine.charset = StandardCharsets.UTF_8
+  commandLine.charset = Charsets.UTF_8
   DTD_COMMAND_LINE_PARAMETERS.forEach(commandLine::addParameter)
   Analytics.updateEnvironment(commandLine)
   return commandLine
