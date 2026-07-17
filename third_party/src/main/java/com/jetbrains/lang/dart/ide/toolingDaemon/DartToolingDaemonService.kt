@@ -5,7 +5,6 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.intellij.execution.ExecutionException
-import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.KillableProcessHandler
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessListener
@@ -19,7 +18,6 @@ import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.*
 import com.intellij.util.EventDispatcher
@@ -29,19 +27,16 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
-import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
-import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.websocket.WebSocket
 import com.jetbrains.lang.dart.websocket.WebSocketEventHandler
 import com.jetbrains.lang.dart.websocket.WebSocketException
 import com.jetbrains.lang.dart.websocket.WebSocketMessage
 import kotlinx.coroutines.CoroutineScope
 import java.net.URI
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
@@ -88,13 +83,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
 
     activeLocationChangeEventSupported = DartAnalysisServerService.isDartSdkVersionSufficientForWorkspaceApplyEdits(sdk.version)
 
-    val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
-    commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
-    commandLine.charset = StandardCharsets.UTF_8
-    commandLine.addParameter("tooling-daemon")
-    commandLine.addParameter("--machine")
-    commandLine.addParameter("--ping-interval=15")
-    Analytics.updateEnvironment(commandLine)
+    val commandLine = createDtdCommandLine(sdk)
 
     logger.info("Starting Dart Tooling Daemon, sdk ${sdk.version}")
     dtdProcessHandler = object : KillableProcessHandler(commandLine) {
@@ -301,7 +290,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
       if (serviceRunning) return
 
       // The first line of text is the command issued, which can be ignored.
-      val text = event.text.trim().takeUnless { it.endsWith(" tooling-daemon --machine --ping-interval=15") }
+      val text = event.text.trim().takeUnless { isDtdCommandLine(it) }
                  ?: return
 
       var uri: String? = null

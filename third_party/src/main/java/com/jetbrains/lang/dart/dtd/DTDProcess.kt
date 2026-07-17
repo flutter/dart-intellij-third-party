@@ -8,29 +8,26 @@ package com.jetbrains.lang.dart.dtd
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.KillableProcessHandler
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessListener
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.EventDispatcher
 import com.intellij.util.io.BaseOutputReader
-import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonConsumer
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonRequestHandler
+import com.jetbrains.lang.dart.ide.toolingDaemon.createDtdCommandLine
+import com.jetbrains.lang.dart.ide.toolingDaemon.isDtdCommandLine
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
-import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.websocket.WebSocketEventHandler
 import com.jetbrains.lang.dart.websocket.WebSocketException
 import com.jetbrains.lang.dart.websocket.WebSocketMessage
 import com.jetbrains.lang.dart.websocket.WebSocket
 import java.net.URI
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
 
 class DTDProcess {
@@ -125,13 +122,7 @@ class DTDProcess {
   }
 
   fun start(sdk: DartSdk) {
-    val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
-    commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
-    commandLine.charset = StandardCharsets.UTF_8
-    commandLine.addParameter("tooling-daemon")
-    commandLine.addParameter("--machine")
-    commandLine.addParameter("--ping-interval=15")
-    Analytics.updateEnvironment(commandLine)
+    val commandLine = createDtdCommandLine(sdk)
 
     osProcessHandler = object : KillableProcessHandler(commandLine) {
       override fun readerOptions(): BaseOutputReader.Options = BaseOutputReader.Options.forMostlySilentProcess()
@@ -231,7 +222,7 @@ class DTDProcess {
       if (processRunning) return
 
       // The first line of text is the command issued, which can be ignored.
-      val text = event.text.trim().takeUnless { it.endsWith(" tooling-daemon --machine --ping-interval=15") }
+      val text = event.text.trim().takeUnless { isDtdCommandLine(it) }
         ?: return
 
       var uri: String? = null
