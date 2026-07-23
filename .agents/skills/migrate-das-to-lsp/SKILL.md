@@ -81,7 +81,7 @@ if (DartConfigurable.isExperimentalLspFeaturesEnabled(element.getProject())) {
 ```
 
 ### Step 2: Enable Feature Customization in Descriptor
-Open [DartLspServerDescriptor.kt](file:///Users/helinx/Documents/dart-intellij-third-party/third_party/src/main/java/com/jetbrains/lang/dart/lsp/DartLspServerDescriptor.kt) and update `lspCustomization` to enable the feature when the setting is toggled on:
+Open [DartLspServerDescriptor.kt](../../../third_party/src/main/java/com/jetbrains/lang/dart/lsp/DartLspServerDescriptor.kt) and update `lspCustomization` to enable the feature when the setting is toggled on:
 ```kotlin
 override val hoverCustomizer: LspHoverCustomizer
     get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
@@ -93,7 +93,7 @@ override val hoverCustomizer: LspHoverCustomizer
 *(Note: Replace `hoverCustomizer` / `LspHoverSupport` with the appropriate customizer property for your feature, such as `goToDefinitionCustomizer`, `renameCustomizer`, etc.)*
 
 ### Step 3: Advertise Capability in Bridge Handshake
-Open [DartBridgeLspServer.kt](file:///Users/helinx/Documents/dart-intellij-third-party/third_party/src/main/java/com/jetbrains/lang/dart/lsp/DartBridgeLspServer.kt) and update the `initialize()` method to declare support for the feature in `ServerCapabilities`:
+Open [DartBridgeLspServer.kt](../../../third_party/src/main/java/com/jetbrains/lang/dart/lsp/DartBridgeLspServer.kt) and update the `initialize()` method to declare support for the feature in `ServerCapabilities`:
 ```kotlin
 override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
     val capabilities = ServerCapabilities().apply {
