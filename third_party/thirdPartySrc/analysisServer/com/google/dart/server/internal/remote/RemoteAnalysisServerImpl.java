@@ -331,12 +331,6 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
     sendRequestToServer(id, RequestUtilities.generateAnalysisGetNavigation(id, file, offset, length), consumer);
   }
 
-  @Deprecated
-  @Override
-  public void analysis_getReachableSources(String file, GetReachableSourcesConsumer consumer) {
-    // TODO(scheglov) implement
-  }
-
   @Override
   public void analysis_getSignature(String file, int offset, GetSignatureConsumer consumer) {
   }
