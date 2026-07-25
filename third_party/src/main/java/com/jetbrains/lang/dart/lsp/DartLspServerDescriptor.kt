@@ -6,7 +6,10 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.io.OSAgnosticPathUtil
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
@@ -37,6 +40,7 @@ import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchyDisabled
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
+import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 
@@ -55,6 +59,17 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
 
     override fun isSupportedFile(file: VirtualFile): Boolean {
         return DartAnalysisServerService.isFileNameRespectedByAnalysisServer(file.name)
+    }
+
+    override fun getFileUri(file: VirtualFile): String {
+        val escapedPath = URLUtil.encodePath(getFilePath(file))
+        val url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath)
+        val uri = VfsUtil.toUri(url)?.toString() ?: url
+        val prefix = "file:///"
+        if (uri.startsWith(prefix) && OSAgnosticPathUtil.startsWithWindowsDrive(uri.substring(prefix.length))) {
+            return prefix + uri[prefix.length].uppercase() + uri.substring(prefix.length + 1)
+        }
+        return uri
     }
 
     override val lspCommunicationChannel: LspCommunicationChannel

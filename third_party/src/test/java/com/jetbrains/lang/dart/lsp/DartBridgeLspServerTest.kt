@@ -250,6 +250,13 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(mockClient.publishedDiagnostics?.diagnostics?.isEmpty() == true)
     }
 
+    fun testGetFileUriFormatting() {
+        val descriptor = DartLspServerDescriptor(project)
+        val file = myFixture.configureByText("foo.dart", "void main() {}").virtualFile
+        val expectedUri = DartAnalysisServerService.getInstance(project).getFileUri(file)
+        assertEquals(expectedUri, descriptor.getFileUri(file))
+    }
+
     private class MockLanguageClient : LanguageClient {
         var publishedDiagnostics: PublishDiagnosticsParams? = null
 
