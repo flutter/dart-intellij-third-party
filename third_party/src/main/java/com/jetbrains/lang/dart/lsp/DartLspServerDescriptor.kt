@@ -61,6 +61,16 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         return DartAnalysisServerService.isFileNameRespectedByAnalysisServer(file.name)
     }
 
+    /**
+     * Re-implements [LspServerDescriptor.getFileUri] to preserve uppercase Windows drive letters (`C:`).
+     *
+     * By default, the underlying JetBrains [LspServerDescriptor.getFileUri] lowercases drive letters (`c%3A`)
+     * to match VS Code conventions. However, legacy server messages sent by the Dart plugin (such as file
+     * synchronizations via `analysis.updateContent`) use uppercase drive letters derived from IntelliJ VFS paths.
+     * Because the Analysis Server evaluates path strings case-sensitively, a casing discrepancy between legacy
+     * and LSP-over-legacy requests causes the server to treat the same file as two distinct contexts, leading
+     * to duplicate analysis errors and sticky markers (see dart-lang/sdk#63819).
+     */
     override fun getFileUri(file: VirtualFile): String {
         val escapedPath = URLUtil.encodePath(getFilePath(file))
         val url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath)
