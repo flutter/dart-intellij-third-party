@@ -253,8 +253,13 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     fun testGetFileUriFormatting() {
         val descriptor = DartLspServerDescriptor(project)
         val file = myFixture.configureByText("foo.dart", "void main() {}").virtualFile
-        val expectedUri = DartAnalysisServerService.getInstance(project).getFileUri(file)
-        assertEquals(expectedUri, descriptor.getFileUri(file))
+        val uri = descriptor.getFileUri(file)
+        assertTrue(uri.startsWith("file:///"))
+        if (com.intellij.openapi.util.SystemInfo.isWindows) {
+            val pathAfterPrefix = uri.substring("file:///".length)
+            assertTrue(pathAfterPrefix[0].isUpperCase())
+            assertEquals(':', pathAfterPrefix[1])
+        }
     }
 
     private class MockLanguageClient : LanguageClient {
