@@ -19,8 +19,8 @@ private val DTD_COMMAND_LINE_PARAMETERS = listOf(
 
 private const val DTD_PING_INTERVAL_PARAMETER_PREFIX = "--ping-interval="
 
-private val DTD_COMMAND_LINE_SUFFIX =
-  DTD_COMMAND_LINE_PARAMETERS.joinToString(separator = " ", prefix = " ") + " $DTD_PING_INTERVAL_PARAMETER_PREFIX"
+private val DTD_COMMAND_LINE_PATTERN =
+  Regex(""".+\btooling-daemon --machine --ping-interval=\d+""")
 
 internal fun createDtdCommandLine(sdk: DartSdk, pingInterval: Int = 15): GeneralCommandLine {
   val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
@@ -32,7 +32,4 @@ internal fun createDtdCommandLine(sdk: DartSdk, pingInterval: Int = 15): General
   return commandLine
 }
 
-internal fun isDtdCommandLine(text: String): Boolean {
-  val pingInterval = text.substringAfterLast(DTD_COMMAND_LINE_SUFFIX, missingDelimiterValue = "")
-  return pingInterval.toIntOrNull() != null
-}
+internal fun isDtdCommandLine(text: String): Boolean = DTD_COMMAND_LINE_PATTERN.matches(text)
