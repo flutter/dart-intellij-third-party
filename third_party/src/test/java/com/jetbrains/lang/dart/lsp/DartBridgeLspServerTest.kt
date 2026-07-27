@@ -255,10 +255,9 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val file = myFixture.configureByText("foo.dart", "void main() {}").virtualFile
         val uri = descriptor.getFileUri(file)
         assertTrue(uri.startsWith("file:///"))
-        if (com.intellij.openapi.util.SystemInfo.isWindows) {
-            val pathAfterPrefix = uri.substring("file:///".length)
-            assertTrue(pathAfterPrefix[0].isUpperCase())
-            assertEquals(':', pathAfterPrefix[1])
+        val pathAfterPrefix = uri.substring("file:///".length)
+        if (pathAfterPrefix.length >= 2 && (pathAfterPrefix[1] == ':' || pathAfterPrefix.substring(1).startsWith("%3A"))) {
+            assertTrue("Drive letter must be uppercase in: $uri", pathAfterPrefix[0].isUpperCase())
         }
     }
 
