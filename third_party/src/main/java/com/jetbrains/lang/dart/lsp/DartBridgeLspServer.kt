@@ -236,6 +236,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest("textDocument/hover", params, Hover::class.java)
     }
 
+    // Note: We advertise linkSupport: true in server.setClientCapabilities (see RequestUtilities.java)
+    // so DAS is guaranteed to return List<LocationLink> for textDocument/definition.
     override fun definition(params: DefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
         logger.info("definition called with params: $params")
         val type = object : com.google.gson.reflect.TypeToken<List<LocationLink>>() {}.type
