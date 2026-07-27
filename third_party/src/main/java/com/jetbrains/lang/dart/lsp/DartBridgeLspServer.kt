@@ -238,32 +238,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun definition(params: DefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
         logger.info("definition called with params: $params")
-        return forwardRequest("textDocument/definition", params, com.google.gson.JsonElement::class.java).thenApply { jsonElement ->
-            if (jsonElement == null || jsonElement.isJsonNull) {
-                return@thenApply Either.forRight(emptyList<LocationLink>())
-            }
-            try {
-                if (jsonElement.isJsonArray) {
-                    val array = jsonElement.asJsonArray
-                    if (array.size() > 0 && array[0].isJsonObject) {
-                        val firstObj = array[0].asJsonObject
-                        if (firstObj.has("targetUri")) {
-                            val links = GSON.fromJson(jsonElement, object : com.google.gson.reflect.TypeToken<List<LocationLink>>() {}.type) as List<LocationLink>
-                            return@thenApply Either.forRight(links)
-                        } else {
-                            val locs = GSON.fromJson(jsonElement, object : com.google.gson.reflect.TypeToken<List<Location>>() {}.type) as List<Location>
-                            return@thenApply Either.forLeft(locs)
-                        }
-                    }
-                    return@thenApply Either.forRight(emptyList<LocationLink>())
-                } else if (jsonElement.isJsonObject) {
-                    val loc = GSON.fromJson(jsonElement, Location::class.java)
-                    return@thenApply Either.forLeft(listOf(loc))
-                }
-            } catch (e: Exception) {
-                logger.error("Failed to parse textDocument/definition response: $jsonElement", e)
-            }
-            Either.forRight(emptyList<LocationLink>())
+        val type = object : com.google.gson.reflect.TypeToken<List<LocationLink>>() {}.type
+        return forwardRequest<List<LocationLink>>("textDocument/definition", params, type).thenApply { links ->
+            Either.forRight(links ?: emptyList())
         }
     }
 
