@@ -14,11 +14,15 @@ import com.google.dart.server.internal.remote.ByteLineReaderStream
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
+import com.google.gson.reflect.TypeToken
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
+import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
@@ -26,6 +30,7 @@ import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
 import org.eclipse.lsp4j.TextDocumentIdentifier
+import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
@@ -189,6 +194,98 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val result = future.get(5, TimeUnit.SECONDS)
         assertNotNull(result)
         assertTrue("Response contents should contain Hover Content", result.contents.toString().contains("Hover Content"))
+    }
+
+    fun testEitherCommandAndCodeActionDeserialization() {
+        val gson = DartBridgeLspServer.GSON
+        val jsonInput = """
+        [
+          {
+            "title": "Sort Members",
+            "command": "dart.edit.sortMembers",
+            "arguments": [
+              {
+                "path": "/Users/helinx/Documents/embeddings_playground/bin/main.dart",
+                "autoTriggered": true
+              }
+            ]
+          },
+          {
+            "title": "Import library 'dart:io'",
+            "kind": "quickfix.import.librarySdk",
+            "command": {
+              "title": "Import library 'dart:io'",
+              "command": "dart.edit.codeAction.apply",
+              "arguments": [
+                {
+                  "textDocument": {
+                    "uri": "file:///Users/helinx/Documents/embeddings_playground/bin/main.dart",
+                    "version": null
+                  },
+                  "range": {
+                    "start": { "character": 39, "line": 11 },
+                    "end": { "character": 39, "line": 11 }
+                  },
+                  "kind": "quickfix.import.librarySdk"
+                }
+              ]
+            }
+          }
+        ]
+        """.trimIndent()
+
+        val type = object : TypeToken<List<Either<Command, CodeAction>>>() {}.type
+        val result: List<Either<Command, CodeAction>> = gson.fromJson(jsonInput, type)
+
+        assertEquals(2, result.size)
+
+        // First item should deserialize cleanly as a Left (Command)
+        assertTrue("First item should be Left (Command)", result[0].isLeft)
+        assertEquals("dart.edit.sortMembers", result[0].left.command)
+        assertEquals("Sort Members", result[0].left.title)
+
+        // Second item should deserialize cleanly as a Right (CodeAction)
+        assertTrue("Second item should be Right (CodeAction)", result[1].isRight)
+        assertEquals("Import library 'dart:io'", result[1].right.title)
+        assertEquals("quickfix.import.librarySdk", result[1].right.kind)
+        assertNotNull(result[1].right.command)
+        assertEquals("dart.edit.codeAction.apply", result[1].right.command.command)
+    }
+
+    fun testExecuteCommandNormalizationPreservesVersionNull() {
+        val gson = DartBridgeLspServer.GSON
+
+        val tdObj = JsonObject().apply {
+            addProperty("uri", "file:///path/to/main.dart")
+        }
+        val rangeObj = JsonObject().apply {
+            add("start", JsonObject().apply { addProperty("line", 10); addProperty("character", 5) })
+            add("end", JsonObject().apply { addProperty("line", 10); addProperty("character", 5) })
+        }
+        val rawMap = JsonObject().apply {
+            add("textDocument", tdObj)
+            add("range", rangeObj)
+            addProperty("kind", "quickfix.import.librarySdk")
+        }
+
+        // Verify that normalizing textDocument ensures "version": null (JsonNull) is included
+        // and serialized when serializeNulls is enabled
+        val td = rawMap.get("textDocument").asJsonObject
+        val normalizedTd = JsonObject().apply {
+            addProperty("uri", td.get("uri").asString)
+            add("version", JsonNull.INSTANCE)
+        }
+        val normalizedMap = JsonObject().apply {
+            add("textDocument", normalizedTd)
+            add("range", rawMap.get("range"))
+            add("kind", rawMap.get("kind"))
+        }
+
+        val serialized = gson.toJson(listOf(normalizedMap))
+        assertTrue("Serialized output must explicitly contain \"version\":null for OptionalVersionedTextDocumentIdentifier validation",
+            serialized.contains("\"version\":null"))
+        assertTrue("Serialized output must explicitly contain valid string uri",
+            serialized.contains("\"uri\":\"file:///path/to/main.dart\""))
     }
 
     fun testDiagnosticServerRequest() {
