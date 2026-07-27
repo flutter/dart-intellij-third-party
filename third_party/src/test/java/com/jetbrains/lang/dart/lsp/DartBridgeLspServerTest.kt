@@ -45,12 +45,12 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
         val das = DartAnalysisServerService.getInstance(project)
 
-        // Stub the version of the test SDK to a modern version (e.g. 3.0.0) to bypass version sufficiency check
+        // Stub the version of the test SDK to a modern version (e.g. 3.14.0-65.0.dev) to bypass version sufficiency check
         val sdk = requireNotNull(com.jetbrains.lang.dart.sdk.DartSdk.getDartSdk(project)) { "Dart SDK not found" }
         originalSdkVersion = sdk.version
         val sdkClass = com.jetbrains.lang.dart.sdk.DartSdk::class.java
         val sdkVersionField = sdkClass.getDeclaredField("myVersion").apply { isAccessible = true }
-        sdkVersionField.set(sdk, "3.0.0")
+        sdkVersionField.set(sdk, "3.14.0-65.0.dev")
 
         // Align mySdkHome and mySdkVersion in DartAnalysisServerService via reflection to bypass re-start check
         val serviceClass = DartAnalysisServerService::class.java
@@ -59,7 +59,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         sdkHomeField.set(das, sdk.homePath)
         
         val dasSdkVersionField = serviceClass.getDeclaredField("mySdkVersion").apply { isAccessible = true }
-        dasSdkVersionField.set(das, "3.0.0")
+        dasSdkVersionField.set(das, "3.14.0-65.0.dev")
 
         val stubSocket = createStubSocket()
         val mockServer = object : RemoteAnalysisServerImpl(stubSocket) {
