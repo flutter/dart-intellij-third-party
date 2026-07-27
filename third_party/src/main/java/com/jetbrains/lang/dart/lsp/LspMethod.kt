@@ -10,6 +10,7 @@ enum class LspMethod(
     val isExperimental: Boolean = false,
     val presentableName: String? = null
 ) {
+    DEFINITION("textDocument/definition", isExperimental = true, presentableName = "navigation"),
     DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = true, presentableName = "diagnostic server"),
     HOVER("textDocument/hover", isExperimental = true, presentableName = "hover"),
     INITIALIZE("initialize"),
