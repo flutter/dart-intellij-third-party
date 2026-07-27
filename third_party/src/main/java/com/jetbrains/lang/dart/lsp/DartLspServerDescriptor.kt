@@ -21,10 +21,14 @@ import com.intellij.platform.dartlsp.api.customization.LspDocumentColorDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentLinkDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentSymbolDisabled
+import com.intellij.platform.dartlsp.api.customization.LspFindReferencesCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesDisabled
+import com.intellij.platform.dartlsp.api.customization.LspFindReferencesSupport
 import com.intellij.platform.dartlsp.api.customization.LspFoldingRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFormattingDisabled
+import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionDisabled
+import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionSupport
 import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionDisabled
 import com.intellij.platform.dartlsp.api.customization.LspHoverCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspHoverDisabled
@@ -79,7 +83,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 LspHoverDisabled
             }
         
-        override val goToDefinitionCustomizer = LspGoToDefinitionDisabled
+        override val goToDefinitionCustomizer: LspGoToDefinitionCustomizer
+            get() = if (DartAnalysisServerService.isLspNavigationEnabled(project)) {
+                LspGoToDefinitionSupport()
+            } else {
+                LspGoToDefinitionDisabled
+            }
         override val goToTypeDefinitionCustomizer = LspGoToTypeDefinitionDisabled
         override val completionCustomizer = LspCompletionDisabled
         override val semanticTokensCustomizer = LspSemanticTokensDisabled
@@ -87,7 +96,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val codeActionsCustomizer = LspCodeActionsDisabled
         override val commandsCustomizer = LspCommandsDisabled
         override val formattingCustomizer = LspFormattingDisabled
-        override val findReferencesCustomizer = LspFindReferencesDisabled
+        override val findReferencesCustomizer: LspFindReferencesCustomizer
+            get() = if (DartAnalysisServerService.isLspNavigationEnabled(project)) {
+                LspFindReferencesSupport()
+            } else {
+                LspFindReferencesDisabled
+            }
         override val optimizeImportsCustomizer = LspOptimizeImportsDisabled
         override val documentColorCustomizer = LspDocumentColorDisabled
         override val documentLinkCustomizer = LspDocumentLinkDisabled

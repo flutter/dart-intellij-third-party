@@ -19,6 +19,7 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.analyzer.DartServerData;
 import com.jetbrains.lang.dart.injection.DartMultiHostInjector;
 import com.jetbrains.lang.dart.resolve.DartResolver;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import org.jetbrains.annotations.NotNull;
 
@@ -51,6 +52,8 @@ final class DartReferenceContributor extends PsiReferenceContributor {
       }
 
       final Project project = element.getProject();
+      if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) return PsiReference.EMPTY_ARRAY;
+
       final VirtualFile file = DartResolveUtil.getRealVirtualFile(InjectedLanguageManager.getInstance(project).getTopLevelFile(element));
       if (!DartAnalysisServerService.isLocalAnalyzableFile(file)) return PsiReference.EMPTY_ARRAY;
 

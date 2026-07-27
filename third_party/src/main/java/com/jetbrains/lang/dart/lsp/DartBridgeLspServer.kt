@@ -14,6 +14,7 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
+import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
@@ -24,15 +25,20 @@ import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.Location
+import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
+import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
+import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
@@ -206,6 +212,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         logger.info("Initialize called")
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
+            setDefinitionProvider(true)
+            setReferencesProvider(true)
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -228,6 +236,43 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun hover(params: HoverParams): CompletableFuture<Hover> {
         return forwardRequest("textDocument/hover", params, Hover::class.java)
+    }
+
+    override fun definition(params: DefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
+        logger.info("definition called with params: $params")
+        return forwardRequest("textDocument/definition", params, com.google.gson.JsonElement::class.java).thenApply { jsonElement ->
+            if (jsonElement == null || jsonElement.isJsonNull) {
+                return@thenApply Either.forRight(emptyList<LocationLink>())
+            }
+            try {
+                if (jsonElement.isJsonArray) {
+                    val array = jsonElement.asJsonArray
+                    if (array.size() > 0 && array[0].isJsonObject) {
+                        val firstObj = array[0].asJsonObject
+                        if (firstObj.has("targetUri")) {
+                            val links = GSON.fromJson(jsonElement, object : com.google.gson.reflect.TypeToken<List<LocationLink>>() {}.type) as List<LocationLink>
+                            return@thenApply Either.forRight(links)
+                        } else {
+                            val locs = GSON.fromJson(jsonElement, object : com.google.gson.reflect.TypeToken<List<Location>>() {}.type) as List<Location>
+                            return@thenApply Either.forLeft(locs)
+                        }
+                    }
+                    return@thenApply Either.forRight(emptyList<LocationLink>())
+                } else if (jsonElement.isJsonObject) {
+                    val loc = GSON.fromJson(jsonElement, Location::class.java)
+                    return@thenApply Either.forLeft(listOf(loc))
+                }
+            } catch (e: Exception) {
+                logger.error("Failed to parse textDocument/definition response: $jsonElement", e)
+            }
+            Either.forRight(emptyList<LocationLink>())
+        }
+    }
+
+    override fun references(params: ReferenceParams): CompletableFuture<List<Location>> {
+        logger.info("references called with params: $params")
+        val type = object : com.google.gson.reflect.TypeToken<List<Location>>() {}.type
+        return forwardRequest("textDocument/references", params, type)
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
@@ -275,6 +320,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
      * to simplify tracking and matching.
      */
     private fun <T> forwardRequest(method: String, params: Any?, responseClass: Class<T>): CompletableFuture<T> {
+        return forwardRequest(method, params, responseClass as Type)
+    }
+
+    private fun <T> forwardRequest(method: String, params: Any?, responseType: Type): CompletableFuture<T> {
         val future = CompletableFuture<T>()
         
         val ready = runReadAction { das.serverReadyForRequest() }
@@ -291,7 +340,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             return future
         }
         
-        val pending = PendingRequest(future, responseClass)
+        val pending = PendingRequest(future, responseType)
         pendingRequests[legacyId] = pending
 
         val lspRequest = JsonObject().apply {
@@ -354,10 +403,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     // Helper class to store pending request info.
-    private inner class PendingRequest<T>(val future: CompletableFuture<T>, val responseClass: Class<T>) {
+    private inner class PendingRequest<T>(val future: CompletableFuture<T>, val responseType: Type) {
         fun complete(resultPayload: JsonElement) {
             try {
-                val result = GSON.fromJson(resultPayload, responseClass)
+                val result = GSON.fromJson<T>(resultPayload, responseType)
                 future.complete(result)
             } catch (e: Exception) {
                 future.completeExceptionally(e)

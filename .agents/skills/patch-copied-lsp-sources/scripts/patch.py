@@ -238,11 +238,17 @@ lsp.rename.action.text=LSP-Based Rename
     if os.path.exists(code_vision_path):
         with open(code_vision_path, "r", encoding="utf-8") as f:
             code_vision_content = f.read()
+        modified = False
         if "handleExtraAction" not in code_vision_content:
             code_vision_content = code_vision_content.replace(
                 "override val singleEntryPerLine: Boolean = false\n}",
                 "override val singleEntryPerLine: Boolean = false\n\n  override fun handleExtraAction(editor: Editor, textRange: TextRange, entry: CodeVisionEntry, actionId: String) {}\n}"
             )
+            modified = True
+        if '"LspCodeVisionProvider"' in code_vision_content:
+            code_vision_content = code_vision_content.replace('"LspCodeVisionProvider"', '"DartLspCodeVisionProvider"')
+            modified = True
+        if modified:
             with open(code_vision_path, "w", encoding="utf-8") as f:
                 f.write(code_vision_content)
 
