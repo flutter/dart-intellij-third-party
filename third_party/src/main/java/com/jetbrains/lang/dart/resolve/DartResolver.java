@@ -20,7 +20,6 @@ import com.jetbrains.lang.dart.analyzer.DartServerData.DartNavigationRegion;
 import com.jetbrains.lang.dart.analyzer.DartServerData.DartNavigationTarget;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.DartTokenTypes;
-import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
