@@ -126,7 +126,6 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
      *    LSP errors to resolve the matching pending request future.
      */
     private fun handleDasResponse(jsonObject: JsonObject) {
-        logger.info("Received DAS response: $jsonObject")
         // Check if it's a notification from DAS.
         if (jsonObject.has("params")) {
             val params = jsonObject.get("params").asJsonObject
@@ -239,7 +238,6 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     // Note: We advertise linkSupport: true in server.setClientCapabilities (see RequestUtilities.java)
     // so DAS is guaranteed to return List<LocationLink> for textDocument/definition.
     override fun definition(params: DefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
-        logger.info("definition called with params: $params")
         val type = object : com.google.gson.reflect.TypeToken<List<LocationLink>>() {}.type
         return forwardRequest<List<LocationLink>>("textDocument/definition", params, type).thenApply { links ->
             Either.forRight(links ?: emptyList())
