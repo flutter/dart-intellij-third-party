@@ -245,9 +245,6 @@ lsp.rename.action.text=LSP-Based Rename
                 "override val singleEntryPerLine: Boolean = false\n\n  override fun handleExtraAction(editor: Editor, textRange: TextRange, entry: CodeVisionEntry, actionId: String) {}\n}"
             )
             modified = True
-        if '"LspCodeVisionProvider"' in code_vision_content:
-            code_vision_content = code_vision_content.replace('"LspCodeVisionProvider"', '"DartLspCodeVisionProvider"')
-            modified = True
         if modified:
             with open(code_vision_path, "w", encoding="utf-8") as f:
                 f.write(code_vision_content)
