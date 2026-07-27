@@ -21,9 +21,7 @@ import com.intellij.platform.dartlsp.api.customization.LspDocumentColorDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentLinkDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentSymbolDisabled
-import com.intellij.platform.dartlsp.api.customization.LspFindReferencesCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesDisabled
-import com.intellij.platform.dartlsp.api.customization.LspFindReferencesSupport
 import com.intellij.platform.dartlsp.api.customization.LspFoldingRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFormattingDisabled
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionCustomizer
@@ -96,12 +94,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val codeActionsCustomizer = LspCodeActionsDisabled
         override val commandsCustomizer = LspCommandsDisabled
         override val formattingCustomizer = LspFormattingDisabled
-        override val findReferencesCustomizer: LspFindReferencesCustomizer
-            get() = if (DartAnalysisServerService.isLspNavigationEnabled(project)) {
-                LspFindReferencesSupport()
-            } else {
-                LspFindReferencesDisabled
-            }
+        override val findReferencesCustomizer = LspFindReferencesDisabled
         override val optimizeImportsCustomizer = LspOptimizeImportsDisabled
         override val documentColorCustomizer = LspDocumentColorDisabled
         override val documentLinkCustomizer = LspDocumentLinkDisabled
