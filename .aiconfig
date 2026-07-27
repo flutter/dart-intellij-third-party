@@ -1,7 +1,7 @@
 project:
   context:
     instruction_files:
-      - tool/skills/code_review.md
+      - .agents/skills/code-review/SKILL.md
       - .gemini/styleguide.md
 
   generation_rules:
