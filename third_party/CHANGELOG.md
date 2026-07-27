@@ -4,6 +4,7 @@
 - Retrieving diagnostics server with JetBrains LSP (#493)
 
 ### Changed
+- Go to Definition implemented with JetBrains LSP (#539)
 
 ### Removed
 
