@@ -22,6 +22,9 @@ You are a Senior Staff Engineer performing a rigorous code review on the develop
 
 Perform a multi-pass analysis of the diff:
 
+### Pass 0: Repository & Structure Restrictions
+- **Third-Party Sources:** Check for any modifications to files under the `third_party/thirdPartySrc/` directory. These files are periodically bulk-copied from upstream, and any direct changes will be lost. Reject such modifications with a `[MUST-FIX]` comment (unless explicitly requested as an override).
+
 ### Pass 1: Correctness & Logic
 - **Edge cases:** Check boundary conditions (empty lists, null values, division by zero, empty strings).
 - **Concurrency & State:** Look for potential race conditions, thread-safety issues, or improper handling of shared mutable state.

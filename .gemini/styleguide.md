@@ -54,6 +54,7 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - Use imports instead of fully qualified names.
 
 ## 4. Code Quality & Maintainability
+- **Third-Party Code:** NEVER modify files under `third_party/thirdPartySrc/` directly. These files are periodically bulk-copied from upstream, so direct modifications will be overwritten. Flag any PR that attempts to change these files with a `[MUST-FIX]` comment.
 - **Single Responsibility:** Methods should ideally be 10-20 lines. If a method exceeds 30 lines, suggest a refactor.
 - **DRY:** Identify blocks of code that are 90%+ identical to existing utility methods in this repo and flag them for duplication.
 - **Meaningful Naming:** Variables should describe their intent (e.g., `timeoutInMs` instead of `t`).

@@ -1,0 +1,9 @@
+project:
+  context:
+    instruction_files:
+      - tool/skills/code_review.md
+      - .gemini/styleguide.md
+
+  generation_rules:
+    - "When the user asks for a 'code review', always follow the instructions specified in `tool/skills/code_review.md`."
+    - "NEVER edit or propose edits to files in `third_party/thirdPartySrc/`. These files are periodically bulk-copied from upstream."
