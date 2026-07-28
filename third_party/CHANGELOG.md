@@ -2,6 +2,7 @@
 
 ### Added
 - Retrieving diagnostics server with JetBrains LSP (#493)
+- Documenting the process for installing dev builds (#544)
 
 ### Changed
 

@@ -13,7 +13,7 @@ To receive development builds of the Dart plugin in IntelliJ IDEA:
 
 1. Open **Settings** (or **Preferences** on macOS) in IntelliJ IDEA.
 2. Go to **Plugins**.
-3. Click the ⚙️ (**Gear icon**) at the top right of the Plugins panel and select **Manage Plugin Repositories...**.
+3. Click the ⚙️ (**Gear icon**) at the top of the Plugins panel and select **Manage Plugin Repositories...**.
 4. Click **+** and add the dev channel repository URL:
    ```text
    https://plugins.jetbrains.com/plugins/dev/6351
