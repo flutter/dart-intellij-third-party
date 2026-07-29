@@ -111,7 +111,6 @@ import org.dartlang.analysis.server.protocol.AnalysisError;
 import org.dartlang.analysis.server.protocol.AnalysisErrorFixes;
 import org.dartlang.analysis.server.protocol.AnalysisErrorSeverity;
 import org.dartlang.analysis.server.protocol.AnalysisErrorType;
-import org.dartlang.analysis.server.protocol.AnalysisOptions;
 import org.dartlang.analysis.server.protocol.AnalysisService;
 import org.dartlang.analysis.server.protocol.AnalysisStatus;
 import org.dartlang.analysis.server.protocol.AvailableSuggestionSet;
@@ -2326,7 +2325,6 @@ public final class DartAnalysisServerService implements Disposable {
 
         mySdkVersion = sdk.getVersion();
 
-        startedServer.analysis_updateOptions(new AnalysisOptions(true, true, true, true, false, true, false));
         boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
         boolean supportsWorkspaceApplyEdits = isDartSdkVersionSufficientForWorkspaceApplyEdits(mySdkVersion);
         startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
