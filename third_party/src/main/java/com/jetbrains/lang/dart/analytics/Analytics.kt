@@ -335,6 +335,9 @@ class FixData(id: String?, project: Project?) :
 class LegacyHoverData(id: String?, project: Project?) :
   AnalyticsData(AnalyticsConstants.LEGACY_HOVER_TYPE, id, project)
 
+class LegacyRefactoringData(kind: String?, project: Project?) :
+  AnalyticsData(AnalyticsConstants.LEGACY_REFACTORING_TYPE, kind, project)
+
 class SettingsData(project: Project?) :
   AnalyticsData(AnalyticsConstants.SETTINGS_TYPE, "settings", project)
 
@@ -378,6 +381,10 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
 
     @JvmStatic
     fun forLegacyHover(id: String?, project: Project?): LegacyHoverData = LegacyHoverData(id, project)
+
+    @JvmStatic
+    fun forLegacyRefactoring(kind: String?, project: Project?): LegacyRefactoringData =
+      LegacyRefactoringData(kind, project)
 
     @JvmStatic
     fun forAction(action: AnAction, event: AnActionEvent): ActionData = forAction(
@@ -425,10 +432,23 @@ object AnalyticsConstants {
   @JvmField
   val DURATION_MS = IntValue("duration_ms")
 
+  @JvmField
+  val EXTRACT_ALL = BooleanValue("extract_all")
+
+  @JvmField
+  val CREATE_GETTER = BooleanValue("create_getter")
+
+  @JvmField
+  val INLINE_ALL = BooleanValue("inline_all")
+
+  @JvmField
+  val NON_DEFAULT_OPTION = BooleanValue("non_default_option")
+
   internal const val ACTION_TYPE = "action"
   internal const val ASSIST_TYPE = "assist"
   internal const val FIX_TYPE = "fix"
   internal const val LEGACY_HOVER_TYPE = "legacy_hover"
+  internal const val LEGACY_REFACTORING_TYPE = "legacy_refactoring"
   internal const val SETTINGS_TYPE = "settings"
   internal const val DEBUG_SESSION_TYPE = "debug_session"
   internal const val RUN_SESSION_TYPE = "run_session"

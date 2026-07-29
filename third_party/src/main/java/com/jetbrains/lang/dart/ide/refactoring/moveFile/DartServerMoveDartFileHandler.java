@@ -71,6 +71,7 @@ public final class DartServerMoveDartFileHandler extends MoveFileHandler {
           assert change != null;
           try {
             AssistUtils.applySourceChange(project, change, false);
+            refactoring.reportAnalytics();
           }
           catch (DartSourceEditException exception) {
             // Exception when trying to apply the creating the refactoring

@@ -147,6 +147,7 @@ class ExtractLocalVariableProcessor {
       assert change != null;
       try {
         AssistUtils.applySourceChange(project, change, true);
+        refactoring.reportAnalytics();
       }
       catch (DartSourceEditException e) {
         CommonRefactoringUtil.showErrorHint(project, editor, e.getMessage(), CommonBundle.getErrorTitle(), null);
