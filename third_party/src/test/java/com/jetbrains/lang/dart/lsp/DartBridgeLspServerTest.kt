@@ -273,8 +273,9 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
         val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
         assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
 
-        val lspMessage = jsonObject!!.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
         assertEquals("123", lspMessage.get("id").asString)
         assertEquals("textDocument/documentHighlight", lspMessage.get("method").asString)
 
