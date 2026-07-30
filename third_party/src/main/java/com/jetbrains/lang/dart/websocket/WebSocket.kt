@@ -47,9 +47,9 @@ class WebSocket(private val uri: URI) {
 
     @Throws(WebSocketException::class)
     fun send(text: String) {
-        val webSocket = jdkWebSocket.get() ?: throw WebSocketException("WebSocket is not connected")
         synchronized(sendLock)
         {
+            val webSocket = jdkWebSocket.get() ?: throw WebSocketException("WebSocket is not connected")
             val future = webSocket.sendText(text, true).toCompletableFuture()
             try {
                 future.get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
