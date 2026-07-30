@@ -4,7 +4,7 @@ package com.jetbrains.lang.dart.ide.actions;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationGroupManager;
-import com.intellij.notification.NotificationListener;
+import com.intellij.notification.NotificationAction;
 import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.colors.EditorColors;
@@ -160,17 +160,12 @@ public final class DartEditorNotificationsProvider implements EditorNotification
                              : DartBundle.message("dart.support.enabled");
         final String message = DartBundle.message("dart.sdk.0.open.dart.settings", sdk.getVersion());
 
-        final NotificationListener listener = new NotificationListener.Adapter() {
-          @Override
-          protected void hyperlinkActivated(@NotNull Notification notification, @NotNull HyperlinkEvent e) {
-            DartConfigurable.openDartSettings(project);
-          }
-        };
-
         NotificationGroupManager.getInstance()
           .getNotificationGroup("Dart Support")
           .createNotification(title, message, NotificationType.INFORMATION)
-          .setListener(listener)
+          .addAction(NotificationAction.createSimple(DartBundle.message("open.dart.settings"), ()-> {
+            DartConfigurable.openDartSettings(project);
+          }))
           .notify(project);
       }
     }
