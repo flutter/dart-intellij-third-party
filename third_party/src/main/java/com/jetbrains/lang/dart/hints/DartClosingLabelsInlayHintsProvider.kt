@@ -5,7 +5,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFile
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 
-class DartInlayHintsProvider : InlayHintsProvider {
+class DartClosingLabelsInlayHintsProvider : InlayHintsProvider {
   companion object {
     const val PROVIDER_ID: String = "dart.closing.labels"
   }
