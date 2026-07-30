@@ -21,6 +21,8 @@ import org.eclipse.lsp4j.DidChangeWatchedFilesParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
+import org.eclipse.lsp4j.DocumentHighlight
+import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
@@ -211,6 +213,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
             setDefinitionProvider(true)
+            setDocumentHighlightProvider(true)
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -242,6 +245,11 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest<List<LocationLink>>("textDocument/definition", params, type).thenApply { links ->
             Either.forRight(links ?: emptyList())
         }
+    }
+
+    override fun documentHighlight(params: DocumentHighlightParams): CompletableFuture<List<DocumentHighlight>> {
+        val type = object : com.google.gson.reflect.TypeToken<List<DocumentHighlight>>() {}.type
+        return forwardRequest<List<DocumentHighlight>>("textDocument/documentHighlight", params, type)
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {

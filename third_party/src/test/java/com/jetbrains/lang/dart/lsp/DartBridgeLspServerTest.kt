@@ -19,6 +19,8 @@ import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
+import org.eclipse.lsp4j.DocumentHighlightKind
+import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
@@ -259,6 +261,45 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         if (pathAfterPrefix.length >= 2 && (pathAfterPrefix[1] == ':' || pathAfterPrefix.substring(1).startsWith("%3A"))) {
             assertTrue("Drive letter must be uppercase in: $uri", pathAfterPrefix[0].isUpperCase())
         }
+    }
+
+    fun testDocumentHighlightRequest() {
+        val params = DocumentHighlightParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            position = Position(1, 2)
+        }
+
+        val future = bridgeServer.documentHighlight(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+
+        val lspMessage = jsonObject!!.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("textDocument/documentHighlight", lspMessage.get("method").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": [
+                    {"range": {"start": {"line": 0, "character": 4}, "end": {"line": 0, "character": 5}}, "kind": 3},
+                    {"range": {"start": {"line": 2, "character": 2}, "end": {"line": 2, "character": 3}}, "kind": 2}
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertEquals(2, result.size)
+        assertEquals(DocumentHighlightKind.Write, result[0].kind)
+        assertEquals(DocumentHighlightKind.Read, result[1].kind)
     }
 
     private class MockLanguageClient : LanguageClient {
