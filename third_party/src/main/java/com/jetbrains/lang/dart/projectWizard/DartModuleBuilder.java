@@ -139,7 +139,7 @@ public final class DartModuleBuilder extends ModuleBuilder {
       DartSdkUtil.updateKnownSdkPaths(project, wizardData.dartSdkPath);
 
       final LibraryTable.ModifiableModel libraryTableModifiableModel =
-              ModifiableModelsProvider.getInstance().getLibraryTableModifiableModel(project);
+        ModifiableModelsProvider.getInstance().getLibraryTableModifiableModel(project);
 
       DartSdkLibUtil.ensureDartSdkConfigured(project, libraryTableModifiableModel, wizardData.dartSdkPath);
 
