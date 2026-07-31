@@ -102,7 +102,7 @@ intellijPlatform {
         }
 
         println("plugin version: ${version.get()}")
-        println("ideaVersion: ${ideaVersion.sinceBuild.get()} and above")
+        println("ideaVersion: ${this.ideaVersion.sinceBuild.get()} and above")
 
         changeNotes = provider {
             project.changelog.renderItem(project.changelog.getLatest(), Changelog.OutputType.HTML)
