@@ -183,6 +183,7 @@ public final class DartModuleBuilder extends ModuleBuilder {
     // This perfectly handles both WebStorm (already initialized) and IntelliJ IDEA (needs to wait).
 
     DumbService.getInstance(module.getProject()).runWhenSmart(() -> {
+      if (module.isDisposed()) return;
       if (ModalityState.current() == ModalityState.nonModal()) {
         runnable.run();
       }
