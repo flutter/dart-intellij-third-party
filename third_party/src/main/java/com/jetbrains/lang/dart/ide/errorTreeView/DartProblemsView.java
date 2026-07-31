@@ -13,8 +13,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsContexts.TabTitle;
-import com.intellij.openapi.util.text.HtmlBuilder;
-import com.intellij.openapi.util.text.HtmlChunk;
+
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -36,7 +35,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.swing.event.HyperlinkEvent;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -188,21 +187,15 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
     return myPresentationHelper.getCurrentFile();
   }
 
-  @SuppressWarnings("unused")
-  public void showWarningNotification(@NotNull @NlsContexts.NotificationTitle String title,
-                                      @Nullable @NlsContexts.NotificationContent String content,
-                                      @Nullable Icon icon) {
-    showNotification(NotificationType.WARNING, title, content, icon, false);
-  }
-
   public void showErrorNotificationTerse(@NotNull @NlsContexts.NotificationTitle String title) {
-    showNotification(NotificationType.ERROR, title, null, null, true);
+    showNotification(NotificationType.ERROR, title, null, null, true, false);
   }
 
   public void showErrorNotification(@NotNull @NlsContexts.NotificationTitle String title,
                                     @Nullable @NlsContexts.NotificationContent String content,
-                                    @Nullable Icon icon) {
-    showNotification(NotificationType.ERROR, title, content, icon, false);
+                                    @Nullable Icon icon,
+                                    boolean addOpenAnalysisAction) {
+    showNotification(NotificationType.ERROR, title, content, icon, false, addOpenAnalysisAction);
   }
 
   public void clearNotifications() {
@@ -212,67 +205,76 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
     }
   }
 
-  public static final String OPEN_DART_ANALYSIS_LINK = "open.dart.analysis";
-
   private void showNotification(@NotNull NotificationType notificationType,
                                 @NotNull @NlsContexts.NotificationTitle String title,
                                 @Nullable @NlsContexts.NotificationContent String content,
                                 @Nullable Icon icon,
-                                boolean terse) {
+                                boolean terse,
+                                boolean addOpenAnalysisAction) {
     clearNotifications();
 
     if (myDisabledForSession) return;
 
-    content = StringUtil.notNullize(content);
-    if (!terse) {
-      if (!content.endsWith("<br>")) content += "<br>";
-      content +=
-        new HtmlBuilder().br()
-          .appendLink("disable.for.session", DartBundle.message("notification.link.don.t.show.for.this.session"))
-          .append(HtmlChunk.nbsp(7))
-          .appendLink("never.show.again", DartBundle.message("notification.link.never.show.again"));
-    }
+    final Notification notification = NotificationGroupManager.getInstance().getNotificationGroup("Dart Analysis")
+      .createNotification(title, StringUtil.notNullize(content), notificationType);
 
-    myNotification = NotificationGroupManager.getInstance().getNotificationGroup("Dart Analysis")
-      .createNotification(title, content, notificationType).setListener(new NotificationListener.Adapter() {
-      @Override
-      protected void hyperlinkActivated(final @NotNull Notification notification, final @NotNull HyperlinkEvent e) {
-        notification.expire();
-
-        if (OPEN_DART_ANALYSIS_LINK.equals(e.getDescription())) {
+    if (addOpenAnalysisAction) {
+      notification.addAction(NotificationAction.createSimple(
+        DartBundle.message("notification.open.dart.analysis.action.text"),
+        () -> {
+          notification.expire();
           ToolWindow toolWindow = getDartAnalysisToolWindow();
           if (toolWindow != null) {
             toolWindow.activate(null);
           }
         }
-        else if ("disable.for.session".equals(e.getDescription())) {
-          myDisabledForSession = true;
-        }
-        else if ("never.show.again".equals(e.getDescription())) {
-          NotificationGroupManager.getInstance().getNotificationGroup("Dart Analysis")
-            .createNotification(DartBundle.message("notification.title.warning.disabled"),
-                                DartBundle.message("notification.content.you.can.enable.it.back.in.the.a.href.event.log.a.settings",
-                                                   ActionCenter.getToolwindowName()),
-                                NotificationType.INFORMATION).setListener(new Adapter() {
-                @Override
-                protected void hyperlinkActivated(@NotNull Notification notification, @NotNull HyperlinkEvent e) {
-                  notification.expire();
-                  final ToolWindow toolWindow = getToolWindow(myProject);
-                  if (toolWindow != null) toolWindow.activate(null);
-                  // ActionCenter.activateLog(myProject);
-                }
-              }).notify(myProject);
-
-          NotificationsConfiguration.getNotificationsConfiguration().setDisplayType(notification.getGroupId(), NotificationDisplayType.NONE);
-        }
-      }
-    });
-
-    if (icon != null) {
-      myNotification.setIcon(icon);
+      ));
     }
 
-    myNotification.notify(myProject);
+    if (!terse) {
+      notification.addAction(NotificationAction.createSimple(
+        DartBundle.message("notification.don.t.show.for.this.session.action.text"),
+        () -> {
+          notification.expire();
+          myDisabledForSession = true;
+        }
+      ));
+
+      notification.addAction(NotificationAction.createSimple(
+        DartBundle.message("notification.never.show.again.action.text"),
+        () -> {
+          notification.expire();
+
+          final Notification innerNotification = NotificationGroupManager.getInstance().getNotificationGroup("Dart Analysis")
+            .createNotification(
+              DartBundle.message("notification.title.warning.disabled"),
+              DartBundle.message("notification.content.you.can.enable.it.back.in.the.settings", ActionCenter.getToolwindowName()),
+              NotificationType.INFORMATION
+            );
+
+          innerNotification.addAction(NotificationAction.createSimple(
+            DartBundle.message("notification.restore.settings.action.text", ActionCenter.getToolwindowName()),
+            () -> {
+              innerNotification.expire();
+              final ToolWindow toolWindow = getToolWindow(myProject);
+              if (toolWindow != null) toolWindow.activate(null);
+            }
+          ));
+
+          innerNotification.notify(myProject);
+
+          NotificationsConfiguration.getNotificationsConfiguration()
+            .setDisplayType(notification.getGroupId(), NotificationDisplayType.NONE);
+        }
+      ));
+    }
+
+    if (icon != null) {
+      notification.setIcon(icon);
+    }
+
+    myNotification = notification;
+    notification.notify(myProject);
   }
 
   @Override
