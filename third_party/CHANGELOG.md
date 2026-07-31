@@ -1,13 +1,28 @@
 ## Unreleased
 
 ### Added
-- Retrieving diagnostics server with JetBrains LSP (#493)
 
 ### Changed
 
 ### Removed
 
 ### Fixed
+
+## 508.0.0
+
+### Added
+- Retrieving diagnostics server with JetBrains LSP (#493)
+- Documenting the process for installing dev builds (#544)
+
+### Changed
+- Go to Definition implemented with JetBrains LSP (#539)
+
+### Removed
+- untilBuild restriction (#553)
+
+### Fixed
+- Duplicate analysis errors on Windows due to drive letter casing in LSP file URIs (#537)
+- DTD connection timeouts by enabling a 15-second ping interval (#525)
 
 ## 507.0.0
 

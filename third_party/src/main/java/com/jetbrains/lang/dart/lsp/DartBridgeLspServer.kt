@@ -14,6 +14,7 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
+import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
@@ -24,15 +25,19 @@ import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.Location
+import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
+import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
+import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 
@@ -121,7 +126,6 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
      *    LSP errors to resolve the matching pending request future.
      */
     private fun handleDasResponse(jsonObject: JsonObject) {
-        logger.info("Received DAS response: $jsonObject")
         // Check if it's a notification from DAS.
         if (jsonObject.has("params")) {
             val params = jsonObject.get("params").asJsonObject
@@ -206,6 +210,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         logger.info("Initialize called")
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
+            setDefinitionProvider(true)
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -228,6 +233,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun hover(params: HoverParams): CompletableFuture<Hover> {
         return forwardRequest("textDocument/hover", params, Hover::class.java)
+    }
+
+    // Note: We advertise linkSupport: true in server.setClientCapabilities (see RequestUtilities.java)
+    // so DAS is guaranteed to return List<LocationLink> for textDocument/definition.
+    override fun definition(params: DefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
+        val type = object : com.google.gson.reflect.TypeToken<List<LocationLink>>() {}.type
+        return forwardRequest<List<LocationLink>>("textDocument/definition", params, type).thenApply { links ->
+            Either.forRight(links ?: emptyList())
+        }
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
@@ -275,6 +289,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
      * to simplify tracking and matching.
      */
     private fun <T> forwardRequest(method: String, params: Any?, responseClass: Class<T>): CompletableFuture<T> {
+        return forwardRequest(method, params, responseClass as Type)
+    }
+
+    private fun <T> forwardRequest(method: String, params: Any?, responseType: Type): CompletableFuture<T> {
         val future = CompletableFuture<T>()
         
         val ready = runReadAction { das.serverReadyForRequest() }
@@ -291,7 +309,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             return future
         }
         
-        val pending = PendingRequest(future, responseClass)
+        val pending = PendingRequest(future, responseType)
         pendingRequests[legacyId] = pending
 
         val lspRequest = JsonObject().apply {
@@ -354,10 +372,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     // Helper class to store pending request info.
-    private inner class PendingRequest<T>(val future: CompletableFuture<T>, val responseClass: Class<T>) {
+    private inner class PendingRequest<T>(val future: CompletableFuture<T>, val responseType: Type) {
         fun complete(resultPayload: JsonElement) {
             try {
-                val result = GSON.fromJson(resultPayload, responseClass)
+                val result = GSON.fromJson<T>(resultPayload, responseType)
                 future.complete(result)
             } catch (e: Exception) {
                 future.completeExceptionally(e)

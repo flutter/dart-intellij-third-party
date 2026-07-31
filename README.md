@@ -7,6 +7,20 @@
 [![integration tests](https://github.com/flutter/dart-intellij-third-party/actions/workflows/integration_tests.yaml/badge.svg?label=integration%20tests)](https://github.com/flutter/dart-intellij-third-party/actions/workflows/integration_tests.yaml)
 
 
+## Installing Dev Builds
+
+To receive development builds of the Dart plugin in IntelliJ IDEA:
+
+1. Open **Settings** (or **Preferences** on macOS) in IntelliJ IDEA.
+2. Go to **Plugins**.
+3. Click the ⚙️ (**Gear icon**) at the top of the Plugins panel and select **Manage Plugin Repositories...**.
+4. Click **+** and add the dev channel repository URL:
+   ```text
+   https://plugins.jetbrains.com/plugins/dev/6351
+   ```
+5. Click **OK**. The IDE will now check for and install updates from the `dev` channel.
+
+
 ## Development setup
 
 1. Clone this repository with

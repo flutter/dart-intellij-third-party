@@ -98,6 +98,7 @@ import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
@@ -110,7 +111,6 @@ import org.dartlang.analysis.server.protocol.AnalysisError;
 import org.dartlang.analysis.server.protocol.AnalysisErrorFixes;
 import org.dartlang.analysis.server.protocol.AnalysisErrorSeverity;
 import org.dartlang.analysis.server.protocol.AnalysisErrorType;
-import org.dartlang.analysis.server.protocol.AnalysisOptions;
 import org.dartlang.analysis.server.protocol.AnalysisService;
 import org.dartlang.analysis.server.protocol.AnalysisStatus;
 import org.dartlang.analysis.server.protocol.AvailableSuggestionSet;
@@ -180,6 +180,7 @@ public final class DartAnalysisServerService implements Disposable {
   // https://htmlpreview.github.io/?https://github.com/dart-lang/sdk/blob/main/pkg/analysis_server/doc/api.html#request_server.setClientCapabilities
   public static final String MIN_FILE_URI_SDK_VERSION = "3.4.0";
   private static final String MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION = "3.8";
+  public static final String MIN_LSP_NAVIGATION_SDK_VERSION = "3.14.0-65.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -576,6 +577,18 @@ public final class DartAnalysisServerService implements Disposable {
 
   public static boolean isDartSdkVersionSufficientForWorkspaceApplyEdits(@NotNull String sdkVersion) {
     return StringUtil.compareVersionNumbers(sdkVersion, MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspNavigation(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_NAVIGATION_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspNavigationEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspNavigation(sdk.getVersion());
   }
 
   public boolean shouldUseCompletion2() {
@@ -2312,7 +2325,6 @@ public final class DartAnalysisServerService implements Disposable {
 
         mySdkVersion = sdk.getVersion();
 
-        startedServer.analysis_updateOptions(new AnalysisOptions(true, true, true, true, false, true, false));
         boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
         boolean supportsWorkspaceApplyEdits = isDartSdkVersionSufficientForWorkspaceApplyEdits(mySdkVersion);
         startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),

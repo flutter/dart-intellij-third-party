@@ -1058,6 +1058,8 @@ public class RequestUtilities {
       params.addProperty("supportsUris", supportsUris);
     }
 
+    JsonObject lspCapabilities = new JsonObject();
+
     if (supportsWorkspaceApplyEdits) {
       JsonObject workspace = new JsonObject();
       workspace.addProperty("applyEdit", true);
@@ -1066,11 +1068,18 @@ public class RequestUtilities {
       workspaceEdit.addProperty("documentChanges", false);
       workspace.add("workspaceEdit", workspaceEdit);
 
-      JsonObject lspCapabilities = new JsonObject();
       lspCapabilities.add("workspace", workspace);
-
-      params.add("lspCapabilities", lspCapabilities);
     }
+
+    JsonObject textDocument = new JsonObject();
+
+    JsonObject definition = new JsonObject();
+    definition.addProperty("linkSupport", true);
+    textDocument.add("definition", definition);
+
+    lspCapabilities.add("textDocument", textDocument);
+
+    params.add("lspCapabilities", lspCapabilities);
 
     return buildJsonObjectRequest(idValue, METHOD_SERVER_SET_CAPABILITIES, params);
   }

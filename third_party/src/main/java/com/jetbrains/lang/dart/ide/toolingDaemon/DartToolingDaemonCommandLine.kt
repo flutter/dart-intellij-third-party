@@ -15,18 +15,21 @@ import com.jetbrains.lang.dart.sdk.DartSdkUtil
 private val DTD_COMMAND_LINE_PARAMETERS = listOf(
   "tooling-daemon",
   "--machine",
-  "--ping-interval=15",
 )
 
-private val DTD_COMMAND_LINE_SUFFIX = DTD_COMMAND_LINE_PARAMETERS.joinToString(separator = " ", prefix = " ")
+private const val DTD_PING_INTERVAL_PARAMETER_PREFIX = "--ping-interval="
 
-internal fun createDtdCommandLine(sdk: DartSdk): GeneralCommandLine {
+private val DTD_COMMAND_LINE_PATTERN =
+  Regex(""".+\btooling-daemon --machine --ping-interval=\d+""")
+
+internal fun createDtdCommandLine(sdk: DartSdk, pingInterval: Int = 15): GeneralCommandLine {
   val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
   commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
   commandLine.charset = Charsets.UTF_8
   DTD_COMMAND_LINE_PARAMETERS.forEach(commandLine::addParameter)
+  commandLine.addParameter("$DTD_PING_INTERVAL_PARAMETER_PREFIX$pingInterval")
   Analytics.updateEnvironment(commandLine)
   return commandLine
 }
 
-internal fun isDtdCommandLine(text: String): Boolean = text.endsWith(DTD_COMMAND_LINE_SUFFIX)
+internal fun isDtdCommandLine(text: String): Boolean = DTD_COMMAND_LINE_PATTERN.matches(text)

@@ -6,7 +6,10 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.io.OSAgnosticPathUtil
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
@@ -24,7 +27,9 @@ import com.intellij.platform.dartlsp.api.customization.LspDocumentSymbolDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFoldingRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFormattingDisabled
+import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionDisabled
+import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionSupport
 import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionDisabled
 import com.intellij.platform.dartlsp.api.customization.LspHoverCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspHoverDisabled
@@ -37,6 +42,7 @@ import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchyDisabled
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
+import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 
@@ -55,6 +61,27 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
 
     override fun isSupportedFile(file: VirtualFile): Boolean {
         return DartAnalysisServerService.isFileNameRespectedByAnalysisServer(file.name)
+    }
+
+    /**
+     * Re-implements [LspServerDescriptor.getFileUri] to preserve uppercase Windows drive letters (`C:`).
+     *
+     * By default, the underlying JetBrains [LspServerDescriptor.getFileUri] lowercases drive letters (`c%3A`)
+     * to match VS Code conventions. However, legacy server messages sent by the Dart plugin (such as file
+     * synchronizations via `analysis.updateContent`) use uppercase drive letters derived from IntelliJ VFS paths.
+     * Because the Analysis Server evaluates path strings case-sensitively, a casing discrepancy between legacy
+     * and LSP-over-legacy requests causes the server to treat the same file as two distinct contexts, leading
+     * to duplicate analysis errors and sticky markers (see dart-lang/sdk#63819).
+     */
+    override fun getFileUri(file: VirtualFile): String {
+        val escapedPath = URLUtil.encodePath(getFilePath(file))
+        val url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath)
+        val uri = VfsUtil.toUri(url)?.toString() ?: url
+        val prefix = "file:///"
+        if (uri.startsWith(prefix) && OSAgnosticPathUtil.startsWithWindowsDrive(uri.substring(prefix.length))) {
+            return prefix + uri[prefix.length].uppercase() + uri.substring(prefix.length + 1)
+        }
+        return uri
     }
 
     override val lspCommunicationChannel: LspCommunicationChannel
@@ -79,7 +106,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 LspHoverDisabled
             }
         
-        override val goToDefinitionCustomizer = LspGoToDefinitionDisabled
+        override val goToDefinitionCustomizer: LspGoToDefinitionCustomizer
+            get() = if (DartAnalysisServerService.isLspNavigationEnabled(project)) {
+                LspGoToDefinitionSupport()
+            } else {
+                LspGoToDefinitionDisabled
+            }
         override val goToTypeDefinitionCustomizer = LspGoToTypeDefinitionDisabled
         override val completionCustomizer = LspCompletionDisabled
         override val semanticTokensCustomizer = LspSemanticTokensDisabled
