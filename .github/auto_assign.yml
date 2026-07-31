@@ -1,8 +1,0 @@
-addReviewers: true
-addAssignees: false
-
-reviewers:
-  - helin24
-  - pq
-
-numberOfReviewers: 1
