@@ -5,6 +5,7 @@ import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.notification.*;
 import com.intellij.openapi.application.ApplicationInfo;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -64,22 +65,26 @@ public class DartAnalysisServerErrorHandler {
               DartBundle.message("notification.title.dart.analysis.issue"),
               notificationContent,
               isFatal ? NotificationType.ERROR : NotificationType.WARNING)
-            .addAction(NotificationAction.createSimple(DartBundle.message("notification.view.details.action.text"), () -> {
-              String content = calculateIssueText(messageOneLine, sdkVersion, message, stackTrace, debugLog);
-              try {
-                // 'issue-1.md'
-                File ioFile = FileUtil.createTempFile("issue-" + issueNumber, ".md", true);
-                FileUtil.createParentDirs(ioFile);
-                FileUtil.writeToFile(ioFile, content);
+      .addAction(NotificationAction.createSimple(DartBundle.message("notification.view.details.action.text"), () -> {
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+          String content = calculateIssueText(messageOneLine, sdkVersion, message, stackTrace, debugLog);
+          try {
+            // 'issue-1.md'
+           File ioFile = FileUtil.createTempFile("issue-" + issueNumber, ".md", true);
+           FileUtil.createParentDirs(ioFile);
+           FileUtil.writeToFile(ioFile, content);
 
-                VirtualFile file = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(ioFile);
-                if (file != null) {
-                  FileEditorManager.getInstance(myProject).openFile(file, true);
-                }
-              } catch (IOException ioe) {
-                LOG.warn("Error creating issue file", ioe);
-              }
-            }))
+           VirtualFile file = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(ioFile);
+           if (file != null) {
+             ApplicationManager.getApplication().invokeLater(() -> {
+               FileEditorManager.getInstance(myProject).openFile(file, true);
+               }, com.intellij.openapi.application.ModalityState.nonModal(), myProject.getDisposed());
+           }
+          } catch (IOException ioe) {
+            LOG.warn("Error creating issue file", ioe);
+          }
+        });
+      }))
       .notify(myProject);
   }
 

@@ -389,13 +389,13 @@ final class PubServerService extends NetService {
       final String message = DartBundle.message(myNotificationAboutErrors ? "dart.webdev.server.output.contains.errors"
                                                                           : "dart.webdev.server.output.contains.warnings");
 
-      myNotification = NOTIFICATION_GROUP.createNotification(message, NotificationType.WARNING).
-              addAction(NotificationAction.createSimple(DartBundle.message("open.dart.webdev.server.action.text"), () -> {
-                myNotification.expire();
+      final Notification notification = NOTIFICATION_GROUP.createNotification(message, NotificationType.WARNING);
+      notification.addAction(NotificationAction.createSimple(DartBundle.message("open.dart.webdev.server.action.text"), () -> {
+                notification.expire();
                 ToolWindowManager.getInstance(myProject).getToolWindow(DART_WEBDEV).activate(null);
               }));
-
-      myNotification.notify(myProject);
+      myNotification = notification;
+      notification.notify(myProject);
     }
   }
 }
