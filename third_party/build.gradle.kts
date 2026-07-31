@@ -102,7 +102,7 @@ intellijPlatform {
         }
 
         println("plugin version: ${version.get()}")
-        println("ideaVersion: ${ideaVersion.sinceBuild.get()} to ${ideaVersion.untilBuild.orNull}")
+        println("ideaVersion: ${this.ideaVersion.sinceBuild.get()} and above")
 
         changeNotes = provider {
             project.changelog.renderItem(project.changelog.getLatest(), Changelog.OutputType.HTML)
@@ -313,7 +313,6 @@ tasks {
     printProductsReleases {
         channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
         types = listOf(IntelliJPlatformType.IntellijIdeaCommunity, IntelliJPlatformType.IntellijIdeaUltimate, IntelliJPlatformType.AndroidStudio)
-        untilBuild = provider { null }
         doLast {
             println()
             println("Mapping printProductsReleases output to ideV:")
