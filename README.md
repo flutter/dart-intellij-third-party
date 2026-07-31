@@ -132,6 +132,7 @@ These skills are located in the [.agents/skills/](.agents/skills/) directory. Th
 * **[Code Review](.agents/skills/code-review/SKILL.md):** Performs a pedantic, multi-perspective code review (covering logic, correctness, resource safety, design, and styleguide compliance) on your uncommitted changes.
 * **[Migrate DAS to LSP](.agents/skills/migrate-das-to-lsp/SKILL.md):** Guide for converting legacy Dart Analysis Server (DAS) feature implementations to JetBrains LSP in the Dart IntelliJ plugin.
 * **[Patch Copied LSP Sources](.agents/skills/patch-copied-lsp-sources/SKILL.md):** Automates copying and patching of JetBrains LSP sources.
+* **[Port PR](.agents/skills/port-pr/SKILL.md):** Fetches a Pull Request from either the dart-intellij-third-party or flutter-intellij repository and conceptually ports its changes to the other repository.
 
 ### How to use:
 Tell your AI assistant to run the desired skill (e.g. by typing `/code-review` or asking *"Run the code-review skill on my changes"*). The agent will automatically find, load, and follow the instructions in the corresponding `SKILL.md` file.
