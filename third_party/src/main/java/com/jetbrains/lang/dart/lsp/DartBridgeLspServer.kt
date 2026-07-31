@@ -10,6 +10,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -241,14 +242,14 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     // Note: We advertise linkSupport: true in server.setClientCapabilities (see RequestUtilities.java)
     // so DAS is guaranteed to return List<LocationLink> for textDocument/definition.
     override fun definition(params: DefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
-        val type = object : com.google.gson.reflect.TypeToken<List<LocationLink>>() {}.type
+        val type = object : TypeToken<List<LocationLink>>() {}.type
         return forwardRequest<List<LocationLink>>("textDocument/definition", params, type).thenApply { links ->
             Either.forRight(links ?: emptyList())
         }
     }
 
     override fun documentHighlight(params: DocumentHighlightParams): CompletableFuture<List<DocumentHighlight>> {
-        val type = object : com.google.gson.reflect.TypeToken<List<DocumentHighlight>>() {}.type
+        val type = object : TypeToken<List<DocumentHighlight>>() {}.type
         return forwardRequest<List<DocumentHighlight>>("textDocument/documentHighlight", params, type)
     }
 

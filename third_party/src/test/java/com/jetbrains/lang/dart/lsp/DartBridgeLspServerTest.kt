@@ -149,9 +149,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
         bridgeServer.hover(params)
 
-        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
-        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
-        assertEquals("123", jsonObject!!.get("id").asString)
+        val jsonObject = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }
+        
+        assertEquals("123", jsonObject.get("id")?.asString)
 
         val outerParams = jsonObject.getAsJsonObject("params")
         val lspMessage = outerParams.getAsJsonObject("lspMessage")
