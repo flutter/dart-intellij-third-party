@@ -18,8 +18,8 @@ This skill guides the agent to port architectural and conceptual changes from a 
    - If the PR is from the `flutter/flutter-intellij` repository, the target repository is `dart-intellij-third-party`.
 
 3. **Fetch PR Details using GitHub MCP:**
-   - Use the `github` MCP server tools (like `pull_request_read`, `get_commit`, or `get_file_contents`) to fetch the PR's description, commits, and diffs. 
-   - Note: If `pull_request_read` requires repository owner and name, extract them from the PR URL.
+   - Use the `github` MCP server tools (like `get_pull_request`, `get_commit`, or `get_file_contents`) to fetch the PR's description, commits, and diffs. 
+   - Note: If `get_pull_request` requires repository owner and name, extract them from the PR URL.
 
 4. **Analyze the Diff:**
    - Read the changes carefully to understand what is being modified.
@@ -31,7 +31,7 @@ This skill guides the agent to port architectural and conceptual changes from a 
    - Use `grep_search` or codebase exploration tools in the target repository to find where the comparable logic lives.
 
 6. **Apply Changes Methodically:**
-   - Make the necessary code changes in the target repository using your file editing tools (`replace_file_content`, `multi_replace_file_content`, etc.).
+   - Make the necessary code changes in the target repository using your file editing tools (`write_file`, `edit_file`, etc.).
    - Adapt the code as necessary to fit the target repository's context, patterns, and language (Java vs Kotlin, etc.).
    - Do not just blindly copy-paste code; apply the *conceptual* changes.
 
