@@ -23,7 +23,7 @@ This skill guides the agent to port architectural and conceptual changes from a 
 
 4. **Analyze the Diff:**
    - Read the changes carefully to understand what is being modified.
-   - Identify the core conceptual and architectural changes being made (e.g., refactoring DAS to LSP, updating a specific IntelliJ Platform API usage, migrating to a new UI component).
+   - Identify the core conceptual and architectural changes being made (e.g., updating the build process, updating a specific IntelliJ Platform API usage, migrating to a new UI component).
 
 5. **Map the File Structure:**
    - The file structures between `dart-intellij-third-party` and `flutter-intellij` are different, although they share some common IntelliJ plugin patterns.
