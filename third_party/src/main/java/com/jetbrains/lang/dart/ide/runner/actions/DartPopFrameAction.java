@@ -36,10 +36,12 @@ public class DartPopFrameAction extends AnAction implements DumbAware {
 
   @Override
   public void update(@NotNull AnActionEvent e) {
+    String place = e.getPlace();
     DartVmServiceStackFrame frame = getStackFrame(e);
     boolean enabled = frame != null && frame.canDrop();
+    boolean isMainMenuOrSearch = ActionPlaces.MAIN_MENU.equals(place) || ActionPlaces.ACTION_SEARCH.equals(place);
 
-    if (ActionPlaces.isMainMenuOrActionSearch(e.getPlace()) || ActionPlaces.DEBUGGER_TOOLBAR.equals(e.getPlace())) {
+    if (isMainMenuOrSearch || ActionPlaces.DEBUGGER_TOOLBAR.equals(place)) {
       e.getPresentation().setEnabled(enabled);
     }
     else {
