@@ -10,11 +10,15 @@ Contributing to Dart Plugin for IntelliJ
   * [IntelliJ set-up](#intellij-set-up)
     * [Open project and sync Gradle](#open-project-and-sync-gradle)
     * [Build and run the plugin](#build-and-run-the-plugin)
+    * [Running on specific IDE versions or flavors](#running-on-specific-ide-versions-or-flavors)
+  * [Building the plugin archive](#building-the-plugin-archive)
   * [Running plugin tests](#running-plugin-tests)
     * [Using the command line](#using-the-command-line)
     * [Using test run configurations in IntelliJ](#using-test-run-configurations-in-intellij)
   * [IntelliJ Plugin Verifier](#intellij-plugin-verifier)
+    * [Updating verifier baselines](#updating-verifier-baselines)
   * [AI Coding Agent Skills](#ai-coding-agent-skills)
+  * [Pull Request Checklist](#pull-request-checklist)
 <!-- TOC -->
 
 ## Contributing code
@@ -52,6 +56,9 @@ To ensure our maintainers can provide timely and high-quality feedback, public F
 5. `git remote add upstream https://github.com/flutter/dart-intellij-third-party`
    The name `upstream` can be whatever you want.
 
+> [!NOTE]
+> The repository includes top-level `gradlew` and `gradlew.bat` scripts that delegate directly to the `third_party` subproject directory. Commands can be run either from the repository root (e.g., `./gradlew <task>`) or from inside the `third_party` directory.
+
 ## Environment set-up
 
 1. Install Java Development Kit 21 (JDK 21).
@@ -80,34 +87,67 @@ To ensure our maintainers can provide timely and high-quality feedback, public F
       export DART_SDK="$FLUTTER_SDK/bin/cache/dart-sdk"
       export DART_HOME="$DART_SDK"
       ```
+    > [!IMPORTANT]
+    > `DART_HOME` (or `DART_SDK`) must point to a valid Dart SDK root directory containing the `version` file so that Analysis Server test suites can locate the SDK binaries.
 
 4. Add `DART_SDK` and `JAVA_HOME` to your `PATH`:
     ```shell
     export PATH=$DART_SDK/bin:$JAVA_HOME/bin:$PATH
     ```
 
-5. Update your current `PATH`.
+5. Update your current `PATH`:
     - Either restart your terminal or run `source ~/.zshrc` / `source ~/.bashrc` to add the new environment variables to your `PATH`.
 
 ## IntelliJ set-up
 
-1. Make sure you're using the latest stable release of IntelliJ,
+1. Make sure you're using the latest stable release of IntelliJ IDEA,
    or download and install [IntelliJ IDEA Ultimate](https://www.jetbrains.com/idea/buy) or [IntelliJ IDEA Community](https://www.jetbrains.com/idea/download).
 
 ### Open project and sync Gradle
 
 2. Start IntelliJ IDEA and open the project:
-   - From the "Welcome to IntelliJ IDEA" dialog, select **Open** and choose the `third_party` directory in this repository.
+   - From the "Welcome to IntelliJ IDEA" dialog, select **Open** and choose either the repository root directory or the `third_party` directory in this repository (opening `third_party` opens the main Gradle root module directly).
    - If you see a popup with "Gradle build scripts found", **confirm loading the Gradle project, and wait until syncing is done.**
 
 ### Build and run the plugin
 
-3. Build and run the plugin instance:
-   - Open **View > Tool Windows > Gradle**, and click **Sync All Gradle Projects**.
-   - To launch a sandboxed IDE instance with the Dart plugin loaded, execute the following command (from the `third_party` directory):
+3. Launch a sandboxed IDE instance with the Dart plugin loaded:
+   - From IntelliJ: Open **View > Tool Windows > Gradle**, expand tasks, and double-click **intellij > runIde**.
+   - Or from the terminal (run from root or `third_party`):
      ```shell
      ./gradlew runIde
      ```
+
+### Running on specific IDE versions or flavors
+
+You can test the plugin against specific IDE distributions (IntelliJ Community, Ultimate, or Android Studio) and specific versions using the `runTarget` task:
+
+- **Run in IntelliJ IDEA Community (specific version):**
+  ```shell
+  ./gradlew runTarget -Pide=IntelliJ -PideV=2025.1
+  ```
+- **Run in IntelliJ IDEA Ultimate:**
+  ```shell
+  ./gradlew runTarget -Pide=Ultimate -PideV=2025.1
+  ```
+- **Run against a local IDE installation (e.g. Android Studio):**
+  ```shell
+  ./gradlew runTarget -PidePath="/Applications/Android Studio.app"
+  ```
+- **List available IDE product releases:**
+  ```shell
+  ./gradlew printProductsReleases
+  ```
+
+## Building the plugin archive
+
+To package the plugin into a deployable `.zip` archive:
+
+```shell
+./gradlew buildPlugin
+```
+
+The output ZIP file will be placed in `third_party/build/distributions/`.
 
 ## Running plugin tests
 
@@ -117,19 +157,16 @@ The test suite is split between unit tests under `src/main/test/java/com/jetbrai
 
 Run all tests:
 ```shell
-cd third_party
 ./gradlew test
 ```
 
 Run **unit tests**:
 ```shell
-cd third_party
 ./gradlew test --tests "com.jetbrains.lang.dart.*"
 ```
 
 Run **Dart Analysis Server tests** (requires `DART_HOME` or `DART_SDK` to be set):
 ```shell
-cd third_party
 ./gradlew test --tests "com.jetbrains.dart.analysisServer.*"
 ```
 
@@ -143,18 +180,25 @@ The project uses the [IntelliJ Plugin Verifier](https://github.com/JetBrains/int
 
 To run the verifier locally:
 ```shell
-cd third_party
 ./gradlew verifyPlugin
 ```
 
-If new issues are found that match expected updates, update the baseline files:
-```shell
-# Linux / macOS
-./third_party/tool/update_baselines.sh
+### Updating verifier baselines
 
-# Windows
-third_party\tool\update_baselines.bat
-```
+If new verification issues are found that match expected platform updates, update the baseline files.
+
+> [!IMPORTANT]
+> The baseline update scripts **must be executed from the root directory of the repository**.
+
+- **Linux / macOS:**
+  ```shell
+  ./third_party/tool/update_baselines.sh
+  ```
+
+- **Windows:**
+  ```cmd
+  third_party\tool\update_baselines.bat
+  ```
 
 ## AI Coding Agent Skills
 
@@ -165,3 +209,19 @@ This repository includes custom configuration and automation skills for AI codin
 * **[Monthly Release](.agents/skills/monthly-release/SKILL.md):** Step-by-step guide for preparing, validating, testing, and publishing monthly releases of the Dart plugin.
 * **[Patch Copied LSP Sources](.agents/skills/patch-copied-lsp-sources/SKILL.md):** Automates copying and patching of JetBrains LSP sources.
 * **[Port PR](.agents/skills/port-pr/SKILL.md):** Fetches a Pull Request from either `dart-intellij-third-party` or `flutter-intellij` and conceptually ports its changes to the other repository.
+
+If you add or update any agent skills, run the documentation checker to verify that all skills remain documented in `README.md`:
+```shell
+./tool/check_agent_skills.sh
+```
+
+## Pull Request Checklist
+
+Before submitting a Pull Request, please ensure:
+
+1. [ ] You have signed the [Google CLA](https://cla.developers.google.com/clas).
+2. [ ] Your code compiles cleanly with JDK 21.
+3. [ ] All unit tests pass: `./gradlew test`.
+4. [ ] Plugin verification passes: `./gradlew verifyPlugin`.
+5. [ ] If adding/modifying AI agent skills, `./tool/check_agent_skills.sh` passes.
+6. [ ] You have less than 2 active open non-draft pull requests in the repository.
