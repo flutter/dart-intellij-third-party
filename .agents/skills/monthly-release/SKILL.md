@@ -22,6 +22,7 @@ Use this skill when preparing, testing, validating, and publishing a new monthly
   2. Identify missing user-facing PRs (bug fixes, new features, performance enhancements).
   3. In `third_party/CHANGELOG.md`, rename `## Unreleased` to `## <new-version>` (e.g. `## 508.0.0`).
   4. Follow changelog formatting conventions:
+     - Entries must strictly use descriptive, state-based phrases (typically starting with gerunds, nouns, or verbs like *Avoid* / *Support* / *Log* / *Prevent*) rather than starting with imperative verbs like *Fix* or *Add*.
      - Under `### Removed`, do NOT repeat action verbs like "Remove" (e.g., `- untilBuild restriction (#553)`).
   5. Add a fresh empty `## Unreleased` section at the top of `third_party/CHANGELOG.md` with standard subheaders (`### Added`, `### Changed`, `### Removed`, `### Fixed`).
   6. Create PR (e.g. `Update changelog for <version> (#<PR>)`) and merge it to `main`.
@@ -29,7 +30,7 @@ Use this skill when preparing, testing, validating, and publishing a new monthly
 
 ### 2. Build & Validate
 - **Compilation & Structure Verification**:
-  1. Ensure local `main` is checked out and updated (`git fetch upstream && git checkout main && git reset --hard upstream/main`).
+  1. Ensure local `main` is checked out and updated (`git fetch upstream && git checkout main && git reset --hard upstream/main`), and navigate to the `third_party` directory (`cd third_party`).
   2. Run compilation check:
      ```shell
      ./gradlew testClasses
@@ -43,7 +44,7 @@ Use this skill when preparing, testing, validating, and publishing a new monthly
      ./gradlew test
      ```
 - **Build Prospective Release Zip Artifact**:
-  1. Run the Gradle build with `-PversionedName`:
+  1. Run the Gradle build with `-PversionedName` (from the `third_party` directory):
      ```shell
      ./gradlew buildPlugin -PversionedName
      ```
