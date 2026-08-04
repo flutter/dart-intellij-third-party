@@ -40,6 +40,30 @@ public class DartDotShorthandCompletionTest extends DartServerCompletionTest {
              }""");
   }
 
+  public void testDotNamedArgCompletion() {
+    doTest("name: ",
+           """
+             class A {
+               A.named({String? name});
+             }
+             void f(A a) {}
+             main() {
+               f(.named(<caret>));
+             }""");
+  }
+
+  public void testDotNewArgCompletion() {
+    doTest("name: ",
+           """
+             class A {
+               A({String? name});
+             }
+             void f(A a) {}
+             main() {
+               f(.new(<caret>));
+             }""");
+  }
+
   private void doTest(String lookupToSelect, String text) {
     myFixture.configureByText("foo.dart", text);
     myFixture.doHighlighting();

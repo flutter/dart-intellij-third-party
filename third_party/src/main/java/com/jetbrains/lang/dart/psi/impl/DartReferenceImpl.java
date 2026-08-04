@@ -49,7 +49,16 @@ public class DartReferenceImpl extends DartExpressionImpl implements DartReferen
       );
     }
 
-    return new UnfairTextRange(0, textRange.getEndOffset() - textRange.getStartOffset());
+    // When there are no child DartReference nodes (e.g. in dot shorthand '.new()' expressions where '.new' consists only
+    // of leaf tokens), exclude any child DartArguments from the reference text range. Otherwise, completion inside the
+    // argument list incorrectly assumes the caret is inside the '.new' reference and calculates an invalid completion prefix.
+    int endOffset = textRange.getEndOffset() - textRange.getStartOffset();
+    DartArguments arguments = PsiTreeUtil.getChildOfType(this, DartArguments.class);
+    if (arguments != null) {
+      endOffset = arguments.getTextRange().getStartOffset() - textRange.getStartOffset();
+    }
+
+    return new UnfairTextRange(0, endOffset);
   }
 
   @Override
