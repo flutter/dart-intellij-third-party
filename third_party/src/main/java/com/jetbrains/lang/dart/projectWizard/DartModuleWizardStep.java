@@ -5,6 +5,7 @@ import com.intellij.ide.util.projectWizard.ProjectBuilder;
 import com.intellij.ide.util.projectWizard.WizardContext;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.options.ConfigurationException;
+import com.intellij.openapi.util.Disposer;
 
 import javax.swing.*;
 
@@ -37,6 +38,6 @@ public class DartModuleWizardStep extends ModuleWizardStep implements Disposable
 
   @Override
   public void dispose() {
-
+    Disposer.dispose(myPeer);
   }
 }
