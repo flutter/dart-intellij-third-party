@@ -127,7 +127,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
 
   private void popupInvoked(Component component, int x, int y) {
     DefaultActionGroup group = new DefaultActionGroup();
-    if (createNavigatable() != null) {
+    if (myTable.getSelectedObject() != null) {
       group.add(ActionManager.getInstance().getAction(IdeActions.ACTION_EDIT_SOURCE));
     }
 
