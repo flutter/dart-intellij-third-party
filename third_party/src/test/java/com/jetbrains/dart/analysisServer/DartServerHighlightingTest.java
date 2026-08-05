@@ -407,4 +407,14 @@ public class DartServerHighlightingTest extends CodeInsightFixtureTestCase {
 //                             }\
 //                            """);
 //  }
+
+  public void testUpdateVisibleFilesWithoutReadAccess() throws Exception {
+    myFixture.configureByText("firstFile.dart", "class Foo {}");
+    final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getProject());
+    com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread(() -> {
+      assertFalse("Read access should not be allowed before calling updateVisibleFiles()",
+                  com.intellij.openapi.application.ApplicationManager.getApplication().isReadAccessAllowed());
+      service.updateVisibleFiles();
+    }).get(10, java.util.concurrent.TimeUnit.SECONDS);
+  }
 }

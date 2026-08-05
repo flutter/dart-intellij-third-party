@@ -967,24 +967,24 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public void updateVisibleFiles() {
-    ApplicationManager.getApplication().assertReadAccessAllowed();
+    ApplicationManager.getApplication().runReadAction(() -> {
+      synchronized (myLock) {
+        final List<String> newVisibleFileUris = new ArrayList<>();
 
-    synchronized (myLock) {
-      final List<String> newVisibleFileUris = new ArrayList<>();
+        for (VirtualFile file : FileEditorManager.getInstance(myProject).getSelectedFiles()) {
+          if (isLocalAnalyzableFile(file)) {
+            newVisibleFileUris.add(getFileUri(file));
+          }
+        }
 
-      for (VirtualFile file : FileEditorManager.getInstance(myProject).getSelectedFiles()) {
-        if (isLocalAnalyzableFile(file)) {
-          newVisibleFileUris.add(getFileUri(file));
+        if (!Comparing.haveEqualElements(myVisibleFileUris, newVisibleFileUris)) {
+          myVisibleFileUris.clear();
+          myVisibleFileUris.addAll(newVisibleFileUris);
+          analysis_setPriorityFiles();
+          analysis_setSubscriptions();
         }
       }
-
-      if (!Comparing.haveEqualElements(myVisibleFileUris, newVisibleFileUris)) {
-        myVisibleFileUris.clear();
-        myVisibleFileUris.addAll(newVisibleFileUris);
-        analysis_setPriorityFiles();
-        analysis_setSubscriptions();
-      }
-    }
+    });
   }
 
   /**
