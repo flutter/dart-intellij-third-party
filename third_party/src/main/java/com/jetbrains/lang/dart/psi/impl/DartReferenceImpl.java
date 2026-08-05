@@ -55,7 +55,8 @@ public class DartReferenceImpl extends DartExpressionImpl implements DartReferen
     int endOffset = textRange.getEndOffset() - textRange.getStartOffset();
     DartArguments arguments = PsiTreeUtil.getChildOfType(this, DartArguments.class);
     if (arguments != null) {
-      endOffset = arguments.getTextRange().getStartOffset() - textRange.getStartOffset();
+      PsiElement prev = com.jetbrains.lang.dart.util.UsefulPsiTreeUtil.getPrevSiblingSkipWhiteSpacesAndComments(arguments, true);
+      endOffset = (prev != null ? prev.getTextRange().getEndOffset() : arguments.getTextRange().getStartOffset()) - textRange.getStartOffset();
     }
 
     return new UnfairTextRange(0, endOffset);
