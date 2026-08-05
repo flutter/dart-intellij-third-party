@@ -410,6 +410,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
       int howManyFilesMatch = 0;
 
       for (VirtualFile file : localFilesWithSameName) {
+        com.intellij.openapi.progress.ProgressManager.checkCanceled();
         if (file == null) continue;
 
         LOG.assertTrue(file.getPath().startsWith(projectRoot.getPath() + "/"), file.getPath() + "," + projectRoot.getPath());
