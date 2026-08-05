@@ -40,7 +40,9 @@ public class DartRefactoringAnalyticsTest extends CodeInsightFixtureTestCase {
     RefactoringStatus initial = refactoring.checkInitialConditions();
     assertNotNull(initial);
     assertTrue(initial.isOK());
-    refactoring.setName("res");
+    String[] names = refactoring.getNames();
+    assertTrue(names.length > 0);
+    refactoring.setName(names[0]);
     RefactoringStatus finalCond = refactoring.checkFinalConditions();
     assertNotNull(finalCond);
     assertTrue(finalCond.isOK());
@@ -53,7 +55,7 @@ public class DartRefactoringAnalyticsTest extends CodeInsightFixtureTestCase {
     RefactoringStatus initial = refactoring.checkInitialConditions();
     assertNotNull(initial);
     assertTrue(initial.isOK());
-    refactoring.setName("res");
+    refactoring.setName("customFunctionName");
     refactoring.setCreateGetter(true);
     RefactoringStatus finalCond = refactoring.checkFinalConditions();
     assertNotNull(finalCond);

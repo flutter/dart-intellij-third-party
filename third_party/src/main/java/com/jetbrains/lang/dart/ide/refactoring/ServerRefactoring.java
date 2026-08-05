@@ -72,36 +72,57 @@ public abstract class ServerRefactoring {
   }
 
   public void reportAnalytics() {
-    LegacyRefactoringData refactoringData = AnalyticsData.forLegacyRefactoring(kind, myProject);
-    boolean nonDefaultOption = false;
+    try {
+      LegacyRefactoringData refactoringData = AnalyticsData.forLegacyRefactoring(kind, myProject);
+      boolean nonDefaultOption = false;
 
-    RefactoringOptions options = getOptions();
-    if (options instanceof ExtractMethodOptions extractMethodOptions) {
-      boolean extractAll = extractMethodOptions.extractAll();
-      boolean createGetter = extractMethodOptions.createGetter();
-      refactoringData.add(AnalyticsConstants.EXTRACT_ALL, extractAll);
-      refactoringData.add(AnalyticsConstants.CREATE_GETTER, createGetter);
-      if (!extractAll || createGetter) {
-        nonDefaultOption = true;
-      }
-    }
-    else if (options instanceof ExtractLocalVariableOptions extractLocalVariableOptions) {
-      boolean extractAll = extractLocalVariableOptions.extractAll();
-      refactoringData.add(AnalyticsConstants.EXTRACT_ALL, extractAll);
-      if (!extractAll) {
-        nonDefaultOption = true;
-      }
-    }
-    else if (options instanceof InlineMethodOptions inlineMethodOptions) {
-      boolean inlineAll = inlineMethodOptions.inlineAll();
-      refactoringData.add(AnalyticsConstants.INLINE_ALL, inlineAll);
-      if (!inlineAll) {
-        nonDefaultOption = true;
-      }
-    }
+      RefactoringOptions options = getOptions();
+      if (options instanceof ExtractMethodOptions extractMethodOptions) {
+        boolean extractAll = extractMethodOptions.extractAll();
+        boolean createGetter = extractMethodOptions.createGetter();
+        refactoringData.add(AnalyticsConstants.EXTRACT_ALL, extractAll);
+        refactoringData.add(AnalyticsConstants.CREATE_GETTER, createGetter);
 
-    refactoringData.add(AnalyticsConstants.NON_DEFAULT_OPTION, nonDefaultOption);
-    Analytics.report(refactoringData);
+        if (this instanceof ServerExtractMethodRefactoring extractMethodRefactoring) {
+          String[] suggestedNames = extractMethodRefactoring.getNames();
+          String currentName = extractMethodOptions.getName();
+          boolean isCustomName = suggestedNames.length > 0 && !suggestedNames[0].equals(currentName);
+          refactoringData.add(AnalyticsConstants.CUSTOM_NAME, isCustomName);
+        }
+
+        if (!extractAll || createGetter) {
+          nonDefaultOption = true;
+        }
+      }
+      else if (options instanceof ExtractLocalVariableOptions extractLocalVariableOptions) {
+        boolean extractAll = extractLocalVariableOptions.extractAll();
+        refactoringData.add(AnalyticsConstants.EXTRACT_ALL, extractAll);
+
+        if (this instanceof ServerExtractLocalVariableRefactoring extractLocalRefactoring) {
+          String[] suggestedNames = extractLocalRefactoring.getNames();
+          String currentName = extractLocalVariableOptions.getName();
+          boolean isCustomName = suggestedNames.length > 0 && !suggestedNames[0].equals(currentName);
+          refactoringData.add(AnalyticsConstants.CUSTOM_NAME, isCustomName);
+        }
+
+        if (!extractAll) {
+          nonDefaultOption = true;
+        }
+      }
+      else if (options instanceof InlineMethodOptions inlineMethodOptions) {
+        boolean inlineAll = inlineMethodOptions.inlineAll();
+        refactoringData.add(AnalyticsConstants.INLINE_ALL, inlineAll);
+        if (!inlineAll) {
+          nonDefaultOption = true;
+        }
+      }
+
+      refactoringData.add(AnalyticsConstants.NON_DEFAULT_OPTION, nonDefaultOption);
+      Analytics.report(refactoringData);
+    }
+    catch (Throwable t) {
+      // Analytics reporting must never prevent refactorings from executing
+    }
   }
 
   protected @NotNull Project getProject() {
