@@ -21,7 +21,6 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
@@ -48,7 +47,6 @@ import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceSt
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceSuspendContext;
 import com.jetbrains.lang.dart.ide.runner.server.webdev.DartDaemonParserUtil;
 import com.jetbrains.lang.dart.util.DartBazelFileUtil;
-import com.jetbrains.lang.dart.util.DartResolveUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -403,16 +401,15 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
       if (remoteUri.startsWith(DartUrlResolver.DART_PREFIX)) continue;
       if (remoteUri.startsWith(DartUrlResolver.PACKAGE_PREFIX)) continue;
 
-      final PsiFile[] localFilesWithSameName = ReadAction.compute(() -> {
+      final Collection<VirtualFile> localFilesWithSameName = ReadAction.computeBlocking(() -> {
         final String remoteFileName = PathUtil.getFileName(remoteUri);
         final GlobalSearchScope scope = GlobalSearchScopesCore.directoryScope(getSession().getProject(), projectRoot, true);
-        return FilenameIndex.getFilesByName(getSession().getProject(), remoteFileName, scope);
+        return FilenameIndex.getVirtualFilesByName(remoteFileName, scope);
       });
 
       int howManyFilesMatch = 0;
 
-      for (PsiFile psiFile : localFilesWithSameName) {
-        final VirtualFile file = DartResolveUtil.getRealVirtualFile(psiFile);
+      for (VirtualFile file : localFilesWithSameName) {
         if (file == null) continue;
 
         LOG.assertTrue(file.getPath().startsWith(projectRoot.getPath() + "/"), file.getPath() + "," + projectRoot.getPath());
