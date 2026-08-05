@@ -447,9 +447,6 @@ object AnalyticsConstants {
   @JvmField
   val CUSTOM_NAME = BooleanValue("custom_name")
 
-  @JvmField
-  val NON_DEFAULT_OPTION = BooleanValue("non_default_option")
-
   internal const val ACTION_TYPE = "action"
   internal const val ASSIST_TYPE = "assist"
   internal const val FIX_TYPE = "fix"

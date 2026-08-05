@@ -74,7 +74,6 @@ public abstract class ServerRefactoring {
   public void reportAnalytics() {
     try {
       LegacyRefactoringData refactoringData = AnalyticsData.forLegacyRefactoring(kind, myProject);
-      boolean nonDefaultOption = false;
 
       RefactoringOptions options = getOptions();
       if (options instanceof ExtractMethodOptions extractMethodOptions) {
@@ -89,10 +88,6 @@ public abstract class ServerRefactoring {
           boolean isCustomName = suggestedNames.length > 0 && !suggestedNames[0].equals(currentName);
           refactoringData.add(AnalyticsConstants.CUSTOM_NAME, isCustomName);
         }
-
-        if (!extractAll || createGetter) {
-          nonDefaultOption = true;
-        }
       }
       else if (options instanceof ExtractLocalVariableOptions extractLocalVariableOptions) {
         boolean extractAll = extractLocalVariableOptions.extractAll();
@@ -104,20 +99,12 @@ public abstract class ServerRefactoring {
           boolean isCustomName = suggestedNames.length > 0 && !suggestedNames[0].equals(currentName);
           refactoringData.add(AnalyticsConstants.CUSTOM_NAME, isCustomName);
         }
-
-        if (!extractAll) {
-          nonDefaultOption = true;
-        }
       }
       else if (options instanceof InlineMethodOptions inlineMethodOptions) {
         boolean inlineAll = inlineMethodOptions.inlineAll();
         refactoringData.add(AnalyticsConstants.INLINE_ALL, inlineAll);
-        if (!inlineAll) {
-          nonDefaultOption = true;
-        }
       }
 
-      refactoringData.add(AnalyticsConstants.NON_DEFAULT_OPTION, nonDefaultOption);
       Analytics.report(refactoringData);
     }
     catch (Throwable t) {
