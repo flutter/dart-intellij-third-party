@@ -32,7 +32,7 @@ public class ServerExtractMethodRefactoring extends ServerRefactoring {
   }
 
   public String @NotNull [] getNames() {
-    return feedback != null ? ArrayUtilRt.toStringArray(feedback.getNames()) : com.intellij.util.ArrayUtil.EMPTY_STRING_ARRAY;
+    return feedback != null ? ArrayUtilRt.toStringArray(feedback.getNames()) : ArrayUtilRt.EMPTY_STRING_ARRAY;
   }
 
   public int getOccurrencesCount() {

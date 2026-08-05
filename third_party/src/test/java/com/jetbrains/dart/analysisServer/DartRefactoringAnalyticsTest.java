@@ -47,7 +47,10 @@ public class DartRefactoringAnalyticsTest extends CodeInsightFixtureTestCase {
     assertNotNull(finalCond);
     assertTrue(finalCond.isOK());
 
-    refactoring.reportAnalytics();
+    LegacyRefactoringData data = refactoring.collectAnalyticsData();
+    assertEquals(true, data.getData().get(AnalyticsConstants.EXTRACT_ALL.getName()));
+    assertEquals(false, data.getData().get(AnalyticsConstants.CREATE_GETTER.getName()));
+    assertEquals(false, data.getData().get(AnalyticsConstants.CUSTOM_NAME.getName()));
   }
 
   public void testExtractMethodNonDefaultAnalytics() {
@@ -61,6 +64,9 @@ public class DartRefactoringAnalyticsTest extends CodeInsightFixtureTestCase {
     assertNotNull(finalCond);
     assertTrue(finalCond.isOK());
 
-    refactoring.reportAnalytics();
+    LegacyRefactoringData data = refactoring.collectAnalyticsData();
+    assertEquals(true, data.getData().get(AnalyticsConstants.EXTRACT_ALL.getName()));
+    assertEquals(true, data.getData().get(AnalyticsConstants.CREATE_GETTER.getName()));
+    assertEquals(true, data.getData().get(AnalyticsConstants.CUSTOM_NAME.getName()));
   }
 }
