@@ -37,6 +37,10 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - **Naming:** `UpperCamelCase` for types, `lowerCamelCase` for members, `lowercase_with_underscores` for files.
 - **Concurrency:** Prefer `async/await` over raw `Future.then()`. Use `final` by default.
 
+### Dart Language Features & Grammar
+- **Implementation & Review:** When tasked with implementing a new Dart language feature, modifying the Dart parser/grammar (e.g., `Dart.bnf`, lexers), or reviewing a Pull Request that introduces new syntax, you **MUST** consult and follow the `implement-dart-language-feature` skill.
+- **Verification:** Aggressively evaluate any new language features against the simplicity, permissive grammar, and testing requirements defined in the skill before proposing final code or approving a review.
+
 ### Kotlin
 - **Immutability:** Prefer `val` over `var`. Use `data class` for state-holding objects.
 - **Scope Functions:** Use `.let`, `.apply`, and `.also` correctly to reduce temporary variables.
