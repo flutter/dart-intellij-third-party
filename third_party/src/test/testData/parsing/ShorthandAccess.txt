@@ -538,8 +538,9 @@ Dart File
             VAR_INIT
               PsiElement(=)('=')
               NEW_EXPRESSION
-                PsiElement(.)('.')
-                PsiElement(new)('new')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(.)('.')
+                  PsiElement(new)('new')
                 TYPE_ARGUMENTS
                   PsiElement(<)('<')
                   TYPE_LIST
@@ -567,8 +568,9 @@ Dart File
               PsiElement(=)('=')
               REFERENCE_EXPRESSION
                 NEW_EXPRESSION
-                  PsiElement(.)('.')
-                  PsiElement(new)('new')
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(.)('.')
+                    PsiElement(new)('new')
                   TYPE_ARGUMENTS
                     PsiElement(<)('<')
                     TYPE_LIST
@@ -598,8 +600,9 @@ Dart File
               PsiElement(=)('=')
               REFERENCE_EXPRESSION
                 NEW_EXPRESSION
-                  PsiElement(.)('.')
-                  PsiElement(new)('new')
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(.)('.')
+                    PsiElement(new)('new')
                   TYPE_ARGUMENTS
                     PsiElement(<)('<')
                     TYPE_LIST
@@ -632,8 +635,9 @@ Dart File
               CALL_EXPRESSION
                 REFERENCE_EXPRESSION
                   NEW_EXPRESSION
-                    PsiElement(.)('.')
-                    PsiElement(new)('new')
+                    SHORTHAND_NEW_EXPRESSION_PREFIX
+                      PsiElement(.)('.')
+                      PsiElement(new)('new')
                     TYPE_ARGUMENTS
                       PsiElement(<)('<')
                       TYPE_LIST
@@ -668,8 +672,9 @@ Dart File
               PsiElement(=)('=')
               REFERENCE_EXPRESSION
                 NEW_EXPRESSION
-                  PsiElement(.)('.')
-                  PsiElement(new)('new')
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(.)('.')
+                    PsiElement(new)('new')
                   TYPE_ARGUMENTS
                     PsiElement(<)('<')
                     TYPE_LIST
@@ -696,8 +701,9 @@ Dart File
               PsiElement(=)('=')
               REFERENCE_EXPRESSION
                 NEW_EXPRESSION
-                  PsiElement(.)('.')
-                  PsiElement(new)('new')
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(.)('.')
+                    PsiElement(new)('new')
                   TYPE_ARGUMENTS
                     PsiElement(<)('<')
                     TYPE_LIST
@@ -727,8 +733,9 @@ Dart File
               CALL_EXPRESSION
                 REFERENCE_EXPRESSION
                   NEW_EXPRESSION
-                    PsiElement(.)('.')
-                    PsiElement(new)('new')
+                    SHORTHAND_NEW_EXPRESSION_PREFIX
+                      PsiElement(.)('.')
+                      PsiElement(new)('new')
                     TYPE_ARGUMENTS
                       PsiElement(<)('<')
                       TYPE_LIST
@@ -759,6 +766,27 @@ Dart File
             VAR_INIT
               PsiElement(=)('=')
               NEW_EXPRESSION
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(.)('.')
+                  PsiElement(new)('new')
+          PsiElement(;)(';')
+          VAR_DECLARATION_LIST
+            VAR_ACCESS_DECLARATION
+              TYPE
+                SIMPLE_TYPE
+                  REFERENCE_EXPRESSION
+                    ID
+                      PsiElement(IDENTIFIER)('Symbol')
+              COMPONENT_NAME
+                ID
+                  PsiElement(IDENTIFIER)('symbol')
+            VAR_INIT
+              PsiElement(=)('=')
+              REFERENCE_EXPRESSION
+                NEW_EXPRESSION
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(.)('.')
+                    PsiElement(new)('new')
                 PsiElement(.)('.')
                 PsiElement(new)('new')
           PsiElement(;)(';')
@@ -776,27 +804,9 @@ Dart File
               PsiElement(=)('=')
               REFERENCE_EXPRESSION
                 NEW_EXPRESSION
-                  PsiElement(.)('.')
-                  PsiElement(new)('new')
-                PsiElement(.)('.')
-                PsiElement(new)('new')
-          PsiElement(;)(';')
-          VAR_DECLARATION_LIST
-            VAR_ACCESS_DECLARATION
-              TYPE
-                SIMPLE_TYPE
-                  REFERENCE_EXPRESSION
-                    ID
-                      PsiElement(IDENTIFIER)('Symbol')
-              COMPONENT_NAME
-                ID
-                  PsiElement(IDENTIFIER)('symbol')
-            VAR_INIT
-              PsiElement(=)('=')
-              REFERENCE_EXPRESSION
-                NEW_EXPRESSION
-                  PsiElement(.)('.')
-                  PsiElement(new)('new')
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(.)('.')
+                    PsiElement(new)('new')
                 PsiElement(.)('.')
                 REFERENCE_EXPRESSION
                   ID
@@ -817,8 +827,9 @@ Dart File
               CALL_EXPRESSION
                 REFERENCE_EXPRESSION
                   NEW_EXPRESSION
-                    PsiElement(.)('.')
-                    PsiElement(new)('new')
+                    SHORTHAND_NEW_EXPRESSION_PREFIX
+                      PsiElement(.)('.')
+                      PsiElement(new)('new')
                   PsiElement(.)('.')
                   REFERENCE_EXPRESSION
                     ID
@@ -847,8 +858,9 @@ Dart File
                 PsiElement(,)(',')
                 ELEMENT
                   NEW_EXPRESSION
-                    PsiElement(.)('.')
-                    PsiElement(new)('new')
+                    SHORTHAND_NEW_EXPRESSION_PREFIX
+                      PsiElement(.)('.')
+                      PsiElement(new)('new')
                     ARGUMENTS
                       PsiElement(()('(')
                       ARGUMENT_LIST
@@ -881,8 +893,9 @@ Dart File
                     PsiElement(IDENTIFIER)('flag')
                 PsiElement(?)('?')
                 NEW_EXPRESSION
-                  PsiElement(.)('.')
-                  PsiElement(new)('new')
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(.)('.')
+                    PsiElement(new)('new')
                   ARGUMENTS
                     PsiElement(()('(')
                     ARGUMENT_LIST
@@ -893,11 +906,12 @@ Dart File
                     PsiElement())(')')
                 PsiElement(:)(':')
                 NEW_EXPRESSION
-                  PsiElement(const)('const')
-                  PsiElement(.)('.')
-                  REFERENCE_EXPRESSION
-                    ID
-                      PsiElement(IDENTIFIER)('no')
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(const)('const')
+                    PsiElement(.)('.')
+                    REFERENCE_EXPRESSION
+                      ID
+                        PsiElement(IDENTIFIER)('no')
           PsiElement(;)(';')
           CALL_EXPRESSION
             REFERENCE_EXPRESSION
@@ -940,8 +954,9 @@ Dart File
                       PsiElement(IDENTIFIER)('a')
                   PsiElement(:)(':')
                   NEW_EXPRESSION
-                    PsiElement(.)('.')
-                    PsiElement(new)('new')
+                    SHORTHAND_NEW_EXPRESSION_PREFIX
+                      PsiElement(.)('.')
+                      PsiElement(new)('new')
                     ARGUMENTS
                       PsiElement(()('(')
                       ARGUMENT_LIST
@@ -960,8 +975,9 @@ Dart File
               PsiElement(()('(')
               ARGUMENT_LIST
                 NEW_EXPRESSION
-                  PsiElement(.)('.')
-                  PsiElement(new)('new')
+                  SHORTHAND_NEW_EXPRESSION_PREFIX
+                    PsiElement(.)('.')
+                    PsiElement(new)('new')
                   ARGUMENTS
                     PsiElement(()('(')
                     ARGUMENT_LIST
@@ -1030,9 +1046,10 @@ Dart File
             VAR_INIT
               PsiElement(=)('=')
               NEW_EXPRESSION
-                PsiElement(const)('const')
-                PsiElement(.)('.')
-                PsiElement(new)('new')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(const)('const')
+                  PsiElement(.)('.')
+                  PsiElement(new)('new')
                 ARGUMENTS
                   PsiElement(()('(')
                   PsiElement())(')')
@@ -1050,11 +1067,12 @@ Dart File
             VAR_INIT
               PsiElement(=)('=')
               NEW_EXPRESSION
-                PsiElement(const)('const')
-                PsiElement(.)('.')
-                REFERENCE_EXPRESSION
-                  ID
-                    PsiElement(IDENTIFIER)('named')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(const)('const')
+                  PsiElement(.)('.')
+                  REFERENCE_EXPRESSION
+                    ID
+                      PsiElement(IDENTIFIER)('named')
                 ARGUMENTS
                   PsiElement(()('(')
                   PsiElement())(')')
@@ -1072,11 +1090,12 @@ Dart File
             VAR_INIT
               PsiElement(=)('=')
               NEW_EXPRESSION
-                PsiElement(const)('const')
-                PsiElement(.)('.')
-                REFERENCE_EXPRESSION
-                  ID
-                    PsiElement(IDENTIFIER)('Value')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(const)('const')
+                  PsiElement(.)('.')
+                  REFERENCE_EXPRESSION
+                    ID
+                      PsiElement(IDENTIFIER)('Value')
                 ARGUMENTS
                   PsiElement(()('(')
                   ARGUMENT_LIST
@@ -1097,11 +1116,12 @@ Dart File
             VAR_INIT
               PsiElement(=)('=')
               NEW_EXPRESSION
-                PsiElement(const)('const')
-                PsiElement(.)('.')
-                REFERENCE_EXPRESSION
-                  ID
-                    PsiElement(IDENTIFIER)('Value')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(const)('const')
+                  PsiElement(.)('.')
+                  REFERENCE_EXPRESSION
+                    ID
+                      PsiElement(IDENTIFIER)('Value')
                 TYPE_ARGUMENTS
                   PsiElement(<)('<')
                   TYPE_LIST
@@ -1133,11 +1153,12 @@ Dart File
             VAR_INIT
               PsiElement(=)('=')
               NEW_EXPRESSION
-                PsiElement(const)('const')
-                PsiElement(.)('.')
-                REFERENCE_EXPRESSION
-                  ID
-                    PsiElement(IDENTIFIER)('foo')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(const)('const')
+                  PsiElement(.)('.')
+                  REFERENCE_EXPRESSION
+                    ID
+                      PsiElement(IDENTIFIER)('foo')
           PsiElement(;)(';')
           VAR_DECLARATION_LIST
             VAR_ACCESS_DECLARATION
@@ -1152,9 +1173,10 @@ Dart File
             VAR_INIT
               PsiElement(=)('=')
               NEW_EXPRESSION
-                PsiElement(const)('const')
-                PsiElement(.)('.')
-                PsiElement(new)('new')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(const)('const')
+                  PsiElement(.)('.')
+                  PsiElement(new)('new')
           PsiElement(;)(';')
           SWITCH_STATEMENT
             PsiElement(switch)('switch')
@@ -1180,9 +1202,10 @@ Dart File
             SWITCH_CASE
               PsiElement(case)('case')
               NEW_EXPRESSION
-                PsiElement(const)('const')
-                PsiElement(.)('.')
-                PsiElement(new)('new')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(const)('const')
+                  PsiElement(.)('.')
+                  PsiElement(new)('new')
               PsiElement(:)(':')
               STATEMENTS
                 BREAK_STATEMENT
@@ -1243,11 +1266,12 @@ Dart File
             SWITCH_CASE
               PsiElement(case)('case')
               NEW_EXPRESSION
-                PsiElement(const)('const')
-                PsiElement(.)('.')
-                REFERENCE_EXPRESSION
-                  ID
-                    PsiElement(IDENTIFIER)('Option')
+                SHORTHAND_NEW_EXPRESSION_PREFIX
+                  PsiElement(const)('const')
+                  PsiElement(.)('.')
+                  REFERENCE_EXPRESSION
+                    ID
+                      PsiElement(IDENTIFIER)('Option')
                 TYPE_ARGUMENTS
                   PsiElement(<)('<')
                   TYPE_LIST

@@ -258,7 +258,8 @@ Dart File
       PsiElement({)('{')
       CLASS_MEMBERS
         NEW_CONSTRUCTOR_DECLARATION
-          PsiElement(new)('new')
+          COMPONENT_NAME
+            PsiElement(new)('new')
           FORMAL_PARAMETER_LIST
             PsiElement(()('(')
             NORMAL_FORMAL_PARAMETER
@@ -274,7 +275,8 @@ Dart File
             PsiElement())(')')
           PsiElement(;)(';')
         NEW_CONSTRUCTOR_DECLARATION
-          PsiElement(new)('new')
+          COMPONENT_NAME
+            PsiElement(new)('new')
           COMPONENT_NAME
             ID
               PsiElement(IDENTIFIER)('f')
@@ -522,7 +524,8 @@ Dart File
               ID
                 PsiElement(IDENTIFIER)('meta')
           PsiElement(const)('const')
-          PsiElement(new)('new')
+          COMPONENT_NAME
+            PsiElement(new)('new')
           FORMAL_PARAMETER_LIST
             PsiElement(()('(')
             NORMAL_FORMAL_PARAMETER
@@ -634,7 +637,8 @@ Dart File
                 PsiElement(;)(';')
               PsiElement(})('}')
         NEW_CONSTRUCTOR_DECLARATION
-          PsiElement(new)('new')
+          COMPONENT_NAME
+            PsiElement(new)('new')
           FORMAL_PARAMETER_LIST
             PsiElement(()('(')
             NORMAL_FORMAL_PARAMETER

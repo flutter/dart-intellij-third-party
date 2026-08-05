@@ -34,7 +34,8 @@ Dart File
             ID
               PsiElement(IDENTIFIER)('C')
           PsiElement(.)('.')
-          PsiElement(new)('new')
+          COMPONENT_NAME
+            PsiElement(new)('new')
           FORMAL_PARAMETER_LIST
             PsiElement(()('(')
             NORMAL_FORMAL_PARAMETER
@@ -2407,7 +2408,8 @@ Dart File
             ID
               PsiElement(IDENTIFIER)('C')
           PsiElement(.)('.')
-          PsiElement(new)('new')
+          COMPONENT_NAME
+            PsiElement(new)('new')
           FORMAL_PARAMETER_LIST
             PsiElement(()('(')
             NORMAL_FORMAL_PARAMETER

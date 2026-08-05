@@ -62,7 +62,7 @@ public class DartResolver implements ResolveCache.AbstractResolver<DartReference
       }
     }
 
-    if (region == null && reference instanceof DartNewExpression) {
+    if (region == null && (reference instanceof DartNewExpression || reference instanceof DartShorthandNewExpressionPrefix)) {
       for (ASTNode child : reference.getNode().getChildren(null)) {
         if (child.getPsi() instanceof DartReference || child.getElementType() == DartTokenTypes.NEW) {
           refOffset = child.getTextRange().getStartOffset();
