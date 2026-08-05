@@ -13,7 +13,7 @@ When modifying the grammar and parser to support new syntax, adhere to the follo
 
 * **Permissive over Restrictive:** Be permissive when modifying the grammar. Trust that the Dart analyzer will produce the necessary diagnostics on invalid code. We do not need to strictly enforce language semantics at the parser level if it overcomplicates the grammar.
 * **Reuse Existing Productions:** Strive to reuse existing grammar productions rather than introducing new ones. If an existing production almost works, explore and document the pros and cons of broadening it before creating a new one.
-* **Simplicity:** Elect for simplicity wherever possible. Complex grammar rules are brittle and hard to maintain.
+* **Simplicity:** Opt for simplicity wherever possible. Complex grammar rules are brittle and hard to maintain.
 * **Discrete Steps:** Break the work into discrete, logical steps. (e.g., 1. Syntax/Grammar declarations, 2. AST node creation, 3. Parser logic, 4. Formatting/Highlighting).
 
 ## 2. Verification and Testing Protocol
