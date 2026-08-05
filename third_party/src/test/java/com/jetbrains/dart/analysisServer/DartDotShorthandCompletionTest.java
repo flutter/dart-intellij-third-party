@@ -100,6 +100,56 @@ public class DartDotShorthandCompletionTest extends DartServerCompletionTest {
              }""");
   }
 
+  public void testPrimaryConstructorDotNewArgCompletion() {
+    doTest("name: ",
+           """
+             class A({String? name});
+             void f(A a) {}
+             main() {
+               f(.new(<caret>));
+             }""");
+  }
+
+  public void testPrimaryConstructorDotNamedArgCompletion() {
+    doTest("name: ",
+           """
+             class A.named({String? name});
+             void f(A a) {}
+             main() {
+               f(.named(<caret>));
+             }""");
+  }
+
+  public void testPrimaryConstructorDotNewPartialArgCompletion() {
+    doTest("name: ",
+           """
+             class A({String? name});
+             void f(A a) {}
+             main() {
+               f(.new(na<caret>));
+             }""");
+  }
+
+  public void testPrimaryConstructorDotNamedPartialArgCompletion() {
+    doTest("name: ",
+           """
+             class A.named({String? name});
+             void f(A a) {}
+             main() {
+               f(.named(na<caret>));
+             }""");
+  }
+
+  public void testExplicitNewPrimaryConstructorDotNewArgCompletion() {
+    doTest("name: ",
+           """
+             class A.new({String? name});
+             void f(A a) {}
+             main() {
+               f(.new(<caret>));
+             }""");
+  }
+
   private void doTest(String lookupToSelect, String text) {
     myFixture.configureByText("foo.dart", text);
     myFixture.doHighlighting();
