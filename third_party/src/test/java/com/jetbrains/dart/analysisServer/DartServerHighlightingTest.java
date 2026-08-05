@@ -4,6 +4,7 @@ package com.jetbrains.dart.analysisServer;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.actionSystem.IdeActions;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
@@ -25,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.awt.datatransfer.StringSelection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class DartServerHighlightingTest extends CodeInsightFixtureTestCase {
   @Override
@@ -411,10 +413,10 @@ public class DartServerHighlightingTest extends CodeInsightFixtureTestCase {
   public void testUpdateVisibleFilesWithoutReadAccess() throws Exception {
     myFixture.configureByText("firstFile.dart", "class Foo {}");
     final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getProject());
-    com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread(() -> {
+    ApplicationManager.getApplication().executeOnPooledThread(() -> {
       assertFalse("Read access should not be allowed before calling updateVisibleFiles()",
-                  com.intellij.openapi.application.ApplicationManager.getApplication().isReadAccessAllowed());
+                  ApplicationManager.getApplication().isReadAccessAllowed());
       service.updateVisibleFiles();
-    }).get(10, java.util.concurrent.TimeUnit.SECONDS);
+    }).get(10, TimeUnit.SECONDS);
   }
 }
