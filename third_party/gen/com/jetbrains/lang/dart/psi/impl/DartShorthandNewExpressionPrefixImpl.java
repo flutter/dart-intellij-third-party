@@ -11,15 +11,15 @@ import static com.jetbrains.lang.dart.DartTokenTypes.*;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.util.DartPsiImplUtil;
 
-public class DartNewExpressionImpl extends DartReferenceImpl implements DartNewExpression {
+public class DartShorthandNewExpressionPrefixImpl extends DartReferenceImpl implements DartShorthandNewExpressionPrefix {
 
-  public DartNewExpressionImpl(ASTNode node) {
+  public DartShorthandNewExpressionPrefixImpl(ASTNode node) {
     super(node);
   }
 
   @Override
   public void accept(@NotNull DartVisitor visitor) {
-    visitor.visitNewExpression(this);
+    visitor.visitShorthandNewExpressionPrefix(this);
   }
 
   @Override
@@ -32,34 +32,6 @@ public class DartNewExpressionImpl extends DartReferenceImpl implements DartNewE
   @Nullable
   public DartReferenceExpression getReferenceExpression() {
     return findChildByClass(DartReferenceExpression.class);
-  }
-
-  @Override
-  @Nullable
-  public DartShorthandNewExpressionPrefix getShorthandNewExpressionPrefix() {
-    return findChildByClass(DartShorthandNewExpressionPrefix.class);
-  }
-
-  @Override
-  @Nullable
-  public DartType getType() {
-    return findChildByClass(DartType.class);
-  }
-
-  @Override
-  @Nullable
-  public DartTypeArguments getTypeArguments() {
-    return findChildByClass(DartTypeArguments.class);
-  }
-
-  @Override
-  public boolean isConstantObjectExpression() {
-    return DartPsiImplUtil.isConstantObjectExpression(this);
-  }
-
-  @Override
-  public @Nullable DartArguments getArguments() {
-    return DartPsiImplUtil.getArguments(this);
   }
 
 }

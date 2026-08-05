@@ -3,6 +3,7 @@ package com.jetbrains.lang.dart.contextInfo;
 
 import com.intellij.codeInsight.hint.DeclarationRangeHandler;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.PsiElement;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.psi.*;
 import org.jetbrains.annotations.NotNull;
@@ -18,10 +19,16 @@ public final class DartDeclarationRangeHandler implements DeclarationRangeHandle
         return TextRange.create(element.getTextRange().getStartOffset(), expression.getTextRange().getEndOffset());
       }
     }
-    if (element instanceof DartNewExpression) {
-      DartReferenceExpression lastExpression = ContainerUtil.getLastItem(((DartNewExpression)element).getReferenceExpressionList());
-      if (lastExpression != null) {
-        return TextRange.create(element.getTextRange().getStartOffset(), lastExpression.getTextRange().getEndOffset());
+    if (element instanceof DartNewExpression newExpression) {
+      PsiElement endElement = newExpression.getReferenceExpression();
+      if (endElement == null) {
+        endElement = newExpression.getType();
+      }
+      if (endElement == null) {
+        endElement = newExpression.getShorthandNewExpressionPrefix();
+      }
+      if (endElement != null) {
+        return TextRange.create(element.getTextRange().getStartOffset(), endElement.getTextRange().getEndOffset());
       }
     }
 

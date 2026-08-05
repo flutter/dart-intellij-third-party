@@ -143,6 +143,7 @@ public interface DartTokenTypes {
   IElementType SHIFT_EXPRESSION = new DartElementType("SHIFT_EXPRESSION");
   IElementType SHIFT_OPERATOR = new DartElementType("SHIFT_OPERATOR");
   IElementType SHORTHAND_EXPRESSION = new DartElementType("SHORTHAND_EXPRESSION");
+  IElementType SHORTHAND_NEW_EXPRESSION_PREFIX = new DartElementType("SHORTHAND_NEW_EXPRESSION_PREFIX");
   IElementType SHORT_TEMPLATE_ENTRY = new DartElementType("SHORT_TEMPLATE_ENTRY");
   IElementType SHOW_COMBINATOR = new DartElementType("SHOW_COMBINATOR");
   IElementType SIMPLE_FORMAL_PARAMETER = new DartElementType("SIMPLE_FORMAL_PARAMETER");
@@ -734,6 +735,9 @@ public interface DartTokenTypes {
       }
       else if (type == SHORTHAND_EXPRESSION) {
         return new DartShorthandExpressionImpl(node);
+      }
+      else if (type == SHORTHAND_NEW_EXPRESSION_PREFIX) {
+        return new DartShorthandNewExpressionPrefixImpl(node);
       }
       else if (type == SHORT_TEMPLATE_ENTRY) {
         return new DartShortTemplateEntryImpl(node);

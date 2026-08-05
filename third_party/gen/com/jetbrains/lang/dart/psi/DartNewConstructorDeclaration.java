@@ -11,9 +11,6 @@ public interface DartNewConstructorDeclaration extends DartComponent {
   List<DartComponentName> getComponentNameList();
 
   @Nullable
-  DartComponentName getComponentName();
-
-  @Nullable
   DartFormalParameterList getFormalParameterList();
 
   @Nullable
@@ -30,5 +27,7 @@ public interface DartNewConstructorDeclaration extends DartComponent {
 
   @Nullable
   DartStringLiteralExpression getStringLiteralExpression();
+
+  @Nullable DartComponentName getComponentName();
 
 }
