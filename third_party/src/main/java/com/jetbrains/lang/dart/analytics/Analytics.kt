@@ -285,10 +285,7 @@ object Analytics {
     AnalyticsConfigurationManager.getConfiguration(sdk, project, logger)
 
   @JvmStatic
-  fun report(data: AnalyticsData) {
-    logger.info("Analytics event reported: ${data.data}")
-    data.reportTo(reporter)
-  }
+  fun report(data: AnalyticsData) = data.reportTo(reporter)
 
   @JvmStatic
   fun recordRunOrDebugSession(mechanism: String, executor: Executor, project: Project?) {
@@ -507,7 +504,6 @@ internal object NoOpReporter : AnalyticsReporter() {
 }
 
 internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
-  private val logger: Logger = PluginLogger.createLogger(UnifiedAnalyticsReporter::class.java)
   const val IDE_EVENT = "ide_event"
 
   override fun process(data: AnalyticsData) {
@@ -519,7 +515,6 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
   }
 
   private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
-    logger.info("Sending analytics event payload: $dataMap")
     val params = JsonObject()
     params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
