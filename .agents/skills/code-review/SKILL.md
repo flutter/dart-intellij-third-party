@@ -51,6 +51,6 @@ Perform a multi-pass analysis of the diff:
    If you are in a non-interactive environment, automatically invoke a subagent to perform the review.
 2. Retrieve the current changes (using `git diff`).
 3. Read `.gemini/styleguide.md` if present.
-4. Run `./tool/check_agent_skills.sh` (if the file exists) to verify skill documentation integrity. Record any failures as `[MUST-FIX]` items.
+4. Run `bash ./tool/check_agent_skills.sh` (if the file exists) to verify skill documentation integrity. Record any failures as `[MUST-FIX]` items.
 5. Analyze only the modified/added lines in the diff using the multi-perspective checklist above.
 6. Output the categorized review comments with code references (file names, line numbers) and clear explanations/recommendations, including the results of the script checks.
