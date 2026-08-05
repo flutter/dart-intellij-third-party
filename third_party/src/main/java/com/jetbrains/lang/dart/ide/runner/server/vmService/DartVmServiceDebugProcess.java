@@ -401,7 +401,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
       if (remoteUri.startsWith(DartUrlResolver.DART_PREFIX)) continue;
       if (remoteUri.startsWith(DartUrlResolver.PACKAGE_PREFIX)) continue;
 
-      final Collection<VirtualFile> localFilesWithSameName = ReadAction.computeBlocking(() -> {
+      final Collection<VirtualFile> localFilesWithSameName = ReadAction.compute(() -> {
         final String remoteFileName = PathUtil.getFileName(remoteUri);
         final GlobalSearchScope scope = GlobalSearchScopesCore.directoryScope(getSession().getProject(), projectRoot, true);
         return FilenameIndex.getVirtualFilesByName(remoteFileName, scope);
