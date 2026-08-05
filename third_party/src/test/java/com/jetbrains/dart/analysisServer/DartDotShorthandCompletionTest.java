@@ -64,22 +64,44 @@ public class DartDotShorthandCompletionTest extends DartServerCompletionTest {
              }""");
   }
 
+  public void testDotNamedPartialArgCompletion() {
+    doTest("name: ",
+           """
+             class A {
+               A.named({String? name});
+             }
+             void f(A a) {}
+             main() {
+               f(.named(na<caret>));
+             }""");
+  }
+
+  public void testDotNewPartialArgCompletion() {
+    doTest("name: ",
+           """
+             class A {
+               A({String? name});
+             }
+             void f(A a) {}
+             main() {
+               f(.new(na<caret>));
+             }""");
+  }
+
   private void doTest(String lookupToSelect, String text) {
     myFixture.configureByText("foo.dart", text);
     myFixture.doHighlighting();
     myFixture.completeBasic();
-    myFixture.type(lookupToSelect); 
-    // We expect the completion to work, so we check if the item is in the list
-    // The base class methods might be useful but we need custom setup for text verification or just basic completion check
-    // Actually, checking if "new" or "named" is present is enough for now.
-    // But verify behavior: if we type "new", it should select "new"
-    
-     // Let's reuse selectLookup logic if possible or just assert it exists
     if (lookupToSelect != null) {
-        // Find if the lookup contains our expected element
-        var lookups = myFixture.getLookupElementStrings();
-        assertNotNull("Lookup list should not be null", lookups);
+      var lookups = myFixture.getLookupElementStrings();
+      if (lookups != null) {
         assertTrue("Likely missing completion item: " + lookupToSelect + ". Found: " + lookups, lookups.contains(lookupToSelect));
+      } else {
+        // When a unique completion suggestion matches the prefix, IntelliJ auto-inserts it without showing a lookup list.
+        String editorText = myFixture.getEditor().getDocument().getText();
+        assertTrue("Lookup list was null and expected item '" + lookupToSelect + "' was not auto-inserted in editor:\n" + editorText,
+                   editorText.contains(lookupToSelect));
+      }
     }
   }
 }
