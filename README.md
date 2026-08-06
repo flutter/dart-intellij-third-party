@@ -139,3 +139,7 @@ These skills are located in the [.agents/skills/](.agents/skills/) directory. Th
 ### How to use:
 Tell your AI assistant to run the desired skill (e.g. by typing `/code-review` or asking *"Run the code-review skill on my changes"*). The agent will automatically find, load, and follow the instructions in the corresponding `SKILL.md` file.
 
+## Contributing to this plugin
+
+If you would like to contribute to the Dart plugin, see our [contribution guide](CONTRIBUTING.md) guide.
+
