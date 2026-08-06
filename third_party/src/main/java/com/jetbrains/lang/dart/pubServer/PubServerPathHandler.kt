@@ -3,7 +3,7 @@ package com.jetbrains.lang.dart.pubServer
 
 import com.google.common.net.UrlEscapers
 import com.jetbrains.lang.dart.logging.PluginLogger
-import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.Pair
@@ -15,9 +15,9 @@ import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.HttpHeaders
-import org.jetbrains.builtInWebServer.PathQuery
+import com.intellij.openapi.roots.ProjectRootManager
+import java.util.concurrent.Callable
 import org.jetbrains.builtInWebServer.WebServerPathHandler
-import org.jetbrains.builtInWebServer.WebServerPathToFileManager
 
 private val LOG = PluginLogger.createLogger(PubServerPathHandler::class.java)
 
@@ -31,17 +31,25 @@ private class PubServerPathHandler : WebServerPathHandler {
     authHeaders: HttpHeaders,
     isCustomHost: Boolean,
   ): Boolean {
-    val servedDirAndPathForPubServer = runReadActionBlocking {
+    val servedDirAndPathForPubServer = ReadAction.nonBlocking(Callable {
       getServedDirAndPathForPubServer(project, path)
-    } ?: return false
+    }).executeSynchronously() ?: return false
     PubServerManager.getInstance(project).send(context.channel(), request, authHeaders, servedDirAndPathForPubServer.first,
                                                servedDirAndPathForPubServer.second)
     return true
   }
 }
 
-@Suppress("ApiStatus")
-private val pathQuery = PathQuery(searchInLibs = false, searchInArtifacts = false, useHtaccess = false, useVfs = true)
+private fun findFileInContentRoots(project: Project, path: String): VirtualFile? {
+  val relativePath = path.trimStart('/')
+  for (root in ProjectRootManager.getInstance(project).contentRoots) {
+    val file = root.findFileByRelativePath(relativePath)
+    if (file != null) {
+      return file
+    }
+  }
+  return null
+}
 
 private fun getServedDirAndPathForPubServer(project: Project, path: String): Pair<VirtualFile, String>? {
   // File with requested path may not exist, pub server will generate and serve it.
@@ -49,8 +57,7 @@ private fun getServedDirAndPathForPubServer(project: Project, path: String): Pai
 
   // There may be 2 content roots with web/foo.html and web/bar.html files in them correspondingly. We need to catch the correct 'web' folder.
   // First see if full path can be resolved to a file
-  val pathToFileManager = WebServerPathToFileManager.getInstance(project)
-  val file = pathToFileManager.findVirtualFile(path, pathQuery = pathQuery)
+  val file = findFileInContentRoots(project, path)
   if (file != null && ProjectFileIndex.getInstance(project).isInContent(file)) {
     return getServedDirAndPathForPubServer(project, file)
   }
@@ -67,7 +74,7 @@ private fun getServedDirAndPathForPubServer(project: Project, path: String): Pai
     }
 
     val pathPart = path.substring(0, slashIndex)
-    val dir = pathToFileManager.findVirtualFile(pathPart, pathQuery = pathQuery)
+    val dir = findFileInContentRoots(project, pathPart)
     if (dir == null || !dir.isDirectory) {
       continue
     }
