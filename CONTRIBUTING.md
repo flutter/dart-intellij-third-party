@@ -224,4 +224,4 @@ Before submitting a Pull Request, please ensure:
 3. [ ] All unit tests pass: `./gradlew test`.
 4. [ ] Plugin verification passes: `./gradlew verifyPlugin`.
 5. [ ] If adding/modifying AI agent skills, `./tool/check_agent_skills.sh` passes.
-6. [ ] You have less than 2 active open non-draft pull requests in the repository.
+6. [ ] Opening this pull request will not exceed the limit of 2 concurrent open non-draft pull requests.
