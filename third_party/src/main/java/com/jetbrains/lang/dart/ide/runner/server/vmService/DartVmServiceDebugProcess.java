@@ -12,6 +12,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.ui.InputValidator;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Disposer;
@@ -410,7 +411,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
       int howManyFilesMatch = 0;
 
       for (VirtualFile file : localFilesWithSameName) {
-        com.intellij.openapi.progress.ProgressManager.checkCanceled();
+        ProgressManager.checkCanceled();
         if (file == null) continue;
 
         LOG.assertTrue(file.getPath().startsWith(projectRoot.getPath() + "/"), file.getPath() + "," + projectRoot.getPath());
