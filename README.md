@@ -141,5 +141,5 @@ Tell your AI assistant to run the desired skill (e.g. by typing `/code-review` o
 
 ## Contributing to this plugin
 
-If you would like to contribute to the Dart plugin, see our [contribution guide](CONTRIBUTING.md) guide.
+If you would like to contribute to the Dart plugin, see our [contribution guide](CONTRIBUTING.md).
 
