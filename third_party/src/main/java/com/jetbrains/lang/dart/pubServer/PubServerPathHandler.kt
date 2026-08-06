@@ -3,6 +3,7 @@ package com.jetbrains.lang.dart.pubServer
 
 import com.google.common.net.UrlEscapers
 import com.jetbrains.lang.dart.logging.PluginLogger
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.Pair
@@ -30,13 +31,16 @@ private class PubServerPathHandler : WebServerPathHandler {
     authHeaders: HttpHeaders,
     isCustomHost: Boolean,
   ): Boolean {
-    val servedDirAndPathForPubServer = getServedDirAndPathForPubServer(project, path) ?: return false
+    val servedDirAndPathForPubServer = runReadActionBlocking {
+      getServedDirAndPathForPubServer(project, path)
+    } ?: return false
     PubServerManager.getInstance(project).send(context.channel(), request, authHeaders, servedDirAndPathForPubServer.first,
                                                servedDirAndPathForPubServer.second)
     return true
   }
 }
 
+@Suppress("ApiStatus")
 private val pathQuery = PathQuery(searchInLibs = false, searchInArtifacts = false, useHtaccess = false, useVfs = true)
 
 private fun getServedDirAndPathForPubServer(project: Project, path: String): Pair<VirtualFile, String>? {
