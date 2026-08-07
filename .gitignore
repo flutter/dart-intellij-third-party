@@ -1,4 +1,20 @@
 # Mac Finder settings
 .DS_Store
 
+
+# IntelliJ and IDEs
+.idea/
+**/.idea/
+*.iml
+third_party/.settings/
 /.vscode
+
+# Gradle
+.gradle/
+**/build/
+out/
+
+# Dart / Flutter
+.dart_tool/
+.packages
+pubspec.lock
