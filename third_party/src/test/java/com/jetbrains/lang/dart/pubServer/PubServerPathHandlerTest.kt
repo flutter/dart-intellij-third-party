@@ -8,20 +8,22 @@ class PubServerPathHandlerTest : BasePlatformTestCase() {
   fun testServedDirAndPathForWebFolder() {
     myFixture.addFileToProject("pubspec.yaml", "name: test_project\n")
     val psiFile = myFixture.addFileToProject("web/index.html", "<html></html>")
-    val result = getServedDirAndPathForPubServer(project, psiFile.virtualFile)
+    val result = requireNotNull(getServedDirAndPathForPubServer(project, psiFile.virtualFile)) {
+      "Result should not be null for web folder"
+    }
 
-    assertNotNull("Result should not be null for web folder", result)
-    assertEquals("web", result!!.first.name)
+    assertEquals("web", result.first.name)
     assertEquals("/index.html", result.second)
   }
 
   fun testServedDirAndPathForExampleFolder() {
     myFixture.addFileToProject("pubspec.yaml", "name: test_project\n")
     val psiFile = myFixture.addFileToProject("example/main.dart", "void main() {}")
-    val result = getServedDirAndPathForPubServer(project, psiFile.virtualFile)
+    val result = requireNotNull(getServedDirAndPathForPubServer(project, psiFile.virtualFile)) {
+      "Result should not be null for example folder"
+    }
 
-    assertNotNull("Result should not be null for example folder", result)
-    assertEquals("example", result!!.first.name)
+    assertEquals("example", result.first.name)
     assertEquals("/main.dart", result.second)
   }
 
@@ -60,10 +62,11 @@ class PubServerPathHandlerTest : BasePlatformTestCase() {
   fun testEscapedUrlPath() {
     myFixture.addFileToProject("pubspec.yaml", "name: test_project\n")
     val psiFile = myFixture.addFileToProject("web/my page.html", "<html></html>")
-    val result = getServedDirAndPathForPubServer(project, psiFile.virtualFile)
+    val result = requireNotNull(getServedDirAndPathForPubServer(project, psiFile.virtualFile)) {
+      "Result should not be null for file with space in path"
+    }
 
-    assertNotNull("Result should not be null for file with space in path", result)
-    assertEquals("web", result!!.first.name)
+    assertEquals("web", result.first.name)
     assertEquals("/my%20page.html", result.second)
   }
 }

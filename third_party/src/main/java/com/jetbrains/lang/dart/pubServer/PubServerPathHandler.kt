@@ -2,21 +2,21 @@
 package com.jetbrains.lang.dart.pubServer
 
 import com.google.common.net.UrlEscapers
-import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.util.DartUrlResolver
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.HttpHeaders
-import com.intellij.openapi.roots.ProjectRootManager
-import java.util.concurrent.Callable
 import org.jetbrains.builtInWebServer.WebServerPathHandler
 
 private val LOG = PluginLogger.createLogger(PubServerPathHandler::class.java)
@@ -31,9 +31,9 @@ private class PubServerPathHandler : WebServerPathHandler {
     authHeaders: HttpHeaders,
     isCustomHost: Boolean,
   ): Boolean {
-    val servedDirAndPathForPubServer = ReadAction.nonBlocking(Callable {
+    val servedDirAndPathForPubServer = ReadAction.nonBlocking<Pair<VirtualFile, String>?> {
       getServedDirAndPathForPubServer(project, path)
-    }).executeSynchronously() ?: return false
+    }.executeSynchronously() ?: return false
     PubServerManager.getInstance(project).send(context.channel(), request, authHeaders, servedDirAndPathForPubServer.first,
                                                servedDirAndPathForPubServer.second)
     return true
@@ -43,6 +43,7 @@ private class PubServerPathHandler : WebServerPathHandler {
 private fun findFileInContentRoots(project: Project, path: String): VirtualFile? {
   val relativePath = path.trimStart('/')
   for (root in ProjectRootManager.getInstance(project).contentRoots) {
+    ProgressManager.checkCanceled()
     val file = root.findFileByRelativePath(relativePath)
     if (file != null) {
       return file
@@ -68,6 +69,7 @@ private fun getServedDirAndPathForPubServer(project: Project, path: String): Pai
 
   var slashIndex = -1
   while (true) {
+    ProgressManager.checkCanceled()
     slashIndex = path.indexOf('/', slashIndex + 1)
     if (slashIndex < 0) {
       break
