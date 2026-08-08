@@ -6,7 +6,6 @@
 
 ### Changed
 - Go to Definition implemented with JetBrains LSP (#539)
-- Rename `DartInlayHintsProvider` to `DartClosingLabelsInlayHintsProvider` to reflect that it only renders closing labels; provider ID and user settings are unchanged (#551)
 
 ### Removed
 
