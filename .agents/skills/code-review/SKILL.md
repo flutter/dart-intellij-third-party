@@ -25,8 +25,8 @@ Perform a multi-pass analysis of the diff:
 ### Pass 0: Repository & Structure Restrictions
 - **Third-Party Sources:** Check for modifications under `third_party/thirdPartySrc/`.
   - Treat `third_party/thirdPartySrc/vmServiceDrivers/` as plugin-owned code. The Dart SDK removed its Java VM Service implementation and generator as technical debt ([dart-lang/sdk#63939](https://github.com/dart-lang/sdk/issues/63939), [SDK change 531301](https://dart-review.googlesource.com/c/sdk/+/531301)), so the Dart and Flutter IntelliJ plugins now maintain these copies directly.
-  - Review VM Service driver changes normally; do not reject them solely because they are under `thirdPartySrc/`.
-  - Other `thirdPartySrc/` content is periodically copied from upstream, and direct changes will be lost. Reject modifications outside the exception with a `[MUST-FIX]` comment unless the change includes an explicit, durable patching workflow or repository-owner override.
+  - Review VM Service driver changes normally; do not reject them solely because they are under `third_party/thirdPartySrc/`.
+  - Other `third_party/thirdPartySrc/` content is periodically copied from upstream, and direct changes will be lost. Reject modifications outside the exception with a `[MUST-FIX]` comment unless the change includes an explicit, durable patching workflow or repository-owner override.
 
 ### Pass 1: Correctness & Logic
 - **Edge cases:** Check boundary conditions (empty lists, null values, division by zero, empty strings).

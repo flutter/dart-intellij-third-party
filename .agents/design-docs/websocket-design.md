@@ -99,7 +99,7 @@ The mirrored files are:
 
 Their behavior and implementation bodies must stay aligned with Dart. Package declarations and imports differ intentionally.
 
-The Dart SDK removed its Java VM Service implementation and generator as technical debt. The plugin copies are therefore maintained directly rather than refreshed from the SDK. For WebSocket work, the generic assumption that files under `thirdPartySrc` must never be edited is no longer correct for these plugin-owned VM Service sources. This document declares Dart canonical only for the four WebSocket files; it does not establish a synchronization policy for the rest of the VM Service driver.
+The Dart SDK removed its Java VM Service implementation and generator as technical debt. The plugin copies are therefore maintained directly rather than refreshed from the SDK. For WebSocket work, the generic assumption that files under `third_party/thirdPartySrc/` must never be edited is no longer correct for these plugin-owned VM Service sources. This document declares Dart canonical only for the four WebSocket files; it does not establish a synchronization policy for the rest of the VM Service driver.
 
 Behavioral WebSocket changes are made and validated in Dart first. After a Dart pull request exists, use the repository's `port-pr` workflow to carry the change to Flutter, compare the four implementations, and run Flutter's VM Service integration test. The overall cross-plugin change is not complete until parity is verified.
 
