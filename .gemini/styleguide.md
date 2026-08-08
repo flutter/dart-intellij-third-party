@@ -58,7 +58,9 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - Use imports instead of fully qualified names.
 
 ## 4. Code Quality & Maintainability
-- **Third-Party Code:** NEVER modify files under `third_party/thirdPartySrc/` directly. These files are periodically bulk-copied from upstream, so direct modifications will be overwritten. Flag any PR that attempts to change these files with a `[MUST-FIX]` comment.
+- **Third-Party Code:** NEVER modify files under `third_party/thirdPartySrc/` directly, except for the plugin-owned VM Service sources under `third_party/thirdPartySrc/vmServiceDrivers/`.
+  - **VM Service exception:** The Dart SDK removed its Java VM Service implementation and generator as technical debt ([dart-lang/sdk#63939](https://github.com/dart-lang/sdk/issues/63939), [SDK change 531301](https://dart-review.googlesource.com/c/sdk/+/531301)). The Dart and Flutter IntelliJ plugins now maintain their VM Service copies directly, so review changes under `vmServiceDrivers/` as normal owned code rather than rejecting them solely because of their location.
+  - All other `thirdPartySrc/` content is still periodically copied from upstream. Flag direct modifications outside this exception with a `[MUST-FIX]` comment unless the change includes an explicit, durable patching workflow or repository-owner override.
 - **Single Responsibility:** Methods should ideally be 10-20 lines. If a method exceeds 30 lines, suggest a refactor.
 - **DRY:** Identify blocks of code that are 90%+ identical to existing utility methods in this repo and flag them for duplication.
 - **Meaningful Naming:** Variables should describe their intent (e.g., `timeoutInMs` instead of `t`).
