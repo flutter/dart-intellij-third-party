@@ -236,9 +236,8 @@ Every behavioral wrapper change requires a focused regression test and the exist
 
 ### Dart Integration Tests
 
-From the repository root, with a Dart SDK configured as required by the integration test workflow:
+From the Dart IntelliJ repository root, with a Dart SDK configured as required by the integration test workflow:
 
-    cd third_party
     ./gradlew test --tests "com.jetbrains.dart.dartToolingDaemon.DTDProcessTest" --tests "com.jetbrains.dart.dartToolingDaemon.DartToolingDaemonServiceTest" --tests "com.jetbrains.dart.vmService.VmServiceTest"
 
 These cover:
@@ -250,10 +249,9 @@ These cover:
 
 ### Flutter Integration Test
 
-After porting the four wrapper files, from the Dart repository root:
+After porting the four wrapper files, run the test from the Flutter IntelliJ repository root, with a real Flutter SDK configured through `FLUTTER_SDK` or `FLUTTER_ROOT`:
 
-    cd ../flutter-intellij
-    FLUTTER_ROOT=/path/to/flutter ./gradlew integration --tests "io.flutter.integrationTest.vmService.VmServiceTest"
+    ./gradlew integration --tests "io.flutter.integrationTest.vmService.VmServiceTest"
 
 ### Focused Regression Scenarios
 
