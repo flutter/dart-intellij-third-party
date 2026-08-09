@@ -6,4 +6,4 @@ project:
 
   generation_rules:
     - "When the user asks for a 'code review', always follow the instructions specified in `tool/skills/code_review.md`."
-    - "NEVER edit or propose edits to files in `third_party/thirdPartySrc/`. These files are periodically bulk-copied from upstream."
+    - "NEVER edit or propose edits to files in `third_party/thirdPartySrc/`, except for the plugin-owned VM Service sources under `third_party/thirdPartySrc/vmServiceDrivers/`. Other files in `third_party/thirdPartySrc/` are periodically bulk-copied from upstream."
