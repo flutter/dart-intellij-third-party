@@ -1273,12 +1273,40 @@ limitations under the License.
         li.id = `issue-item-${issue.id}`;
         li.onclick = () => selectIssue(issue.id);
 
+        const dupes = issue.suggestions.possible_duplicates || [];
+
+
+        const dupeBadge = dupes.length > 0 ? `<span class="priority-badge" style="background-color: var(--color-p3); color: white;" title="Possible duplicates found">${dupes.length} Dupes?</span>` : '';
+
+
+
         li.innerHTML = `
+
+
           <div class="issue-meta">
+
+
             <span class="issue-id">#${issue.id}</span>
-            <span class="priority-badge ${pClass}" id="list-priority-badge-${issue.id}">${dec.priority}</span>
+
+
+            <div style="display:flex; gap:4px;">
+
+
+              ${dupeBadge}
+
+
+              <span class="priority-badge ${pClass}" id="list-priority-badge-${issue.id}">${dec.priority}</span>
+
+
+            </div>
+
+
           </div>
+
+
           <div class="issue-title">${issue.title}</div>
+
+
           <div class="issue-subtext">
             <span>@${issue.author}</span>
             <span class="reviewed-icon">✓ Reviewed</span>
@@ -1341,27 +1369,142 @@ limitations under the License.
         `;
       }
 
+      let duplicatesHtml = '';
+
+
+      if (issue.suggestions.possible_duplicates && issue.suggestions.possible_duplicates.length > 0) {
+
+
+        duplicatesHtml = `
+
+
+        <div class="section-label" style="margin-top: 1.5rem; color: var(--color-p3);">Possible Duplicates (${issue.suggestions.possible_duplicates.length})</div>
+
+
+        <div class="comments-container" style="border-left: 3px solid var(--color-p3);">
+
+
+          ${issue.suggestions.possible_duplicates
+
+
+            .map(
+
+
+              d => `
+
+
+            <div class="comment-card" style="padding: 0.75rem;">
+
+
+              <div style="font-weight: 500; margin-bottom: 4px;">
+
+
+                <a href="${d.url}" target="_blank" style="color: var(--text-primary); text-decoration: none;">#${d.number}: ${d.title}</a>
+
+
+              </div>
+
+
+              <div style="font-size: 0.8rem; color: var(--text-secondary); display: flex; gap: 8px;">
+
+
+                <span class="badge-${d.state.toLowerCase() === 'closed' ? 'p0' : 'p3'}">${d.state}</span>
+
+
+                <span>Opened: ${formatDate(d.createdAt)}</span>
+
+
+              </div>
+
+
+            </div>
+
+
+          `,
+
+
+            )
+
+
+            .join('')}
+
+
+        </div>
+
+
+        `;
+
+
+      }
+
+
+
       detailPane.innerHTML = `
+
+
         <div class="detail-header">
+
+
           <div class="detail-title-row">
+
+
             <h2 class="detail-title">${issue.title}</h2>
+
+
           </div>
+
+
           <div class="detail-meta" style="margin-bottom: 0.5rem;">
+
+
             Opened by <strong>@${issue.author}</strong> • 
+
+
             <a class="github-link" href="https://github.com/${repoData.repo}/issues/${issue.id}" target="_blank">
+
+
               View on GitHub ↗
+
+
             </a>
+
+
           </div>
+
+
           <div class="detail-dates" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1.5rem; display: flex; gap: 16px;">
+
+
             <span>Opened: <strong>${formatDate(issue.createdAt)}</strong></span>
+
+
             <span>Last modified: <strong>${formatDate(issue.updatedAt || issue.createdAt)}</strong></span>
+
+
           </div>
+
+
         </div>
+
+
         <div class="detail-body-container">
+
+
           <div class="section-label">Description</div>
+
+
           <div class="issue-body">${cleanBody}</div>
+
+
+          ${duplicatesHtml}
+
+
           ${commentsHtml}
+
+
         </div>
+
+
       `;
 
       // Pre-fill Form Controls on Right
