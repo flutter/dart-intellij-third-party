@@ -33,7 +33,7 @@ public abstract class DartUrlResolver {
    * @param contextFile may be pubspec.yaml file, its parent folder or any file/folder within this parent folder; in case of import statements resolve this must be an analyzed file
    */
   public static @NotNull DartUrlResolver getInstance(final @NotNull Project project, final @NotNull VirtualFile contextFile) {
-    return ReadAction.nonBlocking(() -> new DartUrlResolverImpl(project, contextFile)).executeSynchronously();
+    return ReadAction.compute(() -> new DartUrlResolverImpl(project, contextFile));
   }
 
   public abstract @Nullable VirtualFile getPubspecYamlFile();
