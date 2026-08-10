@@ -23,7 +23,6 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.DumbAware
@@ -295,12 +294,11 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
         console.clear()
       }
       else {
-        val actionManager = serviceAsync<ActionManager>()
         console = readAction { createConsole(project, pubspecYamlFile) }
         info = PubToolWindowContentInfo(module, pubspecYamlFile, command, actionTitle, console)
 
         withContext(Dispatchers.EDT) {
-          val actionToolbar = createToolWindowActionsBar(actionManager, info)
+          val actionToolbar = createToolWindowActionsBar(info)
 
           val toolWindowPanel = SimpleToolWindowPanel(false, true)
           toolWindowPanel.setContent(console.component)
@@ -351,7 +349,8 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
       return consoleBuilder.console
     }
 
-    private fun createToolWindowActionsBar(actionManager: ActionManager, info: PubToolWindowContentInfo): ActionToolbar {
+    private fun createToolWindowActionsBar(info: PubToolWindowContentInfo): ActionToolbar {
+      val actionManager = ActionManager.getInstance()
       val actionGroup = DefaultActionGroup()
 
       val rerunPubCommandAction = RerunPubCommandAction(info)
