@@ -1524,6 +1524,15 @@ limitations under the License.
         if (opt.value === aiType) opt.text += ' (suggested)';
       });
 
+      // Reset priority text
+      Array.from(prioSelect.options).forEach(opt => {
+        opt.text = (opt.value === 'None' ? 'Priority' : opt.value);
+      });
+      const aiPrio = issue.suggestions.priority || 'None';
+      Array.from(prioSelect.options).forEach(opt => {
+        if (opt.value === aiPrio) opt.text += ' (suggested)';
+      });
+
       typeSelect.value = dec.type || 'None';
       prioSelect.value = dec.priority;
       updateDropdownColors();
