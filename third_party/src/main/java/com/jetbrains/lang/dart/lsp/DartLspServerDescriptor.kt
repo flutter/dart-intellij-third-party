@@ -21,7 +21,9 @@ import com.intellij.platform.dartlsp.api.customization.LspCompletionDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCustomization
 import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentColorDisabled
+import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsDisabled
+import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsSupport
 import com.intellij.platform.dartlsp.api.customization.LspDocumentLinkDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentSymbolDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesDisabled
@@ -42,6 +44,7 @@ import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchyDisabled
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
+import com.intellij.psi.PsiFile
 import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
@@ -125,7 +128,15 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val documentLinkCustomizer = LspDocumentLinkDisabled
         override val foldingRangeCustomizer = LspFoldingRangeDisabled
         override val inlayHintCustomizer = LspInlayHintDisabled
-        override val documentHighlightsCustomizer = LspDocumentHighlightsDisabled
+        override val documentHighlightsCustomizer: LspDocumentHighlightsCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                object : LspDocumentHighlightsSupport() {
+                    // The default implementation only serves plain-text/TextMate files.
+                    override fun shouldAskServerForDocumentHighlights(psiFile: PsiFile): Boolean = true
+                }
+            } else {
+                LspDocumentHighlightsDisabled
+            }
         override val signatureHelpCustomizer = LspSignatureHelpDisabled
         override val documentSymbolCustomizer = LspDocumentSymbolDisabled
         override val workspaceSymbolCustomizer = LspWorkspaceSymbolDisabled

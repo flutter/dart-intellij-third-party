@@ -13,6 +13,7 @@
 ### Added
 - Retrieving diagnostics server with JetBrains LSP (#493)
 - Documenting the process for installing dev builds (#544)
+- Highlighting read vs write variable occurrences (JetBrains LSP, experimental feature) (#552)
 
 ### Changed
 - Go to Definition implemented with JetBrains LSP (#539)

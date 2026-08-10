@@ -12,6 +12,7 @@ enum class LspMethod(
 ) {
     DEFINITION("textDocument/definition", isExperimental = true, presentableName = "navigation"),
     DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = true, presentableName = "diagnostic server"),
+    DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = true, presentableName = "read/write highlighting"),
     HOVER("textDocument/hover", isExperimental = true, presentableName = "hover"),
     INITIALIZE("initialize"),
     SHUTDOWN("shutdown");
