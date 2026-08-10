@@ -153,7 +153,7 @@
        implementationClass="com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider"/>
 
     <codeInsight.declarativeInlayProvider language="Dart"
-                                          implementationClass="com.jetbrains.lang.dart.hints.DartInlayHintsProvider"
+                                          implementationClass="com.jetbrains.lang.dart.hints.DartClosingLabelsInlayHintsProvider"
                                           isEnabledByDefault="true"
                                           group="OTHER_GROUP"
                                           providerId="dart.closing.labels"
