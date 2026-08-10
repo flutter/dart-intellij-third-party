@@ -37,7 +37,7 @@ Process the raw issues and generate recommended triage fields based on the proje
    - Call the `invoke_subagent` tool in parallel for those issues. Prompt each subagent to analyze its assigned issue against the guidelines in [triage_criteria.md](references/triage_criteria.md), [proposed_actions.md](references/proposed_actions.md), [priorities.md](references/priorities.md), and [labels.md](references/labels.md). Instruct them to return a structured JSON block containing `priority`, `proposed_actions` (an array of tag strings from proposed_actions.md), `labels`, `reply`, and `search_keywords` (a string of 3-5 highly specific keywords or stack trace snippets designed to find duplicate issues).
    - While the subagents are running, or after they report back, use the `gh issue list --search "<search_keywords>" --state all --json number,title,state,createdAt,url --limit 3` command for each issue's generated keywords.
    - Compile their recommendations and your search results into the standard schema:
-     - Ensure `assignee` is left empty by default unless there is a strong reason to assign an owner. Include a short sentence in `assignee_reason` explaining why they were chosen, or why it was left blank.
+     - Ensure `assignee` is left empty by default unless there is a strong reason to assign an owner.
      - Inject `possible_duplicates` (the raw JSON array of the top 3 GitHub search results, omitting the current issue itself).
      - Inject `total_issues_count` (preserving the total count from the raw issues JSON).
      - Save the final compiled payload to `issues_to_triage_<REPO_NAME_CLEANED>.json` in the scratch directory.
