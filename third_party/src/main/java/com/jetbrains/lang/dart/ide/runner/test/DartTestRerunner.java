@@ -9,7 +9,6 @@ import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.runners.ProgramRunner;
 import com.intellij.execution.testframework.AbstractTestProxy;
 import com.intellij.execution.testframework.sm.runner.SMTestProxy;
-import com.intellij.execution.testframework.sm.runner.states.TestStateInfo.Magnitude;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.util.text.StringUtil;
 import org.jetbrains.annotations.NotNull;
@@ -49,11 +48,12 @@ public class DartTestRerunner implements RunProfileState {
     for (AbstractTestProxy test : failedTests) {
       assert test instanceof SMTestProxy : test.getClass().getName();
 
-      final Magnitude magnitude = ((SMTestProxy)test).getMagnitudeInfo();
+      SMTestProxy smTest = (SMTestProxy)test;
+
       if (test.getParent() != null &&
-          !((SMTestProxy)test).isSuite() &&
+          !smTest.isSuite() &&
           test.isLeaf() &&
-          (magnitude == Magnitude.FAILED_INDEX || magnitude == Magnitude.ERROR_INDEX || magnitude == Magnitude.TERMINATED_INDEX)) {
+          (smTest.isDefect() || smTest.isInterrupted())) {
         if (!buf.isEmpty()) buf.append('|');
         buf.append(buildFullTestName(test));
       }
