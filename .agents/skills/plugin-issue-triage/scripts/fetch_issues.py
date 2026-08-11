@@ -31,32 +31,12 @@ def run_cmd(args):
         return None
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Fetch open, untriaged issues and their comments."
-    )
-    parser.add_argument(
-        "--repo", required=True, help="GitHub repository name (owner/repo)."
-    )
-    parser.add_argument(
-        "--output-file", required=True, help="Path to save the fetched issues JSON."
-    )
-    parser.add_argument(
-        "--limit", type=int, default=10, help="Maximum number of issues to fetch."
-    )
-    args = parser.parse_args()
-
-    # 1. Check if gh CLI is installed and authenticated
-    if not shutil.which("gh"):
-        print(
-            "Error: GitHub CLI ('gh') is not installed or not in PATH.", file=sys.stderr
-        )
-        sys.exit(1)
-
-    print(f"Fetching assignees for {args.repo}...")
-    # Fetch CODEOWNERS
+def fetch_for_repo(repo, limit):
+    print(f"\n--- Fetching data for {repo} ---")
+    
+    print(f"Fetching assignees for {repo}...")
     import base64
-    codeowners_b64 = run_cmd(["gh", "api", f"repos/{args.repo}/contents/.github/CODEOWNERS", "--jq", ".content"])
+    codeowners_b64 = run_cmd(["gh", "api", f"repos/{repo}/contents/.github/CODEOWNERS", "--jq", ".content"])
     
     owners = []
     if codeowners_b64:
@@ -74,12 +54,10 @@ def main():
         except Exception as e:
             pass
             
-    # Fetch all assignees
-    assignees_json = run_cmd(["gh", "api", f"repos/{args.repo}/assignees", "--paginate", "--jq", ".[].login"])
+    assignees_json = run_cmd(["gh", "api", f"repos/{repo}/assignees", "--paginate", "--jq", ".[].login"])
     raw_assignees = []
     if assignees_json:
         all_assignees = [a.strip() for a in assignees_json.splitlines() if a.strip()]
-        # Put owners first
         raw_assignees = [o for o in owners if o in all_assignees]
         for a in all_assignees:
             if a not in raw_assignees:
@@ -87,8 +65,6 @@ def main():
 
     assignees = []
     if raw_assignees:
-
-        # Build a name mapping from git log history
         name_map = {}
         git_log = run_cmd(["git", "log", "--format=%an <%ae>"])
         if git_log:
@@ -109,28 +85,32 @@ def main():
                     name_map[email_prefix] = name
                     name_map[cleaned_name] = name
 
-        # Map assignees to their real names
         for login in raw_assignees:
             login_lower = login.lower()
             real_name = ""
             if login_lower in name_map:
                 real_name = name_map[login_lower]
             else:
-                # Substring matching fallback
                 for key, val in name_map.items():
                     if login_lower.startswith(key) or key.startswith(login_lower):
                         real_name = val
                         break
 
-            # Fallback: Use login name directly to prevent slow API requests and rate-limiting
             if not real_name:
                 real_name = login
 
             assignees.append({"login": login, "name": real_name})
 
-    print(f"Fetching available labels for {args.repo}...")
+    # To isolate owners correctly based on our recent fixes
+    repo_owners = [a for a in assignees if a["login"] in owners]
+    # If they were not found in assignees list for some reason
+    for o in owners:
+        if not any(a["login"] == o for a in repo_owners):
+            repo_owners.append({"login": o, "name": o})
+
+    print(f"Fetching available labels for {repo}...")
     labels_json = run_cmd(
-        ["gh", "label", "list", "--repo", args.repo, "--limit", "150", "--json", "name"]
+        ["gh", "label", "list", "--repo", repo, "--limit", "150", "--json", "name"]
     )
     repo_labels = []
     if labels_json:
@@ -140,32 +120,22 @@ def main():
         except Exception as e:
             print(f"Warning: Failed to parse repository labels: {e}", file=sys.stderr)
 
-    print(f"Fetching open issues from {args.repo}...")
-    # 2. Fetch open issues with key fields
+    print(f"Fetching open issues from {repo}...")
     issues_json = run_cmd([
-        "gh",
-        "issue",
-        "list",
-        "--repo",
-        args.repo,
-        "--state",
-        "open",
-        "--limit",
-        "100",
-        "--json",
-        "number,title,author,body,createdAt,updatedAt,labels,assignees",
+        "gh", "issue", "list", "--repo", repo, "--state", "open",
+        "--limit", "100", "--json", "number,title,author,body,createdAt,updatedAt,labels,assignees",
     ])
 
     if not issues_json:
-        print("Failed to fetch issues or repository is empty.", file=sys.stderr)
-        sys.exit(1)
-
-    issues = json.loads(issues_json)
+        print(f"Failed to fetch issues or repository {repo} is empty.", file=sys.stderr)
+        issues = []
+    else:
+        issues = json.loads(issues_json)
+        
     priority_labels = {"P0", "P1", "P2", "P3", "P4"}
     untriaged_issues = []
 
     for issue in issues:
-        # Check if the issue has a priority label or status label keeping it out of the queue
         is_ignored = False
         labels = issue.get("labels", [])
         for l in labels:
@@ -181,27 +151,15 @@ def main():
         if not is_ignored:
             untriaged_issues.append(issue)
 
-    print(
-        f"Found {len(untriaged_issues)} untriaged issues. Fetching comments for up to"
-        f" {args.limit}..."
-    )
+    print(f"Found {len(untriaged_issues)} untriaged issues. Fetching comments for up to {limit}...")
 
     enriched_issues = []
-    for i, issue in enumerate(untriaged_issues[: args.limit]):
+    for i, issue in enumerate(untriaged_issues[: limit]):
         issue_id = issue["number"]
-        # Parse author name
         author = issue.get("author", {}).get("login", "unknown")
 
-        # Fetch comments for this specific issue
         comments_json = run_cmd([
-            "gh",
-            "issue",
-            "view",
-            str(issue_id),
-            "--repo",
-            args.repo,
-            "--json",
-            "comments",
+            "gh", "issue", "view", str(issue_id), "--repo", repo, "--json", "comments",
         ])
 
         comments = []
@@ -215,10 +173,7 @@ def main():
                         "body": c.get("body", ""),
                     })
             except Exception as e:
-                print(
-                    f"Failed to parse comments for issue #{issue_id}: {e}",
-                    file=sys.stderr,
-                )
+                print(f"Failed to parse comments for issue #{issue_id}: {e}", file=sys.stderr)
 
         existing_assignees = [
             a.get("login") for a in issue.get("assignees", []) if a.get("login")
@@ -226,6 +181,7 @@ def main():
 
         enriched_issues.append({
             "id": issue_id,
+            "repo": repo,
             "title": issue.get("title", ""),
             "author": author,
             "body": issue.get("body", ""),
@@ -235,24 +191,79 @@ def main():
             "assignees": existing_assignees,
             "comments": comments,
         })
-
-    # Prepare output payload
-    payload = {
-        "repo": args.repo,
+        
+    return {
         "assignees": assignees,
+        "owners": repo_owners,
         "labels": repo_labels,
         "issues": enriched_issues,
-        "total_issues_count": len(untriaged_issues),
+        "total_issues_count": len(untriaged_issues)
     }
 
-    # Write to output file
+def main():
+    parser = argparse.ArgumentParser(
+        description="Fetch open, untriaged issues and their comments."
+    )
+    parser.add_argument(
+        "--repo", default="both", help="GitHub repository name (owner/repo) or 'both'."
+    )
+    parser.add_argument(
+        "--output-file", required=True, help="Path to save the fetched issues JSON."
+    )
+    parser.add_argument(
+        "--limit", type=int, default=50, help="Maximum number of issues to fetch per repo."
+    )
+    args = parser.parse_args()
+
+    if not shutil.which("gh"):
+        print("Error: GitHub CLI ('gh') is not installed or not in PATH.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.repo == "both":
+        targets = ["flutter/dart-intellij-third-party", "flutter/flutter-intellij"]
+    else:
+        targets = [args.repo]
+        
+    all_assignees = []
+    seen_assignees = set()
+    all_owners = []
+    seen_owners = set()
+    labels_by_repo = {}
+    all_issues = []
+    total_count = 0
+    
+    for t in targets:
+        data = fetch_for_repo(t, args.limit)
+        
+        for a in data["assignees"]:
+            if a["login"] not in seen_assignees:
+                seen_assignees.add(a["login"])
+                all_assignees.append(a)
+                
+        for o in data["owners"]:
+            if o["login"] not in seen_owners:
+                seen_owners.add(o["login"])
+                all_owners.append(o)
+                
+        labels_by_repo[t] = data["labels"]
+        all_issues.extend(data["issues"])
+        total_count += data["total_issues_count"]
+        
+    payload = {
+        "repo": args.repo,
+        "assignees": all_assignees,
+        "owners": all_owners,
+        "labels_by_repo": labels_by_repo,
+        "issues": all_issues,
+        "total_issues_count": total_count,
+    }
+
     output_path = os.path.abspath(os.path.expanduser(args.output_file))
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
 
-    print(f"Successfully saved {len(enriched_issues)} issues to {output_path}")
-
+    print(f"Successfully saved {len(all_issues)} total issues to {output_path}")
 
 if __name__ == "__main__":
     main()

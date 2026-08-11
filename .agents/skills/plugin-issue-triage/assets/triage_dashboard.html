@@ -1261,7 +1261,24 @@ limitations under the License.
       const container = document.getElementById('issueListContainer');
       container.innerHTML = '';
 
+      let lastRepo = null;
       repoData.issues.forEach(issue => {
+        if (issue.repo && issue.repo !== lastRepo) {
+          const header = document.createElement('li');
+          header.style.padding = '0.5rem 1rem';
+          header.style.backgroundColor = 'var(--bg-card)';
+          header.style.color = 'var(--accent-primary)';
+          header.style.fontSize = '0.75rem';
+          header.style.fontWeight = 'bold';
+          header.style.textTransform = 'uppercase';
+          header.style.letterSpacing = '0.05em';
+          header.style.borderBottom = '1px solid var(--border-color)';
+          header.style.borderTop = lastRepo ? '1px solid var(--border-color)' : 'none';
+          header.textContent = issue.repo.replace(/^flutter\//i, '');
+          container.appendChild(header);
+          lastRepo = issue.repo;
+        }
+
         const dec = decisions[issue.id];
         const pClass =
           dec.priority !== 'None' ? `badge-${dec.priority.toLowerCase()}` : 'badge-none';
