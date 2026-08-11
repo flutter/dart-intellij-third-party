@@ -50,12 +50,12 @@ public class DartTestRerunner implements RunProfileState {
 
       SMTestProxy smTest = (SMTestProxy)test;
 
-      if (test.getParent() != null &&
+      if (smTest.getParent() != null &&
           !smTest.isSuite() &&
-          test.isLeaf() &&
+          smTest.isLeaf() &&
           (smTest.isDefect() || smTest.isInterrupted())) {
         if (!buf.isEmpty()) buf.append('|');
-        buf.append(buildFullTestName(test));
+        buf.append(buildFullTestName(smTest));
       }
     }
     return buf.toString();
