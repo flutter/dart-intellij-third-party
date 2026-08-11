@@ -34,12 +34,13 @@ Process the raw issues and generate recommended triage fields based on the proje
 1. Read the triage criteria reference document: [triage_criteria.md](references/triage_criteria.md), [priorities.md](references/priorities.md), and [labels.md](references/labels.md).
 2. **Natively Orchestrate Subagents**: 
    - Load the first N issues (defaulting to 10, or as requested) from the downloaded JSON.
-   - Call the `invoke_subagent` tool in parallel for those issues. Prompt each subagent to analyze its assigned issue against the guidelines in [triage_criteria.md](references/triage_criteria.md), [proposed_actions.md](references/proposed_actions.md), [priorities.md](references/priorities.md), and [labels.md](references/labels.md). Instruct them to return a structured JSON block containing `priority`, `proposed_actions` (an array of tag strings from proposed_actions.md), `labels`, `reply`, and `search_keywords` (a string of 3-5 highly specific keywords or stack trace snippets designed to find duplicate issues).
+   - Call the `invoke_subagent` tool in parallel for those issues. Prompt each subagent to analyze its assigned issue against the guidelines in [triage_criteria.md](references/triage_criteria.md), [proposed_actions.md](references/proposed_actions.md), [priorities.md](references/priorities.md), and [labels.md](references/labels.md). Instruct them to return a structured JSON block containing `issue_type` ("bug", "enhancement", or "task"), `priority`, `proposed_actions` (an array of tag strings from proposed_actions.md), `labels`, `reply`, and `search_keywords` (a string of 3-5 highly specific keywords or stack trace snippets designed to find duplicate issues).
    - While the subagents are running, or after they report back, use the `gh issue list --search "<search_keywords>" --state all --json number,title,state,createdAt,url --limit 3` command for each issue's generated keywords.
    - Compile their recommendations and your search results into the standard schema:
+     - Inject the subagent's JSON recommendations into the issue object under the key `suggestions`.
      - Ensure `assignee` is left empty by default unless there is a strong reason to assign an owner.
-     - Inject `possible_duplicates` (the raw JSON array of the top 3 GitHub search results, omitting the current issue itself).
-     - Inject `total_issues_count` (preserving the total count from the raw issues JSON).
+     - Inject `possible_duplicates` (the raw JSON array of the top 3 GitHub search results, omitting the current issue itself) into the `suggestions` object.
+     - Inject `total_issues_count` (preserving the total count from the raw issues JSON) at the root level of the JSON.
      - Save the final compiled payload to `issues_to_triage_<REPO_NAME_CLEANED>.json` in the scratch directory.
 
 ---

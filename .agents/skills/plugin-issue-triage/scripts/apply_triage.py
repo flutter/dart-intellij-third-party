@@ -53,6 +53,7 @@ def main():
 
     for i, dec in enumerate(approved_decisions):
         issue_id = str(dec["id"])
+        repo = dec.get("repo")
         priority = dec["priority"]
         assignee = dec["assignee"]
         labels = dec["labels"]
@@ -64,7 +65,7 @@ def main():
             # 1. Update Labels (Priority and component/type labels)
             current_labels = []
             issue_info_json = run_cmd(
-                ["gh", "issue", "view", issue_id, "--json", "labels"]
+                ["gh", "issue", "view", issue_id] + (["-R", repo] if repo else []) + [ "--json", "labels"]
             )
             if issue_info_json:
                 try:
@@ -117,17 +118,17 @@ def main():
             if remove_labels:
                 remove_str = ",".join(remove_labels)
                 print(f"  Removing conflicting priority labels: {remove_str}")
-                run_cmd(["gh", "issue", "edit", issue_id, "--remove-label", remove_str])
+                run_cmd(["gh", "issue", "edit", issue_id] + (["-R", repo] if repo else []) + [ "--remove-label", remove_str])
 
             if add_labels:
                 add_str = ",".join(add_labels)
                 print(f"  Adding labels: {add_str}")
-                run_cmd(["gh", "issue", "edit", issue_id, "--add-label", add_str])
+                run_cmd(["gh", "issue", "edit", issue_id] + (["-R", repo] if repo else []) + [ "--add-label", add_str])
 
             # 2. Assignee
             if assignee:
                 print(f"  Assigning to: @{assignee}")
-                run_cmd(["gh", "issue", "edit", issue_id, "--add-assignee", assignee])
+                run_cmd(["gh", "issue", "edit", issue_id] + (["-R", repo] if repo else []) + [ "--add-assignee", assignee])
 
             # 3. Post Response Comment
             if reply:
@@ -139,7 +140,7 @@ def main():
 
                 already_posted = False
                 comments_json = run_cmd(
-                    ["gh", "issue", "view", issue_id, "--json", "comments"]
+                    ["gh", "issue", "view", issue_id] + (["-R", repo] if repo else []) + [ "--json", "comments"]
                 )
                 if comments_json:
                     try:
@@ -160,7 +161,7 @@ def main():
                 else:
                     print(f"  Posting comment...")
                     run_cmd(
-                        ["gh", "issue", "comment", issue_id, "--body", comment_body]
+                        ["gh", "issue", "comment", issue_id] + (["-R", repo] if repo else []) + [ "--body", comment_body]
                     )
 
             
@@ -171,7 +172,7 @@ def main():
 
             if add_to_project:
                 print(f"  Adding to DevExp GitHub Project (Flutter 239)...")
-                issue_url = run_cmd(["gh", "issue", "view", issue_id, "--json", "url", "--jq", ".url"])
+                issue_url = run_cmd(["gh", "issue", "view", issue_id] + (["-R", repo] if repo else []) + [ "--json", "url", "--jq", ".url"])
                 if issue_url:
                     item_json = run_cmd(["gh", "project", "item-add", "239", "--owner", "flutter", "--url", issue_url, "--format", "json"])
                     if item_json:
