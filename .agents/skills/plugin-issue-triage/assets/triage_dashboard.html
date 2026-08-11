@@ -1124,7 +1124,7 @@ limitations under the License.
         originalObjects.forEach(renderOption);
       }
 
-      const ownersList = (repoData.assignees || []).filter(a => !originalAssignees.includes(a.login));
+      const ownersList = (repoData.owners || []).filter(a => !originalAssignees.includes(a.login));
       if (ownersList.length > 0) {
         if (originalObjects.length > 0) {
           const sep = document.createElement('div');
@@ -1136,16 +1136,22 @@ limitations under the License.
         headerOpt.textContent = '── Owners ──';
         selectOptions.appendChild(headerOpt);
         ownersList.forEach(renderOption);
+
+        const sepAfter = document.createElement('div');
+        sepAfter.className = 'custom-select-option separator';
+        selectOptions.appendChild(sepAfter);
       }
 
       const othersList = allAssignees.filter(a => {
-        return !originalAssignees.includes(a.login) && !(repoData.assignees || []).some(owner => owner.login === a.login);
+        return !originalAssignees.includes(a.login) && !(repoData.owners || []).some(owner => owner.login === a.login);
       });
 
       if (othersList.length > 0) {
-        const sep = document.createElement('div');
-        sep.className = 'custom-select-option separator';
-        selectOptions.appendChild(sep);
+        if (ownersList.length === 0 && originalObjects.length > 0) {
+          const sep = document.createElement('div');
+          sep.className = 'custom-select-option separator';
+          selectOptions.appendChild(sep);
+        }
 
         const headerOpt = document.createElement('div');
         headerOpt.className = 'custom-select-option disabled-header';
