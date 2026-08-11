@@ -99,12 +99,13 @@ def main():
                 # If new priority is "None", remove any existing priority label
                 remove_labels.extend(list(existing_p_labels))
 
-            # Ensure status: first-line-handled is added to all triaged issues
-            if (
-                "status: first-line-handled" not in current_labels
-                and "status: first-line-handled" not in add_labels
-            ):
-                add_labels.append("status: first-line-handled")
+            # Ensure status: first-line-handled is added to all triaged issues (flutter repo only)
+            if repo == "flutter/flutter-intellij":
+                if (
+                    "status: first-line-handled" not in current_labels
+                    and "status: first-line-handled" not in add_labels
+                ):
+                    add_labels.append("status: first-line-handled")
 
 
             # Determine other non-priority component/type labels to add
@@ -114,7 +115,24 @@ def main():
                 if l and l not in current_labels and l not in add_labels:
                     add_labels.append(l)
 
-            # Apply label changes via gh CLI
+
+            # Fetch valid labels for this repo to avoid failing the update
+            repo_labels_json = run_cmd(["gh", "label", "list", "-R", repo, "--json", "name", "--limit", "100"])
+            valid_labels = set()
+            if repo_labels_json:
+                try:
+                    for l in json.loads(repo_labels_json):
+                        valid_labels.add(l['name'])
+                except:
+                    pass
+
+            # Filter add_labels to only include those that exist in the repo
+            original_add = add_labels.copy()
+            add_labels = [l for l in add_labels if l in valid_labels]
+            if len(add_labels) != len(original_add):
+                print(f"  Warning: Ignoring invalid labels: {set(original_add) - set(add_labels)}")
+
+# Apply label changes via gh CLI
             if remove_labels:
                 remove_str = ",".join(remove_labels)
                 print(f"  Removing conflicting priority labels: {remove_str}")
@@ -124,6 +142,42 @@ def main():
                 add_str = ",".join(add_labels)
                 print(f"  Adding labels: {add_str}")
                 run_cmd(["gh", "issue", "edit", issue_id] + (["-R", repo] if repo else []) + [ "--add-label", add_str])
+
+            # Apply GitHub Issue Type (Bug, Feature, Task)
+            issue_type = dec.get("type", "").lower()
+            if issue_type:
+                if issue_type == "enhancement":
+                    issue_type = "feature" # Maps to Feature in GitHub
+                    
+                print(f"  Applying Issue Type: {issue_type.capitalize()}")
+                try:
+                    # 1. Fetch valid issue types for the repo
+                    issue_types_json = run_cmd(["gh", "api", f"repos/{repo}/issue-types"])
+                    types_data = json.loads(issue_types_json)
+                    target_type = next((t for t in types_data if t.get("name", "").lower() == issue_type), None)
+                    
+                    if target_type:
+                        type_node_id = target_type["node_id"]
+                        
+                        # 2. Get global node ID of the issue
+                        issue_data_json = run_cmd(["gh", "issue", "view", issue_id] + (["-R", repo] if repo else []) + ["--json", "id"])
+                        issue_node_id = json.loads(issue_data_json).get("id")
+                        
+                        if issue_node_id:
+                            # 3. Apply the type via GraphQL mutation
+                            query = '''
+                            mutation($issueId: ID!, $issueTypeId: ID) {
+                              updateIssueIssueType(input: {issueId: $issueId, issueTypeId: $issueTypeId}) {
+                                issue { id }
+                              }
+                            }
+                            '''
+                            run_cmd(["gh", "api", "graphql", "-F", f"issueId={issue_node_id}", "-F", f"issueTypeId={type_node_id}", "-f", f"query={query}"])
+                            print(f"  Successfully applied Issue Type '{target_type['name']}'.")
+                    else:
+                        print(f"  Warning: Issue Type '{issue_type}' not found for repo {repo}.")
+                except Exception as ex:
+                    print(f"  Warning: Failed to apply Issue Type: {ex}", file=sys.stderr)
 
             # 2. Assignee
             if assignee:
@@ -247,6 +301,21 @@ def main():
                                                 else:
                                                     run_cmd(["gh", "project", "item-edit", "--id", item_id, "--project-id", proj_id, "--field-id", swarm_field_id, "--text", "Yes"])
                                                     print(f"  Successfully set Swarmable (Text)")
+                                        
+                                        issue_type = dec.get("type")
+                                        if issue_type:
+                                            type_field = next((f for f in fields if f.get("name", "").lower() in ["type", "issue type"]), None)
+                                            if type_field:
+                                                type_field_id = type_field["id"]
+                                                options = type_field.get("options", [])
+                                                target_opt = next((o for o in options if o["name"].lower() == issue_type.lower()), None)
+                                                if target_opt:
+                                                    run_cmd(["gh", "project", "item-edit", "--id", item_id, "--project-id", proj_id, "--field-id", type_field_id, "--single-select-option-id", target_opt["id"]])
+                                                    print(f"  Successfully set Type to '{target_opt['name']}'")
+                                                else:
+                                                    print(f"  Warning: Type option '{issue_type}' not found in project field options.")
+                                            else:
+                                                print(f"  Warning: Could not find 'Type' or 'Issue Type' field in project.")
                         except Exception as ex:
                             print(f"  Warning: Failed to add/edit project item: {ex}", file=sys.stderr)
 
