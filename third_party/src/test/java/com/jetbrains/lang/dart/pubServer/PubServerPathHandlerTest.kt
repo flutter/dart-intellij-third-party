@@ -69,4 +69,37 @@ class PubServerPathHandlerTest : BasePlatformTestCase() {
     assertEquals("web", result.first.name)
     assertEquals("/my%20page.html", result.second)
   }
+
+  fun testServedDirAndPathForStringPathWithProjectName() {
+    myFixture.addFileToProject("pubspec.yaml", "name: test_project\n")
+    myFixture.addFileToProject("web/index.html", "<html></html>")
+    val result = requireNotNull(getServedDirAndPathForPubServer(project, "/test_project/web/index.html", "test_project")) {
+      "Result should not be null for path with project name prefix"
+    }
+
+    assertEquals("web", result.first.name)
+    assertEquals("/index.html", result.second)
+  }
+
+  fun testServedDirAndPathForStringPathWithoutProjectName() {
+    myFixture.addFileToProject("pubspec.yaml", "name: test_project\n")
+    myFixture.addFileToProject("web/index.html", "<html></html>")
+    val result = requireNotNull(getServedDirAndPathForPubServer(project, "/web/index.html", "test_project")) {
+      "Result should not be null for path without project name prefix"
+    }
+
+    assertEquals("web", result.first.name)
+    assertEquals("/index.html", result.second)
+  }
+
+  fun testServedDirAndPathForNonExistingFileWithStringPath() {
+    myFixture.addFileToProject("pubspec.yaml", "name: test_project\n")
+    myFixture.addFileToProject("web/index.html", "<html></html>")
+    val result = requireNotNull(getServedDirAndPathForPubServer(project, "/test_project/web/generated.dart.js", "test_project")) {
+      "Result should not be null for non-existing file in served directory"
+    }
+
+    assertEquals("web", result.first.name)
+    assertEquals("/generated.dart.js", result.second)
+  }
 }

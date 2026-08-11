@@ -32,7 +32,7 @@ private class PubServerPathHandler : WebServerPathHandler {
     isCustomHost: Boolean,
   ): Boolean {
     val servedDirAndPathForPubServer = ReadAction.nonBlocking<Pair<VirtualFile, String>?> {
-      getServedDirAndPathForPubServer(project, path)
+      getServedDirAndPathForPubServer(project, path, projectName)
     }.executeSynchronously() ?: return false
     PubServerManager.getInstance(project).send(context.channel(), request, authHeaders, servedDirAndPathForPubServer.first,
                                                servedDirAndPathForPubServer.second)
@@ -52,13 +52,33 @@ private fun findFileInContentRoots(project: Project, path: String): VirtualFile?
   return null
 }
 
-private fun getServedDirAndPathForPubServer(project: Project, path: String): Pair<VirtualFile, String>? {
+fun getServedDirAndPathForPubServer(
+  project: Project,
+  path: String,
+  projectName: String? = null,
+): Pair<VirtualFile, String>? {
+  val effectivePath = if (!projectName.isNullOrEmpty()) {
+    if (path.startsWith("/$projectName/")) {
+      path.removePrefix("/$projectName")
+    } else if (path == "/$projectName") {
+      ""
+    } else if (path.startsWith("$projectName/")) {
+      path.removePrefix(projectName)
+    } else if (path == projectName) {
+      ""
+    } else {
+      path
+    }
+  } else {
+    path
+  }
+
   // File with requested path may not exist, pub server will generate and serve it.
   // Here we find deepest (if nested) Dart project (aka Dart package) folder and its existing subfolder that can be served by pub server.
 
   // There may be 2 content roots with web/foo.html and web/bar.html files in them correspondingly. We need to catch the correct 'web' folder.
   // First see if full path can be resolved to a file
-  val file = findFileInContentRoots(project, path)
+  val file = findFileInContentRoots(project, effectivePath)
   if (file != null && ProjectFileIndex.getInstance(project).isInContent(file)) {
     return getServedDirAndPathForPubServer(project, file)
   }
@@ -70,12 +90,12 @@ private fun getServedDirAndPathForPubServer(project: Project, path: String): Pai
   var slashIndex = -1
   while (true) {
     ProgressManager.checkCanceled()
-    slashIndex = path.indexOf('/', slashIndex + 1)
+    slashIndex = effectivePath.indexOf('/', slashIndex + 1)
     if (slashIndex < 0) {
       break
     }
 
-    val pathPart = path.substring(0, slashIndex)
+    val pathPart = effectivePath.substring(0, slashIndex)
     val dir = findFileInContentRoots(project, pathPart)
     if (dir == null || !dir.isDirectory) {
       continue
@@ -90,7 +110,7 @@ private fun getServedDirAndPathForPubServer(project: Project, path: String): Pai
       }
 
       servedDir = dir
-      pubServePath = path.substring(slashIndex)
+      pubServePath = effectivePath.substring(slashIndex)
       // continue looking for nested Dart project
     }
   }
