@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.ui.components.JBRadioButton;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
+import com.intellij.xdebugger.breakpoints.XBreakpointListener;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel;
 import com.jetbrains.lang.dart.DartBundle;
@@ -51,14 +52,19 @@ public final class DartExceptionBreakpointType
 
   @Override
   public @Nullable XBreakpointCustomPropertiesPanel<XBreakpoint<DartExceptionBreakpointProperties>> createCustomPropertiesPanel(final @NotNull Project project) {
-    return new DartExceptionBreakpointPropertiesPanel();
+    return new DartExceptionBreakpointPropertiesPanel(project);
   }
 
   private static class DartExceptionBreakpointPropertiesPanel
     extends XBreakpointCustomPropertiesPanel<XBreakpoint<DartExceptionBreakpointProperties>> {
 
+    private final Project myProject;
     private JBRadioButton myBreakOnUncaughtExceptions;
     private JBRadioButton myBreakOnAllExceptions;
+
+    DartExceptionBreakpointPropertiesPanel(Project project) {
+      myProject = project;
+    }
 
     @Override
     public @NotNull JComponent getComponent() {
@@ -83,6 +89,9 @@ public final class DartExceptionBreakpointType
       final boolean newValue = myBreakOnAllExceptions.isSelected();
       if (oldValue != newValue) {
         breakpoint.getProperties().setBreakOnAllExceptions(newValue);
+        @SuppressWarnings("unchecked")
+        final XBreakpointListener<XBreakpoint<DartExceptionBreakpointProperties>> publisher = myProject.getMessageBus().syncPublisher(XBreakpointListener.TOPIC);
+        publisher.breakpointChanged(breakpoint);
       }
     }
 
