@@ -8,7 +8,6 @@ import com.intellij.ui.components.JBRadioButton;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
 import com.jetbrains.lang.dart.DartBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -84,7 +83,6 @@ public final class DartExceptionBreakpointType
       final boolean newValue = myBreakOnAllExceptions.isSelected();
       if (oldValue != newValue) {
         breakpoint.getProperties().setBreakOnAllExceptions(newValue);
-        ((XBreakpointBase<?, ?, ?>)breakpoint).fireBreakpointChanged();
       }
     }
 
