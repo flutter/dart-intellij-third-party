@@ -36,8 +36,12 @@ internal fun createDtdCommandLine(sdk: DartSdk, pingInterval: Int = 15): General
   return commandLine
 }
 
-internal fun supportsDtdPingInterval(sdkVersion: String): Boolean =
-  sdkVersion.firstOrNull()?.isDigit() == true &&
-  DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_DTD_PING_INTERVAL_SDK_VERSION) >= 0
+internal fun supportsDtdPingInterval(sdkVersion: String): Boolean {
+  if (sdkVersion.isBlank() || !sdkVersion.first().isDigit()) {
+    return false
+  }
+
+  return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_DTD_PING_INTERVAL_SDK_VERSION) >= 0
+}
 
 internal fun isDtdCommandLine(text: String): Boolean = DTD_COMMAND_LINE_PATTERN.matches(text)
