@@ -13,7 +13,16 @@ class DartToolingDaemonCommandLineTest : TestCase() {
     fun testIdentifiesDtdCommandLine() {
         assertTrue(isDtdCommandLine("/path/to/dart tooling-daemon --machine --ping-interval=15"))
         assertTrue(isDtdCommandLine("/path/to/dart tooling-daemon --machine --ping-interval=30"))
-        assertFalse(isDtdCommandLine("/path/to/dart tooling-daemon --machine"))
+        assertTrue(isDtdCommandLine("/path/to/dart tooling-daemon --machine"))
         assertFalse(isDtdCommandLine("/path/to/dart tooling-daemon --machine --ping-interval=invalid"))
+    }
+
+    fun testSupportsDtdPingInterval() {
+        assertFalse(supportsDtdPingInterval("3.10.9"))
+        assertFalse(supportsDtdPingInterval("3.11.0-dev.100.0"))
+        assertTrue(supportsDtdPingInterval("3.11.0"))
+        assertTrue(supportsDtdPingInterval("3.12.0-dev.1.0"))
+        assertTrue(supportsDtdPingInterval("3.12.0"))
+        assertFalse(supportsDtdPingInterval("unknown"))
     }
 }
