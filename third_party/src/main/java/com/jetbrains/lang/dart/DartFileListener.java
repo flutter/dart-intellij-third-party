@@ -75,8 +75,8 @@ public final class DartFileListener implements AsyncFileListener {
             packagesFileEvents.add(propertyChangeEvent);
           }
 
-          if (DartAnalysisServerService.isFileNameRespectedByAnalysisServer(propertyChangeEvent.getOldValue().toString()) ||
-              DartAnalysisServerService.isFileNameRespectedByAnalysisServer(propertyChangeEvent.getNewValue().toString())) {
+          if ((propertyChangeEvent.getOldValue() instanceof String oldValue && DartAnalysisServerService.isFileNameRespectedByAnalysisServer(oldValue)) ||
+                  (propertyChangeEvent.getNewValue() instanceof String newValue && DartAnalysisServerService.isFileNameRespectedByAnalysisServer(newValue))) {
             moveOrRenameAnalyzableFileEvents.add(propertyChangeEvent);
           }
         }
