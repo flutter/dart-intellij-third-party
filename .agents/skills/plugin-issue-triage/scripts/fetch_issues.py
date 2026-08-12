@@ -181,6 +181,7 @@ def fetch_for_repo(repo, limit):
 
         enriched_issues.append({
             "id": issue_id,
+            "number": issue_id,
             "repo": repo,
             "title": issue.get("title", ""),
             "author": author,
