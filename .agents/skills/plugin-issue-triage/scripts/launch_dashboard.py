@@ -97,7 +97,7 @@ class TriageDashboardHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "success"}).encode("utf-8"))
 
                 exit_status = 0
-                shutdown_event.set()
+                threading.Timer(0.5, shutdown_event.set).start()
 
             except Exception as e:
                 self.send_error_json(500, f"Failed to save triage decisions: {str(e)}")
@@ -109,7 +109,7 @@ class TriageDashboardHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"status": "aborted"}).encode("utf-8"))
 
             exit_status = 1
-            shutdown_event.set()
+            threading.Timer(0.5, shutdown_event.set).start()
         elif parsed_url.path == "/api/config":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
