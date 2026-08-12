@@ -102,4 +102,23 @@ class PubServerPathHandlerTest : BasePlatformTestCase() {
     assertEquals("web", result.first.name)
     assertEquals("/generated.dart.js", result.second)
   }
+
+  fun testServedDirAndPathForStringPathWithoutLeadingSlash() {
+    myFixture.addFileToProject("pubspec.yaml", "name: test_project\n")
+    myFixture.addFileToProject("web/index.html", "<html></html>")
+    val result = requireNotNull(getServedDirAndPathForPubServer(project, "test_project/web/index.html", "test_project")) {
+      "Result should not be null for path without leading slash"
+    }
+
+    assertEquals("web", result.first.name)
+    assertEquals("/index.html", result.second)
+  }
+
+  fun testServedDirAndPathForStringPathWithDifferentProjectNamePrefix() {
+    myFixture.addFileToProject("pubspec.yaml", "name: test_project\n")
+    myFixture.addFileToProject("web/index.html", "<html></html>")
+    val result = getServedDirAndPathForPubServer(project, "/test_project_other/web/index.html", "test_project")
+
+    assertNull("Result should be null when path prefix matches project name only partially and file doesn't exist", result)
+  }
 }

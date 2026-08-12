@@ -52,26 +52,22 @@ private fun findFileInContentRoots(project: Project, path: String): VirtualFile?
   return null
 }
 
+private fun removeProjectNamePrefix(path: String, projectName: String?): String {
+  if (projectName.isNullOrEmpty()) return path
+  val trimmed = path.removePrefix("/")
+  return when {
+    trimmed == projectName -> ""
+    trimmed.startsWith("$projectName/") -> trimmed.removePrefix(projectName)
+    else -> path
+  }
+}
+
 fun getServedDirAndPathForPubServer(
   project: Project,
   path: String,
   projectName: String? = null,
 ): Pair<VirtualFile, String>? {
-  val effectivePath = if (!projectName.isNullOrEmpty()) {
-    if (path.startsWith("/$projectName/")) {
-      path.removePrefix("/$projectName")
-    } else if (path == "/$projectName") {
-      ""
-    } else if (path.startsWith("$projectName/")) {
-      path.removePrefix(projectName)
-    } else if (path == projectName) {
-      ""
-    } else {
-      path
-    }
-  } else {
-    path
-  }
+  val effectivePath = removeProjectNamePrefix(path, projectName)
 
   // File with requested path may not exist, pub server will generate and serve it.
   // Here we find deepest (if nested) Dart project (aka Dart package) folder and its existing subfolder that can be served by pub server.
