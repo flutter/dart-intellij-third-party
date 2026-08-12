@@ -43,7 +43,7 @@ Process the raw issues and generate recommended triage fields based on the proje
      - Inject `possible_duplicates` (the raw JSON array of the top 3 GitHub search results, omitting the current issue itself) into the `suggestions` object.
      - Inject `total_issues_count` (preserving the total count from the raw issues JSON) at the root level of the JSON.
      - Critically, ensure that the root-level metadata structures (`labels_by_repo`, `owners`, and `assignees`) from the raw JSON payload(s) are strictly preserved and merged into the compiled JSON so the dashboard has access to them.
-     - Save the final compiled payload to `issues_to_triage_<REPO_NAME_CLEANED>.json` in the scratch directory. *If "both" was selected, combine all compiled issues into a single `issues_to_triage_combined.json` file.*
+     - Save the final compiled payload to `issues_to_triage_<REPO_NAME_CLEANED>.json` in the scratch directory. *If "both" was selected, combine all compiled issues into a single `issues_to_triage_combined.json` file. Ensure the combined issues are grouped by repository (all dart-intellij-third-party issues first, followed by all flutter-intellij issues) rather than interleaved.*
 
 ---
 
