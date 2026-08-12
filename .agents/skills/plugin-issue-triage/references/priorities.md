@@ -11,6 +11,7 @@ Use the following guidelines to suggest an appropriate priority (P0, P1, P2, P3,
 - Bugs in language feature implementation.
 - Uncaught exceptions resulting in plugin crashes, widespread but with workaround.
 - Performance regression, large or widespread (but not both), or impacting key users.
+- Issues related to LSP migration.
 
 ## Medium/Low (P2, P3, P4)
 - For other issues, assign P2, P3, or P4 based on general severity, impact, and reach.
