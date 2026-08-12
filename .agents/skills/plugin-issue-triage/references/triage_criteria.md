@@ -31,7 +31,7 @@ All triaged issues must be categorized and appropriately labeled.
 - **Analysis**:
   - Verify if the request aligns with the plugin's roadmap and design philosophy.
 - **Action**:
-  - If aligned, set action to `backlog` with priority `P2` or `P3` and suggest the `enhancement` label.
+  - If aligned, set action to `backlog` with priority `P2` or `P3` and suggest the `feature` label.
   - If it is more of an internal chore or maintenance, suggest the `task` label.
   - If out of scope, set priority to `P4` and action to `backlog` (keeping the issue open). 
 

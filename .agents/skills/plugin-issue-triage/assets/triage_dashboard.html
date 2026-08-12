@@ -832,7 +832,7 @@ limitations under the License.
               style="border-radius: 6px; padding: 0.5rem; border: 1px solid var(--border-color); background-color: var(--bg-surface); color: var(--text-primary); outline: none; font-size: 0.9rem; font-weight: 500;">
               <option value="None">Type</option>
               <option value="bug">Bug</option>
-              <option value="enhancement">Enhancement</option>
+              <option value="feature">Feature</option>
               <option value="task">Task</option>
             </select>
           </div>
@@ -1532,7 +1532,7 @@ limitations under the License.
       Array.from(typeSelect.options).forEach(opt => {
         opt.text = (opt.value === 'None' ? 'Type' : opt.value.charAt(0).toUpperCase() + opt.value.slice(1));
       });
-      const knownTypes = ['bug', 'enhancement', 'task'];
+      const knownTypes = ['bug', 'feature', 'task'];
       let aiType = issue.suggestions.issue_type || 'None';
       if (aiType === 'None') {
         const typeLabelMatch = (issue.suggestions.labels || []).find(l => {
@@ -1635,7 +1635,7 @@ limitations under the License.
 
       switch (typeSelect.value) {
         case 'bug': typeSelect.style.backgroundColor = 'rgba(159, 18, 57, 0.4)'; typeSelect.style.color = '#fb7185'; break;
-        case 'enhancement': typeSelect.style.backgroundColor = 'rgba(3, 102, 214, 0.4)'; typeSelect.style.color = '#60a5fa'; break;
+        case 'feature': typeSelect.style.backgroundColor = 'rgba(3, 102, 214, 0.4)'; typeSelect.style.color = '#60a5fa'; break;
         case 'task': typeSelect.style.backgroundColor = 'rgba(255, 211, 61, 0.4)'; typeSelect.style.color = '#fbbf24'; break;
         default: typeSelect.style.backgroundColor = 'var(--bg-base)'; typeSelect.style.color = 'var(--text-primary)'; break;
       }
