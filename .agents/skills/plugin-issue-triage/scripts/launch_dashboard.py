@@ -22,7 +22,6 @@ import urllib.parse
 import urllib.request
 import threading
 import time
-import subprocess
 import datetime
 
 # Global event for shutdown synchronization, and exit status
