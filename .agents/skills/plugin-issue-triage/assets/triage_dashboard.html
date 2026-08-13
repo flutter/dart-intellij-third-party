@@ -1784,16 +1784,9 @@ limitations under the License.
             const pClass =
               d.priority !== 'None' ? `badge-${d.priority.toLowerCase()}` : 'badge-none';
 
-            const actionLabels = {
-              investigate: 'Keep open, mark for research',
-              assign_and_fix: 'Keep open, assign to developer',
-              needs_info: 'Ask for info, status: waiting-for-author-response',
-              backlog: 'Keep open in backlog',
-              close_duplicate: 'Close as duplicate',
-              close_invalid: 'Close as invalid/spam',
-              close_resolved: 'Close as resolved/answered',
-            };
-            const actionText = actionLabels[d.action] || d.action;
+            const proposedText = (d.proposed_actions || [])
+              .map(tag => ACTION_TAGS[tag] ? ACTION_TAGS[tag].label : tag)
+              .join(', ') || 'None';
 
             return `
             <div style="
