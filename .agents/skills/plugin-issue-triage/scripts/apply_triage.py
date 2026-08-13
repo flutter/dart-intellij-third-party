@@ -50,6 +50,10 @@ def main():
     print(f"Applying {len(approved_decisions)} approved triage decisions to GitHub...")
 
     failed_issues = []
+    valid_labels_cache = {}
+    issue_types_cache = {}
+    project_id_cache = None
+    project_fields_cache = None
 
     for i, dec in enumerate(approved_decisions):
         issue_id = str(dec["id"])
