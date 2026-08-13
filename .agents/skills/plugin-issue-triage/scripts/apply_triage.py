@@ -117,14 +117,17 @@ def main():
 
 
             # Fetch valid labels for this repo to avoid failing the update
-            repo_labels_json = run_cmd(["gh", "label", "list", "-R", repo, "--json", "name", "--limit", "100"])
-            valid_labels = set()
-            if repo_labels_json:
-                try:
-                    for l in json.loads(repo_labels_json):
-                        valid_labels.add(l['name'])
-                except:
-                    pass
+            if repo not in valid_labels_cache:
+                repo_labels_json = run_cmd(["gh", "label", "list"] + (["-R", repo] if repo else []) + ["--json", "name", "--limit", "100"])
+                valid_labels = set()
+                if repo_labels_json:
+                    try:
+                        for l in json.loads(repo_labels_json):
+                            valid_labels.add(l['name'])
+                    except Exception:
+                        pass
+                valid_labels_cache[repo] = valid_labels
+            valid_labels = valid_labels_cache[repo]
 
             # Filter add_labels to only include those that exist in the repo
             original_add = add_labels.copy()
