@@ -20,6 +20,7 @@ import argparse
 import os
 import re
 import shutil
+import base64
 
 
 def run_cmd(args):
