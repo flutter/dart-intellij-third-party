@@ -1219,9 +1219,10 @@ limitations under the License.
 
         // Dynamically override standard labels list with real repo labels if available,
         // filtering out priority labels (P0-P4) since they are managed via the priority dropdown.
-        if (Array.isArray(repoData.labels) && repoData.labels.length > 0) {
-          const filteredLabels = repoData.labels.filter(label => !/^[Pp][0-4]$/.test(label));
-          standardLabels.splice(0, standardLabels.length, ...filteredLabels);
+        if (repoData.labels_by_repo) {
+          const allLabels = Object.values(repoData.labels_by_repo).flat();
+          const uniqueLabels = [...new Set(allLabels)].filter(label => !/^[Pp][0-4]$/.test(label));
+          standardLabels.splice(0, standardLabels.length, ...uniqueLabels);
         }
 
         // Pre-populate decisions object with AI suggestions
