@@ -17,7 +17,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dart-version: ['stable']
         os: [ubuntu-large]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
@@ -35,13 +34,14 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: Set up Dart SDK ${{ matrix.dart-version }}
-        uses: dart-lang/setup-dart@65eb853c7ba17dde3be364c3d2858773e7144260 # v1
-        with:
-          sdk: ${{ matrix.dart-version }}
+      - name: Provision Dart SDK
+        run: ../tool/provision_dart.sh
+        working-directory: third_party
 
       - name: Run Integration Tests
-        run: ./gradlew :test --tests "com.jetbrains.dart.*" -PverboseTests
+        run: |
+          export DART_HOME="$(pwd)/../dart-sdk"
+          ./gradlew :test --tests "com.jetbrains.dart.*" -PverboseTests
         working-directory: third_party
 
       - name: Upload test results

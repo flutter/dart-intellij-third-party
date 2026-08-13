@@ -68,8 +68,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
 
+      - name: Provision Dart SDK
+        run: ../tool/provision_dart.sh
+        working-directory: third_party
+
       - name: Unit Test Action
-        run: ./gradlew :test --tests "com.jetbrains.lang.dart.*"
+        run: |
+          export DART_HOME="$(pwd)/../dart-sdk"
+          ./gradlew :test --tests "com.jetbrains.lang.dart.*"
         working-directory: third_party
 
       - name: Upload test results
