@@ -1820,8 +1820,8 @@ limitations under the License.
                 return list.length > 0
                   ? list
                     .map(login => {
-                      const found = repoData.assignees.find(a => a.login === login);
-                      return found && found.name ? `${found.name} (@${login})` : `@${login}`;
+                      const found = (repoData.assignees || []).find(a => a.login === login);
+                      return found && found.name ? `\${found.name} (@\${login})` : `@\${login}`;
                     })
                     .join(', ')
                   : 'None';
