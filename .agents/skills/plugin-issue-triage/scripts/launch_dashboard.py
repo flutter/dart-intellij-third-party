@@ -165,7 +165,6 @@ def main():
     TriageDashboardHandler.data_file = resolved_data_file
     TriageDashboardHandler.output_file = resolved_output_file
     
-    import datetime
     current_iteration = datetime.date.today().strftime("%B")
     
     # Bind to random port
