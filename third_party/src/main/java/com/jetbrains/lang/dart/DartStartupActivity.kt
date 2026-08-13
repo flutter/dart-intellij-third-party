@@ -150,23 +150,33 @@ class DartStartupActivity : ProjectActivity {
   }
 
   private suspend fun reportSettingsAnalytics(project: Project) {
-    val (dartSupportEnabled, sdkVersion, experimentalLspFeaturesEnabled) = readAction {
+    val info = readAction {
       val sdk = DartSdk.getDartSdk(project)
       val enabled = sdk != null && project.moduleManager.modules.any { DartSdkLibUtil.isDartSdkEnabled(it) }
       val version = sdk?.version ?: "unknown"
       val experimentalEnabled = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
-      Triple(enabled, version, experimentalEnabled)
+      SettingsReportInfo(sdk, enabled, version, experimentalEnabled)
     }
 
-    if (!dartSupportEnabled) return
+    if (!info.dartSupportEnabled || info.sdk == null) return
+
+    val config = Analytics.getConfiguration(info.sdk, project)
+    if (config.suppressAnalytics) return
 
     val settingsData = SettingsData(project)
-    settingsData["experimentalLspFeaturesEnabled"] = experimentalLspFeaturesEnabled
-    settingsData["sdkVersion"] = sdkVersion
+    settingsData["experimentalLspFeaturesEnabled"] = info.experimentalLspFeaturesEnabled
+    settingsData["sdkVersion"] = info.sdkVersion
 
     Analytics.report(settingsData)
   }
 }
+
+private data class SettingsReportInfo(
+  val sdk: DartSdk?,
+  val dartSupportEnabled: Boolean,
+  val sdkVersion: String,
+  val experimentalLspFeaturesEnabled: Boolean
+)
 
 fun excludeBuildAndToolCacheFolders(module: Module, pubspecYamlFile: VirtualFile) {
   prepareExcludeBuildAndToolCacheFolders(module, pubspecYamlFile)?.invoke()

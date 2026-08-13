@@ -22,7 +22,7 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
 
     private companion object {
         const val INITIALIZATION_TIMEOUT_SECONDS = 5
-        const val EXPECTED_REQUEST_COUNT = 3
+        const val EXPECTED_REQUEST_COUNT = 4
     }
 
     override fun setUp() {
@@ -59,6 +59,10 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
             }
         }
 
+        // Send an early request before starting the service (while webSocketReady is false)
+        val earlyParams = JsonObject().apply { addProperty("streamId", "Service") }
+        dartToolingDaemonService.sendRequest("streamListen", earlyParams, includeSecret = true) {}
+
         dartToolingDaemonService.startService()
         UIUtil.dispatchAllInvocationEvents()
         PlatformTestUtil.waitWithEventsDispatching(
@@ -67,6 +71,9 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
             INITIALIZATION_TIMEOUT_SECONDS
         )
 
+        val streamListenId = idOfRequest(sentRequestsById, "a streamListen request") {
+            it["method"]?.asString == "streamListen"
+        }
         val getActiveLocationId =
             idOfRequest(sentRequestsById, "a registerService request for Editor.getActiveLocation") {
                 it.isRegisterService("Editor", "getActiveLocation")
@@ -78,6 +85,7 @@ class DartToolingDaemonServiceTest : BasePlatformTestCase() {
             it["method"]?.asString == "FileSystem.setIDEWorkspaceRoots"
         }
 
+        assertSuccessResponse(responsesById, streamListenId)
         assertSuccessResponse(responsesById, getActiveLocationId)
         assertSuccessResponse(responsesById, navigateToCodeId)
         assertSuccessResponse(responsesById, setWorkspaceRootsId)
