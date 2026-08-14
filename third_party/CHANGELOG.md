@@ -13,10 +13,6 @@
 ### Added
 - Highlighting read vs write variable occurrences (JetBrains LSP, experimental feature) (#552)
 
-### Changed
-
-### Removed
-
 ### Fixed
 - Code completion and parameter info tooltips for constructor shorthand '.new' argument lists (#573)
 - Avoid passing unsupported '--ping-interval' flag to DTD on Dart SDKs older than 3.8.0-16.0.dev (#599)
