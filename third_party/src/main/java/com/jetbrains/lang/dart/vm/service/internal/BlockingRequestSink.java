@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.dartlang.vm.service.internal;
+package com.jetbrains.lang.dart.vm.service.internal;
 
 import com.google.common.collect.Lists;
 import com.google.gson.JsonObject;
