@@ -16,13 +16,14 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.io.BaseOutputReader
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.util.DartTestUtils
-import org.dartlang.vm.service.VmService
-import org.dartlang.vm.service.consumer.SuccessConsumer
-import org.dartlang.vm.service.consumer.VMConsumer
-import org.dartlang.vm.service.consumer.VersionConsumer
-import org.dartlang.vm.service.element.RPCError
-import org.dartlang.vm.service.element.VM
-import org.dartlang.vm.service.element.Version
+import com.jetbrains.lang.dart.vm.service.element.Success
+import com.jetbrains.lang.dart.vm.service.VmService
+import com.jetbrains.lang.dart.vm.service.consumer.SuccessConsumer
+import com.jetbrains.lang.dart.vm.service.consumer.VMConsumer
+import com.jetbrains.lang.dart.vm.service.consumer.VersionConsumer
+import com.jetbrains.lang.dart.vm.service.element.RPCError
+import com.jetbrains.lang.dart.vm.service.element.VM
+import com.jetbrains.lang.dart.vm.service.element.Version
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -77,7 +78,7 @@ class VmServiceTest : BasePlatformTestCase() {
     // Subscribe to the Isolate stream and expect a Success response.
     val streamSuccess = CountDownLatch(1)
     service.streamListen(VmService.ISOLATE_STREAM_ID, object : SuccessConsumer {
-      override fun received(response: org.dartlang.vm.service.element.Success?) = streamSuccess.countDown()
+      override fun received(response: Success?) = streamSuccess.countDown()
       override fun onError(error: RPCError?) {}
     })
     assertTrue(
