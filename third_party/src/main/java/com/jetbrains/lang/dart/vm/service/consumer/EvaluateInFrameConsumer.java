@@ -11,16 +11,18 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.dartlang.vm.service.consumer;
+package com.jetbrains.lang.dart.vm.service.consumer;
 
-import org.dartlang.vm.service.element.RPCError;
+import com.jetbrains.lang.dart.vm.service.element.ErrorRef;
+import com.jetbrains.lang.dart.vm.service.element.InstanceRef;
+import com.jetbrains.lang.dart.vm.service.element.Sentinel;
 
-/**
- * Consumer is a common interface for all consumer interfaces.
- */
-public interface Consumer {
-  /**
-   * Called if the request failed for some reason.
-   */
-  void onError(RPCError error);
+@SuppressWarnings({"WeakerAccess", "unused"})
+public interface EvaluateInFrameConsumer extends Consumer {
+
+  void received(ErrorRef response);
+
+  void received(InstanceRef response);
+
+  void received(Sentinel response);
 }

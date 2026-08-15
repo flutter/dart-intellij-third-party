@@ -11,25 +11,22 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.dartlang.vm.service.element;
-
-// This is a generated file.
-
-import com.google.gson.JsonObject;
+package com.jetbrains.lang.dart.vm.service.element;
 
 /**
- * See getClientName and setClientName.
+ * An {@link ExceptionPauseMode} indicates how the isolate pauses when an exception is thrown.
  */
 @SuppressWarnings({"WeakerAccess", "unused"})
-public class ClientName extends Response {
-    public ClientName(JsonObject json) {
-        super(json);
-    }
+public enum ExceptionPauseMode {
 
-    /**
-   * The name of the currently connected VM service client.
+  All,
+
+  None,
+
+  Unhandled,
+
+  /**
+   * Represents a value returned by the VM but unknown to this client.
    */
-    public String getName() {
-        return getAsString("name");
-    }
+  Unknown
 }

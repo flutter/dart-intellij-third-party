@@ -11,25 +11,12 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.dartlang.vm.service.element;
+package com.jetbrains.lang.dart.vm.service.consumer;
 
-// This is a generated file.
+import com.jetbrains.lang.dart.vm.service.element.CpuSamples;
 
-import com.google.gson.JsonObject;
-
-/**
- * See Client Agents.
- */
 @SuppressWarnings({"WeakerAccess", "unused"})
-public class ClientAgentType extends Response {
-    public ClientAgentType(JsonObject json) {
-        super(json);
-    }
+public interface CpuSamplesConsumer extends Consumer {
 
-    /**
-   * The agent type for a client. null if no agent type is associated with a client.
-   */
-    public String getName() {
-        return getAsString("name");
-    }
+  void received(CpuSamples response);
 }

@@ -1,4 +1,4 @@
-package org.dartlang.vm.service.element;
+package com.jetbrains.lang.dart.vm.service.element;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
