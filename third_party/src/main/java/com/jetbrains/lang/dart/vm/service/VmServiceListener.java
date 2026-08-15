@@ -11,9 +11,9 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.dartlang.vm.service;
+package com.jetbrains.lang.dart.vm.service;
 
-import org.dartlang.vm.service.element.Event;
+import com.jetbrains.lang.dart.vm.service.element.Event;
 
 /**
  * Interface used by {@link VmService} to notify others of VM events.

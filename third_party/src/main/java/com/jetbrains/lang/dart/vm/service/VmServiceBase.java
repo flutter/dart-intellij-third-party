@@ -11,22 +11,22 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.dartlang.vm.service;
+package com.jetbrains.lang.dart.vm.service;
 
 import com.google.common.collect.Maps;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.jetbrains.lang.dart.vm.service.consumer.*;
+import com.jetbrains.lang.dart.vm.service.element.*;
+import com.jetbrains.lang.dart.vm.service.internal.RequestSink;
+import com.jetbrains.lang.dart.vm.service.internal.VmServiceConst;
+import com.jetbrains.lang.dart.vm.service.internal.WebSocketRequestSink;
+import com.jetbrains.lang.dart.vm.service.logging.Logging;
 import com.jetbrains.lang.dart.websocket.WebSocket;
 import com.jetbrains.lang.dart.websocket.WebSocketEventHandler;
 import com.jetbrains.lang.dart.websocket.WebSocketException;
 import com.jetbrains.lang.dart.websocket.WebSocketMessage;
-import org.dartlang.vm.service.consumer.*;
-import org.dartlang.vm.service.element.*;
-import org.dartlang.vm.service.internal.RequestSink;
-import org.dartlang.vm.service.internal.VmServiceConst;
-import org.dartlang.vm.service.internal.WebSocketRequestSink;
-import org.dartlang.vm.service.logging.Logging;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Internal {@link VmService} base class containing non-generated code.
+ * Internal base class for {@link VmService}.
  */
 @SuppressWarnings({"unused", "WeakerAccess"})
 abstract class VmServiceBase implements VmServiceConst {

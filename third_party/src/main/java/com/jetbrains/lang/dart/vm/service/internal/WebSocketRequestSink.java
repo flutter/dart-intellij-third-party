@@ -11,12 +11,12 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.dartlang.vm.service.internal;
+package com.jetbrains.lang.dart.vm.service.internal;
 
 import com.google.gson.JsonObject;
 import com.jetbrains.lang.dart.websocket.WebSocket;
 import com.jetbrains.lang.dart.websocket.WebSocketException;
-import org.dartlang.vm.service.logging.Logging;
+import com.jetbrains.lang.dart.vm.service.logging.Logging;
 
 /**
  * An {@link WebSocket} based implementation of {@link RequestSink}.
