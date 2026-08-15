@@ -6,8 +6,8 @@ import com.intellij.icons.AllIcons;
 import com.intellij.util.SmartList;
 import com.intellij.xdebugger.frame.*;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.DartVmServiceDebugProcess;
-import org.dartlang.vm.service.consumer.GetObjectConsumer;
-import org.dartlang.vm.service.element.*;
+import com.jetbrains.lang.dart.vm.service.consumer.GetObjectConsumer;
+import com.jetbrains.lang.dart.vm.service.element.*;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;

@@ -10,7 +10,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointManager;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.jetbrains.lang.dart.ide.runner.DartExceptionBreakpointProperties;
 import com.jetbrains.lang.dart.ide.runner.DartExceptionBreakpointType;
-import org.dartlang.vm.service.element.ExceptionPauseMode;
+import com.jetbrains.lang.dart.vm.service.element.ExceptionPauseMode;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

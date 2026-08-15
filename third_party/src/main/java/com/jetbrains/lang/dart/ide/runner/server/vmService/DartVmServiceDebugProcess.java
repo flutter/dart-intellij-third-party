@@ -49,11 +49,11 @@ import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceSu
 import com.jetbrains.lang.dart.ide.runner.server.webdev.DartDaemonParserUtil;
 import com.jetbrains.lang.dart.util.DartBazelFileUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
+import com.jetbrains.lang.dart.vm.service.element.*;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import org.dartlang.vm.service.VmService;
-import org.dartlang.vm.service.element.*;
-import org.dartlang.vm.service.logging.Logging;
+import com.jetbrains.lang.dart.vm.service.VmService;
+import com.jetbrains.lang.dart.vm.service.logging.Logging;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -275,7 +275,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
   }
 
   private void setLogger() {
-    Logging.setLogger(new org.dartlang.vm.service.logging.Logger() {
+    Logging.setLogger(new com.jetbrains.lang.dart.vm.service.logging.Logger() {
       @Override
       public void logError(final String message) {
         if (message.contains("\"code\":102,")) { // Cannot add breakpoint, already logged in logInformation()

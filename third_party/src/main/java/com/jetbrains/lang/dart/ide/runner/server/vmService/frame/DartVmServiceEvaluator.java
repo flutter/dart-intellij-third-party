@@ -22,8 +22,8 @@ import com.jetbrains.lang.dart.ide.runner.server.vmService.DartVmServiceDebugPro
 import com.jetbrains.lang.dart.ide.runner.server.vmService.VmServiceWrapper;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
-import org.dartlang.vm.service.consumer.GetObjectConsumer;
-import org.dartlang.vm.service.element.*;
+import com.jetbrains.lang.dart.vm.service.consumer.GetObjectConsumer;
+import com.jetbrains.lang.dart.vm.service.element.*;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

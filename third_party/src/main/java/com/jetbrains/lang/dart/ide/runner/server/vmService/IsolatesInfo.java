@@ -1,8 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.runner.server.vmService;
 
-import org.dartlang.vm.service.element.Isolate;
-import org.dartlang.vm.service.element.IsolateRef;
+import com.jetbrains.lang.dart.vm.service.element.Isolate;
+import com.jetbrains.lang.dart.vm.service.element.IsolateRef;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
