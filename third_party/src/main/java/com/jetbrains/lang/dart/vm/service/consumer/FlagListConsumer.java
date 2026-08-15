@@ -11,10 +11,12 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.dartlang.vm.service.consumer;
+package com.jetbrains.lang.dart.vm.service.consumer;
 
-import org.dartlang.vm.service.element.Library;
+import com.jetbrains.lang.dart.vm.service.element.FlagList;
 
-public interface GetLibraryConsumer extends Consumer {
-  void received(Library response);
+@SuppressWarnings({"WeakerAccess", "unused"})
+public interface FlagListConsumer extends Consumer {
+
+  void received(FlagList response);
 }
