@@ -3,7 +3,7 @@ package com.jetbrains.lang.dart.ide.runner.server.vmService.frame;
 
 import com.intellij.xdebugger.XSourcePosition;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.DartVmServiceDebugProcess;
-import com.jetbrains.lang.dart.vm.service.element.Frame;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Frame;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

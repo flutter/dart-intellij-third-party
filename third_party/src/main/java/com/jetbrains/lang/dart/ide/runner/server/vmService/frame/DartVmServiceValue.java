@@ -14,8 +14,8 @@ import com.intellij.xdebugger.frame.presentation.XStringValuePresentation;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.DartVmServiceDebugProcess;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.VmServiceConsumers;
-import com.jetbrains.lang.dart.vm.service.consumer.GetObjectConsumer;
-import com.jetbrains.lang.dart.vm.service.element.*;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.GetObjectConsumer;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

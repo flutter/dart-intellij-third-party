@@ -46,14 +46,14 @@ import com.jetbrains.lang.dart.ide.runner.server.OpenDartObservatoryUrlAction;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceEvaluator;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceStackFrame;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceSuspendContext;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.*;
 import com.jetbrains.lang.dart.ide.runner.server.webdev.DartDaemonParserUtil;
 import com.jetbrains.lang.dart.util.DartBazelFileUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
-import com.jetbrains.lang.dart.vm.service.element.*;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import com.jetbrains.lang.dart.vm.service.VmService;
-import com.jetbrains.lang.dart.vm.service.logging.Logging;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.VmService;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.logging.Logging;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -275,7 +275,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
   }
 
   private void setLogger() {
-    Logging.setLogger(new com.jetbrains.lang.dart.vm.service.logging.Logger() {
+    Logging.setLogger(new com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.logging.Logger() {
       @Override
       public void logError(final String message) {
         if (message.contains("\"code\":102,")) { // Cannot add breakpoint, already logged in logInformation()

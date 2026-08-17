@@ -18,8 +18,8 @@ import com.intellij.xdebugger.frame.XValue;
 import com.jetbrains.lang.dart.ide.runner.DartExceptionBreakpointProperties;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceSuspendContext;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceValue;
-import com.jetbrains.lang.dart.vm.service.VmServiceListener;
-import com.jetbrains.lang.dart.vm.service.element.*;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.VmServiceListener;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

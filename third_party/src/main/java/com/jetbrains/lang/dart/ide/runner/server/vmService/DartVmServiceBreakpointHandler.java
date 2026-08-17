@@ -6,7 +6,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.jetbrains.lang.dart.ide.runner.DartLineBreakpointType;
-import com.jetbrains.lang.dart.vm.service.element.Breakpoint;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Breakpoint;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;

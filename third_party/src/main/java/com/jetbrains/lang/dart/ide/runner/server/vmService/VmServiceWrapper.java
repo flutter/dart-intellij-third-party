@@ -28,10 +28,10 @@ import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartAsyncMarker
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceEvaluator;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceStackFrame;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceValue;
-import com.jetbrains.lang.dart.vm.service.VmService;
-import com.jetbrains.lang.dart.vm.service.consumer.*;
-import com.jetbrains.lang.dart.vm.service.element.*;
-import com.jetbrains.lang.dart.vm.service.element.Stack;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.VmService;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.*;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.*;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Stack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

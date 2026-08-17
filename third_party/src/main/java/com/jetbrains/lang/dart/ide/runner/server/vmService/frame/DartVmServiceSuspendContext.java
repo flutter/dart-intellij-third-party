@@ -5,9 +5,9 @@ import com.intellij.xdebugger.frame.XExecutionStack;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.DartVmServiceDebugProcess;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.IsolatesInfo;
-import com.jetbrains.lang.dart.vm.service.element.Frame;
-import com.jetbrains.lang.dart.vm.service.element.InstanceRef;
-import com.jetbrains.lang.dart.vm.service.element.IsolateRef;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Frame;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.InstanceRef;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.IsolateRef;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
