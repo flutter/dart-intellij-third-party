@@ -59,7 +59,6 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 
 ## 4. Code Quality & Maintainability
 - **Third-Party Code:** NEVER modify files under `third_party/thirdPartySrc/` directly. This content is periodically copied from upstream, so flag direct modifications with a `[MUST-FIX]` comment unless the change includes an explicit, durable patching workflow or repository-owner override.
-- **VM Service Drivers:** Sources under `third_party/src/main/java/com/jetbrains/lang/dart/ide/runner/server/vmService/vmServiceDrivers/` are plugin-owned. The Dart SDK removed its Java VM Service implementation and generator as technical debt ([dart-lang/sdk#63939](https://github.com/dart-lang/sdk/issues/63939), [SDK change 531301](https://dart-review.googlesource.com/c/sdk/+/531301)), so review changes there normally.
 - **Single Responsibility:** Methods should ideally be 10-20 lines. If a method exceeds 30 lines, suggest a refactor.
 - **DRY:** Identify blocks of code that are 90%+ identical to existing utility methods in this repo and flag them for duplication.
 - **Meaningful Naming:** Variables should describe their intent (e.g., `timeoutInMs` instead of `t`).
