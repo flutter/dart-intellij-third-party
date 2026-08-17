@@ -57,17 +57,15 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
       val label: @NlsSafe String? = params.label
       val commandName: String = label ?: DartBundle.message("code.changes.by.dart.analysis.server")
 
-      var applied = false
-      try {
+      val result = runCatching {
         WriteCommandAction.writeCommandAction(project)
           .withName(commandName)
-          .run<Throwable> {
-            applied = applyWorkspaceEdit(params.workspaceEdit)
+          .compute<Boolean, Throwable> {
+            applyWorkspaceEdit(params.workspaceEdit)
           }
       }
-      finally {
-        consumer.workspaceEditApplied(DartLspApplyWorkspaceEditResult(applied))
-      }
+      consumer.workspaceEditApplied(DartLspApplyWorkspaceEditResult(result.getOrDefault(false)))
+      result.getOrThrow()
     }
   }
 
