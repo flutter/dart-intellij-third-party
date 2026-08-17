@@ -63,11 +63,10 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
           .withName(commandName)
           .run<Throwable> {
             applied = applyWorkspaceEdit(params.workspaceEdit)
-            consumer.workspaceEditApplied(DartLspApplyWorkspaceEditResult(applied))
           }
       }
       finally {
-        if (!applied) consumer.workspaceEditApplied(DartLspApplyWorkspaceEditResult(false))
+        consumer.workspaceEditApplied(DartLspApplyWorkspaceEditResult(applied))
       }
     }
   }
