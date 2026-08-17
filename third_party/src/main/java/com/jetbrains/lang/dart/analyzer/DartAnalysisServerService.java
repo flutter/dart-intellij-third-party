@@ -292,49 +292,7 @@ public final class DartAnalysisServerService implements Disposable {
 
     @Override
     public void computedErrors(@NotNull String filePathOrUri, @NotNull List<AnalysisError> errors) {
-      DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathOrUri);
-
-      final ProgressIndicator indicator = myProgressIndicator;
-      if (indicator != null && fileInfo instanceof DartLocalFileInfo localFileInfo) {
-        String fileName = PathUtil.getFileName(localFileInfo.getFilePath());
-        indicator.setText(DartBundle.message("dart.analysis.progress.with.file", fileName));
-      }
-
-      final List<AnalysisError> errorsWithoutTodo = errors.isEmpty() ? Collections.emptyList() : new ArrayList<>(errors.size());
-      boolean hasSevereProblems = false;
-
-      for (AnalysisError error : errors) {
-        if (AnalysisErrorSeverity.ERROR.equals(error.getSeverity())) {
-          hasSevereProblems = true;
-        }
-        if (!AnalysisErrorType.TODO.equals(error.getType())) {
-          errorsWithoutTodo.add(error);
-        }
-      }
-
-      int newHash = errorsWithoutTodo.isEmpty() ? 0 : ensureNotZero(errorsWithoutTodo.hashCode());
-
-      if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-        int oldHash;
-        synchronized (myFilePathsWithErrors) {
-          // TObjectIntHashMap returns 0 if there's no such entry, it's equivalent to empty error set for this file
-          oldHash = myFilePathToErrorsHash.getInt(localFileInfo.getFilePath());
-        }
-
-        // do nothing if errors are the same as were already handled previously
-        if (oldHash == newHash && myServerData.isErrorInfoUpToDate(localFileInfo)) return;
-      }
-
-      boolean restartHighlighting =
-        fileInfo instanceof DartLocalFileInfo localFileInfo && myVisibleFileUris.contains(getLocalFileUri(localFileInfo.getFilePath()))
-        ||
-        fileInfo instanceof DartNotLocalFileInfo notLocalFileInfo && myVisibleFileUris.contains(notLocalFileInfo.getFileUri());
-
-      if (myServerData.computedErrors(fileInfo, errorsWithoutTodo, restartHighlighting)) {
-        if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-          onErrorsUpdated(localFileInfo, errorsWithoutTodo, hasSevereProblems, newHash);
-        }
-      }
+      processComputedErrors(filePathOrUri, errors, true);
     }
 
     @Override
@@ -1169,7 +1127,25 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public void onLspDiagnosticsUpdated(@NotNull String filePathOrUri, @NotNull List<AnalysisError> errors) {
+    // Delegates to shared processComputedErrors logic so that LSP publishDiagnostics notifications
+    // behave 100% identically to legacy DAS computedErrors notifications (TODO filtering, error state deduplication,
+    // active editor highlighting updates, Project View decorators, and Dart Analysis tool window population).
+    processComputedErrors(filePathOrUri, errors, false);
+  }
+
+  private void processComputedErrors(@NotNull String filePathOrUri,
+                                     @NotNull List<AnalysisError> errors,
+                                     boolean updateProgressIndicator) {
     DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathOrUri);
+
+    if (updateProgressIndicator) {
+      final ProgressIndicator indicator = myProgressIndicator;
+      if (indicator != null && fileInfo instanceof DartLocalFileInfo localFileInfo) {
+        String fileName = PathUtil.getFileName(localFileInfo.getFilePath());
+        indicator.setText(DartBundle.message("dart.analysis.progress.with.file", fileName));
+      }
+    }
+
     final List<AnalysisError> errorsWithoutTodo = errors.isEmpty() ? Collections.emptyList() : new ArrayList<>(errors.size());
     boolean hasSevereProblems = false;
 
@@ -1183,6 +1159,18 @@ public final class DartAnalysisServerService implements Disposable {
     }
 
     int newHash = errorsWithoutTodo.isEmpty() ? 0 : ensureNotZero(errorsWithoutTodo.hashCode());
+
+    if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
+      int oldHash;
+      synchronized (myFilePathsWithErrors) {
+        // TObjectIntHashMap returns 0 if there's no such entry, it's equivalent to empty error set for this file
+        oldHash = myFilePathToErrorsHash.getInt(localFileInfo.getFilePath());
+      }
+
+      // do nothing if errors are the same as were already handled previously
+      if (oldHash == newHash && myServerData.isErrorInfoUpToDate(localFileInfo)) return;
+    }
+
     boolean restartHighlighting =
       fileInfo instanceof DartLocalFileInfo localFileInfo && myVisibleFileUris.contains(getLocalFileUri(localFileInfo.getFilePath()))
       ||
