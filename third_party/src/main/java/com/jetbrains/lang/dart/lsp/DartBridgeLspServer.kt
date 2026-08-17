@@ -15,7 +15,11 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
+import org.dartlang.analysis.server.protocol.AnalysisError
+import org.dartlang.analysis.server.protocol.DiagnosticMessage
 import org.eclipse.lsp4j.DefinitionParams
+import org.eclipse.lsp4j.Diagnostic
+import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
@@ -75,6 +79,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     companion object {
         private val logger = PluginLogger.createLogger(DartBridgeLspServer::class.java)
         private const val LSP_MESSAGE_KEY = "lspMessage"
+        private const val LSP_NOTIFICATION_KEY = "lspNotification"
         private const val LSP_RESPONSE_KEY = "lspResponse"
         private const val JSONRPC_VERSION = "2.0"
         
@@ -106,7 +111,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     private fun setupDasResponseListener() {
         val listener = ResponseListener { response ->
             // Intercept only those responses that contain LSP payload keys.
-            if (!response.contains(LSP_MESSAGE_KEY) && !response.contains(LSP_RESPONSE_KEY)) {
+            if (!response.contains(LSP_MESSAGE_KEY) && !response.contains(LSP_RESPONSE_KEY) && !response.contains(LSP_NOTIFICATION_KEY)) {
                 return@ResponseListener
             }
 
@@ -132,8 +137,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         // Check if it's a notification from DAS.
         if (jsonObject.has("params")) {
             val params = jsonObject.get("params").asJsonObject
-            if (params.has(LSP_MESSAGE_KEY)) {
-                val msgObj = params.get(LSP_MESSAGE_KEY).asJsonObject
+            val msgObj = when {
+                params.has(LSP_NOTIFICATION_KEY) -> params.get(LSP_NOTIFICATION_KEY).asJsonObject
+                params.has(LSP_MESSAGE_KEY) -> params.get(LSP_MESSAGE_KEY).asJsonObject
+                else -> null
+            }
+            if (msgObj != null) {
                 val method = msgObj.getAsJsonPrimitive("method")?.asString
                 if (method != null) {
                     // Forward notification to client.
@@ -191,12 +200,103 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 val paramsObj = msgObj.get("params")
                 val params = GSON.fromJson(paramsObj, PublishDiagnosticsParams::class.java)
                 client.publishDiagnostics(params)
+                val errors = params.diagnostics.map { convertDiagnosticToAnalysisError(params.uri, it) }
+                das.onLspDiagnosticsUpdated(params.uri, errors)
             } else {
                 logger.info("Ignored notification from DAS: $method")
             }
         } catch (e: Exception) {
             logger.error("Failed to forward notification: $msgObj", e)
         }
+    }
+
+    private fun convertDiagnosticToAnalysisError(uri: String, diagnostic: Diagnostic): AnalysisError {
+        val severity = when (diagnostic.severity) {
+            DiagnosticSeverity.Error -> "ERROR"
+            DiagnosticSeverity.Warning -> "WARNING"
+            DiagnosticSeverity.Information, DiagnosticSeverity.Hint -> "INFO"
+            else -> "ERROR"
+        }
+        val codeStr = diagnostic.code?.let { if (it.isLeft) it.left else it.right.toString() }
+        val type = when {
+            codeStr?.equals("todo", ignoreCase = true) == true -> "TODO"
+            severity == "ERROR" -> "COMPILE_TIME_ERROR"
+            severity == "WARNING" -> "STATIC_WARNING"
+            else -> "HINT"
+        }
+        val fileInfo = com.jetbrains.lang.dart.analyzer.getDartFileInfo(project, uri)
+        val filePath = if (fileInfo is com.jetbrains.lang.dart.analyzer.DartLocalFileInfo) fileInfo.filePath else uri
+        val vFile = fileInfo.findFile()
+        val document = vFile?.let {
+            runReadAction {
+                com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(it)
+            }
+        }
+        val docOffset = if (document != null) {
+            com.intellij.platform.dartlsp.util.getOffsetInDocument(document, diagnostic.range.start) ?: 0
+        } else {
+            0
+        }
+        val docEnd = if (document != null) {
+            com.intellij.platform.dartlsp.util.getOffsetInDocument(document, diagnostic.range.end) ?: 0
+        } else {
+            0
+        }
+        val offset = das.getOriginalOffset(vFile, docOffset)
+        val length = (das.getOriginalOffset(vFile, docEnd) - offset).coerceAtLeast(0)
+        val location = org.dartlang.analysis.server.protocol.Location(
+            filePath,
+            offset,
+            length,
+            (diagnostic.range.start.line + 1).coerceAtLeast(1),
+            (diagnostic.range.start.character + 1).coerceAtLeast(1),
+            (diagnostic.range.end.line + 1).coerceAtLeast(1),
+            (diagnostic.range.end.character + 1).coerceAtLeast(1)
+        )
+        val contextMessages = diagnostic.relatedInformation?.mapNotNull { info ->
+            val infoUri = info.location.uri
+            val infoFileInfo = com.jetbrains.lang.dart.analyzer.getDartFileInfo(project, infoUri)
+            val infoFilePath = if (infoFileInfo is com.jetbrains.lang.dart.analyzer.DartLocalFileInfo) infoFileInfo.filePath else infoUri
+            val infoVFile = infoFileInfo.findFile()
+            val infoDoc = infoVFile?.let {
+                runReadAction {
+                    com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(it)
+                }
+            }
+            val infoDocOffset = if (infoDoc != null) {
+                com.intellij.platform.dartlsp.util.getOffsetInDocument(infoDoc, info.location.range.start) ?: 0
+            } else {
+                0
+            }
+            val infoDocEnd = if (infoDoc != null) {
+                com.intellij.platform.dartlsp.util.getOffsetInDocument(infoDoc, info.location.range.end) ?: 0
+            } else {
+                0
+            }
+            val infoOffset = das.getOriginalOffset(infoVFile, infoDocOffset)
+            val infoLen = (das.getOriginalOffset(infoVFile, infoDocEnd) - infoOffset).coerceAtLeast(0)
+            val infoLocation = org.dartlang.analysis.server.protocol.Location(
+                infoFilePath,
+                infoOffset,
+                infoLen,
+                (info.location.range.start.line + 1).coerceAtLeast(1),
+                (info.location.range.start.character + 1).coerceAtLeast(1),
+                (info.location.range.end.line + 1).coerceAtLeast(1),
+                (info.location.range.end.character + 1).coerceAtLeast(1)
+            )
+            DiagnosticMessage(info.message, infoLocation)
+        } ?: emptyList()
+        return AnalysisError(
+            severity,
+            type,
+            location,
+            diagnostic.message,
+            null,
+            codeStr,
+            diagnostic.codeDescription?.href,
+            contextMessages,
+            null
+        )
     }
 
     fun stop() {

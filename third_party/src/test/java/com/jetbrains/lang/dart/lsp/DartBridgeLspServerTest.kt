@@ -307,6 +307,54 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(true, lspCapabilities.get("testCap").asBoolean)
     }
 
+    fun testPublishDiagnosticsNotification() {
+        val testFile = myFixture.addFileToProject(
+            "lib/test.dart",
+            """
+            void main() {
+              int x = "string";
+            }
+            """.trimIndent()
+        )
+        val fileUri = "file://${testFile.virtualFile.path}"
+
+        val notificationJson = """
+            {
+              "params": {
+                "lspNotification": {
+                  "jsonrpc": "2.0",
+                  "method": "textDocument/publishDiagnostics",
+                  "params": {
+                    "uri": "$fileUri",
+                    "diagnostics": [
+                      {
+                        "range": {
+                          "start": {"line": 1, "character": 10},
+                          "end": {"line": 1, "character": 18}
+                        },
+                        "severity": 1,
+                        "code": "invalid_assignment",
+                        "message": "A value of type 'String' can't be assigned to a variable of type 'int'.",
+                        "source": "dart"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(notificationJson)
+
+        assertNotNull(mockClient.publishedDiagnostics)
+        assertEquals(fileUri, mockClient.publishedDiagnostics?.uri)
+        assertEquals(1, mockClient.publishedDiagnostics?.diagnostics?.size)
+
+        // Also check that DartAnalysisServerService processed the diagnostic
+        val errorsHash = DartAnalysisServerService.getInstance(project).getFilePathsWithErrorsHash()
+        assertNotSame(0, errorsHash)
+    }
+
     private class MockLanguageClient : LanguageClient {
         var publishedDiagnostics: PublishDiagnosticsParams? = null
 
