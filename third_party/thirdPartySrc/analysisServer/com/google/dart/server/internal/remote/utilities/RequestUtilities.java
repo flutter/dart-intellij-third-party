@@ -1077,6 +1077,10 @@ public class RequestUtilities {
     definition.addProperty("linkSupport", true);
     textDocument.add("definition", definition);
 
+    JsonObject typeDefinition = new JsonObject();
+    typeDefinition.addProperty("linkSupport", true);
+    textDocument.add("typeDefinition", typeDefinition);
+
     lspCapabilities.add("textDocument", textDocument);
 
     params.add("lspCapabilities", lspCapabilities);
