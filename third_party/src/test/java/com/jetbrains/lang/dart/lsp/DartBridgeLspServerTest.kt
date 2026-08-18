@@ -37,6 +37,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
     private lateinit var bridgeServer: DartBridgeLspServer
     private lateinit var capturedListener: ResponseListener
+    private lateinit var mockServer: RemoteAnalysisServerImpl
     private val mockClient = MockLanguageClient()
     private val capturedRequests = CopyOnWriteArrayList<JsonObject>()
 
@@ -57,7 +58,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         dasSdkVersionField.set(das, sdk.version)
 
         val stubSocket = createStubSocket()
-        val mockServer = object : RemoteAnalysisServerImpl(stubSocket) {
+        mockServer = object : RemoteAnalysisServerImpl(stubSocket) {
             override fun addResponseListener(listener: ResponseListener) {
                 capturedListener = listener
                 super.addResponseListener(listener)
@@ -289,6 +290,21 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(2, result.size)
         assertEquals(DocumentHighlightKind.Write, result[0].kind)
         assertEquals(DocumentHighlightKind.Read, result[1].kind)
+    }
+
+    fun testClientCapabilities() {
+        val lspCaps = JsonObject().apply {
+            addProperty("testCap", true)
+        }
+        mockServer.server_setClientCapabilities(listOf("openUrlRequest"), true, lspCaps)
+
+        val req = requireNotNull(capturedRequests.find { it.get("method")?.asString == "server.setClientCapabilities" }) {
+            "A server.setClientCapabilities request should be generated"
+        }
+        val params = req.getAsJsonObject("params")
+        assertEquals(true, params.get("supportsUris").asBoolean)
+        val lspCapabilities = params.getAsJsonObject("lspCapabilities")
+        assertEquals(true, lspCapabilities.get("testCap").asBoolean)
     }
 
     private class MockLanguageClient : LanguageClient {
