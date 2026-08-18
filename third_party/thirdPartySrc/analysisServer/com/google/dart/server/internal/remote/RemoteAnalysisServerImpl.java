@@ -707,6 +707,15 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   }
 
   @Override
+  public void server_setClientCapabilities(List<String> requests, boolean supportsUris, Object lspCapabilities) {
+    String id = generateUniqueId();
+    if (requests == null) {
+      requests = StringUtilities.EMPTY_LIST;
+    }
+    sendRequestToServer(id, RequestUtilities.generateClientCapabilities(id, requests, supportsUris, lspCapabilities));
+  }
+
+  @Override
   public void lsp_connectToDtd(String uri) {
     String id = generateUniqueId();
     sendRequestToServer(id, RequestUtilities.generateConnectToDtd(id, uri), new BasicConsumer() {

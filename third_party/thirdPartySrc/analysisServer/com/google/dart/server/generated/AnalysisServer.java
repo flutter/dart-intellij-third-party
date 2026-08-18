@@ -1049,6 +1049,7 @@ public interface AnalysisServer {
    *        client sets this capability.
    */
   public void server_setClientCapabilities(List<String> requests, boolean supportsUris, boolean supportsWorkspaceApplyEdits);
+  public void server_setClientCapabilities(List<String> requests, boolean supportsUris, Object lspCapabilities);
 
   /**
    * {@code server.setSubscriptions}

@@ -153,6 +153,9 @@ public class RequestUtilities {
     else if (object instanceof String) {
       return new JsonPrimitive((String)object);
     }
+    else if (object instanceof JsonElement) {
+      return (JsonElement)object;
+    }
     else if (object instanceof List<?>) {
       List<?> list = (List<?>)object;
       JsonArray jsonArray = new JsonArray();
@@ -1081,6 +1084,21 @@ public class RequestUtilities {
 
     params.add("lspCapabilities", lspCapabilities);
 
+    return buildJsonObjectRequest(idValue, METHOD_SERVER_SET_CAPABILITIES, params);
+  }
+
+  public static JsonObject generateClientCapabilities(String idValue,
+                                                      List<String> requests,
+                                                      boolean supportsUris,
+                                                      Object lspCapabilities) {
+    JsonObject params = new JsonObject();
+    params.add(REQUESTS, buildJsonElement(requests));
+    if (supportsUris) {
+      params.addProperty("supportsUris", supportsUris);
+    }
+    if (lspCapabilities != null) {
+      params.add("lspCapabilities", buildJsonElement(lspCapabilities));
+    }
     return buildJsonObjectRequest(idValue, METHOD_SERVER_SET_CAPABILITIES, params);
   }
 
