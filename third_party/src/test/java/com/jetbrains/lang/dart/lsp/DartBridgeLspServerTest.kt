@@ -28,6 +28,7 @@ import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
 import org.eclipse.lsp4j.TextDocumentIdentifier
+import org.eclipse.lsp4j.TypeDefinitionParams
 import org.eclipse.lsp4j.services.LanguageClient
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
@@ -353,6 +354,49 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         // Also check that DartAnalysisServerService processed the diagnostic
         val errorsHash = DartAnalysisServerService.getInstance(project).getFilePathsWithErrorsHash()
         assertNotSame(0, errorsHash)
+    }
+
+    fun testTypeDefinitionRequest() {
+        val params = TypeDefinitionParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            position = Position(1, 2)
+        }
+
+        val future = bridgeServer.typeDefinition(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("textDocument/typeDefinition", lspMessage.get("method").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": [
+                    {
+                      "targetUri": "file://target.dart",
+                      "targetRange": {"start": {"line": 0, "character": 0}, "end": {"line": 10, "character": 0}},
+                      "targetSelectionRange": {"start": {"line": 0, "character": 6}, "end": {"line": 0, "character": 9}}
+                    }
+                  ]
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertTrue(result.isRight)
+        assertEquals(1, result.right.size)
+        assertEquals("file://target.dart", result.right[0].targetUri)
     }
 
     private class MockLanguageClient : LanguageClient {

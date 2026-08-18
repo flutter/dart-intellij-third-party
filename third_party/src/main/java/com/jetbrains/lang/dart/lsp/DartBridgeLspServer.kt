@@ -44,6 +44,7 @@ import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
+import org.eclipse.lsp4j.TypeDefinitionParams
 import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -227,6 +228,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
             setDefinitionProvider(true)
+            setTypeDefinitionProvider(true)
             setDocumentHighlightProvider(true)
             // Add other capabilities as we support them.
         }
@@ -257,6 +259,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     override fun definition(params: DefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
         val type = object : TypeToken<List<LocationLink>>() {}.type
         return forwardRequest<List<LocationLink>>("textDocument/definition", params, type).thenApply { links ->
+            Either.forRight(links ?: emptyList())
+        }
+    }
+
+    override fun typeDefinition(params: TypeDefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
+        val type = object : TypeToken<List<LocationLink>>() {}.type
+        return forwardRequest<List<LocationLink>>("textDocument/typeDefinition", params, type).thenApply { links ->
             Either.forRight(links ?: emptyList())
         }
     }
