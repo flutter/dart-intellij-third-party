@@ -563,6 +563,10 @@ public final class DartAnalysisServerService implements Disposable {
     definition.addProperty("linkSupport", true);
     textDocument.add("definition", definition);
 
+    JsonObject typeDefinition = new JsonObject();
+    typeDefinition.addProperty("linkSupport", true);
+    textDocument.add("typeDefinition", typeDefinition);
+
     if (supportsLspDiagnostics) {
       JsonObject publishDiagnostics = new JsonObject();
       publishDiagnostics.addProperty("relatedInformation", true);
