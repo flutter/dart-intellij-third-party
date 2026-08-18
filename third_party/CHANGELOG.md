@@ -1,7 +1,7 @@
 ## Unreleased
 
 ### Added
-- Go to Type Declaration implemented with JetBrains LSP
+- Go to Type Declaration implemented with JetBrains LSP (#615)
 
 ### Changed
 
