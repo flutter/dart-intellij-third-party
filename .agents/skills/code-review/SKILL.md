@@ -23,7 +23,7 @@ You are a Senior Staff Engineer performing a rigorous code review on the develop
 Perform a multi-pass analysis of the diff:
 
 ### Pass 0: Repository & Structure Restrictions
-- **Third-Party Sources:** Check for direct modifications under `third_party/thirdPartySrc/platform-lsp/` or `org.dartlang.analysis.server.protocol/`.
+- **Third-Party Sources:** Check for direct modifications under `third_party/thirdPartySrc/platform-lsp/` or `third_party/thirdPartySrc/analysisServer/org/dartlang/analysis/server/protocol/`.
   - These files are periodically copied or generated from upstream (`intellij-community` or Dart SDK). Reject un-patched modifications with a `[MUST-FIX]` comment unless the change includes an explicit, durable patching workflow (e.g., `.agents/skills/patch-copied-lsp-sources/scripts/patch.py`).
   - *Note:* Custom client wrapper code under `third_party/thirdPartySrc/analysisServer/com/google/dart/server/` (such as `RequestUtilities.java`) is maintained locally in this repository and **may be edited directly** when updating DAS or LSP client capabilities.
 
