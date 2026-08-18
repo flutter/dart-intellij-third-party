@@ -579,6 +579,31 @@ public final class DartAnalysisServerService implements Disposable {
     return StringUtil.compareVersionNumbers(sdkVersion, MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION) >= 0;
   }
 
+  public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion) {
+    JsonObject lspCapabilities = new JsonObject();
+
+    if (isDartSdkVersionSufficientForWorkspaceApplyEdits(sdkVersion)) {
+      JsonObject workspace = new JsonObject();
+      workspace.addProperty("applyEdit", true);
+
+      JsonObject workspaceEdit = new JsonObject();
+      workspaceEdit.addProperty("documentChanges", false);
+      workspace.add("workspaceEdit", workspaceEdit);
+
+      lspCapabilities.add("workspace", workspace);
+    }
+
+    JsonObject textDocument = new JsonObject();
+
+    JsonObject definition = new JsonObject();
+    definition.addProperty("linkSupport", true);
+    textDocument.add("definition", definition);
+
+    lspCapabilities.add("textDocument", textDocument);
+
+    return lspCapabilities;
+  }
+
   public static boolean isDartSdkVersionSufficientForLspNavigation(@NotNull String sdkVersion) {
     return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_NAVIGATION_SDK_VERSION) >= 0;
   }
@@ -2326,10 +2351,9 @@ public final class DartAnalysisServerService implements Disposable {
         mySdkVersion = sdk.getVersion();
 
         boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
-        boolean supportsWorkspaceApplyEdits = isDartSdkVersionSufficientForWorkspaceApplyEdits(mySdkVersion);
         startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
                                                    supportsUris,
-                                                   supportsWorkspaceApplyEdits);
+                                                   buildLspCapabilities(mySdkVersion));
 
         myServer = startedServer;
 
