@@ -32,6 +32,7 @@ import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ServerCapabilities
+import org.eclipse.lsp4j.TypeDefinitionParams
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.Either
@@ -215,6 +216,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setHoverProvider(true)
             setDefinitionProvider(true)
             setDocumentHighlightProvider(true)
+            setTypeDefinitionProvider(true)
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -244,6 +246,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     override fun definition(params: DefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
         val type = object : TypeToken<List<LocationLink>>() {}.type
         return forwardRequest<List<LocationLink>>("textDocument/definition", params, type).thenApply { links ->
+            Either.forRight(links ?: emptyList())
+        }
+    }
+
+    // Note: We advertise linkSupport: true for typeDefinition in server.setClientCapabilities
+    // (see DartAnalysisServerService.buildLspCapabilities) so DAS returns List<LocationLink>.
+    override fun typeDefinition(params: TypeDefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
+        val type = object : TypeToken<List<LocationLink>>() {}.type
+        return forwardRequest<List<LocationLink>>("textDocument/typeDefinition", params, type).thenApply { links ->
             Either.forRight(links ?: emptyList())
         }
     }
