@@ -28,6 +28,8 @@ import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.InlayHint
+import org.eclipse.lsp4j.InlayHintParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
@@ -215,6 +217,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setHoverProvider(true)
             setDefinitionProvider(true)
             setDocumentHighlightProvider(true)
+            setInlayHintProvider(true)
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -251,6 +254,11 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     override fun documentHighlight(params: DocumentHighlightParams): CompletableFuture<List<DocumentHighlight>> {
         val type = object : TypeToken<List<DocumentHighlight>>() {}.type
         return forwardRequest<List<DocumentHighlight>>("textDocument/documentHighlight", params, type)
+    }
+
+    override fun inlayHint(params: InlayHintParams): CompletableFuture<List<InlayHint>> {
+        val type = object : TypeToken<List<InlayHint>>() {}.type
+        return forwardRequest<List<InlayHint>>("textDocument/inlayHint", params, type)
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
