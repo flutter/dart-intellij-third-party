@@ -308,6 +308,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("123", lspMessage.get("id").asString)
         assertEquals("textDocument/typeDefinition", lspMessage.get("method").asString)
 
+        val sentParams = lspMessage.getAsJsonObject("params")
+        assertEquals("file://test.dart", sentParams.getAsJsonObject("textDocument").get("uri").asString)
+        assertEquals(3, sentParams.getAsJsonObject("position").get("line").asInt)
+        assertEquals(7, sentParams.getAsJsonObject("position").get("character").asInt)
+
         val responseJson = """
             {
               "id": "123",
@@ -335,6 +340,38 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(1, result.right.size)
         assertEquals("file:///lib/foo.dart", result.right[0].targetUri)
         assertEquals(10, result.right[0].targetSelectionRange.start.line)
+    }
+
+    fun testTypeDefinitionRequestWithNullResult() {
+        val params = TypeDefinitionParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            position = Position(3, 7)
+        }
+
+        val future = bridgeServer.typeDefinition(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertTrue(result.isRight)
+        assertTrue(result.right.isEmpty())
     }
 
     private class MockLanguageClient : LanguageClient {
