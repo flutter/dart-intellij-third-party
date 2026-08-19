@@ -250,12 +250,32 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
-    // Note: We advertise linkSupport: true for typeDefinition in server.setClientCapabilities
-    // (see DartAnalysisServerService.buildLspCapabilities) so DAS returns List<LocationLink>.
+    // Note: DAS only returns List<LocationLink> for textDocument/typeDefinition when the client advertises
+    // typeDefinition.linkSupport; otherwise it answers with a single Location or a List<Location> (LSP
+    // `Definition`). Accept all of these shapes so the feature does not depend on that capability.
     override fun typeDefinition(params: TypeDefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
-        val type = object : TypeToken<List<LocationLink>>() {}.type
-        return forwardRequest<List<LocationLink>>("textDocument/typeDefinition", params, type).thenApply { links ->
-            Either.forRight(links ?: emptyList())
+        return forwardRequest("textDocument/typeDefinition", params, JsonElement::class.java).thenApply { json ->
+            toDefinitionResult(json)
+        }
+    }
+
+    private fun toDefinitionResult(json: JsonElement?): Either<List<Location>, List<LocationLink>> {
+        if (json == null || json.isJsonNull) {
+            return Either.forRight(emptyList())
+        }
+        if (json.isJsonObject) {
+            return Either.forLeft(listOf(GSON.fromJson(json, Location::class.java)))
+        }
+        if (!json.isJsonArray || json.asJsonArray.isEmpty) {
+            return Either.forRight(emptyList())
+        }
+        val first = json.asJsonArray[0]
+        return if (first.isJsonObject && first.asJsonObject.has("targetUri")) {
+            val type = object : TypeToken<List<LocationLink>>() {}.type
+            Either.forRight(GSON.fromJson(json, type))
+        } else {
+            val type = object : TypeToken<List<Location>>() {}.type
+            Either.forLeft(GSON.fromJson(json, type))
         }
     }
 
