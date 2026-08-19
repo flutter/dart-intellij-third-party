@@ -256,9 +256,21 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest<List<DocumentHighlight>>("textDocument/documentHighlight", params, type)
     }
 
+    // Unlike the other overrides above, this one must never let its future complete
+    // exceptionally: the LSP client's inlay-hint cache awaits this future inside a coroutine
+    // without catching exceptions, so a DAS error (e.g. FileNotAnalyzed) would otherwise
+    // surface as an uncaught IDE error instead of simply showing no hints.
     override fun inlayHint(params: InlayHintParams): CompletableFuture<List<InlayHint>> {
         val type = object : TypeToken<List<InlayHint>>() {}.type
         return forwardRequest<List<InlayHint>>("textDocument/inlayHint", params, type)
+            .handle { hints, error ->
+                if (error != null) {
+                    logger.info("textDocument/inlayHint failed: ${error.message}")
+                    emptyList()
+                } else {
+                    hints ?: emptyList()
+                }
+            }
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {

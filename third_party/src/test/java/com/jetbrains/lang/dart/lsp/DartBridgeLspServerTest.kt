@@ -326,6 +326,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("123", lspMessage.get("id").asString)
         assertEquals("textDocument/inlayHint", lspMessage.get("method").asString)
 
+        val sentParams = lspMessage.getAsJsonObject("params")
+        assertEquals("file://test.dart", sentParams.getAsJsonObject("textDocument").get("uri").asString)
+        assertEquals(0, sentParams.getAsJsonObject("range").getAsJsonObject("start").get("line").asInt)
+        assertEquals(10, sentParams.getAsJsonObject("range").getAsJsonObject("end").get("line").asInt)
+
         val responseJson = """
             {
               "id": "123",
@@ -350,6 +355,71 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("String", result[0].label.left)
         assertEquals(InlayHintKind.Parameter, result[1].kind)
         assertEquals("name:", result[1].label.right[0].value)
+    }
+
+    fun testInlayHintRequestWithErrorResponse() {
+        val params = InlayHintParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            range = Range(Position(0, 0), Position(10, 0))
+        }
+
+        val future = bridgeServer.inlayHint(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32001,
+                    "message": "File not analyzed"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertTrue(result.isEmpty())
+    }
+
+    fun testInlayHintRequestWithNullResult() {
+        val params = InlayHintParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            range = Range(Position(0, 0), Position(10, 0))
+        }
+
+        val future = bridgeServer.inlayHint(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertTrue(result.isEmpty())
     }
 
     private class MockLanguageClient : LanguageClient {
