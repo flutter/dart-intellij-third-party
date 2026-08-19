@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Added
+- Go to Type Declaration for Dart via LSP textDocument/typeDefinition (JetBrains LSP, experimental feature) (#618)
 
 ### Changed
 
