@@ -181,6 +181,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_FILE_URI_SDK_VERSION = "3.4.0";
   private static final String MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION = "3.8";
   public static final String MIN_LSP_NAVIGATION_SDK_VERSION = "3.14.0-65.0.dev";
+  public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -614,6 +615,18 @@ public final class DartAnalysisServerService implements Disposable {
     }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspNavigation(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspInlayHints(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_INLAY_HINTS_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspInlayHintsEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspInlayHints(sdk.getVersion());
   }
 
   public boolean shouldUseCompletion2() {
