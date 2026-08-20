@@ -294,7 +294,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             } else if (element.isJsonArray) {
                 val type = object : TypeToken<List<CompletionItem>>() {}.type
                 val items: List<CompletionItem> = GSON.fromJson(element, type) ?: emptyList()
-                Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, items))
+                Either.forLeft<List<CompletionItem>, CompletionList>(items)
             } else {
                 val list = GSON.fromJson(element, CompletionList::class.java) ?: CompletionList(false, emptyList())
                 Either.forRight<List<CompletionItem>, CompletionList>(list)

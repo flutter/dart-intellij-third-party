@@ -388,11 +388,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
         val result = future.get(5, TimeUnit.SECONDS)
         assertNotNull(result)
-        assertTrue(result.isRight)
-        val completionList = result.right
-        assertEquals(1, completionList.items.size)
-        assertEquals("toString", completionList.items[0].label)
-        assertEquals(CompletionItemKind.Method, completionList.items[0].kind)
+        assertTrue(result.isLeft)
+        val items = result.left
+        assertEquals(1, items.size)
+        assertEquals("toString", items[0].label)
+        assertEquals(CompletionItemKind.Method, items[0].kind)
     }
 
     fun testCompletionResolveRequest() {
@@ -502,7 +502,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testCompletionSupportIconMapping() {
-        val support = DartLspCompletionSupport()
+        val support = DartLspCompletionSupport
         val constructorItem = CompletionItem().apply { kind = CompletionItemKind.Constructor }
         assertEquals(com.intellij.icons.AllIcons.Nodes.ClassInitializer, support.getIcon(constructorItem))
 
