@@ -17,6 +17,7 @@ import org.dartlang.analysis.server.protocol.DiagnosticMessage
 import org.dartlang.analysis.server.protocol.Location
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
+import org.eclipse.lsp4j.Range
 
 object DartLspDiagnosticConverter {
 
@@ -44,66 +45,9 @@ object DartLspDiagnosticConverter {
             severity == "WARNING" -> "STATIC_WARNING"
             else -> "HINT"
         }
-        val fileInfo = getDartFileInfo(project, uri)
-        val filePath = if (fileInfo is DartLocalFileInfo) fileInfo.filePath else uri
-        val vFile = fileInfo.findFile()
-        val document = vFile?.let {
-            runReadAction {
-                FileDocumentManager.getInstance().getDocument(it)
-            }
-        }
-        val docOffset = if (document != null) {
-            getOffsetInDocument(document, diagnostic.range.start) ?: 0
-        } else {
-            0
-        }
-        val docEnd = if (document != null) {
-            getOffsetInDocument(document, diagnostic.range.end) ?: 0
-        } else {
-            0
-        }
-        val offset = das.getOriginalOffset(vFile, docOffset)
-        val length = (das.getOriginalOffset(vFile, docEnd) - offset).coerceAtLeast(0)
-        val location = Location(
-            filePath,
-            offset,
-            length,
-            (diagnostic.range.start.line + 1).coerceAtLeast(1),
-            (diagnostic.range.start.character + 1).coerceAtLeast(1),
-            (diagnostic.range.end.line + 1).coerceAtLeast(1),
-            (diagnostic.range.end.character + 1).coerceAtLeast(1)
-        )
+        val location = resolveLocation(project, das, uri, diagnostic.range)
         val contextMessages = diagnostic.relatedInformation?.mapNotNull { info ->
-            val infoUri = info.location.uri
-            val infoFileInfo = getDartFileInfo(project, infoUri)
-            val infoFilePath = if (infoFileInfo is DartLocalFileInfo) infoFileInfo.filePath else infoUri
-            val infoVFile = infoFileInfo.findFile()
-            val infoDoc = infoVFile?.let {
-                runReadAction {
-                    FileDocumentManager.getInstance().getDocument(it)
-                }
-            }
-            val infoDocOffset = if (infoDoc != null) {
-                getOffsetInDocument(infoDoc, info.location.range.start) ?: 0
-            } else {
-                0
-            }
-            val infoDocEnd = if (infoDoc != null) {
-                getOffsetInDocument(infoDoc, info.location.range.end) ?: 0
-            } else {
-                0
-            }
-            val infoOffset = das.getOriginalOffset(infoVFile, infoDocOffset)
-            val infoLen = (das.getOriginalOffset(infoVFile, infoDocEnd) - infoOffset).coerceAtLeast(0)
-            val infoLocation = Location(
-                infoFilePath,
-                infoOffset,
-                infoLen,
-                (info.location.range.start.line + 1).coerceAtLeast(1),
-                (info.location.range.start.character + 1).coerceAtLeast(1),
-                (info.location.range.end.line + 1).coerceAtLeast(1),
-                (info.location.range.end.character + 1).coerceAtLeast(1)
-            )
+            val infoLocation = resolveLocation(project, das, info.location.uri, info.location.range)
             DiagnosticMessage(info.message, infoLocation)
         }
         val url = diagnostic.codeDescription?.href
@@ -118,6 +62,40 @@ object DartLspDiagnosticConverter {
             url,
             contextMessages,
             false
+        )
+    }
+
+    private fun resolveLocation(
+        project: Project,
+        das: DartAnalysisServerService,
+        uri: String,
+        range: Range
+    ): Location {
+        val fileInfo = getDartFileInfo(project, uri)
+        val filePath = if (fileInfo is DartLocalFileInfo) fileInfo.filePath else uri
+        val (vFile, docOffset, docEnd) = runReadAction {
+            val f = fileInfo.findFile()
+            val doc = f?.let { FileDocumentManager.getInstance().getDocument(it) }
+            if (doc != null) {
+                Triple(
+                    f,
+                    getOffsetInDocument(doc, range.start) ?: 0,
+                    getOffsetInDocument(doc, range.end) ?: 0
+                )
+            } else {
+                Triple(f, 0, 0)
+            }
+        }
+        val offset = das.getOriginalOffset(vFile, docOffset)
+        val length = (das.getOriginalOffset(vFile, docEnd) - offset).coerceAtLeast(0)
+        return Location(
+            filePath,
+            offset,
+            length,
+            (range.start.line + 1).coerceAtLeast(1),
+            (range.start.character + 1).coerceAtLeast(1),
+            (range.end.line + 1).coerceAtLeast(1),
+            (range.end.character + 1).coerceAtLeast(1)
         )
     }
 }
