@@ -11,6 +11,8 @@ enum class LspMethod(
     val presentableName: String? = null
 ) {
     CODE_ACTION("textDocument/codeAction", isExperimental = true, presentableName = "code actions"),
+    COMPLETION("textDocument/completion", isExperimental = true, presentableName = "completion"),
+    COMPLETION_RESOLVE("completionItem/resolve", isExperimental = false),
     DEFINITION("textDocument/definition", isExperimental = true, presentableName = "navigation"),
     DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = false),
     DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = true, presentableName = "read/write highlighting"),
