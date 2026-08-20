@@ -1,4 +1,5 @@
 ## Unreleased
+- Find Usages / references with JetBrains LSP (experimental feature) (#396) under ## Unreleased -> ### Added).
 
 ### Added
 - Populate Dart Analysis tool window errors and warnings using Language Server Protocol (LSP) publishDiagnostics notifications (#520)

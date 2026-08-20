@@ -16,7 +16,8 @@ enum class LspMethod(
     HOVER("textDocument/hover", isExperimental = true, presentableName = "hover"),
     INITIALIZE("initialize"),
     SHUTDOWN("shutdown"),
-    TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false);
+    TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
+    REFERENCES("textDocument/references", isExperimental = true, presentableName = "references");
 
     companion object {
         fun fromMethod(method: String): LspMethod? = entries.find { it.method == method }
