@@ -15,7 +15,8 @@ enum class LspMethod(
     DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = true, presentableName = "read/write highlighting"),
     HOVER("textDocument/hover", isExperimental = true, presentableName = "hover"),
     INITIALIZE("initialize"),
-    SHUTDOWN("shutdown");
+    SHUTDOWN("shutdown"),
+    REFERENCES("textDocument/references", isExperimental = true, presentableName = "references");
 
     companion object {
         fun fromMethod(method: String): LspMethod? = entries.find { it.method == method }
