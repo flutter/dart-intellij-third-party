@@ -15,6 +15,10 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
+import org.eclipse.lsp4j.CompletionItem
+import org.eclipse.lsp4j.CompletionList
+import org.eclipse.lsp4j.CompletionOptions
+import org.eclipse.lsp4j.CompletionParams
 import org.dartlang.analysis.server.protocol.AnalysisError
 import org.dartlang.analysis.server.protocol.DiagnosticMessage
 import org.eclipse.lsp4j.CallHierarchyIncomingCall
@@ -24,8 +28,6 @@ import org.eclipse.lsp4j.CallHierarchyOutgoingCall
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.DefinitionParams
-import org.eclipse.lsp4j.Diagnostic
-import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
@@ -244,6 +246,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setTypeHierarchyProvider(true)
             setCallHierarchyProvider(true)
             setReferencesProvider(true)
+            setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -281,6 +284,31 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val type = object : TypeToken<List<LocationLink>>() {}.type
         return forwardRequest<List<LocationLink>>("textDocument/typeDefinition", params, type).thenApply { links ->
             Either.forRight(links ?: emptyList())
+        }
+    }
+
+    override fun completion(params: CompletionParams): CompletableFuture<Either<List<CompletionItem>, CompletionList>> {
+        return forwardRequest<JsonElement>("textDocument/completion", params, JsonElement::class.java).thenApply { element ->
+            if (element == null || element.isJsonNull) {
+                Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, emptyList()))
+            } else if (element.isJsonArray) {
+                val type = object : TypeToken<List<CompletionItem>>() {}.type
+                val items: List<CompletionItem> = GSON.fromJson(element, type) ?: emptyList()
+                Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, items))
+            } else {
+                val list = GSON.fromJson(element, CompletionList::class.java) ?: CompletionList(false, emptyList())
+                Either.forRight<List<CompletionItem>, CompletionList>(list)
+            }
+        }.exceptionally { e ->
+            logger.info("textDocument/completion failed: ${e.message}")
+            Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, emptyList()))
+        }
+    }
+
+    override fun resolveCompletionItem(unresolved: CompletionItem): CompletableFuture<CompletionItem> {
+        return forwardRequest("completionItem/resolve", unresolved, CompletionItem::class.java).exceptionally { e ->
+            logger.info("completionItem/resolve failed: ${e.message}")
+            unresolved
         }
     }
 

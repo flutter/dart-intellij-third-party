@@ -5,6 +5,7 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
@@ -52,6 +53,9 @@ import com.intellij.psi.PsiFile
 import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
+import org.eclipse.lsp4j.CompletionItem
+import org.eclipse.lsp4j.CompletionItemKind
+import javax.swing.Icon
 
 /**
  * Configuration descriptor that defines how the JetBrains LSP client communicates with the Dart Bridge server.
@@ -115,7 +119,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 LspGoToDefinitionDisabled
             }
         override val goToTypeDefinitionCustomizer = LspGoToTypeDefinitionSupport()
-        override val completionCustomizer = LspCompletionDisabled
+        override val completionCustomizer: LspCompletionCustomizer
+            get() = if (DartAnalysisServerService.isLspCompletionEnabled(project)) {
+                DartLspCompletionSupport()
+            } else {
+                LspCompletionDisabled
+            }
         override val semanticTokensCustomizer = LspSemanticTokensDisabled
         override val diagnosticsCustomizer = LspDiagnosticsDisabled
         override val codeActionsCustomizer = LspCodeActionsDisabled
@@ -160,5 +169,13 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val selectionRangeCustomizer = LspSelectionRangeDisabled
         override val codeLensCustomizer = LspCodeLensDisabled
         override val renameCustomizer = LspRenameDisabled
+    }
+}
+
+open class DartLspCompletionSupport : LspCompletionSupport() {
+    public override fun getIcon(item: CompletionItem): Icon? = when (item.kind) {
+        CompletionItemKind.Constructor -> AllIcons.Nodes.ClassInitializer
+        CompletionItemKind.Function -> AllIcons.Nodes.Lambda
+        else -> super.getIcon(item)
     }
 }
