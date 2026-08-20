@@ -1063,17 +1063,6 @@ public class RequestUtilities {
     if (lspCapabilities != null) {
       params.add("lspCapabilities", buildJsonElement(lspCapabilities));
     }
-
-    JsonObject textDocument = new JsonObject();
-
-    JsonObject definition = new JsonObject();
-    definition.addProperty("linkSupport", true);
-    textDocument.add("definition", definition);
-
-    lspCapabilities.add("textDocument", textDocument);
-
-    params.add("lspCapabilities", lspCapabilities);
-
     return buildJsonObjectRequest(idValue, METHOD_SERVER_SET_CAPABILITIES, params);
   }
 

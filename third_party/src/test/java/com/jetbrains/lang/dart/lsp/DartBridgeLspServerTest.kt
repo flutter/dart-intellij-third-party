@@ -528,6 +528,20 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(true, lspCapabilities.get("testCap").asBoolean)
     }
 
+    fun testBuildLspCapabilitiesIncludesCompletion() {
+        val lspCapabilities = DartAnalysisServerService.buildLspCapabilities("3.8.0")
+        val textDocument = lspCapabilities.getAsJsonObject("textDocument")
+        assertNotNull(textDocument)
+        val completion = textDocument.getAsJsonObject("completion")
+        assertNotNull(completion)
+        val completionItem = completion.getAsJsonObject("completionItem")
+        assertNotNull(completionItem)
+        assertTrue(completionItem.get("snippetSupport").asBoolean)
+        assertTrue(completionItem.get("labelDetailsSupport").asBoolean)
+        assertTrue(completionItem.get("deprecatedSupport").asBoolean)
+        assertTrue(completionItem.get("insertReplaceSupport").asBoolean)
+    }
+
     fun testPublishDiagnosticsNotification() {
         val testFile = myFixture.addFileToProject(
             "lib/test.dart",

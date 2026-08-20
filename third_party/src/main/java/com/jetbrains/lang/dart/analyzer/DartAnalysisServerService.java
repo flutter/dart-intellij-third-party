@@ -580,6 +580,15 @@ public final class DartAnalysisServerService implements Disposable {
       textDocument.add("publishDiagnostics", publishDiagnostics);
     }
 
+    JsonObject completion = new JsonObject();
+    JsonObject completionItem = new JsonObject();
+    completionItem.addProperty("snippetSupport", true);
+    completionItem.addProperty("labelDetailsSupport", true);
+    completionItem.addProperty("deprecatedSupport", true);
+    completionItem.addProperty("insertReplaceSupport", true);
+    completion.add("completionItem", completionItem);
+    textDocument.add("completion", completion);
+
     lspCapabilities.add("textDocument", textDocument);
 
     return lspCapabilities;
