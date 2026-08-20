@@ -182,8 +182,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_FILE_URI_SDK_VERSION = "3.4.0";
   private static final String MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION = "3.8";
   public static final String MIN_LSP_NAVIGATION_SDK_VERSION = "3.14.0-65.0.dev";
-  // TODO(update when SDK version is available): update when Danny's publishDiagnostics change is rolled out to a named SDK version
-  public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-0.0.dev";
+  public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-137.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
