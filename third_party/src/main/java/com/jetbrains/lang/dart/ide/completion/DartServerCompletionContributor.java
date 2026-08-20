@@ -90,6 +90,10 @@ public final class DartServerCompletionContributor extends CompletionContributor
                  return;
                }
 
+               if (DartAnalysisServerService.isLspCompletionEnabled(project)) {
+                 return;
+               }
+
                VirtualFile file = DartResolveUtil.getRealVirtualFile(originalFile);
                if (file instanceof VirtualFileWindow) {
                  file = ((VirtualFileWindow)file).getDelegate();
@@ -366,6 +370,9 @@ public final class DartServerCompletionContributor extends CompletionContributor
 
   @Override
   public void beforeCompletion(@NotNull CompletionInitializationContext context) {
+    if (DartAnalysisServerService.isLspCompletionEnabled(context.getProject())) {
+      return;
+    }
     final PsiElement psiElement = context.getFile().findElementAt(context.getStartOffset());
     final PsiElement parent = psiElement != null ? psiElement.getParent() : null;
     if (parent instanceof DartStringLiteralExpression) {
