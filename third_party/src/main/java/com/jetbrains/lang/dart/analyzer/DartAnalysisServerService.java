@@ -591,6 +591,10 @@ public final class DartAnalysisServerService implements Disposable {
     return sdk != null && isDartSdkVersionSufficientForLspNavigation(sdk.getVersion());
   }
 
+  public static boolean isLspCompletionEnabled(final @NotNull Project project) {
+    return DartConfigurable.isExperimentalLspFeaturesEnabled(project);
+  }
+
   public boolean shouldUseCompletion2() {
     return StringUtil.compareVersionNumbers(getServerVersion(), COMPLETION_2_SERVER_VERSION) >= 0;
   }

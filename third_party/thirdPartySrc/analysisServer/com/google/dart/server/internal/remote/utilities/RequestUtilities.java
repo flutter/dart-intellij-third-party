@@ -1077,6 +1077,15 @@ public class RequestUtilities {
     definition.addProperty("linkSupport", true);
     textDocument.add("definition", definition);
 
+    JsonObject completion = new JsonObject();
+    JsonObject completionItem = new JsonObject();
+    completionItem.addProperty("snippetSupport", true);
+    completionItem.addProperty("labelDetailsSupport", true);
+    completionItem.addProperty("deprecatedSupport", true);
+    completionItem.addProperty("insertReplaceSupport", true);
+    completion.add("completionItem", completionItem);
+    textDocument.add("completion", completion);
+
     lspCapabilities.add("textDocument", textDocument);
 
     params.add("lspCapabilities", lspCapabilities);
