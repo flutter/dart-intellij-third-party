@@ -15,7 +15,11 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
+import org.dartlang.analysis.server.protocol.AnalysisError
+import org.dartlang.analysis.server.protocol.DiagnosticMessage
 import org.eclipse.lsp4j.DefinitionParams
+import org.eclipse.lsp4j.Diagnostic
+import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
@@ -77,6 +81,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     companion object {
         private val logger = PluginLogger.createLogger(DartBridgeLspServer::class.java)
         private const val LSP_MESSAGE_KEY = "lspMessage"
+        private const val LSP_NOTIFICATION_KEY = "lspNotification"
         private const val LSP_RESPONSE_KEY = "lspResponse"
         private const val JSONRPC_VERSION = "2.0"
         
@@ -108,7 +113,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     private fun setupDasResponseListener() {
         val listener = ResponseListener { response ->
             // Intercept only those responses that contain LSP payload keys.
-            if (!response.contains(LSP_MESSAGE_KEY) && !response.contains(LSP_RESPONSE_KEY)) {
+            if (!response.contains(LSP_MESSAGE_KEY) && !response.contains(LSP_RESPONSE_KEY) && !response.contains(LSP_NOTIFICATION_KEY)) {
                 return@ResponseListener
             }
 
@@ -134,8 +139,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         // Check if it's a notification from DAS.
         if (jsonObject.has("params")) {
             val params = jsonObject.get("params").asJsonObject
-            if (params.has(LSP_MESSAGE_KEY)) {
-                val msgObj = params.get(LSP_MESSAGE_KEY).asJsonObject
+            val msgObj = when {
+                params.has(LSP_NOTIFICATION_KEY) -> params.get(LSP_NOTIFICATION_KEY).asJsonObject
+                params.has(LSP_MESSAGE_KEY) -> params.get(LSP_MESSAGE_KEY).asJsonObject
+                else -> null
+            }
+            if (msgObj != null) {
                 val method = msgObj.getAsJsonPrimitive("method")?.asString
                 if (method != null) {
                     // Forward notification to client.
@@ -193,6 +202,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 val paramsObj = msgObj.get("params")
                 val params = GSON.fromJson(paramsObj, PublishDiagnosticsParams::class.java)
                 client.publishDiagnostics(params)
+                val errors = params.diagnostics?.map {
+                    DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, params.uri, it)
+                } ?: emptyList()
+                das.onLspDiagnosticsUpdated(params.uri, errors)
             } else {
                 logger.info("Ignored notification from DAS: $method")
             }
