@@ -450,6 +450,17 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(10, result[0].range.end.character)
     }
 
+    fun testIsDartSdkVersionSufficientForLspReferences() {
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("3.14.0-65.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("3.15.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("4.0.0"))
+
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("3.13.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("3.0.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("2.19.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("2.14.0"))
+    }
+
     private class MockLanguageClient : LanguageClient {
         var publishedDiagnostics: PublishDiagnosticsParams? = null
 
