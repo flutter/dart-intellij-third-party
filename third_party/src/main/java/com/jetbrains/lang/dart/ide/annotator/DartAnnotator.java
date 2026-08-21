@@ -195,10 +195,12 @@ public final class DartAnnotator implements Annotator {
       }
     }
 
-    processDartRegionsInRange(notYetAppliedErrors, element.getTextRange(), err -> {
-      VirtualFile vFile = element.getContainingFile().getVirtualFile();
-      createAnnotation(holder, err, new DartQuickFixSet(element.getManager(), vFile, err.getOffset(), err.getCode()));
-    });
+    if (!DartAnalysisServerService.isLspPublishDiagnosticsEnabled(element.getProject())) {
+      processDartRegionsInRange(notYetAppliedErrors, element.getTextRange(), err -> {
+        VirtualFile vFile = element.getContainingFile().getVirtualFile();
+        createAnnotation(holder, err, new DartQuickFixSet(element.getManager(), vFile, err.getOffset(), err.getCode()));
+      });
+    }
 
     processDartRegionsInRange(notYetAppliedHighlighting, element.getTextRange(), region -> {
       String attributeKey = HIGHLIGHTING_TYPE_MAP.get(region.getType());

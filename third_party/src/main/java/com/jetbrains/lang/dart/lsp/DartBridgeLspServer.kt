@@ -27,6 +27,7 @@ import org.dartlang.analysis.server.protocol.DiagnosticMessage
 import org.eclipse.lsp4j.ApplyWorkspaceEditParams
 import org.eclipse.lsp4j.ApplyWorkspaceEditResponse
 import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionOptions
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.DefinitionParams
@@ -247,7 +248,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setDefinitionProvider(true)
             setTypeDefinitionProvider(true)
             setDocumentHighlightProvider(true)
-            setCodeActionProvider(true)
+            setCodeActionProvider(CodeActionOptions().apply {
+                resolveProvider = true
+            })
             setExecuteCommandProvider(ExecuteCommandOptions())
             // Add other capabilities as we support them.
         }

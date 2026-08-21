@@ -386,6 +386,36 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(true, lspCapabilities.get("testCap").asBoolean)
     }
 
+    fun testBuildLspCapabilitiesWithCodeActions() {
+        val enabledCaps = DartAnalysisServerService.buildLspCapabilities("3.14.0", true, true)
+        val textDocEnabled = enabledCaps.getAsJsonObject("textDocument")
+        assertNotNull(textDocEnabled)
+        val codeAction = textDocEnabled.getAsJsonObject("codeAction")
+        assertNotNull("codeAction capabilities must be present when enabled", codeAction)
+        val literalSupport = codeAction.getAsJsonObject("codeActionLiteralSupport")
+        assertNotNull("codeActionLiteralSupport must be present", literalSupport)
+        val valueSet = literalSupport.getAsJsonObject("codeActionKind").getAsJsonArray("valueSet")
+        val kinds = valueSet.map { it.asString }
+        assertTrue(kinds.contains("quickfix"))
+        assertTrue(kinds.contains("refactor"))
+        assertTrue(kinds.contains("source.organizeImports"))
+        assertEquals(true, codeAction.get("dataSupport").asBoolean)
+        val resolveProps = codeAction.getAsJsonObject("resolveSupport").getAsJsonArray("properties").map { it.asString }
+        assertTrue(resolveProps.contains("edit"))
+
+        val disabledCaps = DartAnalysisServerService.buildLspCapabilities("3.14.0", true, false)
+        val textDocDisabled = disabledCaps.getAsJsonObject("textDocument")
+        assertFalse("codeAction capabilities should not be present when disabled", textDocDisabled.has("codeAction"))
+    }
+
+    fun testInitializeCapabilitiesIncludesCodeActionOptions() {
+        val initResult = bridgeServer.initialize(org.eclipse.lsp4j.InitializeParams()).get(5, TimeUnit.SECONDS)
+        val caProvider = initResult.capabilities.codeActionProvider
+        assertNotNull("codeActionProvider capability must be set", caProvider)
+        assertTrue("codeActionProvider should be Either.forRight(CodeActionOptions)", caProvider.isRight)
+        assertEquals(true, caProvider.right.resolveProvider)
+    }
+
     fun testPublishDiagnosticsNotification() {
         val testFile = myFixture.addFileToProject(
             "lib/test.dart",
