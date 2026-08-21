@@ -268,7 +268,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest<List<DocumentHighlight>>("textDocument/documentHighlight", params, type)
     }
 
-    override fun references(params: ReferenceParams?): CompletableFuture<List<Location>> {
+    override fun references(params: ReferenceParams): CompletableFuture<List<Location>> {
         val type = object: TypeToken<List<Location>>() {}.type
 
         return forwardRequest("textDocument/references", params, type)
