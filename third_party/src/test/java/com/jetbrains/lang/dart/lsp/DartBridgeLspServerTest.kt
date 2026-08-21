@@ -416,6 +416,12 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(true, caProvider.right.resolveProvider)
     }
 
+    fun testLspMethodExperimentalFeatures() {
+        val experimentalNames = LspMethod.getExperimentalFeatures().mapNotNull { it.presentableName }
+        assertTrue("Experimental features list should contain 'code actions'", experimentalNames.contains("code actions"))
+        assertTrue("Experimental features list should contain 'errors and warnings'", experimentalNames.contains("errors and warnings"))
+    }
+
     fun testPublishDiagnosticsNotification() {
         val testFile = myFixture.addFileToProject(
             "lib/test.dart",
