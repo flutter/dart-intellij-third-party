@@ -125,7 +125,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val commandsCustomizer = LspCommandsDisabled
         override val formattingCustomizer = LspFormattingDisabled
         override val findReferencesCustomizer: LspFindReferencesCustomizer
-            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+            get() = if (DartAnalysisServerService.isLspReferencesEnabled(project)) {
                 LspFindReferencesSupport()
             } else {
                 LspFindReferencesDisabled
