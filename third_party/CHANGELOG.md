@@ -5,6 +5,7 @@
 - Code completion with JetBrains LSP (experimental feature) (#399)
 
 ### Changed
+- Syntax highlighting implemented with JetBrains LSP as an experimental feature (#401)
 
 ### Removed
 
@@ -20,6 +21,9 @@
 - Quick fixes, assists, source actions, and refactorings via LSP code actions (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#526)
 
 ### Changed
+- Highlighting read vs write variable occurrences via LSP is now enabled for all users
+
+### Removed
 - Highlighting read vs write variable occurrences via LSP is now enabled for all users (#693)
 
 ### Fixed
