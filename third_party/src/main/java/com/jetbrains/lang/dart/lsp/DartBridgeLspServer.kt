@@ -33,6 +33,7 @@ import org.eclipse.lsp4j.CallHierarchyOutgoingCall
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionOptions
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.DefinitionParams
@@ -264,7 +265,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setTypeHierarchyProvider(true)
             setCallHierarchyProvider(true)
             setReferencesProvider(true)
-            setCodeActionProvider(true)
+            setCodeActionProvider(CodeActionOptions().apply {
+                resolveProvider = true
+            })
             setExecuteCommandProvider(ExecuteCommandOptions())
             // Add other capabilities as we support them.
         }
