@@ -36,6 +36,7 @@ import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionDisa
 import com.intellij.platform.dartlsp.api.customization.LspHoverCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspHoverDisabled
 import com.intellij.platform.dartlsp.api.customization.LspHoverSupport
+import com.intellij.platform.dartlsp.api.customization.LspInlayHintCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintDisabled
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
@@ -127,7 +128,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val documentColorCustomizer = LspDocumentColorDisabled
         override val documentLinkCustomizer = LspDocumentLinkDisabled
         override val foldingRangeCustomizer = LspFoldingRangeDisabled
-        override val inlayHintCustomizer = LspInlayHintDisabled
+        override val inlayHintCustomizer: LspInlayHintCustomizer
+            get() = if (DartAnalysisServerService.isLspInlayHintsEnabled(project)) {
+                DartLspInlayHintSupport()
+            } else {
+                LspInlayHintDisabled
+            }
         override val documentHighlightsCustomizer: LspDocumentHighlightsCustomizer
             get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
                 object : LspDocumentHighlightsSupport() {

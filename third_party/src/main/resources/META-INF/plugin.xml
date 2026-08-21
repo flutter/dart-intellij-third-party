@@ -162,6 +162,26 @@
                                           descriptionKey="dart.inlay.hints.closing.labels.description">
     </codeInsight.declarativeInlayProvider>
 
+    <codeInsight.declarativeInlayProvider language="Dart"
+                                          implementationClass="com.jetbrains.lang.dart.hints.DartParameterNamesInlayHintsProvider"
+                                          isEnabledByDefault="false"
+                                          group="PARAMETERS_GROUP"
+                                          providerId="dart.parameter.names"
+                                          bundle="messages.DartBundle"
+                                          nameKey="dart.inlay.hints.parameter.names.name"
+                                          descriptionKey="dart.inlay.hints.parameter.names.description">
+    </codeInsight.declarativeInlayProvider>
+
+    <codeInsight.declarativeInlayProvider language="Dart"
+                                          implementationClass="com.jetbrains.lang.dart.hints.DartTypesInlayHintsProvider"
+                                          isEnabledByDefault="false"
+                                          group="TYPES_GROUP"
+                                          providerId="dart.types"
+                                          bundle="messages.DartBundle"
+                                          nameKey="dart.inlay.hints.types.name"
+                                          descriptionKey="dart.inlay.hints.types.description">
+    </codeInsight.declarativeInlayProvider>
+
     <lang.surroundDescriptor language="Dart"
                              implementationClass="com.jetbrains.lang.dart.ide.surroundWith.DartExpressionSurroundDescriptor"/>
     <lang.surroundDescriptor language="Dart"
