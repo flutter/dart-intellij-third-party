@@ -35,6 +35,7 @@ import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
@@ -228,6 +229,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setHoverProvider(true)
             setDefinitionProvider(true)
             setDocumentHighlightProvider(true)
+            setReferencesProvider(true)
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -264,6 +266,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     override fun documentHighlight(params: DocumentHighlightParams): CompletableFuture<List<DocumentHighlight>> {
         val type = object : TypeToken<List<DocumentHighlight>>() {}.type
         return forwardRequest<List<DocumentHighlight>>("textDocument/documentHighlight", params, type)
+    }
+
+    override fun references(params: ReferenceParams): CompletableFuture<List<Location>> {
+        val type = object: TypeToken<List<Location>>() {}.type
+
+        return forwardRequest("textDocument/references", params, type)
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
