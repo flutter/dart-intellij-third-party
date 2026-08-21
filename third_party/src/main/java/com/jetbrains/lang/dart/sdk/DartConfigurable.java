@@ -534,10 +534,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
   }
 
   public static boolean isLspCodeActionsEnabled(@NotNull Project project) {
-    if (!isExperimentalLspFeaturesEnabled(project)) return false;
-    final DartSdk sdk = DartSdk.getDartSdk(project);
-    if (sdk == null) return false;
-    return DartAnalysisServerService.isDartSdkVersionSufficientForLspCodeActions(sdk.getVersion());
+    return DartAnalysisServerService.isLspCodeActionsEnabled(project);
   }
 
   public static void setExperimentalLspFeaturesEnabled(@NotNull Project project, boolean enabled) {
