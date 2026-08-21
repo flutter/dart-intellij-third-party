@@ -301,10 +301,8 @@ public final class DartAnnotator implements Annotator {
     if (error.getCode() != null) {
       builder = builder.problemGroup(quickFixSet.getProblemGroup());
     }
-    if (!DartConfigurable.isLspCodeActionsEnabled(holder.getCurrentAnnotationSession().getFile().getProject())) {
-      for (DartQuickFix fix : quickFixSet.getQuickFixes()) {
-        builder = builder.withFix(fix);
-      }
+    for (DartQuickFix fix : quickFixSet.getQuickFixes()) {
+      builder = builder.withFix(fix);
     }
     builder.create();
   }
