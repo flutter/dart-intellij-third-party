@@ -15,7 +15,7 @@ enum class LspMethod(
     DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = true, presentableName = "read/write highlighting"),
     HOVER("textDocument/hover", isExperimental = true, presentableName = "hover"),
     INITIALIZE("initialize"),
-    INLAY_HINT("textDocument/inlayHint", isExperimental = true, presentableName = "inlay hints"),
+    INLAY_HINT("textDocument/inlayHint"),
     SHUTDOWN("shutdown");
 
     companion object {

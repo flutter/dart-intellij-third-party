@@ -1,7 +1,7 @@
 ## Unreleased
 
 ### Added
-- Inlay hints for types and parameter names (JetBrains LSP, experimental feature; requires Dart SDK 3.14.0-139.0.dev or newer) (#617)
+- Inlay hints for types and parameter names, configurable in Settings | Editor | Inlay Hints (JetBrains LSP; requires Dart SDK 3.14.0-139.0.dev or newer) (#617)
 
 ### Changed
 
