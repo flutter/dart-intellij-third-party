@@ -188,8 +188,10 @@ public final class DartAnnotator implements Annotator {
           notYetAppliedErrors.sort(Comparator.comparingInt(DartServerData.DartError::getOffset));
           ensureNoErrorsAfterEOF(notYetAppliedErrors, element.getContainingFile().getTextLength());
 
-          notYetAppliedHighlighting.addAll(service.getHighlight(vFile));
-          notYetAppliedHighlighting.sort(Comparator.comparingInt(DartServerData.DartHighlightRegion::getOffset));
+          if (!DartAnalysisServerService.isLspHighlightingEnabled(element.getProject())) {
+            notYetAppliedHighlighting.addAll(service.getHighlight(vFile));
+            notYetAppliedHighlighting.sort(Comparator.comparingInt(DartServerData.DartHighlightRegion::getOffset));
+          }
         }
       }
     }
