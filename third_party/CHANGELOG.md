@@ -3,6 +3,7 @@
 ### Added
 
 ### Changed
+- Syntax highlighting implemented with JetBrains LSP as an experimental feature (requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Removed
 
@@ -39,6 +40,9 @@
 - Quick fixes, assists, source actions, and refactorings via LSP code actions (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#526)
 
 ### Changed
+- Highlighting read vs write variable occurrences via LSP is now enabled for all users
+
+### Removed
 - Highlighting read vs write variable occurrences via LSP is now enabled for all users (#693)
 
 ### Fixed
@@ -106,6 +110,7 @@
 ### Added
 
 ### Changed
+- Syntax highlighting implemented with JetBrains LSP as an experimental feature (requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Removed
 
@@ -119,6 +124,7 @@
 - Retrieving diagnostics server with lsp4ij (#391)
 
 ### Changed
+- Syntax highlighting implemented with JetBrains LSP as an experimental feature (requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Removed
 
@@ -138,6 +144,7 @@
 - Dependency on lsp4ij with basic initialization (#348)
 
 ### Changed
+- Syntax highlighting implemented with JetBrains LSP as an experimental feature (requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Removed
 
