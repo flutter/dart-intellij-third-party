@@ -440,6 +440,67 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("Resolved Docs", result.documentation.right.value)
     }
 
+    fun testCompletionResolveRequestWithNullResult() {
+        val unresolved = CompletionItem().apply {
+            label = "unresolvedItem"
+            detail = "Original Detail"
+        }
+
+        val future = bridgeServer.resolveCompletionItem(unresolved)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals("unresolvedItem", result.label)
+        assertEquals("Original Detail", result.detail)
+    }
+
+    fun testCompletionResolveRequestWithErrorResponse() {
+        val unresolved = CompletionItem().apply {
+            label = "unresolvedItem"
+            detail = "Original Detail"
+        }
+
+        val future = bridgeServer.resolveCompletionItem(unresolved)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32603,
+                    "message": "Internal error"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals("unresolvedItem", result.label)
+        assertEquals("Original Detail", result.detail)
+    }
+
     fun testCompletionRequestWithErrorResponse() {
         val params = CompletionParams().apply {
             textDocument = TextDocumentIdentifier("file://test.dart")

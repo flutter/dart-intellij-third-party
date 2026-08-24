@@ -370,7 +370,8 @@ public final class DartServerCompletionContributor extends CompletionContributor
 
   @Override
   public void beforeCompletion(@NotNull CompletionInitializationContext context) {
-    if (DartAnalysisServerService.isLspCompletionEnabled(context.getProject())) {
+    if (DartAnalysisServerService.isLspCompletionEnabled(context.getProject()) &&
+        !(context.getFile() instanceof DartExpressionCodeFragment)) {
       return;
     }
     final PsiElement psiElement = context.getFile().findElementAt(context.getStartOffset());

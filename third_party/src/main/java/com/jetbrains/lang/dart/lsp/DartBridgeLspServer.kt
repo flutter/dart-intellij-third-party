@@ -306,7 +306,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     override fun resolveCompletionItem(unresolved: CompletionItem): CompletableFuture<CompletionItem> {
-        return forwardRequest("completionItem/resolve", unresolved, CompletionItem::class.java).exceptionally { e ->
+        return forwardRequest("completionItem/resolve", unresolved, CompletionItem::class.java).thenApply { resolved ->
+            resolved ?: unresolved
+        }.exceptionally { e ->
             logger.info("completionItem/resolve failed: ${e.message}")
             unresolved
         }
