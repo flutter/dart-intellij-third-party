@@ -24,7 +24,9 @@ import com.intellij.platform.dartlsp.api.customization.LspCodeLensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCommandsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCommandsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCommandsSupport
+import com.intellij.platform.dartlsp.api.customization.LspCompletionCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCompletionDisabled
+import com.intellij.platform.dartlsp.api.customization.LspCompletionSupport
 import com.intellij.platform.dartlsp.api.customization.LspCustomization
 import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsDisabled
