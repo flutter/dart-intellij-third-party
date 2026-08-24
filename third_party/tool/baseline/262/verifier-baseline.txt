@@ -1,9 +1,3 @@
-* 
-*     com.jetbrains.lang.dart.ide.structure.DartStructureViewElement
-*     com.jetbrains.lang.dart.ide.structure.DartStructureViewElement.<init>(PsiFile psiFile, Outline outline)
-*     com.jetbrains.lang.dart.ide.structure.DartStructureViewModel.DartStructureViewRootElement
-*     com.jetbrains.lang.dart.ide.structure.DartStructureViewModel.DartStructureViewRootElement.<init>(PsiFile file)
-*   Class com.intellij.ide.structureView.impl.common.PsiTreeElementBase is referenced in
 * Deprecated constructor com.intellij.codeInsight.template.TemplateContextType.<init>(java.lang.String id, java.lang.String presentableName, java.lang.Class baseContextType) is invoked in com.jetbrains.lang.dart.ide.template.DartTemplateContextType.<init>(String, String, Class)
 * Deprecated constructor com.intellij.execution.configuration.EnvironmentVariablesComponent.<init>() is invoked in com.jetbrains.lang.dart.ide.runner.server.ui.DartCommandLineConfigurationEditorForm.$$$setupUI$$$() : void
 * Deprecated constructor com.intellij.execution.configuration.EnvironmentVariablesComponent.<init>() is invoked in com.jetbrains.lang.dart.ide.runner.test.ui.DartTestConfigurationEditorForm.$$$setupUI$$$() : void
@@ -13,8 +7,8 @@
 * Deprecated method com.google.dart.server.generated.AnalysisServer.analysis_updateOptions(org.dartlang.analysis.server.protocol.AnalysisOptions arg0) : void is overridden in class com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 * Deprecated method com.google.dart.server.generated.AnalysisServer.completion_registerLibraryPaths(java.util.List arg0) : void is overridden in class com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 * Deprecated method com.google.dart.server.generated.AnalysisServer.execution_setSubscriptions(java.util.List arg0) : void is overridden in class com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
-* Deprecated method com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.restart() : void is invoked in com.jetbrains.lang.dart.analyzer.DartServerData.lambda$forceFileAnnotation$0(Project) : void
-* Deprecated method com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.restart() : void is invoked in com.jetbrains.lang.dart.sdk.DartConfigurable.lambda$apply$0(boolean) : void
+* Deprecated method com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.restart() : void is invoked in com.jetbrains.lang.dart.analyzer.DartServerData.lambda$forceFileAnnotation$5(Project) : void
+* Deprecated method com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.restart() : void is invoked in com.jetbrains.lang.dart.sdk.DartConfigurable.lambda$apply$6(boolean) : void
 * Deprecated method com.intellij.openapi.application.ActionsKt.runReadAction(kotlin.jvm.functions.Function0 runnable) : T is invoked in com.jetbrains.lang.dart.lsp.DartBridgeLspServer.forwardRequest(String, Object, Type) : CompletableFuture
 * Deprecated method com.intellij.openapi.application.ActionsKt.runReadAction(kotlin.jvm.functions.Function0 runnable) : T is invoked in com.jetbrains.lang.dart.lsp.DartLspDiagnosticConverter.resolveLocation(Project, DartAnalysisServerService, String, Range) : Location
 * Deprecated method com.intellij.openapi.application.ReadAction.compute(com.intellij.openapi.util.ThrowableComputable action) : T is invoked in com.jetbrains.lang.dart.ide.findUsages.DartServerFindUsagesHandler.processElementUsages(PsiElement, Processor, FindUsagesOptions) : boolean
@@ -51,7 +45,3 @@
 * Internal method com.intellij.util.net.NetKt.loopbackSocketAddress(int port) : java.net.InetSocketAddress is invoked in com.jetbrains.lang.dart.pubServer.PubServerService.connectToProcess(AsyncPromise, int, OSProcessHandler, Consumer) : void. This method is marked with @org.jetbrains.annotations.ApiStatus.Internal annotation or @com.intellij.openapi.util.IntellijInternalApi annotation and indicates that the method is not supposed to be used in client code.
 * Internal method com.intellij.util.PlatformUtils.getPlatformPrefix() : java.lang.String is invoked in com.jetbrains.lang.dart.sdk.DartSdkLibUtil.isIdeWithMultipleModuleSupport() : boolean. This method is marked with @org.jetbrains.annotations.ApiStatus.Internal annotation or @com.intellij.openapi.util.IntellijInternalApi annotation and indicates that the method is not supposed to be used in client code.
 * Internal method com.intellij.util.PlatformUtils.isIntelliJ() : boolean is invoked in com.jetbrains.lang.dart.sdk.DartSdkLibUtil.isIdeWithMultipleModuleSupport() : boolean. This method is marked with @org.jetbrains.annotations.ApiStatus.Internal annotation or @com.intellij.openapi.util.IntellijInternalApi annotation and indicates that the method is not supposed to be used in client code.
-* It is also possible, however, that this package was actually removed from a dependency causing the detected problems. Access to unresolved classes at runtime may lead to **NoSuchClassError**.
-* Package 'com.intellij.ide.structureView.impl.common' is not found along with its class com.intellij.ide.structureView.impl.common.PsiTreeElementBase.
-* Probably the package 'com.intellij.ide.structureView.impl.common' belongs to a library or dependency that is not resolved by the checker.
-* The following classes of 'com.intellij.ide.structureView.impl.common' are not resolved:
