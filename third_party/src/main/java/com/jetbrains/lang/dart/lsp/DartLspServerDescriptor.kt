@@ -20,7 +20,9 @@ import com.intellij.platform.dartlsp.api.customization.LspCallHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspCodeActionsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCodeLensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCommandsDisabled
+import com.intellij.platform.dartlsp.api.customization.LspCompletionCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCompletionDisabled
+import com.intellij.platform.dartlsp.api.customization.LspCompletionSupport
 import com.intellij.platform.dartlsp.api.customization.LspCustomization
 import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentColorDisabled
