@@ -5,6 +5,7 @@
 - Go to Type Declaration implemented with JetBrains LSP (#615)
 
 ### Changed
+- Diagnostics server port retrieval via LSP has passed the experimental phase and is now enabled for all users with an appropriate SDK
 
 ### Removed
 
