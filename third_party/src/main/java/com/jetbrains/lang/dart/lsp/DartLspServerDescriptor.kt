@@ -14,12 +14,18 @@ import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
+import com.intellij.platform.dartlsp.api.customization.LspCodeActionsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCodeActionsDisabled
+import com.intellij.platform.dartlsp.api.customization.LspCodeActionsSupport
 import com.intellij.platform.dartlsp.api.customization.LspCodeLensDisabled
+import com.intellij.platform.dartlsp.api.customization.LspCommandsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCommandsDisabled
+import com.intellij.platform.dartlsp.api.customization.LspCommandsSupport
 import com.intellij.platform.dartlsp.api.customization.LspCompletionDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCustomization
+import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsDisabled
+import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsSupport
 import com.intellij.platform.dartlsp.api.customization.LspDocumentColorDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsDisabled
@@ -111,9 +117,24 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val goToTypeDefinitionCustomizer = LspGoToTypeDefinitionSupport()
         override val completionCustomizer = LspCompletionDisabled
         override val semanticTokensCustomizer = LspSemanticTokensDisabled
-        override val diagnosticsCustomizer = LspDiagnosticsDisabled
-        override val codeActionsCustomizer = LspCodeActionsDisabled
-        override val commandsCustomizer = LspCommandsDisabled
+        override val diagnosticsCustomizer: LspDiagnosticsCustomizer
+            get() = if (DartAnalysisServerService.isLspPublishDiagnosticsEnabled(project)) {
+                LspDiagnosticsSupport()
+            } else {
+                LspDiagnosticsDisabled
+            }
+        override val codeActionsCustomizer: LspCodeActionsCustomizer
+            get() = if (DartConfigurable.isLspCodeActionsEnabled(project)) {
+                LspCodeActionsSupport()
+            } else {
+                LspCodeActionsDisabled
+            }
+        override val commandsCustomizer: LspCommandsCustomizer
+            get() = if (DartConfigurable.isLspCodeActionsEnabled(project)) {
+                LspCommandsSupport()
+            } else {
+                LspCommandsDisabled
+            }
         override val formattingCustomizer = LspFormattingDisabled
         override val findReferencesCustomizer = LspFindReferencesDisabled
         override val optimizeImportsCustomizer = LspOptimizeImportsDisabled
