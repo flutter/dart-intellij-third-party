@@ -3,31 +3,20 @@ package com.jetbrains.lang.dart.ide.documentation;
 
 import com.intellij.lang.documentation.DocumentationProvider;
 import com.intellij.navigation.NavigationItem;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
-import com.intellij.psi.PsiReference;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.jetbrains.lang.dart.analytics.Analytics;
-import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
-import com.jetbrains.lang.dart.analytics.AnalyticsData;
-import com.jetbrains.lang.dart.analytics.LegacyHoverData;
-import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.completion.DartLookupObject;
-import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.psi.DartComponent;
 import com.jetbrains.lang.dart.psi.DartFactoryConstructorDeclaration;
-import com.jetbrains.lang.dart.psi.DartId;
 import com.jetbrains.lang.dart.psi.DartNamedConstructorDeclaration;
-import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
-import org.dartlang.analysis.server.protocol.HoverInformation;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,55 +25,11 @@ import java.util.Collections;
 import java.util.List;
 
 public final class DartDocumentationProvider implements DocumentationProvider {
-  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartDocumentationProvider.class);
   private static final String BASE_DART_DOC_URL = "https://api.dart.dev/stable/";
 
   @Override
   public @Nls String generateDoc(final @NotNull PsiElement element, final @Nullable PsiElement originalElement) {
-    if (DartConfigurable.isExperimentalLspFeaturesEnabled(element.getProject())) {
-      return null;
-    }
-    long startTime = System.currentTimeMillis();
-    // in case of code completion 'element' comes from completion list and has nothing to do with 'originalElement',
-    // but for Quick Doc in editor we should prefer building docs for 'originalElement' because such doc has info about propagated type
-    final PsiElement elementForDocs = resolvesTo(originalElement, element) ? originalElement : element;
-    final HoverInformation hover = getSingleHover(elementForDocs);
-    String result = null;
-    if (hover != null) {
-      result = generateDocServer(element.getProject(), hover);
-    } else {
-      result = DartDocUtil.generateDoc(element);
-    }
-    recordHoverTiming(startTime, "generateDoc", element.getProject());
-
-    return result;
-  }
-
-  private static void recordHoverTiming(long startTime, @NotNull String actionName, @NotNull Project project) {
-    long durationMs = System.currentTimeMillis() - startTime;
-    LOG.info("Hover " + actionName + " end-to-end took " + durationMs + "ms");
-
-    LegacyHoverData hoverData = AnalyticsData.forLegacyHover("dart.legacy_hover." + actionName, project);
-    hoverData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
-    Analytics.report(hoverData);
-  }
-
-  private static boolean resolvesTo(final @Nullable PsiElement originalElement, final @NotNull PsiElement target) {
-    final PsiReference reference;
-
-    if (originalElement instanceof PsiReference) {
-      reference = (PsiReference)originalElement;
-    }
-    else {
-      final PsiElement parent = originalElement == null ? null : originalElement.getParent();
-      final PsiElement parentParent = parent instanceof DartId ? parent.getParent() : null;
-      if (parentParent == null) return false;
-      if (parentParent == target) return true;
-      if (!parentParent.getText().equals(target.getText())) return false;
-      reference = parentParent.getReference();
-    }
-
-    return reference != null && reference.resolve() == target;
+    return null;
   }
 
   @Override
@@ -94,21 +39,7 @@ public final class DartDocumentationProvider implements DocumentationProvider {
 
   @Override
   public @Nls String getQuickNavigateInfo(final PsiElement element, final PsiElement originalElement) {
-    if (DartConfigurable.isExperimentalLspFeaturesEnabled(element.getProject())) {
-      return null;
-    }
-    long startTime = System.currentTimeMillis();
-    final PsiElement elementForInfo = resolvesTo(originalElement, element) ? originalElement : element;
-    final HoverInformation hover = getSingleHover(elementForInfo);
-    String result = null;
-    if (hover != null) {
-      result = buildHoverTextServer(elementForInfo.getProject(), hover);
-    } else {
-      result = DartDocUtil.getSignature(element);
-    }
-    recordHoverTiming(startTime, "getQuickNavigateInfo", elementForInfo.getProject());
-
-    return result;
+    return null;
   }
 
   @Override
@@ -122,33 +53,6 @@ public final class DartDocumentationProvider implements DocumentationProvider {
 
     final String docUrl = constructDocUrl(component);
     return docUrl == null ? null : Collections.singletonList(docUrl);
-  }
-
-  public static @NotNull @Nls String buildHoverTextServer(@NotNull Project project, @NotNull HoverInformation hover) {
-    final String elementDescription = StringUtil.trim(hover.getElementDescription());
-    final String staticType = elementDescription == null || elementDescription.equals(hover.getStaticType()) ? null : hover.getStaticType();
-    final String containingLibraryName = StringUtil.trim(hover.getContainingLibraryName());
-    return DartDocUtil.generateDoc(project, elementDescription, false, null, containingLibraryName, null, staticType, true);
-  }
-
-  public static @NotNull @Nls String generateDocServer(@NotNull Project project, @NotNull HoverInformation hover) {
-    final String elementDescription = StringUtil.trim(hover.getElementDescription());
-    final String containingLibraryName = StringUtil.trim(hover.getContainingLibraryName());
-    final String containingClassDescription = StringUtil.trim(hover.getContainingClassDescription());
-    final String staticType = StringUtil.trim(hover.getStaticType());
-    final String docText = StringUtil.trim(hover.getDartdoc());
-    return DartDocUtil
-      .generateDoc(project, elementDescription, false, docText, containingLibraryName, containingClassDescription, staticType, false);
-  }
-
-  public static @Nullable HoverInformation getSingleHover(final @NotNull PsiFile psiFile, final int offset) {
-    VirtualFile file = psiFile.getVirtualFile();
-    final List<HoverInformation> hoverList =
-      file != null ? DartAnalysisServerService.getInstance(psiFile.getProject()).analysis_getHover(file, offset) : Collections.emptyList();
-    if (hoverList.isEmpty()) {
-      return null;
-    }
-    return hoverList.getFirst();
   }
 
   private static @Nullable String constructDocUrl(final @NotNull DartComponent component) {
@@ -206,15 +110,6 @@ public final class DartDocumentationProvider implements DocumentationProvider {
       }
     }
 
-    return null;
-  }
-
-  private static @Nullable HoverInformation getSingleHover(final PsiElement element) {
-    final PsiFile psiFile = element == null ? null : element.getContainingFile();
-    if (psiFile != null) {
-      final int offset = element.getTextOffset();
-      return getSingleHover(psiFile, offset);
-    }
     return null;
   }
 }

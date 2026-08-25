@@ -33,8 +33,6 @@ import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionCustomiz
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionDisabled
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionSupport
 import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionSupport
-import com.intellij.platform.dartlsp.api.customization.LspHoverCustomizer
-import com.intellij.platform.dartlsp.api.customization.LspHoverDisabled
 import com.intellij.platform.dartlsp.api.customization.LspHoverSupport
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintDisabled
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
@@ -102,12 +100,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         }
 
     override val lspCustomization: LspCustomization = object : LspCustomization() {
-        override val hoverCustomizer: LspHoverCustomizer
-            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-                LspHoverSupport()
-            } else {
-                LspHoverDisabled
-            }
+        override val hoverCustomizer = LspHoverSupport()
         
         override val goToDefinitionCustomizer: LspGoToDefinitionCustomizer
             get() = if (DartAnalysisServerService.isLspNavigationEnabled(project)) {

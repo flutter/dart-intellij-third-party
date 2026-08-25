@@ -6,6 +6,7 @@
 
 ### Changed
 - Diagnostics server port retrieval via LSP has passed the experimental phase and is now enabled for all users with an appropriate SDK
+- Hover via LSP is now enabled for all users (#626)
 
 ### Removed
 

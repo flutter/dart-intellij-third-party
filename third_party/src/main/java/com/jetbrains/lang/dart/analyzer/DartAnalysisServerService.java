@@ -13,7 +13,6 @@ import com.google.dart.server.FindElementReferencesConsumer;
 import com.google.dart.server.FormatConsumer;
 import com.google.dart.server.GetAssistsConsumer;
 import com.google.dart.server.GetFixesConsumer;
-import com.google.dart.server.GetHoverConsumer;
 import com.google.dart.server.GetImportedElementsConsumer;
 import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
@@ -121,7 +120,6 @@ import org.dartlang.analysis.server.protocol.CompletionService;
 import org.dartlang.analysis.server.protocol.CompletionSuggestion;
 import org.dartlang.analysis.server.protocol.Element;
 import org.dartlang.analysis.server.protocol.HighlightRegion;
-import org.dartlang.analysis.server.protocol.HoverInformation;
 import org.dartlang.analysis.server.protocol.ImplementedClass;
 import org.dartlang.analysis.server.protocol.ImplementedMember;
 import org.dartlang.analysis.server.protocol.ImportedElements;
@@ -191,7 +189,6 @@ public final class DartAnalysisServerService implements Disposable {
   private static final long EDIT_FORMAT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
   private static final long EDIT_ORGANIZE_DIRECTIVES_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(300);
   private static final long EDIT_SORT_MEMBERS_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
-  private static final long GET_HOVER_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_NAVIGATION_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_ASSISTS_TIMEOUT_EDT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long GET_ASSISTS_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(1000);
@@ -1241,39 +1238,6 @@ public final class DartAnalysisServerService implements Disposable {
     if (myInitializationOnServerStartupDone) {
       DartProblemsView.getInstance(myProject).clearAll();
     }
-  }
-
-  public @NotNull List<HoverInformation> analysis_getHover(final @NotNull VirtualFile file, final int _offset) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return HoverInformation.EMPTY_LIST;
-    }
-
-    final String fileUri = getFileUri(file);
-    final List<HoverInformation> result = new ArrayList<>();
-
-    final CountDownLatch latch = new CountDownLatch(1);
-    final int offset = getOriginalOffset(file, _offset);
-    server.analysis_getHover(fileUri, offset, new GetHoverConsumer() {
-      @Override
-      public void computedHovers(HoverInformation[] hovers) {
-        Collections.addAll(result, hovers);
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(RequestError error) {
-        logError("analysis_getHover()", fileUri, error);
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_HOVER_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("analysis_getHover", GET_HOVER_TIMEOUT, fileUri);
-    }
-    return result;
   }
 
   public @Nullable List<DartServerData.DartNavigationRegion> analysis_getNavigation(final @NotNull VirtualFile file,
