@@ -8,19 +8,27 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
+import com.intellij.platform.dartlsp.impl.features.hierarchy.type.LspTypeHierarchyBrowser;
+import com.intellij.platform.dartlsp.impl.features.hierarchy.type.LspTypeHierarchyProvider;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiTreeUtil;
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.psi.DartReference;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public final class DartTypeHierarchyProvider implements HierarchyProvider {
+  private final HierarchyProvider myLspProvider = new LspTypeHierarchyProvider();
+
   @Override
-  public @Nullable DartClass getTarget(final @NotNull DataContext dataContext) {
+  public @Nullable PsiElement getTarget(final @NotNull DataContext dataContext) {
     final Project project = CommonDataKeys.PROJECT.getData(dataContext);
+    if (project != null && DartAnalysisServerService.isLspTypeHierarchyEnabled(project)) {
+      return myLspProvider.getTarget(dataContext);
+    }
     final Editor editor = CommonDataKeys.EDITOR.getData(dataContext);
     if (project == null || editor == null) return null;
 
@@ -35,11 +43,18 @@ public final class DartTypeHierarchyProvider implements HierarchyProvider {
 
   @Override
   public @NotNull HierarchyBrowser createHierarchyBrowser(@NotNull PsiElement target) {
+    if (DartAnalysisServerService.isLspTypeHierarchyEnabled(target.getProject())) {
+      return myLspProvider.createHierarchyBrowser(target);
+    }
     return new DartTypeHierarchyBrowser(target.getProject(), (DartClass)target);
   }
 
   @Override
   public void browserActivated(final @NotNull HierarchyBrowser hierarchyBrowser) {
+    if (hierarchyBrowser instanceof LspTypeHierarchyBrowser) {
+      myLspProvider.browserActivated(hierarchyBrowser);
+      return;
+    }
     ((DartTypeHierarchyBrowser)hierarchyBrowser).changeView(TypeHierarchyBrowserBase.getTypeHierarchyType());
   }
 }

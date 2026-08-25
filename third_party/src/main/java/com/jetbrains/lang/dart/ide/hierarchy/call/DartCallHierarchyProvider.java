@@ -4,25 +4,43 @@ package com.jetbrains.lang.dart.ide.hierarchy.call;
 import com.intellij.ide.hierarchy.CallHierarchyBrowserBase;
 import com.intellij.ide.hierarchy.HierarchyBrowser;
 import com.intellij.ide.hierarchy.HierarchyProvider;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.project.Project;
+import com.intellij.platform.dartlsp.impl.features.hierarchy.call.LspCallHierarchyBrowser;
+import com.intellij.platform.dartlsp.impl.features.hierarchy.call.LspCallHierarchyProvider;
 import com.intellij.psi.PsiElement;
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public final class DartCallHierarchyProvider implements HierarchyProvider {
+  private final HierarchyProvider myLspProvider = new LspCallHierarchyProvider();
+
   @Override
   public @Nullable PsiElement getTarget(@NotNull DataContext dataContext) {
+    final Project project = CommonDataKeys.PROJECT.getData(dataContext);
+    if (project != null && DartAnalysisServerService.isLspCallHierarchyEnabled(project)) {
+      return myLspProvider.getTarget(dataContext);
+    }
     return DartHierarchyUtil.getResolvedElementAtCursor(dataContext);
   }
 
   @Override
   public @NotNull HierarchyBrowser createHierarchyBrowser(@NotNull PsiElement target) {
+    if (DartAnalysisServerService.isLspCallHierarchyEnabled(target.getProject())) {
+      return myLspProvider.createHierarchyBrowser(target);
+    }
     return new DartCallHierarchyBrowser(target.getProject(), target);
   }
 
   @Override
   public void browserActivated(@NotNull HierarchyBrowser hierarchyBrowser) {
+    if (hierarchyBrowser instanceof LspCallHierarchyBrowser) {
+      myLspProvider.browserActivated(hierarchyBrowser);
+      return;
+    }
     ((DartCallHierarchyBrowser)hierarchyBrowser).changeView(CallHierarchyBrowserBase.getCallerType());
   }
 }
