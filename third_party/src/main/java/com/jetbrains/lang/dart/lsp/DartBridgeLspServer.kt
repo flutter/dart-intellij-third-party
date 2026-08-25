@@ -112,13 +112,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     private var client: LanguageClient? = null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
-    private var responseListener: ResponseListener? = null
+    private var dasMessageListener: ResponseListener? = null
 
     private val das: DartAnalysisServerService
         get() = DartAnalysisServerService.getInstance(project)
 
     init {
-        setupDasResponseListener()
+        setupDasMessageListener()
     }
 
     override fun connect(client: LanguageClient) {
@@ -127,36 +127,35 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     /**
-     * Sets up a listener on the legacy Dart Analysis Server (DAS) to intercept responses 
-     * and notifications sent back to requests originating from the client.
+     * Sets up a listener on the legacy Dart Analysis Server (DAS) to intercept messages
+     * (responses, notifications, and reverse requests) containing LSP payloads.
      */
-    private fun setupDasResponseListener() {
-        val listener = ResponseListener { response ->
-            // Intercept only those responses that contain LSP payload keys.
-            if (!response.contains(LSP_MESSAGE_KEY) && !response.contains(LSP_RESPONSE_KEY) && !response.contains(LSP_NOTIFICATION_KEY)) {
+    private fun setupDasMessageListener() {
+        val listener = ResponseListener { rawMessage ->
+            // Intercept only those messages that contain LSP payload keys.
+            if (!rawMessage.contains(LSP_MESSAGE_KEY) && !rawMessage.contains(LSP_RESPONSE_KEY) && !rawMessage.contains(LSP_NOTIFICATION_KEY)) {
                 return@ResponseListener
             }
 
             try {
-                val jsonObject = JsonParser.parseString(response).asJsonObject
-                handleDasResponse(jsonObject)
+                val jsonObject = JsonParser.parseString(rawMessage).asJsonObject
+                handleDasMessage(jsonObject)
             } catch (e: Exception) {
-                logger.error("Error handling DAS response", e)
+                logger.error("Error handling DAS message", e)
             }
         }
-        this.responseListener = listener
+        this.dasMessageListener = listener
         das.addResponseListener(listener)
     }
 
     /**
-     * Processes raw JSON responses from the Dart Analysis Server.
+     * Processes raw JSON messages from the Dart Analysis Server.
      * Depending on the payload, it either:
-     * 1. Forwards server notifications (e.g. publishDiagnostics) directly to the LSP client.
-     * 2. Unwraps successful LSP responses (e.g. hover/completion results) or exceptional 
-     *    LSP errors to resolve the matching pending request future.
+     * 1. Forwards server-initiated messages (e.g. publishDiagnostics, applyEdit) directly to the LSP client.
+     * 2. Resolves matching pending request futures for client-initiated requests (e.g. hover, codeAction).
      */
-    private fun handleDasResponse(jsonObject: JsonObject) {
-        // Check if it's a notification from DAS.
+    private fun handleDasMessage(jsonObject: JsonObject) {
+        // Check if it's a server-initiated notification or request from DAS.
         if (jsonObject.has("params")) {
             val params = jsonObject.get("params").asJsonObject
             val msgObj = when {
@@ -167,108 +166,116 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             if (msgObj != null) {
                 val method = msgObj.getAsJsonPrimitive("method")?.asString
                 if (method != null) {
-                    // Forward notification to client.
-                    forwardNotificationToClient(method, msgObj)
+                    // Forward server message to client.
+                    forwardServerMessageToClient(method, msgObj)
                 }
                 return
             }
         }
 
-        // Check if it's a response to a request.
+        // Check if it's a response to a client-initiated request.
         val idElement = jsonObject.get("id")
         val topLevelId = if (idElement != null && idElement.isJsonPrimitive) idElement.asString else null
         if (topLevelId != null) {
-            val pending = pendingRequests.remove(topLevelId)
-            if (pending != null) {
-                if (jsonObject.has("result")) {
-                    val result = jsonObject.get("result").asJsonObject
-                    if (result.has(LSP_RESPONSE_KEY)) {
-                        val lspResponseElement = result.get(LSP_RESPONSE_KEY)
-                        if (lspResponseElement != null && lspResponseElement.isJsonObject) {
-                            val lspResponse = lspResponseElement.asJsonObject
-                            if (lspResponse.has("error")) {
-                                val error = lspResponse.getAsJsonObject("error")
-                                pending.completeExceptionally(error)
-                            } else if (lspResponse.has("result")) {
-                                val lspResult = lspResponse.get("result")
-                                if (lspResult != null && !lspResult.isJsonNull) {
-                                    pending.complete(lspResult)
-                                } else {
-                                    pending.completeWithNull()
-                                }
-                            } else {
-                                pending.completeWithNull()
-                            }
+            handlePendingRequestResponse(topLevelId, jsonObject)
+        }
+    }
+
+    private fun handlePendingRequestResponse(topLevelId: String, jsonObject: JsonObject) {
+        val pending = pendingRequests.remove(topLevelId) ?: return
+        if (jsonObject.has("result")) {
+            val result = jsonObject.get("result").asJsonObject
+            if (result.has(LSP_RESPONSE_KEY)) {
+                val lspResponseElement = result.get(LSP_RESPONSE_KEY)
+                if (lspResponseElement != null && lspResponseElement.isJsonObject) {
+                    val lspResponse = lspResponseElement.asJsonObject
+                    if (lspResponse.has("error")) {
+                        val error = lspResponse.getAsJsonObject("error")
+                        pending.completeExceptionally(error)
+                    } else if (lspResponse.has("result")) {
+                        val lspResult = lspResponse.get("result")
+                        if (lspResult != null && !lspResult.isJsonNull) {
+                            pending.complete(lspResult)
                         } else {
                             pending.completeWithNull()
                         }
                     } else {
                         pending.completeWithNull()
                     }
-                } else if (jsonObject.has("error")) {
-                    val error = jsonObject.get("error").asJsonObject
-                    pending.completeExceptionally(error)
+                } else {
+                    pending.completeWithNull()
                 }
+            } else {
+                pending.completeWithNull()
             }
+        } else if (jsonObject.has("error")) {
+            val error = jsonObject.get("error").asJsonObject
+            pending.completeExceptionally(error)
         }
     }
 
-    private fun forwardNotificationToClient(method: String, msgObj: JsonObject) {
+    private fun forwardServerMessageToClient(method: String, msgObj: JsonObject) {
         val client = this.client ?: return
         try {
             // Parse and forward notifications/requests to the LSP client proxy using lsp4j.
-            if (method == "textDocument/publishDiagnostics") {
-                val paramsObj = msgObj.get("params")
-                val params = GSON.fromJson(paramsObj, PublishDiagnosticsParams::class.java)
-                client.publishDiagnostics(params)
-                val errors = params.diagnostics?.map {
-                    DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, params.uri, it)
-                } ?: emptyList()
-                das.onLspDiagnosticsUpdated(params.uri, errors)
-            } else if (method == "workspace/applyEdit") {
-                val paramsObj = msgObj.get("params")
-                val params = GSON.fromJson(paramsObj, ApplyWorkspaceEditParams::class.java)
-                val id = msgObj.get("id")
-                client.applyEdit(params).whenComplete { response, error ->
-                    if (id != null) {
-                        val legacyId = das.generateUniqueId() ?: return@whenComplete
-                        val lspResponse = JsonObject().apply {
-                            addProperty("jsonrpc", JSONRPC_VERSION)
-                            add("id", id)
-                            if (error != null) {
-                                val errorObj = JsonObject().apply {
-                                    addProperty("code", -32603)
-                                    addProperty("message", error.message ?: "Internal error")
-                                }
-                                add("error", errorObj)
-                            } else {
-                                add("result", GSON.toJsonTree(response))
-                            }
-                        }
-                        val legacyRequest = JsonObject().apply {
-                            addProperty("id", legacyId)
-                            addProperty("method", "lsp.handle")
-                            add("params", JsonObject().apply {
-                                add("lspMessage", lspResponse)
-                            })
-                        }
-                        try {
-                            das.sendRequest(legacyId, legacyRequest)
-                        } catch (e: Exception) {
-                            logger.error("Failed to send applyEdit response to DAS", e)
-                        }
-                    }
-                }
-            } else {
-                logger.debug("Ignored notification/request from DAS: $method")
+            when (method) {
+                "textDocument/publishDiagnostics" -> handlePublishDiagnostics(client, msgObj)
+                "workspace/applyEdit" -> handleApplyEdit(client, msgObj)
+                else -> logger.debug("Ignored notification/request from DAS: $method")
             }
         } catch (e: Exception) {
             logger.error("Failed to forward server message for method: $method", e)
         }
     }
 
+    private fun handlePublishDiagnostics(client: LanguageClient, msgObj: JsonObject) {
+        val paramsObj = msgObj.get("params")
+        val params = GSON.fromJson(paramsObj, PublishDiagnosticsParams::class.java)
+        client.publishDiagnostics(params)
+        val errors = params.diagnostics?.map {
+            DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, params.uri, it)
+        } ?: emptyList()
+        das.onLspDiagnosticsUpdated(params.uri, errors)
+    }
+
+    private fun handleApplyEdit(client: LanguageClient, msgObj: JsonObject) {
+        val paramsObj = msgObj.get("params")
+        val params = GSON.fromJson(paramsObj, ApplyWorkspaceEditParams::class.java)
+        val id = msgObj.get("id")
+        client.applyEdit(params).whenComplete { response, error ->
+            if (id != null) {
+                val legacyId = das.generateUniqueId() ?: return@whenComplete
+                val lspResponse = JsonObject().apply {
+                    addProperty("jsonrpc", JSONRPC_VERSION)
+                    add("id", id)
+                    if (error != null) {
+                        val errorObj = JsonObject().apply {
+                            addProperty("code", -32603)
+                            addProperty("message", error.message ?: "Internal error")
+                        }
+                        add("error", errorObj)
+                    } else {
+                        add("result", GSON.toJsonTree(response))
+                    }
+                }
+                val legacyRequest = JsonObject().apply {
+                    addProperty("id", legacyId)
+                    addProperty("method", "lsp.handle")
+                    add("params", JsonObject().apply {
+                        add("lspMessage", lspResponse)
+                    })
+                }
+                try {
+                    das.sendRequest(legacyId, legacyRequest)
+                } catch (e: Exception) {
+                    logger.error("Failed to send applyEdit response to DAS", e)
+                }
+            }
+        }
+    }
+
     fun stop() {
-        responseListener?.let { das.removeResponseListener(it) }
+        dasMessageListener?.let { das.removeResponseListener(it) }
         pendingRequests.forEach { (_, pending) ->
             pending.future.cancel(true)
         }

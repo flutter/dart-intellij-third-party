@@ -112,7 +112,7 @@ override fun hover(params: HoverParams): CompletableFuture<Hover> {
     return forwardRequest("textDocument/hover", params, Hover::class.java)
 }
 ```
-`forwardRequest()` automatically packages the parameters into an `lsp.handle` JSON-RPC request and registers a pending `CompletableFuture`. When DAS responds asynchronously, `handleDasResponse()` resolves the future.
+`forwardRequest()` automatically packages the parameters into an `lsp.handle` JSON-RPC request and registers a pending `CompletableFuture`. When DAS responds asynchronously, `handleDasMessage()` resolves the future.
 
 ---
 
