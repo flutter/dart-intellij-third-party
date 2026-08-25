@@ -183,34 +183,20 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     private fun handlePendingRequestResponse(topLevelId: String, jsonObject: JsonObject) {
         val pending = pendingRequests.remove(topLevelId) ?: return
-        if (jsonObject.has("result")) {
-            val result = jsonObject.get("result").asJsonObject
-            if (result.has(LSP_RESPONSE_KEY)) {
-                val lspResponseElement = result.get(LSP_RESPONSE_KEY)
-                if (lspResponseElement != null && lspResponseElement.isJsonObject) {
-                    val lspResponse = lspResponseElement.asJsonObject
-                    if (lspResponse.has("error")) {
-                        val error = lspResponse.getAsJsonObject("error")
-                        pending.completeExceptionally(error)
-                    } else if (lspResponse.has("result")) {
-                        val lspResult = lspResponse.get("result")
-                        if (lspResult != null && !lspResult.isJsonNull) {
-                            pending.complete(lspResult)
-                        } else {
-                            pending.completeWithNull()
-                        }
-                    } else {
-                        pending.completeWithNull()
-                    }
-                } else {
-                    pending.completeWithNull()
-                }
-            } else {
-                pending.completeWithNull()
-            }
-        } else if (jsonObject.has("error")) {
-            val error = jsonObject.get("error").asJsonObject
-            pending.completeExceptionally(error)
+        val topLevelError = jsonObject.get("error")?.takeIf { it.isJsonObject }?.asJsonObject
+        if (topLevelError != null) {
+            pending.completeExceptionally(topLevelError)
+            return
+        }
+
+        val lspResponse = jsonObject.get("result")?.takeIf { it.isJsonObject }?.asJsonObject
+            ?.get(LSP_RESPONSE_KEY)?.takeIf { it.isJsonObject }?.asJsonObject
+
+        val lspError = lspResponse?.get("error")?.takeIf { it.isJsonObject }?.asJsonObject
+        if (lspError != null) {
+            pending.completeExceptionally(lspError)
+        } else {
+            pending.complete(lspResponse?.get("result"))
         }
     }
 
@@ -540,17 +526,17 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     // Helper class to store pending request info.
     private inner class PendingRequest<T>(val future: CompletableFuture<T>, val responseType: Type) {
-        fun complete(resultPayload: JsonElement) {
+        fun complete(resultPayload: JsonElement?) {
+            if (resultPayload == null || resultPayload.isJsonNull) {
+                future.complete(null)
+                return
+            }
             try {
                 val result: T = GSON.fromJson(resultPayload, responseType)
                 future.complete(result)
             } catch (e: Exception) {
                 future.completeExceptionally(e)
             }
-        }
-
-        fun completeWithNull() {
-            future.complete(null)
         }
 
         fun completeExceptionally(error: JsonObject) {
