@@ -161,7 +161,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 val jsonObject = JsonParser.parseString(response).asJsonObject
                 handleDasResponse(jsonObject)
             } catch (e: Exception) {
-                logger.error("Error handling DAS response: $response", e)
+                logger.error("Error handling DAS response", e)
             }
         }
         this.responseListener = listener
@@ -256,10 +256,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 val params = GSON.fromJson(paramsObj, ApplyWorkspaceEditParams::class.java)
                 client.applyEdit(params)
             } else {
-                logger.info("Ignored notification/request from DAS: $method")
+                logger.debug("Ignored notification/request from DAS: $method")
             }
         } catch (e: Exception) {
-            logger.error("Failed to forward server message: $msgObj", e)
+            logger.error("Failed to forward server message for method: $method", e)
         }
     }
 
@@ -404,12 +404,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     override fun executeCommand(params: ExecuteCommandParams): CompletableFuture<Any> {
-        val rawTree = GSON.toJsonTree(params)
-        logger.info("Client executeCommand called: command=${params.command}, rawParams=$rawTree")
+        logger.debug("Client executeCommand called: command=${params.command}")
 
         val forwardedParams = normalizeExecuteCommandParams(params)
 
-        logger.info("Forwarding executeCommand to DAS: command=${params.command}, unpackedParams=${GSON.toJson(forwardedParams)}")
         return forwardRequest("workspace/executeCommand", forwardedParams, Any::class.java)
     }
 
@@ -570,7 +568,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         try {
             das.sendRequest(legacyId, legacyRequest)
         } catch (e: Exception) {
-            logger.error("Failed to send request to DAS: $legacyRequest", e)
+            logger.error("Failed to send request to DAS for method: $method", e)
             pendingRequests.remove(legacyId)
             future.completeExceptionally(e)
         }
@@ -605,7 +603,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         try {
             das.sendRequest(legacyId, legacyRequest)
         } catch (e: Exception) {
-            logger.error("Failed to send notification to DAS: $legacyRequest", e)
+            logger.error("Failed to send notification to DAS for method: $method", e)
         }
     }
 
