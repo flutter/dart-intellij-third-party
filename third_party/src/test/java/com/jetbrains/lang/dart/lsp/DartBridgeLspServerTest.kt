@@ -19,6 +19,10 @@ import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
+import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
+import org.eclipse.lsp4j.CallHierarchyItem
+import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
+import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.HoverParams
@@ -26,9 +30,15 @@ import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ShowMessageRequestParams
+import org.eclipse.lsp4j.SymbolKind
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TypeDefinitionParams
+import org.eclipse.lsp4j.TypeHierarchyItem
+import org.eclipse.lsp4j.TypeHierarchyPrepareParams
+import org.eclipse.lsp4j.TypeHierarchySubtypesParams
+import org.eclipse.lsp4j.TypeHierarchySupertypesParams
 import org.eclipse.lsp4j.services.LanguageClient
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
@@ -397,6 +407,339 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(result.isRight)
         assertEquals(1, result.right.size)
         assertEquals("file://target.dart", result.right[0].targetUri)
+    }
+
+    // --- Hierarchy ---
+
+    fun testIsDartSdkVersionSufficientForLspTypeHierarchy() {
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.3.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.4.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.14.0-65.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("4.0.0"))
+
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.2.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.0.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("2.19.0"))
+    }
+
+    fun testIsDartSdkVersionSufficientForLspCallHierarchy() {
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.3.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.4.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.14.0-65.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("4.0.0"))
+
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.2.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.0.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("2.19.0"))
+    }
+
+    fun testPrepareTypeHierarchyRequest() {
+        val params = TypeHierarchyPrepareParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            position = Position(1, 2)
+        }
+
+        val future = bridgeServer.prepareTypeHierarchy(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("textDocument/prepareTypeHierarchy", lspMessage.get("method").asString)
+
+        val responseJson = """
+                {
+                  "id": "123",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "123",
+                      "result": [
+                        {
+                          "name": "Dog",
+                          "kind": 5,
+                          "uri": "file://test.dart",
+                          "range": {"start": {"line": 1, "character": 0}, "end": {"line": 5, "character": 1}},
+                          "selectionRange": {"start": {"line": 1, "character": 6}, "end": {"line": 1, "character": 9}}
+                        }
+                      ]
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        assertEquals("Dog", result[0].name)
+        assertEquals(SymbolKind.Class, result[0].kind)
+        assertEquals("file://test.dart", result[0].uri)
+    }
+
+    fun testTypeHierarchySupertypesRequest() {
+        val item = TypeHierarchyItem(
+            "Dog",
+            SymbolKind.Class,
+            "file://test.dart",
+            Range(Position(1, 0), Position(5, 1)),
+            Range(Position(1, 6), Position(1, 9))
+        )
+        val params = TypeHierarchySupertypesParams().apply {
+            this.item = item
+        }
+
+        val future = bridgeServer.typeHierarchySupertypes(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("typeHierarchy/supertypes", lspMessage.get("method").asString)
+
+        val responseJson = """
+                {
+                  "id": "123",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "123",
+                      "result": [
+                        {
+                          "name": "Animal",
+                          "kind": 5,
+                          "uri": "file://test.dart",
+                          "range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 24}},
+                          "selectionRange": {"start": {"line": 0, "character": 15}, "end": {"line": 0, "character": 21}}
+                        }
+                      ]
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        assertEquals("Animal", result[0].name)
+    }
+
+    fun testTypeHierarchySubtypesRequest() {
+        val item = TypeHierarchyItem(
+            "Dog",
+            SymbolKind.Class,
+            "file://test.dart",
+            Range(Position(1, 0), Position(5, 1)),
+            Range(Position(1, 6), Position(1, 9))
+        )
+        val params = TypeHierarchySubtypesParams().apply {
+            this.item = item
+        }
+
+        val future = bridgeServer.typeHierarchySubtypes(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("typeHierarchy/subtypes", lspMessage.get("method").asString)
+
+        val responseJson = """
+                {
+                  "id": "123",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "123",
+                      "result": [
+                        {
+                          "name": "Labrador",
+                          "kind": 5,
+                          "uri": "file://test.dart",
+                          "range": {"start": {"line": 7, "character": 0}, "end": {"line": 7, "character": 27}},
+                          "selectionRange": {"start": {"line": 7, "character": 6}, "end": {"line": 7, "character": 14}}
+                        }
+                      ]
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        assertEquals("Labrador", result[0].name)
+    }
+
+    fun testPrepareCallHierarchyRequest() {
+        val params = CallHierarchyPrepareParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            position = Position(1, 2)
+        }
+
+        val future = bridgeServer.prepareCallHierarchy(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("textDocument/prepareCallHierarchy", lspMessage.get("method").asString)
+
+        val responseJson = """
+                {
+                  "id": "123",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "123",
+                      "result": [
+                        {
+                          "name": "bark",
+                          "kind": 6,
+                          "uri": "file://test.dart",
+                          "range": {"start": {"line": 2, "character": 2}, "end": {"line": 4, "character": 3}},
+                          "selectionRange": {"start": {"line": 2, "character": 7}, "end": {"line": 2, "character": 11}}
+                        }
+                      ]
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        assertEquals("bark", result[0].name)
+        assertEquals(SymbolKind.Method, result[0].kind)
+    }
+
+    fun testCallHierarchyIncomingCallsRequest() {
+        val item = CallHierarchyItem().apply {
+            name = "bark"
+            kind = SymbolKind.Method
+            uri = "file://test.dart"
+            range = Range(Position(2, 2), Position(4, 3))
+            selectionRange = Range(Position(2, 7), Position(2, 11))
+        }
+        val params = CallHierarchyIncomingCallsParams().apply {
+            this.item = item
+        }
+
+        val future = bridgeServer.callHierarchyIncomingCalls(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("callHierarchy/incomingCalls", lspMessage.get("method").asString)
+
+        val responseJson = """
+                {
+                  "id": "123",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "123",
+                      "result": [
+                        {
+                          "from": {
+                            "name": "speak",
+                            "kind": 6,
+                            "uri": "file://test.dart",
+                            "range": {"start": {"line": 0, "character": 2}, "end": {"line": 1, "character": 3}},
+                            "selectionRange": {"start": {"line": 0, "character": 7}, "end": {"line": 0, "character": 12}}
+                          },
+                          "fromRanges": [
+                            {"start": {"line": 1, "character": 4}, "end": {"line": 1, "character": 10}}
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        assertEquals("speak", result[0].from.name)
+        assertEquals(1, result[0].fromRanges.size)
+    }
+
+    fun testCallHierarchyOutgoingCallsRequest() {
+        val item = CallHierarchyItem().apply {
+            name = "bark"
+            kind = SymbolKind.Method
+            uri = "file://test.dart"
+            range = Range(Position(2, 2), Position(4, 3))
+            selectionRange = Range(Position(2, 7), Position(2, 11))
+        }
+        val params = CallHierarchyOutgoingCallsParams().apply {
+            this.item = item
+        }
+
+        val future = bridgeServer.callHierarchyOutgoingCalls(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("callHierarchy/outgoingCalls", lspMessage.get("method").asString)
+
+        val responseJson = """
+                {
+                  "id": "123",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "123",
+                      "result": [
+                        {
+                          "to": {
+                            "name": "print",
+                            "kind": 12,
+                            "uri": "file://core.dart",
+                            "range": {"start": {"line": 10, "character": 0}, "end": {"line": 12, "character": 1}},
+                            "selectionRange": {"start": {"line": 10, "character": 5}, "end": {"line": 10, "character": 10}}
+                          },
+                          "fromRanges": [
+                            {"start": {"line": 3, "character": 4}, "end": {"line": 3, "character": 17}}
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        assertEquals("print", result[0].to.name)
+        assertEquals(1, result[0].fromRanges.size)
     }
 
     private class MockLanguageClient : LanguageClient {
