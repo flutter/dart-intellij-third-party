@@ -26,6 +26,8 @@ import org.eclipse.lsp4j.CallHierarchyItem
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionContext
+import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
@@ -202,36 +204,65 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue("Response contents should contain Hover Content", result.contents.toString().contains("Hover Content"))
     }
 
-    fun testEitherCommandAndCodeActionDeserialization() {
-        val gson = DartBridgeLspServer.GSON
-        val jsonInput = """
-        [
-          {
-            "command": "dart.edit.sortMembers",
-            "title": "Sort Members"
-          },
-          {
-            "title": "Import library 'dart:io'",
-            "kind": "quickfix.import.librarySdk",
-            "command": {
-              "command": "dart.edit.codeAction.apply",
-              "title": "Import library 'dart:io'"
+    fun testCodeActionRequest() {
+        val params = CodeActionParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            range = Range(Position(0, 0), Position(0, 5))
+            context = CodeActionContext(emptyList())
+        }
+
+        val future = bridgeServer.codeAction(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("textDocument/codeAction", lspMessage.get("method").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": [
+                    {
+                      "title": "Sort Members",
+                      "kind": "source.sortMembers",
+                      "command": {
+                        "command": "dart.edit.sortMembers",
+                        "title": "Sort Members"
+                      }
+                    },
+                    {
+                      "title": "Import library 'dart:io'",
+                      "kind": "quickfix.import.librarySdk",
+                      "command": {
+                        "command": "dart.edit.codeAction.apply",
+                        "title": "Import library 'dart:io'"
+                      }
+                    }
+                  ]
+                }
+              }
             }
-          }
-        ]
         """.trimIndent()
 
-        val type = object : TypeToken<List<Either<Command, CodeAction>>>() {}.type
-        val result: List<Either<Command, CodeAction>> = gson.fromJson(jsonInput, type)
+        capturedListener.onResponse(responseJson)
 
+        val result = future.get(5, TimeUnit.SECONDS)
         assertEquals(2, result.size)
 
-        // First item should deserialize cleanly as a Left (Command)
-        assertTrue("First item should be Left (Command)", result[0].isLeft)
-        assertEquals("dart.edit.sortMembers", result[0].left.command)
-        assertEquals("Sort Members", result[0].left.title)
+        // First action should be wrapped as Right(CodeAction)
+        assertTrue("First item should be Right (CodeAction)", result[0].isRight)
+        assertEquals("Sort Members", result[0].right.title)
+        assertEquals("source.sortMembers", result[0].right.kind)
+        assertEquals("dart.edit.sortMembers", result[0].right.command.command)
 
-        // Second item should deserialize cleanly as a Right (CodeAction)
+        // Second action should be wrapped as Right(CodeAction)
         assertTrue("Second item should be Right (CodeAction)", result[1].isRight)
         assertEquals("Import library 'dart:io'", result[1].right.title)
         assertEquals("quickfix.import.librarySdk", result[1].right.kind)
