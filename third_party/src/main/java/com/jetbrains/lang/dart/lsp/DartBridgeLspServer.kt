@@ -10,14 +10,9 @@ import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonNull
 import com.google.gson.JsonObject
-import com.google.gson.JsonParseException
 import com.google.gson.JsonParser
-import com.google.gson.TypeAdapter
-import com.google.gson.TypeAdapterFactory
 import com.google.gson.reflect.TypeToken
 import com.google.gson.stream.JsonReader
-import com.google.gson.stream.JsonToken
-import com.google.gson.stream.JsonWriter
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -53,8 +48,10 @@ import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.JsonRpcMethod
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
+import org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
 import org.eclipse.lsp4j.services.LanguageServer
@@ -101,7 +98,16 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         private const val JSONRPC_VERSION = "2.0"
         
         @JvmField
-        internal val GSON: Gson = DartLspJsonConverter.GSON
+        internal val GSON: Gson = run {
+            val supportedMethods = LinkedHashMap<String, JsonRpcMethod>()
+            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(LanguageServer::class.java))
+            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(TextDocumentService::class.java))
+            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(WorkspaceService::class.java))
+            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(LanguageClient::class.java))
+            MessageJsonHandler(supportedMethods).gson.newBuilder()
+                .serializeNulls()
+                .create()
+        }
     }
 
     private var client: LanguageClient? = null
@@ -301,9 +307,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest("dart/diagnosticServer", null, DiagnosticServerResult::class.java)
     }
 
+    // Note: We advertise codeActionLiteralSupport in server.setClientCapabilities (see DartAnalysisServerService.buildLspCapabilities)
+    // so DAS is guaranteed to return List<CodeAction> for textDocument/codeAction.
     override fun codeAction(params: CodeActionParams): CompletableFuture<List<Either<Command, CodeAction>>> {
-        val responseType = object : TypeToken<List<Either<Command, CodeAction>>>() {}.type
-        return forwardRequest("textDocument/codeAction", params, responseType)
+        val responseType = object : TypeToken<List<CodeAction>>() {}.type
+        return forwardRequest<List<CodeAction>>("textDocument/codeAction", params, responseType).thenApply { actions ->
+            actions?.map { Either.forRight<Command, CodeAction>(it) } ?: emptyList()
+        }
     }
 
     override fun resolveCodeAction(unresolved: CodeAction): CompletableFuture<CodeAction> {
