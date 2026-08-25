@@ -605,12 +605,6 @@ public final class DartAnalysisServerService implements Disposable {
 
       codeAction.addProperty("dataSupport", true);
 
-      JsonObject resolveSupport = new JsonObject();
-      JsonArray properties = new JsonArray();
-      properties.add("edit");
-      resolveSupport.add("properties", properties);
-      codeAction.add("resolveSupport", resolveSupport);
-
       textDocument.add("codeAction", codeAction);
     }
 

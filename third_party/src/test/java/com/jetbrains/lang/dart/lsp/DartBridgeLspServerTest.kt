@@ -21,6 +21,8 @@ import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
+import org.eclipse.lsp4j.ApplyWorkspaceEditParams
+import org.eclipse.lsp4j.ApplyWorkspaceEditResponse
 import org.eclipse.lsp4j.CodeAction
 import org.eclipse.lsp4j.CodeActionContext
 import org.eclipse.lsp4j.CodeActionParams
@@ -432,8 +434,6 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(kinds.contains("refactor"))
         assertTrue(kinds.contains("source.organizeImports"))
         assertEquals(true, codeAction.get("dataSupport").asBoolean)
-        val resolveProps = codeAction.getAsJsonObject("resolveSupport").getAsJsonArray("properties").map { it.asString }
-        assertTrue(resolveProps.contains("edit"))
 
         val disabledCaps = DartAnalysisServerService.buildLspCapabilities("3.14.0", true, false)
         val textDocDisabled = disabledCaps.getAsJsonObject("textDocument")
@@ -444,8 +444,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val initResult = bridgeServer.initialize(org.eclipse.lsp4j.InitializeParams()).get(5, TimeUnit.SECONDS)
         val caProvider = initResult.capabilities.codeActionProvider
         assertNotNull("codeActionProvider capability must be set", caProvider)
-        assertTrue("codeActionProvider should be Either.forRight(CodeActionOptions)", caProvider.isRight)
-        assertEquals(true, caProvider.right.resolveProvider)
+        assertTrue("codeActionProvider should be Either.forLeft(true)", caProvider.isLeft && caProvider.left == true)
     }
 
     fun testLspMethodExperimentalFeatures() {
@@ -545,8 +544,64 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("file://target.dart", result.right[0].targetUri)
     }
 
+    fun testWorkspaceApplyEditRequestForwardedAndResponseSentBack() {
+        val serverRequestJson = """
+            {
+              "params": {
+                "lspMessage": {
+                  "jsonrpc": "2.0",
+                  "id": 99,
+                  "method": "workspace/applyEdit",
+                  "params": {
+                    "label": "Sort Members",
+                    "edit": {
+                      "changes": {
+                        "file:///test.dart": [
+                          {
+                            "range": {
+                              "start": { "line": 0, "character": 0 },
+                              "end": { "line": 1, "character": 0 }
+                            },
+                            "newText": "// sorted\n"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(serverRequestJson)
+
+        // Verify client received the applyEdit call
+        assertNotNull("Client should have received applyEdit params", mockClient.lastApplyWorkspaceEditParams)
+        assertEquals("Sort Members", mockClient.lastApplyWorkspaceEditParams?.label)
+
+        // Verify response was sent back to DAS
+        val responseJsonObject = capturedRequests.find { req ->
+            val lspMsg = req.getAsJsonObject("params")?.getAsJsonObject("lspMessage")
+            lspMsg?.get("id")?.asInt == 99
+        }
+        assertNotNull("An lsp.handle response should be sent back to DAS with id 99", responseJsonObject)
+        assertEquals("123", responseJsonObject!!.get("id").asString)
+
+        val lspMessage = responseJsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals(99, lspMessage.get("id").asInt)
+        assertNotNull("lspMessage should contain result", lspMessage.getAsJsonObject("result"))
+        assertEquals(true, lspMessage.getAsJsonObject("result").get("applied").asBoolean)
+    }
+
     private class MockLanguageClient : LanguageClient {
         var publishedDiagnostics: PublishDiagnosticsParams? = null
+        var lastApplyWorkspaceEditParams: ApplyWorkspaceEditParams? = null
+        var applyEditResult: ApplyWorkspaceEditResponse = ApplyWorkspaceEditResponse(true)
+
+        override fun applyEdit(params: ApplyWorkspaceEditParams?): CompletableFuture<ApplyWorkspaceEditResponse> {
+            lastApplyWorkspaceEditParams = params
+            return CompletableFuture.completedFuture(applyEditResult)
+        }
 
         override fun publishDiagnostics(diagnostics: PublishDiagnosticsParams?) {
             publishedDiagnostics = diagnostics

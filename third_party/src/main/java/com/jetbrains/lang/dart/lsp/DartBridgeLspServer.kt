@@ -228,7 +228,37 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             } else if (method == "workspace/applyEdit") {
                 val paramsObj = msgObj.get("params")
                 val params = GSON.fromJson(paramsObj, ApplyWorkspaceEditParams::class.java)
-                client.applyEdit(params)
+                val id = msgObj.get("id")
+                client.applyEdit(params).whenComplete { response, error ->
+                    if (id != null) {
+                        val legacyId = das.generateUniqueId() ?: return@whenComplete
+                        val lspResponse = JsonObject().apply {
+                            addProperty("jsonrpc", JSONRPC_VERSION)
+                            add("id", id)
+                            if (error != null) {
+                                val errorObj = JsonObject().apply {
+                                    addProperty("code", -32603)
+                                    addProperty("message", error.message ?: "Internal error")
+                                }
+                                add("error", errorObj)
+                            } else {
+                                add("result", GSON.toJsonTree(response))
+                            }
+                        }
+                        val legacyRequest = JsonObject().apply {
+                            addProperty("id", legacyId)
+                            addProperty("method", "lsp.handle")
+                            add("params", JsonObject().apply {
+                                add("lspMessage", lspResponse)
+                            })
+                        }
+                        try {
+                            das.sendRequest(legacyId, legacyRequest)
+                        } catch (e: Exception) {
+                            logger.error("Failed to send applyEdit response to DAS", e)
+                        }
+                    }
+                }
             } else {
                 logger.debug("Ignored notification/request from DAS: $method")
             }
@@ -254,9 +284,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setDefinitionProvider(true)
             setTypeDefinitionProvider(true)
             setDocumentHighlightProvider(true)
-            setCodeActionProvider(CodeActionOptions().apply {
-                resolveProvider = true
-            })
+            setCodeActionProvider(true)
             setExecuteCommandProvider(ExecuteCommandOptions())
             // Add other capabilities as we support them.
         }
@@ -317,7 +345,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     override fun resolveCodeAction(unresolved: CodeAction): CompletableFuture<CodeAction> {
-        return forwardRequest("codeAction/resolve", unresolved, CodeAction::class.java)
+        return CompletableFuture.completedFuture(unresolved)
     }
 
     // Implement other TextDocumentService methods as needed, returning unsupported or forwarding.
