@@ -13,7 +13,9 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
+import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
+import com.intellij.platform.dartlsp.api.customization.LspCallHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspCodeActionsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCodeLensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCommandsDisabled
@@ -35,8 +37,6 @@ import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionCustomiz
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionDisabled
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionSupport
 import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionSupport
-import com.intellij.platform.dartlsp.api.customization.LspHoverCustomizer
-import com.intellij.platform.dartlsp.api.customization.LspHoverDisabled
 import com.intellij.platform.dartlsp.api.customization.LspHoverSupport
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintDisabled
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
@@ -44,7 +44,9 @@ import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSelectionRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
+import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchyDisabled
+import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
 import com.intellij.psi.PsiFile
 import com.intellij.util.io.URLUtil
@@ -104,12 +106,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         }
 
     override val lspCustomization: LspCustomization = object : LspCustomization() {
-        override val hoverCustomizer: LspHoverCustomizer
-            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-                LspHoverSupport()
-            } else {
-                LspHoverDisabled
-            }
+        override val hoverCustomizer = LspHoverSupport()
         
         override val goToDefinitionCustomizer: LspGoToDefinitionCustomizer
             get() = if (DartAnalysisServerService.isLspNavigationEnabled(project)) {
@@ -147,8 +144,19 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val signatureHelpCustomizer = LspSignatureHelpDisabled
         override val documentSymbolCustomizer = LspDocumentSymbolDisabled
         override val workspaceSymbolCustomizer = LspWorkspaceSymbolDisabled
-        override val callHierarchyCustomizer = LspCallHierarchyDisabled
-        override val typeHierarchyCustomizer = LspTypeHierarchyDisabled
+        override val callHierarchyCustomizer: LspCallHierarchyCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                LspCallHierarchySupport()
+            } else {
+                LspCallHierarchyDisabled
+            }
+        override val typeHierarchyCustomizer: LspTypeHierarchyCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                LspTypeHierarchySupport()
+            } else {
+                LspTypeHierarchyDisabled
+            }
+
         override val selectionRangeCustomizer = LspSelectionRangeDisabled
         override val codeLensCustomizer = LspCodeLensDisabled
         override val renameCustomizer = LspRenameDisabled

@@ -16,7 +16,6 @@ import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.lsp.DartLspService;
-import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 
 import org.dartlang.analysis.server.protocol.RequestError;
@@ -53,7 +52,6 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
   void run(final @NotNull Project project, @Nullable AnActionEvent event) {
     String sdkVersion = DartAnalysisServerService.getInstance(project).getSdkVersion();
     if (!sdkVersion.isEmpty() &&
-        DartConfigurable.isExperimentalLspFeaturesEnabled(project) &&
         DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION) >= 0) {
       useLspOverLegacy(project);
     } else {
