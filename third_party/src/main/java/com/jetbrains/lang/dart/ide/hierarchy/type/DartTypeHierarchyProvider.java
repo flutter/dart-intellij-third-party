@@ -17,6 +17,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.psi.DartReference;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,7 +38,7 @@ public final class DartTypeHierarchyProvider implements HierarchyProvider {
   @Override
   public @Nullable PsiElement getTarget(final @NotNull DataContext dataContext) {
     final Project project = CommonDataKeys.PROJECT.getData(dataContext);
-    if (project != null && DartAnalysisServerService.isLspTypeHierarchyEnabled(project)) {
+    if (project != null && DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
       return myLspProvider.getTarget(dataContext);
     }
     final Editor editor = CommonDataKeys.EDITOR.getData(dataContext);
@@ -54,7 +55,7 @@ public final class DartTypeHierarchyProvider implements HierarchyProvider {
 
   @Override
   public @NotNull HierarchyBrowser createHierarchyBrowser(@NotNull PsiElement target) {
-      if (DartAnalysisServerService.isLspTypeHierarchyEnabled(target.getProject())) {
+      if (DartConfigurable.isExperimentalLspFeaturesEnabled(target.getProject())) {
           return myLspProvider.createHierarchyBrowser(target);
       }
       final DartClass dartClass = target instanceof DartClass ? (DartClass) target : PsiTreeUtil.getParentOfType(target, DartClass.class);

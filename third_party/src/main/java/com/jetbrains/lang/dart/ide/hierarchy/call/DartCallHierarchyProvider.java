@@ -12,6 +12,7 @@ import com.intellij.platform.dartlsp.impl.features.hierarchy.call.LspCallHierarc
 import com.intellij.psi.PsiElement;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -33,7 +34,7 @@ public final class DartCallHierarchyProvider implements HierarchyProvider {
   @Override
   public @Nullable PsiElement getTarget(@NotNull DataContext dataContext) {
     final Project project = CommonDataKeys.PROJECT.getData(dataContext);
-    if (project != null && DartAnalysisServerService.isLspCallHierarchyEnabled(project)) {
+    if (project != null && DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
       return myLspProvider.getTarget(dataContext);
     }
     return DartHierarchyUtil.getResolvedElementAtCursor(dataContext);
@@ -41,7 +42,7 @@ public final class DartCallHierarchyProvider implements HierarchyProvider {
 
   @Override
   public @NotNull HierarchyBrowser createHierarchyBrowser(@NotNull PsiElement target) {
-    if (DartAnalysisServerService.isLspCallHierarchyEnabled(target.getProject())) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(target.getProject())) {
       return myLspProvider.createHierarchyBrowser(target);
     }
     return new DartCallHierarchyBrowser(target.getProject(), target);

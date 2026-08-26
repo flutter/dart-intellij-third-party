@@ -145,13 +145,13 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val documentSymbolCustomizer = LspDocumentSymbolDisabled
         override val workspaceSymbolCustomizer = LspWorkspaceSymbolDisabled
         override val callHierarchyCustomizer: LspCallHierarchyCustomizer
-            get() = if (DartAnalysisServerService.isLspCallHierarchyEnabled(project)) {
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
                 LspCallHierarchySupport()
             } else {
                 LspCallHierarchyDisabled
             }
         override val typeHierarchyCustomizer: LspTypeHierarchyCustomizer
-            get() = if (DartAnalysisServerService.isLspTypeHierarchyEnabled(project)) {
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
                 LspTypeHierarchySupport()
             } else {
                 LspTypeHierarchyDisabled

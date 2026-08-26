@@ -183,8 +183,6 @@ public final class DartAnalysisServerService implements Disposable {
   private static final String MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION = "3.8";
   public static final String MIN_LSP_NAVIGATION_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-137.0.dev";
-  public static final String MIN_LSP_TYPE_HIERARCHY_SDK_VERSION = "3.3.0";
-  public static final String MIN_LSP_CALL_HIERARCHY_SDK_VERSION = "3.3.0";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -611,14 +609,6 @@ public final class DartAnalysisServerService implements Disposable {
     }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspPublishDiagnostics(sdk.getVersion());
-  }
-
-  public static boolean isLspTypeHierarchyEnabled(@NotNull Project project) {
-      return DartConfigurable.isExperimentalLspFeaturesEnabled(project);
-  }
-
-  public static boolean isLspCallHierarchyEnabled(@NotNull Project project) {
-      return DartConfigurable.isExperimentalLspFeaturesEnabled(project);
   }
 
   public boolean shouldUseCompletion2() {
