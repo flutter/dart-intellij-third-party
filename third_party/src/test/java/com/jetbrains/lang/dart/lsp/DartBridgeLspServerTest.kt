@@ -590,10 +590,16 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testBuildLspCapabilitiesIncludesCompletion() {
-        val lspCapabilities = DartAnalysisServerService.buildLspCapabilities("3.8.0")
-        val textDocument = lspCapabilities.getAsJsonObject("textDocument")
-        assertNotNull(textDocument)
-        val completion = textDocument.getAsJsonObject("completion")
+        val lspCapabilitiesOlder = DartAnalysisServerService.buildLspCapabilities("3.8.0")
+        val textDocumentOlder = lspCapabilitiesOlder.getAsJsonObject("textDocument")
+        assertNotNull(textDocumentOlder)
+        assertNull(textDocumentOlder.getAsJsonObject("completion"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.8.0"))
+
+        val lspCapabilitiesSufficient = DartAnalysisServerService.buildLspCapabilities("3.14.0-150.0.dev")
+        val textDocumentSufficient = lspCapabilitiesSufficient.getAsJsonObject("textDocument")
+        assertNotNull(textDocumentSufficient)
+        val completion = textDocumentSufficient.getAsJsonObject("completion")
         assertNotNull(completion)
         val completionItem = completion.getAsJsonObject("completionItem")
         assertNotNull(completionItem)
@@ -601,6 +607,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(completionItem.get("labelDetailsSupport").asBoolean)
         assertTrue(completionItem.get("deprecatedSupport").asBoolean)
         assertTrue(completionItem.get("insertReplaceSupport").asBoolean)
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.14.0-150.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.15.0"))
     }
 
     fun testPublishDiagnosticsNotification() {
