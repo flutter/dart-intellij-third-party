@@ -43,10 +43,14 @@ public final class DartTypeHierarchyProvider implements HierarchyProvider {
 
   @Override
   public @NotNull HierarchyBrowser createHierarchyBrowser(@NotNull PsiElement target) {
-    if (DartAnalysisServerService.isLspTypeHierarchyEnabled(target.getProject())) {
-      return myLspProvider.createHierarchyBrowser(target);
-    }
-    return new DartTypeHierarchyBrowser(target.getProject(), (DartClass)target);
+      if (DartAnalysisServerService.isLspTypeHierarchyEnabled(target.getProject())) {
+          return myLspProvider.createHierarchyBrowser(target);
+      }
+      final DartClass dartClass = target instanceof DartClass ? (DartClass) target : PsiTreeUtil.getParentOfType(target, DartClass.class);
+      if (dartClass == null) {
+          throw new IllegalArgumentException("Target element must be a DartClass or inside one");
+      }
+      return new DartTypeHierarchyBrowser(target.getProject(), dartClass);
   }
 
   @Override
