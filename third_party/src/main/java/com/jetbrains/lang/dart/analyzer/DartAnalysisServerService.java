@@ -613,28 +613,12 @@ public final class DartAnalysisServerService implements Disposable {
     return sdk != null && isDartSdkVersionSufficientForLspPublishDiagnostics(sdk.getVersion());
   }
 
-  public static boolean isDartSdkVersionSufficientForLspTypeHierarchy(@NotNull String sdkVersion) {
-      return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_TYPE_HIERARCHY_SDK_VERSION) >= 0;
-  }
-
   public static boolean isLspTypeHierarchyEnabled(@NotNull Project project) {
-      if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-        return false;
-      }
-      final DartSdk sdk = DartSdk.getDartSdk(project);
-      return sdk != null && isDartSdkVersionSufficientForLspTypeHierarchy(sdk.getVersion());
-  }
-
-  public static boolean isDartSdkVersionSufficientForLspCallHierarchy(@NotNull String sdkVersion) {
-      return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_CALL_HIERARCHY_SDK_VERSION) >= 0;
+      return DartConfigurable.isExperimentalLspFeaturesEnabled(project);
   }
 
   public static boolean isLspCallHierarchyEnabled(@NotNull Project project) {
-      if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-          return false;
-      }
-      final DartSdk sdk = DartSdk.getDartSdk(project);
-      return sdk != null && isDartSdkVersionSufficientForLspCallHierarchy(sdk.getVersion());
+      return DartConfigurable.isExperimentalLspFeaturesEnabled(project);
   }
 
   public boolean shouldUseCompletion2() {

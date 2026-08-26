@@ -20,6 +20,17 @@ import com.jetbrains.lang.dart.psi.DartReference;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Type hierarchy provider for Dart.
+ *
+ * <p>While LSP features are experimental, this class acts as a proxy: delegating to
+ * {@link LspTypeHierarchyProvider} when LSP is enabled, and falling back to legacy DAS
+ * when disabled or on unsupported SDK versions.
+ *
+ * <p>TODO(lsp): When LSP is enabled by default and legacy DAS hierarchy is retired,
+ * remove the &lt;typeHierarchyProvider language="Dart"&gt; registration from plugin.xml
+ * and delete this class so the platform's LspTypeHierarchyProvider handles Dart directly.
+ */
 public final class DartTypeHierarchyProvider implements HierarchyProvider {
   private final HierarchyProvider myLspProvider = new LspTypeHierarchyProvider();
 

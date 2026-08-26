@@ -411,28 +411,6 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
     // --- Hierarchy ---
 
-    fun testIsDartSdkVersionSufficientForLspTypeHierarchy() {
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.3.0"))
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.4.0"))
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.14.0-65.0.dev"))
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("4.0.0"))
-
-        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.2.0"))
-        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("3.0.0"))
-        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspTypeHierarchy("2.19.0"))
-    }
-
-    fun testIsDartSdkVersionSufficientForLspCallHierarchy() {
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.3.0"))
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.4.0"))
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.14.0-65.0.dev"))
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("4.0.0"))
-
-        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.2.0"))
-        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("3.0.0"))
-        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspCallHierarchy("2.19.0"))
-    }
-
     fun testPrepareTypeHierarchyRequest() {
         val params = TypeHierarchyPrepareParams().apply {
             textDocument = TextDocumentIdentifier("file://test.dart")
