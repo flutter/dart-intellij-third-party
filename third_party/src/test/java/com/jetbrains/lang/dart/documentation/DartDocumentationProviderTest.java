@@ -1,6 +1,9 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.lang.dart.documentation;
 
+import com.intellij.codeInsight.lookup.LookupElement;
+import com.intellij.codeInsight.lookup.LookupElementBuilder;
+import com.intellij.codeInsight.lookup.LookupManager;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
@@ -9,6 +12,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
+import com.jetbrains.lang.dart.ide.completion.DartLookupObject;
 import com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider;
 import com.jetbrains.lang.dart.psi.DartComponent;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
@@ -100,27 +104,27 @@ public class DartDocumentationProviderTest extends DartCodeInsightFixtureTestCas
     assertNull("Expected null doc without active lookup", myProvider.generateDoc(element, null));
 
     // 2. With an active lookup containing DartLookupObject, generateDoc generates doc
-    com.intellij.codeInsight.lookup.LookupElement lookupElement =
-      com.intellij.codeInsight.lookup.LookupElementBuilder.create(new com.jetbrains.lang.dart.ide.completion.DartLookupObject(getProject(), null, 0), "A");
-    com.intellij.codeInsight.lookup.LookupManager.getInstance(getProject()).showLookup(myFixture.getEditor(), lookupElement);
+    LookupElement lookupElement =
+      LookupElementBuilder.create(new DartLookupObject(getProject(), null, 0), "A");
+    LookupManager.getInstance(getProject()).showLookup(myFixture.getEditor(), lookupElement);
     try {
       final String doc = myProvider.generateDoc(element, null);
       assertNotNull("Expected non-null doc with active DartLookupObject", doc);
       assertTrue("Expected doc to contain class documentation", doc.contains("Documentation for class A"));
     }
     finally {
-      com.intellij.codeInsight.lookup.LookupManager.getInstance(getProject()).hideActiveLookup();
+      LookupManager.getInstance(getProject()).hideActiveLookup();
     }
 
     // 3. With an active lookup containing a non-DartLookupObject, generateDoc returns null
-    com.intellij.codeInsight.lookup.LookupElement plainLookupElement =
-      com.intellij.codeInsight.lookup.LookupElementBuilder.create("plain");
-    com.intellij.codeInsight.lookup.LookupManager.getInstance(getProject()).showLookup(myFixture.getEditor(), plainLookupElement);
+    LookupElement plainLookupElement =
+      LookupElementBuilder.create("plain");
+    LookupManager.getInstance(getProject()).showLookup(myFixture.getEditor(), plainLookupElement);
     try {
       assertNull("Expected null doc with non-DartLookupObject", myProvider.generateDoc(element, null));
     }
     finally {
-      com.intellij.codeInsight.lookup.LookupManager.getInstance(getProject()).hideActiveLookup();
+      LookupManager.getInstance(getProject()).hideActiveLookup();
     }
   }
 }
