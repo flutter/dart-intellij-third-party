@@ -12,6 +12,7 @@
 ### Removed
 
 ### Fixed
+- Quick Documentation from code completion popup window (#632)
 
 ## 508.1.0
 
