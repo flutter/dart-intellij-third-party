@@ -16,6 +16,7 @@ import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.MarkupContent
 import org.eclipse.lsp4j.MarkupKind
 import org.eclipse.lsp4j.jsonrpc.messages.Either
+import java.util.concurrent.TimeUnit
 
 /**
  * The purpose of this class is to
@@ -32,13 +33,35 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either
 internal class LspCompletionObject(
   val lspServer: LspServerImpl,
   private val requestSemaphore: Semaphore,
-  private val initialCompletionItem: CompletionItem,
+  val initialCompletionItem: CompletionItem,
 ) : Pointer<LspCompletionObject>, Symbol, DocumentationTarget {
 
-  private var resolvedCompletionItem: CompletionItem? = null
+  var resolvedCompletionItem: CompletionItem? = null
 
   val completionItem: CompletionItem
     get() = resolvedCompletionItem ?: initialCompletionItem
+
+  internal fun resolveSync(timeoutMs: Long = 1000): CompletionItem {
+    if (resolvedCompletionItem != null) return resolvedCompletionItem!!
+    if (lspServer.serverCapabilities?.completionProvider?.resolveProvider != true) {
+      resolvedCompletionItem = initialCompletionItem
+      return initialCompletionItem
+    }
+    try {
+      val rawResolvedCompletionItem = lspServer.lsp4jServer.textDocumentService
+        .resolveCompletionItem(initialCompletionItem)
+        .get(timeoutMs, TimeUnit.MILLISECONDS)
+      if (rawResolvedCompletionItem != null) {
+        rawResolvedCompletionItem.label = initialCompletionItem.label
+        resolvedCompletionItem = rawResolvedCompletionItem
+      } else {
+        resolvedCompletionItem = initialCompletionItem
+      }
+    } catch (e: Exception) {
+      resolvedCompletionItem = initialCompletionItem
+    }
+    return resolvedCompletionItem!!
+  }
 
   /**
    * This function might send the `completionItem/resolve` request to the LSP server and await for the response suspending.

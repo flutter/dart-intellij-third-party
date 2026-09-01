@@ -21,19 +21,23 @@ import org.eclipse.lsp4j.InsertTextFormat
 
 internal object LspCompletionItemInsertHandler : InsertHandler<LookupElement> {
   override fun handleInsert(context: InsertionContext, lookupElement: LookupElement) {
-    handleAdditionalTextEdits(context, lookupElement)
+    val completionObject = (lookupElement as? LookupElementDecorator<*>)?.`object` as? LspCompletionObject
+                           ?: lookupElement.`object` as? LspCompletionObject
+    val completionItem = completionObject?.resolveSync() ?: lookupElement.lsp4jCompletionItem
+
+    handleAdditionalTextEdits(context, completionItem)
     (lookupElement as? LookupElementDecorator<*>)?.delegate?.handleInsert(context)
-    handleSnippetFormat(context, lookupElement)
-    lookupElement.lsp4jCompletionItem?.command?.let { command ->
+    handleSnippetFormat(context, lookupElement, completionItem)
+    completionItem?.command?.let { command ->
       val lspServer = lookupElement.lspServer
       val lspCommandsSupport = lspServer?.descriptor?.lspCustomization?.commandsCustomizer as? LspCommandsSupport
       lspCommandsSupport?.executeCommand(lspServer, context.file.virtualFile, command)
     }
   }
 
-  private fun handleAdditionalTextEdits(context: InsertionContext, lookupElement: LookupElement) {
-    val edits = lookupElement.lsp4jCompletionItem?.additionalTextEdits ?: return
-    val mainEditRange = lookupElement.lsp4jCompletionItem?.textEdit?.map({ it.range }, { it.insert })
+  private fun handleAdditionalTextEdits(context: InsertionContext, completionItem: CompletionItem?) {
+    val edits = completionItem?.additionalTextEdits ?: return
+    val mainEditRange = completionItem.textEdit?.map({ it.range }, { it.insert })
     val startPosition = mainEditRange?.start ?: getLsp4jPosition(context.document, context.startOffset)
 
     // Full handling of additionalTextEdits is complicated
@@ -47,8 +51,8 @@ internal object LspCompletionItemInsertHandler : InsertHandler<LookupElement> {
     }
   }
 
-  private fun handleSnippetFormat(context: InsertionContext, lookupElement: LookupElement) {
-    if (lookupElement.lsp4jCompletionItem?.insertTextFormat != InsertTextFormat.Snippet) return
+  private fun handleSnippetFormat(context: InsertionContext, lookupElement: LookupElement, completionItem: CompletionItem?) {
+    if (completionItem?.insertTextFormat != InsertTextFormat.Snippet) return
 
     context.document.replaceString(context.startOffset, context.tailOffset, "")
     TemplateManager.getInstance(context.project)
