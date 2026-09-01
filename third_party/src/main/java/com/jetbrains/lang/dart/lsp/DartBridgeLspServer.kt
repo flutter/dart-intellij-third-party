@@ -16,11 +16,11 @@ import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import org.eclipse.lsp4j.CompletionItem
+import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.CompletionOptions
 import org.eclipse.lsp4j.CompletionParams
-import org.dartlang.analysis.server.protocol.AnalysisError
-import org.dartlang.analysis.server.protocol.DiagnosticMessage
+import org.eclipse.lsp4j.InsertTextFormat
 import org.eclipse.lsp4j.CallHierarchyIncomingCall
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
 import org.eclipse.lsp4j.CallHierarchyItem
@@ -40,6 +40,7 @@ import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
@@ -238,6 +239,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
+        sendDefaultConfiguration()
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
             setDefinitionProvider(true)
@@ -250,6 +252,11 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
+    }
+
+    override fun initialized(params: InitializedParams) {
+        logger.info("Initialized called")
+        sendDefaultConfiguration()
     }
 
     override fun shutdown(): CompletableFuture<Any> {
@@ -289,7 +296,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun completion(params: CompletionParams): CompletableFuture<Either<List<CompletionItem>, CompletionList>> {
         return forwardRequest<JsonElement>("textDocument/completion", params, JsonElement::class.java).thenApply { element ->
-            if (element == null || element.isJsonNull) {
+            val result = if (element == null || element.isJsonNull) {
                 Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, emptyList()))
             } else if (element.isJsonArray) {
                 val type = object : TypeToken<List<CompletionItem>>() {}.type
@@ -299,6 +306,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 val list = GSON.fromJson(element, CompletionList::class.java) ?: CompletionList(false, emptyList())
                 Either.forRight<List<CompletionItem>, CompletionList>(list)
             }
+            enhanceCompletionItems(result)
         }.exceptionally { e ->
             logger.info("textDocument/completion failed: ${e.message}")
             Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, emptyList()))
@@ -307,9 +315,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun resolveCompletionItem(unresolved: CompletionItem): CompletableFuture<CompletionItem> {
         return forwardRequest("completionItem/resolve", unresolved, CompletionItem::class.java).thenApply { resolved ->
-            resolved ?: unresolved
+            val item = resolved ?: unresolved
+            enhanceCompletionItem(item)
+            item
         }.exceptionally { e ->
             logger.info("completionItem/resolve failed: ${e.message}")
+            enhanceCompletionItem(unresolved)
             unresolved
         }
     }
@@ -350,7 +361,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     // --- WorkspaceService Implementation ---
 
     override fun didChangeConfiguration(params: DidChangeConfigurationParams) {
-        // Ignored. Configuration is managed by the legacy plugin settings.
+        forwardNotification("workspace/didChangeConfiguration", params)
     }
 
     override fun didChangeWatchedFiles(params: DidChangeWatchedFilesParams) {
@@ -485,6 +496,162 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         } catch (e: Exception) {
             logger.error("Failed to send notification to DAS: $legacyRequest", e)
         }
+    }
+
+    private fun sendDefaultConfiguration() {
+        val settings = mapOf(
+            "completeFunctionCalls" to true,
+            "suggestFromUnimportedLibraries" to true,
+            "dart" to mapOf(
+                "completeFunctionCalls" to true,
+                "suggestFromUnimportedLibraries" to true
+            )
+        )
+        forwardNotification("workspace/didChangeConfiguration", DidChangeConfigurationParams(settings))
+    }
+
+    private fun extractSignature(item: CompletionItem): String? {
+        val labelDetail = item.labelDetails?.detail
+        if (!labelDetail.isNullOrBlank() && labelDetail.startsWith("(") && labelDetail.endsWith(")")) {
+            return labelDetail
+        }
+        val detail = item.detail
+        if (!detail.isNullOrBlank()) {
+            val start = detail.indexOf('(')
+            val end = detail.lastIndexOf(')')
+            if (start != -1 && end != -1 && end > start) {
+                return detail.substring(start, end + 1)
+            }
+        }
+        return null
+    }
+
+    private fun extractParameters(signature: String): List<String> {
+        val trimmed = signature.trim()
+        if (!trimmed.startsWith("(") || !trimmed.endsWith(")")) {
+            return emptyList()
+        }
+        val content = trimmed.substring(1, trimmed.length - 1).trim()
+        if (content.isEmpty()) {
+            return emptyList()
+        }
+
+        val params = mutableListOf<String>()
+        var depthParen = 0
+        var depthAngle = 0
+        var depthBrace = 0
+        var depthBracket = 0
+        val current = StringBuilder()
+
+        for (ch in content) {
+            when (ch) {
+                '(' -> depthParen++
+                ')' -> depthParen--
+                '<' -> depthAngle++
+                '>' -> depthAngle--
+                '{' -> depthBrace++
+                '}' -> depthBrace--
+                '[' -> depthBracket++
+                ']' -> depthBracket--
+                ',' -> {
+                    if (depthParen == 0 && depthAngle == 0 && depthBrace == 0 && depthBracket == 0) {
+                        params.add(current.toString().trim())
+                        current.clear()
+                        continue
+                    }
+                }
+            }
+            current.append(ch)
+        }
+        if (current.isNotEmpty()) {
+            params.add(current.toString().trim())
+        }
+        return params.filter { it.isNotEmpty() }
+    }
+
+    private fun extractParamName(rawParam: String): String? {
+        val beforeEqual = rawParam.substringBefore('=').trim()
+        val stripped = beforeEqual.trim('{', '}', '[', ']').trim()
+        if (stripped.isEmpty()) return null
+
+        val match = Regex("""([a-zA-Z_$][a-zA-Z0-9_$]*)\s*$""").find(stripped)
+        return match?.groupValues?.get(1)
+    }
+
+    private fun isRequiredParam(rawParam: String): Boolean {
+        val trimmed = rawParam.trim()
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            return false
+        }
+        if (trimmed.startsWith("{") || trimmed.endsWith("}")) {
+            return trimmed.contains("required ") || trimmed.startsWith("{required")
+        }
+        return true
+    }
+
+    private fun buildCallableSnippet(name: String, signature: String?): String {
+        if (signature.isNullOrBlank()) {
+            return "$name($0)"
+        }
+        val params = extractParameters(signature)
+        if (params.isEmpty()) {
+            return "$name()$0"
+        }
+
+        val requiredParams = params.filter { isRequiredParam(it) }.mapNotNull { extractParamName(it) }
+        if (requiredParams.isEmpty()) {
+            return "$name($0)"
+        }
+
+        val args = requiredParams.mapIndexed { index, paramName ->
+            "\${${index + 1}:$paramName}"
+        }.joinToString(", ")
+
+        return "$name($args)"
+    }
+
+    private fun enhanceCompletionItem(item: CompletionItem) {
+        if (item.kind == CompletionItemKind.Function ||
+            item.kind == CompletionItemKind.Method ||
+            item.kind == CompletionItemKind.Constructor
+        ) {
+            if (item.insertTextFormat != InsertTextFormat.Snippet) {
+                val signature = extractSignature(item)
+                val textEdit = item.textEdit
+                if (textEdit != null) {
+                    if (textEdit.isLeft) {
+                        val edit = textEdit.left
+                        if (edit != null && edit.newText != null && !edit.newText.contains("(")) {
+                            edit.newText = buildCallableSnippet(edit.newText, signature)
+                            item.insertTextFormat = InsertTextFormat.Snippet
+                        }
+                    } else if (textEdit.isRight) {
+                        val edit = textEdit.right
+                        if (edit != null && edit.newText != null && !edit.newText.contains("(")) {
+                            edit.newText = buildCallableSnippet(edit.newText, signature)
+                            item.insertTextFormat = InsertTextFormat.Snippet
+                        }
+                    }
+                } else if (item.insertText != null) {
+                    if (!item.insertText.contains("(")) {
+                        item.insertText = buildCallableSnippet(item.insertText, signature)
+                        item.insertTextFormat = InsertTextFormat.Snippet
+                    }
+                } else if (item.label != null && !item.label.contains("(")) {
+                    item.insertText = buildCallableSnippet(item.label, signature)
+                    item.insertTextFormat = InsertTextFormat.Snippet
+                }
+            }
+        }
+    }
+
+    private fun enhanceCompletionItems(result: Either<List<CompletionItem>, CompletionList>): Either<List<CompletionItem>, CompletionList> {
+        if (result.isLeft) {
+            result.left?.forEach { enhanceCompletionItem(it) }
+        } else if (result.isRight) {
+            result.right?.items?.forEach { enhanceCompletionItem(it) }
+        }
+        return result
     }
 
     // Helper class to store pending request info.
