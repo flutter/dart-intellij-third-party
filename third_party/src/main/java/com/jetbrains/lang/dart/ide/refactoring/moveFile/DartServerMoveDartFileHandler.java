@@ -63,13 +63,14 @@ public final class DartServerMoveDartFileHandler extends MoveFileHandler {
     final String newFilePath = moveDestination.getVirtualFile().getPath() + "/" + virtualFile.getName();
 
     if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      DartAnalysisServerService.getInstance(project).updateFilesContent();
       final String oldUri = DartLspRenamePsiElementProcessor.getFileUri(virtualFile.getPath());
       final String newUri = DartLspRenamePsiElementProcessor.getFileUri(newFilePath);
       LOG.info("prepareMovedFile via LSP: oldUri=" + oldUri + ", newUri=" + newUri);
       final RenameFilesParams params = new RenameFilesParams(List.of(new FileRename(oldUri, newUri)));
       try {
         final WorkspaceEdit workspaceEdit = DartLspRenamePsiElementProcessor.awaitFutureCheckingCanceled(
-            DartLspService.willRenameFiles(project, params), 5);
+            DartLspService.willRenameFiles(project, params), 10);
         LOG.info("willRenameFiles response: " + workspaceEdit);
         if (workspaceEdit != null) {
           DartLspRenamePsiElementProcessor.applyWorkspaceEdit(project, workspaceEdit);

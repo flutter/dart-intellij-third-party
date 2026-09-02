@@ -408,7 +408,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             return future
         }
 
-        das.updateFilesContent()
+        if (com.intellij.openapi.application.ApplicationManager.getApplication().isReadAccessAllowed) {
+            das.updateFilesContent()
+        }
 
         val legacyId = das.generateUniqueId()
         if (legacyId == null) {

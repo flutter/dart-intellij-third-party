@@ -95,7 +95,7 @@ class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
 
         @JvmStatic
         @Throws(TimeoutException::class)
-        fun <T> awaitFutureCheckingCanceled(future: CompletableFuture<T>, timeoutSeconds: Long = 5): T? {
+        fun <T> awaitFutureCheckingCanceled(future: CompletableFuture<T>, timeoutSeconds: Long = 10): T? {
             val timeoutMillis = timeoutSeconds * 1000
             val startTime = System.currentTimeMillis()
             while (true) {
@@ -165,6 +165,8 @@ class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
         val virtualFile = psiFileSystemItem.virtualFile ?: return
         val project = element.project
 
+        DartAnalysisServerService.getInstance(project).updateFilesContent()
+
         val oldUri = getFileUri(virtualFile.path)
         val parentPath = virtualFile.parent?.path ?: return
         val newPath = "$parentPath/$newName"
@@ -175,7 +177,7 @@ class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
 
         try {
             val workspaceEditFuture = DartLspService.willRenameFiles(project, params)
-            val workspaceEdit = awaitFutureCheckingCanceled(workspaceEditFuture, 5)
+            val workspaceEdit = awaitFutureCheckingCanceled(workspaceEditFuture, 10)
             logger.info("prepareRenaming willRenameFiles response: $workspaceEdit")
             if (workspaceEdit != null) {
                 applyWorkspaceEdit(project, workspaceEdit)
