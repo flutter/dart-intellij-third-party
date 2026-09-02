@@ -549,7 +549,7 @@ public final class DartAnalysisServerService implements Disposable {
       workspace.addProperty("applyEdit", true);
 
       JsonObject workspaceEdit = new JsonObject();
-      workspaceEdit.addProperty("documentChanges", false);
+      workspaceEdit.addProperty("documentChanges", true);
       workspace.add("workspaceEdit", workspaceEdit);
 
       lspCapabilities.add("workspace", workspace);
