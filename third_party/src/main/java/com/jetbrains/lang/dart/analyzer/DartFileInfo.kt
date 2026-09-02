@@ -8,6 +8,7 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -24,6 +25,7 @@ data class DartLocalFileInfo(val filePath: String) : DartFileInfo() {
 data class DartNotLocalFileInfo(private val project: Project, val fileUri: String) : DartFileInfo() {
   override fun findFile(): VirtualFile? =
     DartAnalysisServerService.getInstance(project).getNotLocalVirtualFile(fileUri)
+      ?: VirtualFileManager.getInstance().findFileByUrl(fileUri)
 }
 
 

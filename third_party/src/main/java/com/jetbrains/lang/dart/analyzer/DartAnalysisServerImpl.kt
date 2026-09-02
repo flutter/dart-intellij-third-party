@@ -16,8 +16,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.jetbrains.lang.dart.DartBundle
+import com.jetbrains.lang.dart.logging.PluginLogger
 import kotlinx.coroutines.launch
 import org.dartlang.analysis.server.protocol.*
+
+private val LOG = PluginLogger.createLogger(DartAnalysisServerImpl::class.java)
 
 internal class DartAnalysisServerImpl(private val project: Project, socket: AnalysisServerSocket) : RemoteAnalysisServerImpl(socket) {
 
@@ -71,12 +74,21 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
 
   @RequiresWriteLock
   private fun applyWorkspaceEdit(workspaceEdit: DartLspWorkspaceEdit): Boolean {
-    val changes = workspaceEdit.changes ?: return false
-    changes.entries.forEach { entry ->
-      val uri = entry.key
-      val virtualFile = getDartFileInfo(project, uri).findFile() ?: return false
-      val document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return false
-      if (!applyTextEdits(document, entry.value)) return false
+    val documentChanges = workspaceEdit.documentChanges ?: return false
+
+    for (change in documentChanges) {
+      when (change) {
+        is DartLspTextDocumentEdit -> {
+          val uri = change.textDocument.uri
+          val virtualFile = getDartFileInfo(project, uri).findFile() ?: return false
+          val document = FileDocumentManager.getInstance().getDocument(virtualFile) ?: return false
+          if (!applyTextEdits(document, change.edits)) return false
+        }
+        else -> {
+          LOG.warn("Unsupported document change type: ${change::class.java.simpleName}")
+          return false
+        }
+      }
     }
     return true
   }
