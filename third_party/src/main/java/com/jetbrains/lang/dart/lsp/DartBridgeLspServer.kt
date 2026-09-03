@@ -41,6 +41,10 @@ import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.SemanticTokens
+import org.eclipse.lsp4j.SemanticTokensLegend
+import org.eclipse.lsp4j.SemanticTokensParams
+import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
@@ -244,6 +248,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setTypeHierarchyProvider(true)
             setCallHierarchyProvider(true)
             setReferencesProvider(true)
+            val semanticTokensLegend = SemanticTokensLegend(
+                DartLspSemanticTokensSupport.tokenTypes,
+                DartLspSemanticTokensSupport.tokenModifiers
+            )
+            setSemanticTokensProvider(SemanticTokensWithRegistrationOptions().apply {
+                legend = semanticTokensLegend
+                setFull(true)
+                setRange(false)
+            })
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -293,6 +306,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val type = object: TypeToken<List<Location>>() {}.type
 
         return forwardRequest("textDocument/references", params, type)
+    }
+
+    override fun semanticTokensFull(params: SemanticTokensParams): CompletableFuture<SemanticTokens> {
+        return forwardRequest("textDocument/semanticTokens/full", params, SemanticTokens::class.java).exceptionally { e ->
+            logger.info("textDocument/semanticTokens/full failed: ${e.message}")
+            null
+        }
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {

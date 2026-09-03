@@ -5,6 +5,7 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
@@ -42,7 +43,9 @@ import com.intellij.platform.dartlsp.api.customization.LspInlayHintDisabled
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSelectionRangeDisabled
+import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
+import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensSupport
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchyDisabled
@@ -50,8 +53,12 @@ import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
 import com.intellij.psi.PsiFile
 import com.intellij.util.io.URLUtil
+import com.jetbrains.lang.dart.DartFileType
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import com.jetbrains.lang.dart.sdk.DartConfigurable
+import org.eclipse.lsp4j.SemanticTokenModifiers
+import org.eclipse.lsp4j.SemanticTokenTypes
 
 /**
  * Configuration descriptor that defines how the JetBrains LSP client communicates with the Dart Bridge server.
@@ -116,7 +123,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             }
         override val goToTypeDefinitionCustomizer = LspGoToTypeDefinitionSupport()
         override val completionCustomizer = LspCompletionDisabled
-        override val semanticTokensCustomizer = LspSemanticTokensDisabled
+        override val semanticTokensCustomizer: LspSemanticTokensCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                DartLspSemanticTokensSupport
+            } else {
+                LspSemanticTokensDisabled
+            }
         override val diagnosticsCustomizer = LspDiagnosticsDisabled
         override val codeActionsCustomizer = LspCodeActionsDisabled
         override val commandsCustomizer = LspCommandsDisabled
@@ -160,5 +172,121 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val selectionRangeCustomizer = LspSelectionRangeDisabled
         override val codeLensCustomizer = LspCodeLensDisabled
         override val renameCustomizer = LspRenameDisabled
+    }
+}
+
+object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
+    override fun shouldAskServerForSemanticTokens(psiFile: PsiFile): Boolean {
+        return psiFile.fileType == DartFileType.INSTANCE
+    }
+
+    override val tokenTypes: List<String> = listOf(
+        SemanticTokenTypes.Namespace,
+        SemanticTokenTypes.Type,
+        SemanticTokenTypes.Class,
+        SemanticTokenTypes.Enum,
+        SemanticTokenTypes.Interface,
+        SemanticTokenTypes.Struct,
+        SemanticTokenTypes.TypeParameter,
+        SemanticTokenTypes.Parameter,
+        SemanticTokenTypes.Variable,
+        SemanticTokenTypes.Property,
+        SemanticTokenTypes.EnumMember,
+        SemanticTokenTypes.Event,
+        SemanticTokenTypes.Function,
+        SemanticTokenTypes.Method,
+        SemanticTokenTypes.Macro,
+        SemanticTokenTypes.Keyword,
+        SemanticTokenTypes.Modifier,
+        SemanticTokenTypes.Comment,
+        SemanticTokenTypes.String,
+        SemanticTokenTypes.Number,
+        SemanticTokenTypes.Regexp,
+        SemanticTokenTypes.Operator,
+        SemanticTokenTypes.Decorator,
+        // Dart custom semantic token types:
+        "annotation",
+        "boolean",
+        "label",
+        "source"
+    )
+
+    override val tokenModifiers: List<String> = listOf(
+        SemanticTokenModifiers.Declaration,
+        SemanticTokenModifiers.Definition,
+        SemanticTokenModifiers.Readonly,
+        SemanticTokenModifiers.Static,
+        SemanticTokenModifiers.Deprecated,
+        SemanticTokenModifiers.Abstract,
+        SemanticTokenModifiers.Async,
+        SemanticTokenModifiers.Modification,
+        SemanticTokenModifiers.Documentation,
+        SemanticTokenModifiers.DefaultLibrary,
+        // Dart custom semantic token modifiers:
+        "annotation",
+        "control",
+        "importPrefix",
+        "label",
+        "constructor",
+        "escape",
+        "interpolation",
+        "instance",
+        "source",
+        "void",
+        "wildcard"
+    )
+
+    override fun getTextAttributesKey(tokenType: String, modifiers: List<String>): TextAttributesKey? {
+        val isDecl = modifiers.contains(SemanticTokenModifiers.Declaration)
+        val isStatic = modifiers.contains(SemanticTokenModifiers.Static)
+        val isInstance = modifiers.contains("instance")
+
+        return when (tokenType) {
+            SemanticTokenTypes.Class,
+            SemanticTokenTypes.Interface,
+            SemanticTokenTypes.Struct -> DartSyntaxHighlighterColors.CLASS
+
+            SemanticTokenTypes.Enum -> DartSyntaxHighlighterColors.ENUM
+            SemanticTokenTypes.EnumMember -> DartSyntaxHighlighterColors.ENUM_CONSTANT
+            SemanticTokenTypes.TypeParameter -> DartSyntaxHighlighterColors.TYPE_PARAMETER
+            SemanticTokenTypes.Type -> DartSyntaxHighlighterColors.TYPE_ALIAS
+
+            SemanticTokenTypes.Method -> when {
+                modifiers.contains("constructor") -> DartSyntaxHighlighterColors.CONSTRUCTOR
+                isStatic -> if (isDecl) DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION else DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE
+                isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE
+                else -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE
+            }
+
+            SemanticTokenTypes.Function -> when {
+                isStatic -> if (isDecl) DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION else DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE
+                else -> if (isDecl) DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION else DartSyntaxHighlighterColors.LOCAL_FUNCTION_REFERENCE
+            }
+
+            SemanticTokenTypes.Property -> when {
+                isStatic -> if (isDecl) DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION else DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE
+                isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE
+                else -> if (isDecl) DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_DECLARATION else DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_REFERENCE
+            }
+
+            SemanticTokenTypes.Variable -> when {
+                modifiers.contains("importPrefix") -> DartSyntaxHighlighterColors.IMPORT_PREFIX
+                isStatic -> DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION
+                isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_FIELD_REFERENCE
+                isDecl -> DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION
+                else -> DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE
+            }
+
+            SemanticTokenTypes.Parameter -> if (isDecl) DartSyntaxHighlighterColors.PARAMETER_DECLARATION else DartSyntaxHighlighterColors.PARAMETER_REFERENCE
+            "annotation", SemanticTokenTypes.Decorator -> DartSyntaxHighlighterColors.ANNOTATION
+            "label" -> DartSyntaxHighlighterColors.LABEL
+            SemanticTokenTypes.Namespace -> DartSyntaxHighlighterColors.LIBRARY_NAME
+            SemanticTokenTypes.Keyword, "boolean" -> DartSyntaxHighlighterColors.KEYWORD
+            SemanticTokenTypes.String -> if (modifiers.contains("escape")) DartSyntaxHighlighterColors.VALID_STRING_ESCAPE else DartSyntaxHighlighterColors.STRING
+            SemanticTokenTypes.Comment -> if (modifiers.contains(SemanticTokenModifiers.Documentation)) DartSyntaxHighlighterColors.DOC_COMMENT else DartSyntaxHighlighterColors.LINE_COMMENT
+            SemanticTokenTypes.Number -> DartSyntaxHighlighterColors.NUMBER
+            SemanticTokenTypes.Operator -> DartSyntaxHighlighterColors.OPERATION_SIGN
+            else -> super.getTextAttributesKey(tokenType, modifiers)
+        }
     }
 }

@@ -3,6 +3,7 @@
 ### Added
 
 ### Changed
+- Syntax highlighting implemented with JetBrains LSP as an experimental feature (#401)
 
 ### Removed
 
