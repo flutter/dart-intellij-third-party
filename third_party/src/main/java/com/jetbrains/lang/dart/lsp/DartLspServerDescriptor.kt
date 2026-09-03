@@ -124,7 +124,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val goToTypeDefinitionCustomizer = LspGoToTypeDefinitionSupport()
         override val completionCustomizer = LspCompletionDisabled
         override val semanticTokensCustomizer: LspSemanticTokensCustomizer
-            get() = if (DartAnalysisServerService.isLspHighlightingEnabled(project)) {
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
                 DartLspSemanticTokensSupport
             } else {
                 LspSemanticTokensDisabled
