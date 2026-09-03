@@ -2212,7 +2212,7 @@ public final class DartAnalysisServerService implements Disposable {
       if (myServer == null) return;
 
       final Map<String, List<String>> subscriptions = new HashMap<>();
-      if (!isLspHighlightingEnabled(myProject)) {
+      if (!DartConfigurable.isExperimentalLspFeaturesEnabled(myProject)) {
         subscriptions.put(AnalysisService.HIGHLIGHTS, myVisibleFileUris);
       }
       subscriptions.put(AnalysisService.NAVIGATION, myVisibleFileUris);
