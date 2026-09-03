@@ -189,7 +189,7 @@ public final class DartAnnotator implements Annotator {
           notYetAppliedErrors.sort(Comparator.comparingInt(DartServerData.DartError::getOffset));
           ensureNoErrorsAfterEOF(notYetAppliedErrors, element.getContainingFile().getTextLength());
 
-          if (!DartAnalysisServerService.isLspHighlightingEnabled(element.getProject())) {
+          if (!DartConfigurable.isExperimentalLspFeaturesEnabled(element.getProject())) {
             notYetAppliedHighlighting.addAll(service.getHighlight(vFile));
             notYetAppliedHighlighting.sort(Comparator.comparingInt(DartServerData.DartHighlightRegion::getOffset));
           }
