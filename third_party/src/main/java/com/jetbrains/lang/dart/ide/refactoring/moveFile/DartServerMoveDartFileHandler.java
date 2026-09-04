@@ -17,18 +17,31 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.assists.DartSourceEditException;
+import com.jetbrains.lang.dart.ide.refactoring.DartLspRenamePsiElementProcessor;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
+import com.jetbrains.lang.dart.lsp.DartLspService;
 import com.jetbrains.lang.dart.psi.DartFile;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.SourceChange;
+import org.eclipse.lsp4j.FileRename;
+import org.eclipse.lsp4j.RenameFilesParams;
+import org.eclipse.lsp4j.WorkspaceEdit;
+import com.intellij.openapi.diagnostic.Logger;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.List;
 import java.util.Map;
+import com.intellij.openapi.progress.ProcessCanceledException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class DartServerMoveDartFileHandler extends MoveFileHandler {
+
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartServerMoveDartFileHandler.class);
 
   @Override
   public boolean canProcessElement(PsiFile psiFile) {
@@ -48,6 +61,34 @@ public final class DartServerMoveDartFileHandler extends MoveFileHandler {
     final VirtualFile virtualFile = psiFile.getVirtualFile();
 
     final String newFilePath = moveDestination.getVirtualFile().getPath() + "/" + virtualFile.getName();
+
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      DartAnalysisServerService.getInstance(project).updateFilesContent();
+      final String oldUri = DartLspRenamePsiElementProcessor.getFileUri(virtualFile.getPath());
+      final String newUri = DartLspRenamePsiElementProcessor.getFileUri(newFilePath);
+      LOG.info("prepareMovedFile via LSP: oldUri=" + oldUri + ", newUri=" + newUri);
+      final RenameFilesParams params = new RenameFilesParams(List.of(new FileRename(oldUri, newUri)));
+      try {
+        final WorkspaceEdit workspaceEdit = DartLspRenamePsiElementProcessor.awaitFutureCheckingCanceled(
+            DartLspService.willRenameFiles(project, params), 10);
+        LOG.info("willRenameFiles response: " + workspaceEdit);
+        if (workspaceEdit != null) {
+          DartLspRenamePsiElementProcessor.applyWorkspaceEdit(project, workspaceEdit);
+        }
+      }
+      catch (ProcessCanceledException e) {
+        LOG.info("willRenameFiles for move was canceled");
+        throw e;
+      }
+      catch (TimeoutException e) {
+        LOG.warn("Timeout waiting for willRenameFiles for Dart move", e);
+      }
+      catch (Exception e) {
+        LOG.error("Error executing willRenameFiles for Dart move", e);
+      }
+      return;
+    }
+
     final MoveFileRefactoring refactoring = new MoveFileRefactoring(project, virtualFile, newFilePath);
 
     // Validate initial status.

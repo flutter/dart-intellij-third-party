@@ -5,10 +5,14 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Computable
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspServerManager
 import com.intellij.util.concurrency.AppExecutorUtil
+import org.eclipse.lsp4j.RenameFilesParams
+import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest
 import java.util.concurrent.CompletableFuture
 
@@ -35,8 +39,27 @@ object DartLspService {
             val server = LspServerManager.getInstance(project)
                 .getServersForProvider(DartLspServerSupportProvider::class.java)
                 .firstOrNull() ?: return@supplyAsync null
-            val result = server.sendRequestSync { (it as DartLanguageServer).diagnosticServer() }
-            result?.port
+            var port: Int? = null
+            ProgressManager.getInstance().executeNonCancelableSection {
+                val result = server.sendRequestSync { (it as DartLanguageServer).diagnosticServer() }
+                port = result?.port
+            }
+            port
+        }, AppExecutorUtil.getAppExecutorService())
+    }
+
+    @JvmStatic
+    fun willRenameFiles(project: Project, params: RenameFilesParams): CompletableFuture<WorkspaceEdit?> {
+        return CompletableFuture.supplyAsync({
+            if (project.isDisposed) return@supplyAsync null
+            val server = LspServerManager.getInstance(project)
+                .getServersForProvider(DartLspServerSupportProvider::class.java)
+                .firstOrNull() ?: return@supplyAsync null
+            var edit: WorkspaceEdit? = null
+            ProgressManager.getInstance().executeNonCancelableSection {
+                edit = server.sendRequestSync { it.workspaceService.willRenameFiles(params) }
+            }
+            edit
         }, AppExecutorUtil.getAppExecutorService())
     }
 }

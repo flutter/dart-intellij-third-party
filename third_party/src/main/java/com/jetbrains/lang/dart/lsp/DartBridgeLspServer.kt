@@ -34,6 +34,10 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
 import org.eclipse.lsp4j.DocumentHighlight
 import org.eclipse.lsp4j.DocumentHighlightParams
+import org.eclipse.lsp4j.FileOperationFilter
+import org.eclipse.lsp4j.FileOperationOptions
+import org.eclipse.lsp4j.FileOperationPattern
+import org.eclipse.lsp4j.FileOperationsServerCapabilities
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
@@ -42,7 +46,15 @@ import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ReferenceParams
+import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.ServerCapabilities
+import org.eclipse.lsp4j.TypeDefinitionParams
+import org.eclipse.lsp4j.TypeHierarchyItem
+import org.eclipse.lsp4j.TypeHierarchyPrepareParams
+import org.eclipse.lsp4j.TypeHierarchySubtypesParams
+import org.eclipse.lsp4j.TypeHierarchySupertypesParams
+import org.eclipse.lsp4j.WorkspaceEdit
+import org.eclipse.lsp4j.WorkspaceServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.Either
@@ -51,11 +63,6 @@ import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
-import org.eclipse.lsp4j.TypeDefinitionParams
-import org.eclipse.lsp4j.TypeHierarchyItem
-import org.eclipse.lsp4j.TypeHierarchyPrepareParams
-import org.eclipse.lsp4j.TypeHierarchySubtypesParams
-import org.eclipse.lsp4j.TypeHierarchySupertypesParams
 import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -244,6 +251,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setTypeHierarchyProvider(true)
             setCallHierarchyProvider(true)
             setReferencesProvider(true)
+            val fileOperationsCaps = FileOperationsServerCapabilities().apply {
+                willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
+            }
+            workspace = WorkspaceServerCapabilities().apply {
+                fileOperations = fileOperationsCaps
+            }
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -319,6 +332,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     // --- WorkspaceService Implementation ---
 
+    override fun willRenameFiles(params: RenameFilesParams): CompletableFuture<WorkspaceEdit> {
+        return forwardRequest("workspace/willRenameFiles", params, WorkspaceEdit::class.java)
+    }
+
     override fun didChangeConfiguration(params: DidChangeConfigurationParams) {
         // Ignored. Configuration is managed by the legacy plugin settings.
     }
@@ -381,13 +398,19 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     private fun <T> forwardRequest(method: String, params: Any?, responseType: Type): CompletableFuture<T> {
         val future = CompletableFuture<T>()
         
-        val ready = runReadAction { das.serverReadyForRequest() }
+        val ready = if (das.isServerProcessActive) {
+            true
+        } else {
+            runCatching { runReadAction { das.serverReadyForRequest() } }.getOrDefault(false)
+        }
         if (!ready) {
             future.completeExceptionally(ResponseErrorException(ResponseError(-32001, "Dart Analysis Server is not ready", null)))
             return future
         }
 
-        das.updateFilesContent()
+        if (com.intellij.openapi.application.ApplicationManager.getApplication().isReadAccessAllowed) {
+            das.updateFilesContent()
+        }
 
         val legacyId = das.generateUniqueId()
         if (legacyId == null) {
