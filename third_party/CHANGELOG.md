@@ -7,6 +7,7 @@
 ### Removed
 
 ### Fixed
+- Remove ambiguous "Find Usages Of" popup when invoking Find Usages with LSP references enabled (#643)
 
 ## 509.0.0
 
