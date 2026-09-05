@@ -168,6 +168,11 @@ public enum InstanceKind {
   Uint8List,
 
   /**
+   * An instance of the Dart class UserTag.
+   */
+  UserTag,
+
+  /**
    * An instance of the Dart class WeakProperty.
    */
   WeakProperty,
