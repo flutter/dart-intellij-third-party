@@ -36,6 +36,7 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
 
         val reference = file.findReferenceAt(myFixture.caretOffset)
         assertNotNull("Reference should be found at caret", reference)
+        if (reference == null) return
 
         val evaluator = DartTargetElementEvaluator()
 
@@ -43,9 +44,9 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
         PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
 
         if (DartAnalysisServerService.isLspReferencesEnabled(project)) {
-            val candidates = evaluator.getTargetCandidates(reference!!)
+            val candidates = evaluator.getTargetCandidates(reference)
             assertNotNull(candidates)
-            assertTrue(candidates!!.isEmpty())
+            assertTrue(candidates?.isEmpty() == true)
 
             val utilCandidates = TargetElementUtil.getInstance().getTargetCandidates(reference)
             assertTrue(utilCandidates.isEmpty())
@@ -54,6 +55,6 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
         // Disable experimental LSP features
         PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", false, true)
         assertFalse(DartConfigurable.isExperimentalLspFeaturesEnabled(project))
-        assertNull(evaluator.getTargetCandidates(reference!!))
+        assertNull(evaluator.getTargetCandidates(reference))
     }
 }
