@@ -19,4 +19,5 @@ code_review:
     code_review: true
     # (DEFAULT) -- Note that this is disabled for flutter
     include_drafts: true
-ignore_patterns: []
+ignore_patterns:
+  - "dart-sdk/**"
