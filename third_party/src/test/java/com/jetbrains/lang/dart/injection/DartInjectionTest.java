@@ -1,6 +1,5 @@
 package com.jetbrains.lang.dart.injection;
 
-import com.intellij.lang.Language;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.impl.DebugUtil;
@@ -8,7 +7,6 @@ import com.intellij.testFramework.LightPlatformCodeInsightTestCase;
 import com.intellij.testFramework.ParsingTestCase;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assume;
 
 /**
  * Test the Dart language injection functionality.

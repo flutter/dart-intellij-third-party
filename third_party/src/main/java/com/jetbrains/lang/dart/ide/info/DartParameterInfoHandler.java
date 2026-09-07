@@ -10,15 +10,12 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.util.text.Strings;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.util.DartClassResolveResult;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
-
-import java.util.List;
 
 public final class DartParameterInfoHandler implements ParameterInfoHandler<PsiElement, DartFunctionDescription> {
   private String myParametersListPresentableText = "";

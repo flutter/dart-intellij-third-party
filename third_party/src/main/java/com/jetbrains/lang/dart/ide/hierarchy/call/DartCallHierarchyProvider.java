@@ -10,7 +10,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.platform.dartlsp.impl.features.hierarchy.call.LspCallHierarchyBrowser;
 import com.intellij.platform.dartlsp.impl.features.hierarchy.call.LspCallHierarchyProvider;
 import com.intellij.psi.PsiElement;
-import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.jetbrains.annotations.NotNull;

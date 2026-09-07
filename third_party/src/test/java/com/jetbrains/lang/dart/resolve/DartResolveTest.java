@@ -2,12 +2,9 @@
 package com.jetbrains.lang.dart.resolve;
 
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.ide.runner.DartExecutionHelper;
-
-import static com.jetbrains.dart.analysisServer.DartServerResolverTest.doTest;
 
 /**
  * Test the Dart resolve functionality.

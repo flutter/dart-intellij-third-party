@@ -1,8 +1,5 @@
 package com.jetbrains.dart.analysisServer;
 
-import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
-import com.jetbrains.lang.dart.util.DartTestUtils;
-
 public class DartDotShorthandCompletionTest extends DartServerCompletionTest {
   public void testDotNewCompletion() {
     doTest("new",

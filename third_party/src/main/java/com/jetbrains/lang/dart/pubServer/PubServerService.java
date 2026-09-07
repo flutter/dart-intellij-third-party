@@ -52,7 +52,6 @@ import org.jetbrains.io.Responses;
 import org.jetbrains.io.SimpleChannelInboundHandlerAdapter;
 
 import javax.swing.*;
-import javax.swing.event.HyperlinkEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
