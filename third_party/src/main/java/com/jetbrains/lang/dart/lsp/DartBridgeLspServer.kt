@@ -34,6 +34,8 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
 import org.eclipse.lsp4j.DocumentHighlight
 import org.eclipse.lsp4j.DocumentHighlightParams
+import org.eclipse.lsp4j.DocumentSymbol
+import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
@@ -43,6 +45,7 @@ import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.ServerCapabilities
+import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.Either
@@ -244,6 +247,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setTypeHierarchyProvider(true)
             setCallHierarchyProvider(true)
             setReferencesProvider(true)
+            setDocumentSymbolProvider(true)
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -297,6 +301,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
         return forwardRequest("dart/diagnosticServer", null, DiagnosticServerResult::class.java)
+    }
+
+    override fun documentSymbol(
+        params: DocumentSymbolParams
+    ): CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> {
+        val type = object: TypeToken<List<DocumentSymbol>>() {}.type
+        return forwardRequest<List<DocumentSymbol>>("textDocument/documentSymbol", params, type).thenApply { symbols ->
+            symbols?.map { Either.forRight<SymbolInformation, DocumentSymbol>(it) } ?: emptyList()
+        }
     }
 
     // Implement other TextDocumentService methods as needed, returning unsupported or forwarding.

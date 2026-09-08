@@ -25,6 +25,7 @@ import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
+import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
@@ -769,6 +770,70 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(4, result[0].range.start.character)
         assertEquals(0, result[0].range.end.line)
         assertEquals(10, result[0].range.end.character)
+    }
+
+    fun testDocumentSymbolRequest() {
+        val params = DocumentSymbolParams(TextDocumentIdentifier("file:///test.dart"))
+        val future = bridgeServer.documentSymbol(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+
+        val lspMessage = jsonObject!!.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("textDocument/documentSymbol", lspMessage.get("method").asString)
+
+        val responseJson = """
+                {
+                  "id": "123",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "123",
+                      "result": [
+                        {
+                          "name": "MyClass",
+                          "kind": 5,
+                          "range": {
+                            "start": { "line": 0, "character": 0 },
+                            "end": { "line": 4, "character": 1 }
+                          },
+                          "selectionRange": {
+                            "start": { "line": 0, "character": 6 },
+                            "end": { "line": 0, "character": 13 }
+                          },
+                          "children": [
+                            {
+                              "name": "myMethod",
+                              "detail": "(String name)",
+                              "kind": 6,
+                              "range": {
+                                "start": { "line": 1, "character": 2 },
+                                "end": { "line": 3, "character": 3 }
+                              },
+                              "selectionRange": {
+                                "start": { "line": 1, "character": 7 },
+                                "end": { "line": 1, "character": 15 }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        val rootSymbol = result[0].right
+        assertEquals("MyClass", rootSymbol.name)
+        assertEquals(SymbolKind.Class, rootSymbol.kind)
+        assertEquals(1, rootSymbol.children.size)
+        assertEquals("myMethod", rootSymbol.children[0].name)
+        assertEquals("(String name)", rootSymbol.children[0].detail)
     }
 
     fun testIsDartSdkVersionSufficientForLspReferences() {

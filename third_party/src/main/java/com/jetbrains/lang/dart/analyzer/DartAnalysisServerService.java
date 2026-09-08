@@ -557,6 +557,10 @@ public final class DartAnalysisServerService implements Disposable {
 
     JsonObject textDocument = new JsonObject();
 
+    JsonObject documentSymbol = new JsonObject();
+    documentSymbol.addProperty("hierarchicalDocumentSymbolSupport", true);
+    textDocument.add("documentSymbol", documentSymbol);
+
     JsonObject definition = new JsonObject();
     definition.addProperty("linkSupport", true);
     textDocument.add("definition", definition);

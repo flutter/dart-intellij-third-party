@@ -17,7 +17,8 @@ enum class LspMethod(
     INITIALIZE("initialize"),
     SHUTDOWN("shutdown"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
-    REFERENCES("textDocument/references", isExperimental = true, presentableName = "references");
+    REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
+    DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols");
 
     companion object {
         fun fromMethod(method: String): LspMethod? = entries.find { it.method == method }
