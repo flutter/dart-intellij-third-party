@@ -12,8 +12,8 @@ permissions:
   contents: read
 
 jobs:
-  # Job 0: Check Agent Skills Documentation
-  check-skills-docs:
+  # Job 0: Check AI Configuration and Agent Skills
+  check-ai-config:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -21,8 +21,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run documentation check
+      - name: Check agent skills documentation
         run: ./tool/check_agent_skills.sh
+      - name: Check AI ignore configurations
+        run: ./tool/check_ai_config.sh
 
   # Job 1: Build Plugin
   build-plugin:
