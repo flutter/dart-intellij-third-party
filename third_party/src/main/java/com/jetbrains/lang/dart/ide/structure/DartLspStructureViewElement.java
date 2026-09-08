@@ -62,7 +62,12 @@ public class DartLspStructureViewElement extends PsiTreeElementBase<PsiElement> 
 
     private static @NotNull String buildPresentableText(@NotNull DocumentSymbol symbol) {
         String detail = symbol.getDetail();
-        return symbol.getName() + (StringUtil.isNotEmpty(detail) ? detail : "" );
+        if (StringUtil.isEmpty(detail)) {
+            return symbol.getName();
+        }
+        return symbol.getName() +
+                (detail.startsWith("(") || detail.startsWith("<") || detail.startsWith(":") || detail.startsWith("->") || detail.startsWith("→") ?
+                         detail : ": " + detail);
     }
 
     static @Nullable PsiElement findBestPsiElementForSymbol(@NotNull PsiFile psiFile, @NotNull DocumentSymbol symbol) {
