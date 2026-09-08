@@ -7,12 +7,16 @@ import com.intellij.ide.structureView.TextEditorBasedStructureViewModel;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
 import com.intellij.ide.util.treeView.smartTree.Sorter;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.dartlsp.impl.features.documentSymbol.LspStructureViewSupport;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.analyzer.DartServerData;
 import org.dartlang.analysis.server.protocol.Outline;
+import org.eclipse.lsp4j.DocumentSymbol;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -52,15 +56,20 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
 
   @Override
   public @Nullable PsiElement getCurrentEditorElement() {
-    // Note: this should return an object of type PsiElement to be compatible with the Context Info (alt+q) action.
-    if (getEditor() == null) return null;
+      // Note: this should return an object of type PsiElement to be compatible with the Context Info (alt+q) action.
+      if (getEditor() == null) return null;
+      final LspStructureViewSupport support = LspStructureViewSupport.find(getPsiFile().getProject(), getPsiFile().getVirtualFile());
+      if (support != null) {
+          final DocumentSymbol result = findDeepestSymbolForOffset(getEditor().getCaretModel().getOffset(), support.getDocumentSymbols());
+          return result != null ? DartLspStructureViewElement.findBestPsiElementForSymbol(getPsiFile(), result) : null;
+      }
 
-    final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getPsiFile().getProject());
-    final Outline outline = service.getOutline(getPsiFile().getVirtualFile());
-    if (outline == null) return null;
+      final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getPsiFile().getProject());
+      final Outline outline = service.getOutline(getPsiFile().getVirtualFile());
+      if (outline == null) return null;
 
-    final Outline result = findDeepestOutlineForOffset(getEditor().getCaretModel().getOffset(), outline);
-    return DartStructureViewElement.findBestPsiElementForOutline(getPsiFile(), result);
+      final Outline result = findDeepestOutlineForOffset(getEditor().getCaretModel().getOffset(), outline);
+      return DartStructureViewElement.findBestPsiElementForOutline(getPsiFile(), result);
   }
 
   private @NotNull Outline findDeepestOutlineForOffset(final int offset, final @NotNull Outline outline) {
@@ -88,7 +97,30 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
     return outline;
   }
 
-  @Override
+    private @Nullable DocumentSymbol findDeepestSymbolForOffset(final int offset, final @Nullable List<DocumentSymbol> symbols) {
+        if (symbols == null || symbols.isEmpty()) return null;
+        for (int i = 0; i < symbols.size(); i++) {
+            DocumentSymbol symbol = symbols.get(i);
+            TextRange range = DartLspStructureViewElement.getTextRange(getPsiFile(), symbol.getRange());
+            if (range != null) {
+                if (offset >= range.getStartOffset() && offset <= range.getEndOffset()) {
+                    DocumentSymbol childResult = findDeepestSymbolForOffset(offset, symbol.getChildren());
+                    return childResult != null ? childResult : symbol;
+                }
+                if (offset > range.getEndOffset() && i != symbols.size() - 1) {
+                    DocumentSymbol next = symbols.get(i + 1);
+                    TextRange nextRange = DartLspStructureViewElement.getTextRange(getPsiFile(), next.getRange());
+                    if (nextRange != null && offset < nextRange.getStartOffset()) {
+                        return next;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+
+    @Override
   public boolean isAlwaysShowsPlus(StructureViewTreeElement element) {
     return false;
   }
@@ -114,10 +146,15 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
 
     @Override
     public @NotNull Collection<StructureViewTreeElement> getChildrenBase() {
-      final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getValue().getProject());
-      final Outline outline = service.getOutline(getValue().getVirtualFile());
-      return outline != null ? Arrays.asList(new DartStructureViewElement(getValue(), outline).getChildren())
-                             : Collections.emptyList();
+        final LspStructureViewSupport support = LspStructureViewSupport.find(getValue().getProject(), getValue().getVirtualFile());
+        if (support != null) {
+            return ContainerUtil.map(support.getDocumentSymbols(),
+                    documentSymbol -> new DartLspStructureViewElement(getValue(), support, documentSymbol));
+        }
+        final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getValue().getProject());
+        final Outline outline = service.getOutline(getValue().getVirtualFile());
+        return outline != null ? Arrays.asList(new DartStructureViewElement(getValue(), outline).getChildren())
+                : Collections.emptyList();
     }
   }
 }

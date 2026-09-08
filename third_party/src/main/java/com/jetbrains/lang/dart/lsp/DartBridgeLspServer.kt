@@ -38,6 +38,8 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
 import org.eclipse.lsp4j.DocumentHighlight
 import org.eclipse.lsp4j.DocumentHighlightParams
+import org.eclipse.lsp4j.DocumentSymbol
+import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.ExecuteCommandOptions
 import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileOperationFilter
@@ -56,6 +58,7 @@ import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.ServerCapabilities
+import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.TypeDefinitionParams
 import org.eclipse.lsp4j.TypeHierarchyItem
 import org.eclipse.lsp4j.TypeHierarchyPrepareParams
@@ -296,6 +299,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setTypeHierarchyProvider(true)
             setCallHierarchyProvider(true)
             setReferencesProvider(true)
+            setDocumentSymbolProvider(true)
             val fileOperationsCaps = FileOperationsServerCapabilities().apply {
                 willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
             }
@@ -382,6 +386,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val responseType = object : TypeToken<List<CodeAction>>() {}.type
         return forwardRequest<List<CodeAction>>("textDocument/codeAction", params, responseType).thenApply { actions ->
             actions?.map { Either.forRight<Command, CodeAction>(it) } ?: emptyList()
+        }
+    }
+
+    override fun documentSymbol(
+        params: DocumentSymbolParams
+    ): CompletableFuture<List<Either<SymbolInformation, DocumentSymbol>>> {
+        val type = object: TypeToken<List<DocumentSymbol>>() {}.type
+        return forwardRequest<List<DocumentSymbol>>("textDocument/documentSymbol", params, type).thenApply { symbols ->
+            symbols?.map { Either.forRight<SymbolInformation, DocumentSymbol>(it) } ?: emptyList()
         }
     }
 
