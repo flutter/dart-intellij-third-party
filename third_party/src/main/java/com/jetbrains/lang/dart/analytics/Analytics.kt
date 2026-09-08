@@ -332,9 +332,6 @@ class AssistData(id: String?, project: Project?) :
 class FixData(id: String?, project: Project?) :
   AnalyticsData(AnalyticsConstants.FIX_TYPE, id, project)
 
-class LegacyHoverData(id: String?, project: Project?) :
-  AnalyticsData(AnalyticsConstants.LEGACY_HOVER_TYPE, id, project)
-
 class LegacyRefactoringData(kind: String?, project: Project?) :
   AnalyticsData(AnalyticsConstants.LEGACY_REFACTORING_TYPE, kind, project)
 
@@ -378,9 +375,6 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
 
     @JvmStatic
     fun forFix(id: String?, project: Project?): FixData = FixData(id, project)
-
-    @JvmStatic
-    fun forLegacyHover(id: String?, project: Project?): LegacyHoverData = LegacyHoverData(id, project)
 
     @JvmStatic
     fun forLegacyRefactoring(kind: String?, project: Project?): LegacyRefactoringData =
@@ -447,7 +441,6 @@ object AnalyticsConstants {
   internal const val ACTION_TYPE = "action"
   internal const val ASSIST_TYPE = "assist"
   internal const val FIX_TYPE = "fix"
-  internal const val LEGACY_HOVER_TYPE = "legacy_hover"
   internal const val LEGACY_REFACTORING_TYPE = "legacy_refactoring"
   internal const val SETTINGS_TYPE = "settings"
   internal const val DEBUG_SESSION_TYPE = "debug_session"

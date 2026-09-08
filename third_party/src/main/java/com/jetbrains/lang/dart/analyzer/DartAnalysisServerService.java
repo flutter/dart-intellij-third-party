@@ -13,7 +13,6 @@ import com.google.dart.server.FindElementReferencesConsumer;
 import com.google.dart.server.FormatConsumer;
 import com.google.dart.server.GetAssistsConsumer;
 import com.google.dart.server.GetFixesConsumer;
-import com.google.dart.server.GetHoverConsumer;
 import com.google.dart.server.GetImportedElementsConsumer;
 import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
@@ -121,7 +120,6 @@ import org.dartlang.analysis.server.protocol.CompletionService;
 import org.dartlang.analysis.server.protocol.CompletionSuggestion;
 import org.dartlang.analysis.server.protocol.Element;
 import org.dartlang.analysis.server.protocol.HighlightRegion;
-import org.dartlang.analysis.server.protocol.HoverInformation;
 import org.dartlang.analysis.server.protocol.ImplementedClass;
 import org.dartlang.analysis.server.protocol.ImplementedMember;
 import org.dartlang.analysis.server.protocol.ImportedElements;
@@ -183,6 +181,7 @@ public final class DartAnalysisServerService implements Disposable {
   private static final String MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION = "3.8";
   public static final String MIN_LSP_NAVIGATION_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-137.0.dev";
+  public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
@@ -192,7 +191,6 @@ public final class DartAnalysisServerService implements Disposable {
   private static final long EDIT_FORMAT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
   private static final long EDIT_ORGANIZE_DIRECTIVES_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(300);
   private static final long EDIT_SORT_MEMBERS_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
-  private static final long GET_HOVER_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_NAVIGATION_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_ASSISTS_TIMEOUT_EDT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long GET_ASSISTS_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(1000);
@@ -552,7 +550,7 @@ public final class DartAnalysisServerService implements Disposable {
       workspace.addProperty("applyEdit", true);
 
       JsonObject workspaceEdit = new JsonObject();
-      workspaceEdit.addProperty("documentChanges", false);
+      workspaceEdit.addProperty("documentChanges", true);
       workspace.add("workspaceEdit", workspaceEdit);
 
       lspCapabilities.add("workspace", workspace);
@@ -563,6 +561,10 @@ public final class DartAnalysisServerService implements Disposable {
     JsonObject definition = new JsonObject();
     definition.addProperty("linkSupport", true);
     textDocument.add("definition", definition);
+
+    JsonObject typeDefinition = new JsonObject();
+    typeDefinition.addProperty("linkSupport", true);
+    textDocument.add("typeDefinition", typeDefinition);
 
     if (supportsLspDiagnostics) {
       JsonObject publishDiagnostics = new JsonObject();
@@ -600,7 +602,12 @@ public final class DartAnalysisServerService implements Disposable {
     return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION) >= 0;
   }
 
-  public static boolean isLspPublishDiagnosticsEnabled(final @NotNull Project project) {
+    public static boolean isDartSdkVersionSufficientForLspReferences(@NotNull String sdkVersion) {
+        return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_REFERENCES_SDK_VERSION) >= 0;
+    }
+
+
+    public static boolean isLspPublishDiagnosticsEnabled(final @NotNull Project project) {
     if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
       return false;
     }
@@ -617,7 +624,16 @@ public final class DartAnalysisServerService implements Disposable {
     return sdk != null && isDartSdkVersionSufficientForLspInlayHints(sdk.getVersion());
   }
 
-  public boolean shouldUseCompletion2() {
+    public static boolean isLspReferencesEnabled(final @NotNull Project project) {
+        if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+            return false;
+        }
+        final DartSdk sdk = DartSdk.getDartSdk(project);
+        return sdk != null && isDartSdkVersionSufficientForLspReferences(sdk.getVersion());
+    }
+
+
+    public boolean shouldUseCompletion2() {
     return StringUtil.compareVersionNumbers(getServerVersion(), COMPLETION_2_SERVER_VERSION) >= 0;
   }
 
@@ -1247,39 +1263,6 @@ public final class DartAnalysisServerService implements Disposable {
     if (myInitializationOnServerStartupDone) {
       DartProblemsView.getInstance(myProject).clearAll();
     }
-  }
-
-  public @NotNull List<HoverInformation> analysis_getHover(final @NotNull VirtualFile file, final int _offset) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return HoverInformation.EMPTY_LIST;
-    }
-
-    final String fileUri = getFileUri(file);
-    final List<HoverInformation> result = new ArrayList<>();
-
-    final CountDownLatch latch = new CountDownLatch(1);
-    final int offset = getOriginalOffset(file, _offset);
-    server.analysis_getHover(fileUri, offset, new GetHoverConsumer() {
-      @Override
-      public void computedHovers(HoverInformation[] hovers) {
-        Collections.addAll(result, hovers);
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(RequestError error) {
-        logError("analysis_getHover()", fileUri, error);
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_HOVER_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("analysis_getHover", GET_HOVER_TIMEOUT, fileUri);
-    }
-    return result;
   }
 
   public @Nullable List<DartServerData.DartNavigationRegion> analysis_getNavigation(final @NotNull VirtualFile file,

@@ -1,7 +1,6 @@
 ## Unreleased
 
 ### Added
-- Populate Dart Analysis tool window errors and warnings using Language Server Protocol (LSP) publishDiagnostics notifications (#520)
 - Inlay hints for types and parameter names, configurable in Settings | Editor | Inlay Hints (JetBrains LSP; requires Dart SDK 3.14.0-139.0.dev or newer) (#617)
 
 ### Changed
@@ -9,6 +8,21 @@
 ### Removed
 
 ### Fixed
+
+## 509.0.0
+
+### Added
+- Populating Dart Analysis tool window errors and warnings using Language Server Protocol (LSP) publishDiagnostics notifications (#520)
+- Go to Type Declaration implemented with JetBrains LSP (#615)
+- Type and Call Hierarchy navigation implemented with JetBrains LSP (#403)
+- Find Usages / references with JetBrains LSP (experimental feature) (#396)
+
+### Changed
+- Diagnostics server port retrieval via LSP has passed the experimental phase and is now enabled for all users with an appropriate SDK (#625)
+- Hover via LSP is now enabled for all users (#626)
+
+### Fixed
+- Quick Documentation from code completion popup window (#632)
 
 ## 508.1.0
 

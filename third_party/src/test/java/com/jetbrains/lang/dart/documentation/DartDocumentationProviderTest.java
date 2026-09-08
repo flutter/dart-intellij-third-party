@@ -1,6 +1,9 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.lang.dart.documentation;
 
+import com.intellij.codeInsight.lookup.LookupElement;
+import com.intellij.codeInsight.lookup.LookupElementBuilder;
+import com.intellij.codeInsight.lookup.LookupManager;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
@@ -9,14 +12,14 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
+import com.jetbrains.lang.dart.ide.completion.DartLookupObject;
 import com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider;
 import com.jetbrains.lang.dart.psi.DartComponent;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
-
-import static com.jetbrains.lang.dart.util.DartPresentableUtil.RIGHT_ARROW;
 
 /**
  * Test the {@link com.jetbrains.lang.dart.ide.documentation.DartDocumentationProvider} class.
@@ -27,17 +30,14 @@ public class DartDocumentationProviderTest extends DartCodeInsightFixtureTestCas
 
   private final DartDocumentationProvider myProvider = new DartDocumentationProvider();
 
-  private void doTestQuickNavigateInfo(String expectedDoc, String fileContents) {
+  private void doTestQuickNavigateInfo(String fileContents) {
     final int caretOffset = fileContents.indexOf("<caret>");
     assertTrue(caretOffset != -1);
     final String realContents = fileContents.substring(0, caretOffset) + fileContents.substring(caretOffset + "<caret>".length());
     final PsiFile psiFile = myFixture.addFileToProject("test.dart", realContents);
-    //final DartReference reference = PsiTreeUtil.getParentOfType(psiFile.findElementAt(caretOffset), DartReference.class);
-    //assertNotNull("reference not found at offset: " + caretOffset, reference);
-    //final PsiElement element = reference.resolve();
     final PsiElement element = PsiTreeUtil.getParentOfType(psiFile.findElementAt(caretOffset), DartComponent.class);
     assertNotNull("target element not found at offset " + caretOffset, element);
-    assertEquals(expectedDoc, myProvider.getQuickNavigateInfo(element, element));
+    assertNull(myProvider.getQuickNavigateInfo(element, element));
   }
 
   private void doTestDocUrl(@NotNull final String expectedUrl, @NotNull final String fileRelPath, @NotNull final String declText) {
@@ -52,15 +52,15 @@ public class DartDocumentationProviderTest extends DartCodeInsightFixtureTestCas
   }
 
   public void testFieldRef() {
-    doTestQuickNavigateInfo("int <b>x</b>", "class A { int <caret>x; foo() => x; }");
+    doTestQuickNavigateInfo("class A { int <caret>x; foo() => x; }");
   }
 
   public void testFunctionRef() {
-    doTestQuickNavigateInfo("<b>f</b>() " + RIGHT_ARROW + " dynamic", "<caret>f(); g() => f();");
+    doTestQuickNavigateInfo("<caret>f(); g() => f();");
   }
 
   public void testEnumRef() {
-    doTestQuickNavigateInfo("E <b>E1</b>", "enum E { <caret>E1 } var e = E.E1;");
+    doTestQuickNavigateInfo("enum E { <caret>E1 } var e = E.E1;");
   }
 
   public void testPsiDirectoryRef() {
@@ -90,5 +90,41 @@ public class DartDocumentationProviderTest extends DartCodeInsightFixtureTestCas
     doTestDocUrl("https://api.dart.dev/stable/dart-core/List/length.html",
                  "core/list.dart",
                  "set length(int newLength);");
+  }
+
+  public void testGenerateDocWithAndWithoutActiveLookup() {
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+
+    final PsiFile psiFile = myFixture.addFileToProject("test.dart", "/// Documentation for class A\nclass A {}");
+    myFixture.configureFromExistingVirtualFile(psiFile.getVirtualFile());
+    final PsiElement element = PsiTreeUtil.getParentOfType(psiFile.findElementAt(psiFile.getText().indexOf("A {}")), DartComponent.class);
+    assertNotNull(element);
+
+    // 1. Without an active lookup, generateDoc returns null when experimental LSP features is enabled
+    assertNull("Expected null doc without active lookup", myProvider.generateDoc(element, null));
+
+    // 2. With an active lookup containing DartLookupObject, generateDoc generates doc
+    LookupElement lookupElement =
+      LookupElementBuilder.create(new DartLookupObject(getProject(), null, 0), "A");
+    LookupManager.getInstance(getProject()).showLookup(myFixture.getEditor(), lookupElement);
+    try {
+      final String doc = myProvider.generateDoc(element, null);
+      assertNotNull("Expected non-null doc with active DartLookupObject", doc);
+      assertTrue("Expected doc to contain class documentation", doc.contains("Documentation for class A"));
+    }
+    finally {
+      LookupManager.getInstance(getProject()).hideActiveLookup();
+    }
+
+    // 3. With an active lookup containing a non-DartLookupObject, generateDoc returns null
+    LookupElement plainLookupElement =
+      LookupElementBuilder.create("plain");
+    LookupManager.getInstance(getProject()).showLookup(myFixture.getEditor(), plainLookupElement);
+    try {
+      assertNull("Expected null doc with non-DartLookupObject", myProvider.generateDoc(element, null));
+    }
+    finally {
+      LookupManager.getInstance(getProject()).hideActiveLookup();
+    }
   }
 }

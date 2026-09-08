@@ -33,4 +33,15 @@ public class DartLspExperimentalFeaturesTest extends CodeInsightFixtureTestCase 
     PropertiesComponent.getInstance(getProject()).setValue("dart.lsp.experimental.enabled", true, true);
     assertTrue(DartConfigurable.isExperimentalLspFeaturesEnabled(getProject()));
   }
+
+  public void testLspMethodsExperimentalStatus() {
+    assertFalse(LspMethod.DIAGNOSTIC_SERVER.isExperimental());
+    assertFalse(LspMethod.HOVER.isExperimental());
+    assertFalse(LspMethod.TYPE_DEFINITION.isExperimental());
+    assertTrue(LspMethod.DEFINITION.isExperimental());
+    assertTrue(LspMethod.DOCUMENT_HIGHLIGHT.isExperimental());
+
+    assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.DIAGNOSTIC_SERVER));
+    assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.HOVER));
+  }
 }

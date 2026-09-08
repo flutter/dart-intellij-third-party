@@ -10,7 +10,9 @@ class DartLspTextEdit(val range: DartLspRange, val newText: String)
 
 interface DartLspDocumentChange
 
-class DartLspTextDocumentEdit() : DartLspDocumentChange
+class DartLspVersionedTextDocumentIdentifier(val uri: String, val version: Int?)
+
+class DartLspTextDocumentEdit(val textDocument: DartLspVersionedTextDocumentIdentifier, val edits: List<DartLspTextEdit>) : DartLspDocumentChange
 
 class DartLspCreateFile() : DartLspDocumentChange
 

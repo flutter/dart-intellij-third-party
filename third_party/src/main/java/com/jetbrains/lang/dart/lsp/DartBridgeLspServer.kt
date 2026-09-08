@@ -17,6 +17,12 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import org.dartlang.analysis.server.protocol.AnalysisError
 import org.dartlang.analysis.server.protocol.DiagnosticMessage
+import org.eclipse.lsp4j.CallHierarchyIncomingCall
+import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
+import org.eclipse.lsp4j.CallHierarchyItem
+import org.eclipse.lsp4j.CallHierarchyOutgoingCall
+import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
+import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
@@ -37,6 +43,7 @@ import org.eclipse.lsp4j.InlayHintParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
@@ -46,6 +53,11 @@ import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
+import org.eclipse.lsp4j.TypeDefinitionParams
+import org.eclipse.lsp4j.TypeHierarchyItem
+import org.eclipse.lsp4j.TypeHierarchyPrepareParams
+import org.eclipse.lsp4j.TypeHierarchySubtypesParams
+import org.eclipse.lsp4j.TypeHierarchySupertypesParams
 import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -229,8 +241,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
             setDefinitionProvider(true)
+            setTypeDefinitionProvider(true)
             setDocumentHighlightProvider(true)
             setInlayHintProvider(true)
+            setTypeHierarchyProvider(true)
+            setCallHierarchyProvider(true)
+            setReferencesProvider(true)
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
@@ -264,9 +280,22 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
+    override fun typeDefinition(params: TypeDefinitionParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
+        val type = object : TypeToken<List<LocationLink>>() {}.type
+        return forwardRequest<List<LocationLink>>("textDocument/typeDefinition", params, type).thenApply { links ->
+            Either.forRight(links ?: emptyList())
+        }
+    }
+
     override fun documentHighlight(params: DocumentHighlightParams): CompletableFuture<List<DocumentHighlight>> {
         val type = object : TypeToken<List<DocumentHighlight>>() {}.type
         return forwardRequest<List<DocumentHighlight>>("textDocument/documentHighlight", params, type)
+    }
+
+    override fun references(params: ReferenceParams): CompletableFuture<List<Location>> {
+        val type = object: TypeToken<List<Location>>() {}.type
+
+        return forwardRequest("textDocument/references", params, type)
     }
 
     // Unlike the other overrides above, this one must never let its future complete
@@ -317,6 +346,41 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     override fun didChangeWatchedFiles(params: DidChangeWatchedFilesParams) {
         // Ignored. File watching is handled by the legacy plugin.
     }
+
+    // --- Type Hierarchy ---
+
+    override fun prepareTypeHierarchy(params: TypeHierarchyPrepareParams): CompletableFuture<List<TypeHierarchyItem>> {
+        val type = object : TypeToken<List<TypeHierarchyItem>>() {}.type
+        return forwardRequest("textDocument/prepareTypeHierarchy", params, type)
+    }
+
+    override fun typeHierarchySupertypes(params: TypeHierarchySupertypesParams): CompletableFuture<List<TypeHierarchyItem>> {
+        val type = object : TypeToken<List<TypeHierarchyItem>>() {}.type
+        return forwardRequest("typeHierarchy/supertypes", params, type)
+    }
+
+    override fun typeHierarchySubtypes(params: TypeHierarchySubtypesParams): CompletableFuture<List<TypeHierarchyItem>> {
+        val type = object : TypeToken<List<TypeHierarchyItem>>() {}.type
+        return forwardRequest("typeHierarchy/subtypes", params, type)
+    }
+
+    // --- Call Hierarchy ---
+
+    override fun prepareCallHierarchy(params: CallHierarchyPrepareParams): CompletableFuture<List<CallHierarchyItem>> {
+        val type = object : TypeToken<List<CallHierarchyItem>>() {}.type
+        return forwardRequest("textDocument/prepareCallHierarchy", params, type)
+    }
+
+    override fun callHierarchyIncomingCalls(params: CallHierarchyIncomingCallsParams): CompletableFuture<List<CallHierarchyIncomingCall>> {
+        val type = object : TypeToken<List<CallHierarchyIncomingCall>>() {}.type
+        return forwardRequest("callHierarchy/incomingCalls", params, type)
+    }
+
+    override fun callHierarchyOutgoingCalls(params: CallHierarchyOutgoingCallsParams): CompletableFuture<List<CallHierarchyOutgoingCall>> {
+        val type = object : TypeToken<List<CallHierarchyOutgoingCall>>() {}.type
+        return forwardRequest("callHierarchy/outgoingCalls", params, type)
+    }
+
 
     // --- Helper Methods for Forwarding ---
 

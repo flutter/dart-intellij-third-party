@@ -6,12 +6,18 @@ import com.intellij.find.findUsages.FindUsagesHandlerFactory;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.jetbrains.lang.dart.DartLanguage;
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public final class DartServerFindUsagesHandlerFactory extends FindUsagesHandlerFactory {
   @Override
   public boolean canFindUsages(final @NotNull PsiElement element) {
+    // Disable legacy DAS handler only if the SDK actually supports LSP references
+    if (DartAnalysisServerService.isLspReferencesEnabled(element.getProject())) {
+      return false;
+    }
+
     return element.getLanguage() == DartLanguage.INSTANCE && !(element instanceof PsiFile);
   }
 
