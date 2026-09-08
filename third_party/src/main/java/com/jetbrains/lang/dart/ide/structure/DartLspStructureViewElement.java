@@ -47,7 +47,12 @@ public class DartLspStructureViewElement extends PsiTreeElementBase<PsiElement> 
 
     @Override
     public void navigate(boolean requestFocus) {
-        mySupport.navigate(mySymbol.getSelectionRange().getStart(), requestFocus);
+        Range range = mySymbol.getSelectionRange() != null ? mySymbol.getSelectionRange() : mySymbol.getRange();
+        if (range != null && range.getStart() != null) {
+            mySupport.navigate(range.getStart(), requestFocus);
+        } else if (super.canNavigate()) {
+            super.navigate(requestFocus);
+        }
     }
 
     @Override
@@ -79,6 +84,7 @@ public class DartLspStructureViewElement extends PsiTreeElementBase<PsiElement> 
     static @Nullable TextRange getTextRange(@NotNull PsiFile psiFile, @NotNull Range range) {
         Document document = psiFile.getViewProvider().getDocument();
         if (document == null) return null;
+        if (range.getStart() == null || range.getEnd() == null) return null;
         int startLine = range.getStart().getLine();
         int endLine = range.getEnd().getLine();
         if (startLine < 0 || startLine >= document.getLineCount() || endLine < 0 || endLine >= document.getLineCount()) {
@@ -88,5 +94,17 @@ public class DartLspStructureViewElement extends PsiTreeElementBase<PsiElement> 
         int endOffset = Math.min(document.getLineStartOffset(endLine) + range.getEnd().getCharacter(), document.getLineEndOffset(endLine));
         if (startOffset > endOffset) return null;
         return TextRange.create(startOffset, endOffset);
+    }
+
+    @Override
+    public boolean canNavigate() {
+        return (mySymbol.getSelectionRange() != null && mySymbol.getSelectionRange().getStart() != null)
+                || (mySymbol.getRange() != null && mySymbol.getRange().getStart() != null)
+                || super.canNavigate();
+    }
+
+    @Override
+    public boolean canNavigateToSource() {
+        return canNavigate();
     }
 }
