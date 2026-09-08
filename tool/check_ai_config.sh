@@ -50,23 +50,24 @@ done < "$AIEXCLUDE_FILE"
 # 2. Read and normalize entries scoped specifically under ignore_patterns in .gemini/config.yaml
 in_ignore_patterns=0
 while IFS= read -r line || [[ -n "$line" ]]; do
-  # Strip leading and trailing whitespace
-  line="${line#"${line%%[![:space:]]*}"}"
+  # Strip trailing whitespace
   line="${line%"${line##*[![:space:]]}"}"
-  [[ -z "$line" || "$line" == \#* ]] && continue
+  # Skip empty lines and comments (allowing leading whitespace)
+  [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]] && continue
 
-  if [[ "$line" == "ignore_patterns:"* ]]; then
-    in_ignore_patterns=1
-    continue
-  fi
-
-  # Exit ignore_patterns section when another top-level key starts
-  if [[ $in_ignore_patterns -eq 1 && "$line" =~ ^[a-zA-Z0-9_-]+: ]]; then
-    in_ignore_patterns=0
+  # Detect top-level keys (no leading whitespace, starting at column 0)
+  if [[ "$line" =~ ^([a-zA-Z0-9_-]+): ]]; then
+    key="${BASH_REMATCH[1]}"
+    if [[ "$key" == "ignore_patterns" ]]; then
+      in_ignore_patterns=1
+    else
+      in_ignore_patterns=0
+    fi
     continue
   fi
 
   if [[ $in_ignore_patterns -eq 1 ]]; then
+    # Match list items: optional whitespace, hyphen, whitespace, then the value
     if [[ "$line" =~ ^[[:space:]]*-[[:space:]]+(.*)$ ]]; then
       item="${BASH_REMATCH[1]}"
       item="${item#\"}"
