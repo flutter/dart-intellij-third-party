@@ -58,12 +58,14 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
   public @Nullable PsiElement getCurrentEditorElement() {
       // Note: this should return an object of type PsiElement to be compatible with the Context Info (alt+q) action.
       if (getEditor() == null) return null;
-      final LspStructureViewSupport support = LspStructureViewSupport.find(getPsiFile().getProject(), getPsiFile().getVirtualFile());
-      if (support != null) {
-          final DocumentSymbol result = findDeepestSymbolForOffset(getEditor().getCaretModel().getOffset(), support.getDocumentSymbols());
-          return result != null ? DartLspStructureViewElement.findBestPsiElementForSymbol(getPsiFile(), result) : null;
+      final VirtualFile virtualFile = getPsiFile().getVirtualFile();
+      if (virtualFile != null) {
+          final LspStructureViewSupport support = LspStructureViewSupport.find(getPsiFile().getProject(), virtualFile);
+          if (support != null) {
+              final DocumentSymbol result = findDeepestSymbolForOffset(getEditor().getCaretModel().getOffset(), support.getDocumentSymbols());
+              return result != null ? DartLspStructureViewElement.findBestPsiElementForSymbol(getPsiFile(), result) : null;
+          }
       }
-
       final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getPsiFile().getProject());
       final Outline outline = service.getOutline(getPsiFile().getVirtualFile());
       if (outline == null) return null;
@@ -146,10 +148,13 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
 
     @Override
     public @NotNull Collection<StructureViewTreeElement> getChildrenBase() {
-        final LspStructureViewSupport support = LspStructureViewSupport.find(getValue().getProject(), getValue().getVirtualFile());
-        if (support != null) {
-            return ContainerUtil.map(support.getDocumentSymbols(),
-                    documentSymbol -> new DartLspStructureViewElement(getValue(), support, documentSymbol));
+        final VirtualFile virtualFile = getValue().getVirtualFile();
+        if (virtualFile != null) {
+            final LspStructureViewSupport support = LspStructureViewSupport.find(getValue().getProject(), virtualFile);
+            if (support != null) {
+                return ContainerUtil.map(support.getDocumentSymbols(),
+                        documentSymbol -> new DartLspStructureViewElement(getValue(), support, documentSymbol));
+            }
         }
         final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getValue().getProject());
         final Outline outline = service.getOutline(getValue().getVirtualFile());
