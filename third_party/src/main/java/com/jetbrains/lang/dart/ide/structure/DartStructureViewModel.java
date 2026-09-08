@@ -6,6 +6,7 @@ import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.ide.structureView.TextEditorBasedStructureViewModel;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
 import com.intellij.ide.util.treeView.smartTree.Sorter;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -59,7 +60,7 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
       // Note: this should return an object of type PsiElement to be compatible with the Context Info (alt+q) action.
       if (getEditor() == null) return null;
       final VirtualFile virtualFile = getPsiFile().getVirtualFile();
-      if (virtualFile != null) {
+      if (virtualFile != null && !ApplicationManager.getApplication().isDispatchThread()) {
           final LspStructureViewSupport support = LspStructureViewSupport.find(getPsiFile().getProject(), virtualFile);
           if (support != null) {
               final DocumentSymbol result = findDeepestSymbolForOffset(getEditor().getCaretModel().getOffset(), support.getDocumentSymbols());
@@ -148,6 +149,8 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
 
     @Override
     public @NotNull Collection<StructureViewTreeElement> getChildrenBase() {
+        PsiFile psiFile = getValue();
+        if (psiFile == null || !psiFile.isValid()) return Collections.emptyList();
         final VirtualFile virtualFile = getValue().getVirtualFile();
         if (virtualFile != null) {
             final LspStructureViewSupport support = LspStructureViewSupport.find(getValue().getProject(), virtualFile);
