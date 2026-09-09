@@ -49,7 +49,7 @@ When working with or modifying LSP features, adhere to these rules regarding cop
 4. **DAS Client Capability Handshake (`RequestUtilities.java`)**: Unlike `platform-lsp/`, files inside `third_party/thirdPartySrc/analysisServer/com/google/dart/server/` (such as `RequestUtilities.java`) are custom Java client wrapper utilities maintained locally in this repo. Direct modifications to `RequestUtilities.java` (e.g., setting `"linkSupport": true` on `textDocument.definition` or `textDocument.typeDefinition` when enabling LSP features) are **expected and required** and do not require `patch.py`.
 
 ### Document Synchronization Nuance
-Standard LSP servers rely on `textDocument/didOpen`, `didChange`, and `didClose` notifications to maintain file state. However, in our architecture, document synchronization is already handled globally and synchronously by the legacy `DartAnalysisServerService` (`das.updateFilesContent()`). 
+Standard LSP servers rely on `textDocument/didOpen`, `didChange`, and `didClose` notifications to maintain file state. However, in our architecture, document synchronization is already handled globally and synchronously by the legacy `DartAnalysisServerService` (`das.updateFilesContent()`).
 Therefore, `DartBridgeLspServer` intentionally ignores LSP `didOpen`/`didChange` payloads. **However**, the JetBrains frontend LSP client must still register files as "opened" internally (via `LspOpenedFilesService` and `openForOpenedOrUnsavedFiles()`) so UI features like quick documentation target providers know an active server exists for the file.
 
 ### Functional Trade-offs & Edge Case Scope Differences

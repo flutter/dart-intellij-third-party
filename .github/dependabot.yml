@@ -25,3 +25,12 @@ updates:
     cooldown:
       default-days: 7
 
+  - package-ecosystem: "pub"
+    directory: "/tool"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "autosubmit"
+      - "kokoro:run"
+    cooldown:
+      default-days: 7

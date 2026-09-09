@@ -1,0 +1,13 @@
+# Copyright 2026 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+name: dart_intellij_tool
+description: Tooling and verification scripts for dart-intellij-third-party.
+publish_to: none
+
+environment:
+  sdk: ^3.0.0
+
+dev_dependencies:
+  skills_lint: ^0.5.1

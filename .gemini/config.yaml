@@ -31,3 +31,4 @@ ignore_patterns:
   - "third_party/.kotlin/**"
   - "third_party/gradle/wrapper/gradle-wrapper.jar"
   - "third_party/tool/baseline/**"
+  - "tool/.dart_tool/**"

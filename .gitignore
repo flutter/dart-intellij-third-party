@@ -4,3 +4,4 @@
 /.idea/
 /.vscode
 /dart-sdk/
+.dart_tool/

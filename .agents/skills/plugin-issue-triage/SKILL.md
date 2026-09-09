@@ -9,7 +9,7 @@ This skill guides the process of fetching, analyzing, reviewing, and applying tr
 
 > [!IMPORTANT]
 > **WRITING GUIDELINES**
-> When drafting replies, explanations, or any prose, refer to the [natural-writing](../natural-writing/SKILL.md) skill to ensure clarity, accuracy, and tone.
+> When drafting replies, explanations, or any prose, refer to the `natural-writing` skill to ensure clarity, accuracy, and tone.
 
 ---
 
@@ -33,7 +33,7 @@ Use the fetch script to retrieve all open issues lacking a priority label in the
 Process the raw issues and generate recommended triage fields based on the project's triage criteria.
 
 1. Read the triage criteria reference document: [triage_criteria.md](references/triage_criteria.md), [priorities.md](references/priorities.md), and [labels.md](references/labels.md).
-2. **Natively Orchestrate Subagents**: 
+2. **Natively Orchestrate Subagents**:
    - Load the first N issues (defaulting to 30, or as requested) from the downloaded JSON. *If "both" was selected, load up to 30 issues from each repository.*
    - Call the `invoke_subagent` tool in parallel for those issues. Prompt each subagent to analyze its assigned issue against the guidelines in [triage_criteria.md](references/triage_criteria.md), [proposed_actions.md](references/proposed_actions.md), [priorities.md](references/priorities.md), and [labels.md](references/labels.md). Instruct them to return a structured JSON block containing `issue_type` ("bug", "feature", or "task"), `priority`, `proposed_actions` (an array of tag strings from proposed_actions.md), `labels`, `reply`, and `search_keywords` (a string of 3-5 broad, distinctive keywords, OR a specific stack trace snippet, designed to find duplicate issues without being overly restrictive).
    - While the subagents are running, or after they report back, use the `gh issue list -R <repo> --search "<search_keywords>" --state all --json number,title,state,createdAt,url --limit 3` command for each issue's generated keywords.

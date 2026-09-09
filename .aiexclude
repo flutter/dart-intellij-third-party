@@ -10,6 +10,7 @@ third_party/.settings/
 third_party/.gradle/
 third_party/.intellijPlatform/
 third_party/.kotlin/
+tool/.dart_tool/
 
 # Binary Archives & Baselines
 third_party/gradle/wrapper/gradle-wrapper.jar
