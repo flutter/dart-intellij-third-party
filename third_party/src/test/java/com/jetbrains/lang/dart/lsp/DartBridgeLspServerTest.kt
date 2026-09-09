@@ -25,7 +25,9 @@ import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
+import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
+import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
 import org.eclipse.lsp4j.Position
@@ -33,6 +35,7 @@ import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ReferenceContext
 import org.eclipse.lsp4j.ReferenceParams
+import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
 import org.eclipse.lsp4j.SymbolKind
 import org.eclipse.lsp4j.TextDocumentIdentifier
@@ -41,7 +44,11 @@ import org.eclipse.lsp4j.TypeHierarchyItem
 import org.eclipse.lsp4j.TypeHierarchyPrepareParams
 import org.eclipse.lsp4j.TypeHierarchySubtypesParams
 import org.eclipse.lsp4j.TypeHierarchySupertypesParams
+import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.services.LanguageClient
+import org.eclipse.lsp4j.jsonrpc.Launcher
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
@@ -760,6 +767,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
               }
             }
         """.trimIndent()
+
         capturedListener.onResponse(responseJson)
         val result = future.get(5, TimeUnit.SECONDS)
         assertNotNull(result)
@@ -780,6 +788,99 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("3.0.0"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("2.19.0"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("2.14.0"))
+    }
+
+    fun testInitializeCapabilitiesIncludesFileOperations() {
+        val initResult = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+        assertNotNull("InitializeResult should not be null", initResult)
+        val fileOperations = initResult.capabilities.workspace?.fileOperations
+        assertNotNull("Workspace fileOperations should be advertised", fileOperations)
+        assertNotNull("willRename file operations should be advertised", fileOperations?.willRename)
+    }
+
+    fun testWillRenameFilesRequest() {
+        val oldUri = "file:///project/lib/old_folder"
+        val newUri = "file:///project/lib/new_folder"
+        val params = RenameFilesParams(listOf(FileRename(oldUri, newUri)))
+
+        val future = bridgeServer.willRenameFiles(params)
+
+        val jsonObject = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }
+        assertEquals("123", jsonObject.get("id")?.asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("workspace/willRenameFiles", lspMessage.get("method").asString)
+
+        val lspParams = lspMessage.getAsJsonObject("params")
+        val filesArray = lspParams.getAsJsonArray("files")
+        assertEquals(1, filesArray.size())
+        val fileRenameObj = filesArray.get(0).asJsonObject
+        assertEquals(oldUri, fileRenameObj.get("oldUri").asString)
+        assertEquals(newUri, fileRenameObj.get("newUri").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "documentChanges": [
+                      {
+                        "textDocument": {
+                          "uri": "file:///project/lib/main.dart",
+                          "version": null
+                        },
+                        "edits": [
+                          {
+                            "range": {
+                              "start": {"line": 0, "character": 7},
+                              "end": {"line": 0, "character": 22}
+                            },
+                            "newText": "'package:project/new_folder/a.dart'"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val editResult = checkNotNull(future.get(5, TimeUnit.SECONDS)) { "WorkspaceEdit result should not be null" }
+        val docChanges = checkNotNull(editResult.documentChanges) { "documentChanges should not be null" }
+        assertEquals(1, docChanges.size)
+        assertTrue("documentChanges item should be Left (TextDocumentEdit)", docChanges[0].isLeft)
+        val textDocEdit = docChanges[0].left
+        assertEquals("file:///project/lib/main.dart", textDocEdit.textDocument.uri)
+        assertEquals(1, textDocEdit.edits.size)
+        assertEquals("'package:project/new_folder/a.dart'", textDocEdit.edits[0].newText)
+    }
+
+    fun testBuildLspCapabilitiesIncludesFileOperations() {
+        val caps = DartAnalysisServerService.buildLspCapabilities("3.8.0")
+        val workspace = caps.getAsJsonObject("workspace")
+        assertNotNull("workspace capability should not be null", workspace)
+        val fileOperations = workspace.getAsJsonObject("fileOperations")
+        assertNotNull("fileOperations capability should not be null", fileOperations)
+        assertTrue("willRename should be true", fileOperations.get("willRename").asBoolean)
+    }
+
+    fun testLauncherCreationSucceedsWithoutDuplicateRpcMethodException() {
+        val launcher = Launcher.createLauncher(
+            bridgeServer,
+            LanguageClient::class.java,
+            ByteArrayInputStream(ByteArray(0)),
+            ByteArrayOutputStream()
+        )
+        assertNotNull("Launcher should be created successfully without Duplicate RPC method exceptions", launcher)
     }
 
     private class MockLanguageClient : LanguageClient {
