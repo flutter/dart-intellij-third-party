@@ -19,6 +19,9 @@ public class DartUnitMemberUsageGroupingRule extends SingleParentUsageGroupingRu
   protected @Nullable UsageGroup getParentGroupFor(@NotNull Usage usage, UsageTarget @NotNull [] targets) {
     PsiElement psiElement = usage instanceof PsiElementUsage ? ((PsiElementUsage)usage).getElement() : null;
     if (psiElement == null || psiElement.getLanguage() != DartLanguage.INSTANCE) return null;
+    if (psiElement instanceof com.intellij.psi.PsiFile && usage instanceof com.intellij.usages.UsageInfo2UsageAdapter adapter) {
+      psiElement = psiElement.findElementAt(adapter.getUsageInfo().getNavigationOffset());
+    }
 
     // todo Docs are not parsed perfectly and doc comment may be not a child of the corresponding function. Related to comment for DartDocUtil.getDocumentationText
 
