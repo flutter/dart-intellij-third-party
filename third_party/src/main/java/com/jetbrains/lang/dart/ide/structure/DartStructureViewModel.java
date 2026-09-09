@@ -63,8 +63,11 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
       if (virtualFile != null && !ApplicationManager.getApplication().isDispatchThread()) {
           final LspStructureViewSupport support = LspStructureViewSupport.find(getPsiFile().getProject(), virtualFile);
           if (support != null) {
-              final DocumentSymbol result = findDeepestSymbolForOffset(getEditor().getCaretModel().getOffset(), support.getDocumentSymbols());
-              return result != null ? DartLspStructureViewElement.findBestPsiElementForSymbol(getPsiFile(), result) : null;
+              final List<DocumentSymbol> symbols = support.getDocumentSymbols();
+              if (symbols != null) {
+                  final DocumentSymbol result = findDeepestSymbolForOffset(getEditor().getCaretModel().getOffset(), symbols);
+                  return result != null ? DartLspStructureViewElement.findBestPsiElementForSymbol(getPsiFile(), result) : null;
+              }
           }
       }
       final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getPsiFile().getProject());
@@ -155,8 +158,11 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
         if (virtualFile != null) {
             final LspStructureViewSupport support = LspStructureViewSupport.find(getValue().getProject(), virtualFile);
             if (support != null) {
-                return ContainerUtil.map(support.getDocumentSymbols(),
-                        documentSymbol -> new DartLspStructureViewElement(getValue(), support, documentSymbol));
+                final List<DocumentSymbol> symbols = support.getDocumentSymbols();
+                if (symbols != null) {
+                    return ContainerUtil.map(symbols,
+                            documentSymbol -> new DartLspStructureViewElement(getValue(), support, documentSymbol));
+                }
             }
         }
         final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getValue().getProject());
