@@ -16,7 +16,7 @@ class LspStructureViewSupport private constructor(
   private val lspServer: LspServerImpl,
   private val file: VirtualFile,
 ) {
-  fun getDocumentSymbols(): List<DocumentSymbol> = lspServer.requestExecutor.getDocumentSymbolsCaching(file).orEmpty()
+  fun getDocumentSymbols(): List<DocumentSymbol>? = lspServer.requestExecutor.getDocumentSymbolsCaching(file)
 
   fun getIcon(symbol: DocumentSymbol): Icon? = lspServer.descriptor.lspCustomization.symbolKindCustomizer.getIcon(symbol.kind)
 
