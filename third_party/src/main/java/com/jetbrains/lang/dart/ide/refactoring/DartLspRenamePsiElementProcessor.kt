@@ -40,6 +40,16 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
+/**
+ * Intercepts renaming of Dart files and directories to send `workspace/willRenameFiles`
+ * to the LSP server and apply the resulting workspace edit (e.g. updating imports)
+ * before IntelliJ renames the file on disk.
+ *
+ * Note: JetBrains' platform LSP (`intellij.platform.lsp`) does not currently support
+ * LSP 3.16 `workspace.fileOperations` (`workspace/willRenameFiles`). This custom processor
+ * may be removed or simplified if JetBrains implements built-in platform support
+ * in the future (tracked by IJPL-249183 and IJPL-158718).
+ */
 class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
 
     companion object {
