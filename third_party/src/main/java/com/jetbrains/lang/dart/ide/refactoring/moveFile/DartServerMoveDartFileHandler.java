@@ -73,7 +73,7 @@ public final class DartServerMoveDartFileHandler extends MoveFileHandler {
       try {
         final WorkspaceEdit workspaceEdit = DartLspRenamePsiElementProcessor.awaitFutureCheckingCanceled(
             DartLspService.willRenameFiles(project, params), 10);
-        LOG.info("willRenameFiles response: " + workspaceEdit);
+        LOG.debug("willRenameFiles response: " + workspaceEdit);
         if (workspaceEdit != null) {
           DartLspRenamePsiElementProcessor.applyWorkspaceEdit(project, workspaceEdit);
         }
