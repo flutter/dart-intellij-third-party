@@ -80,7 +80,7 @@ class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
                 val uri = textDocEdit.textDocument.uri
                 val textEdits = textDocEdit.edits
                 val virtualFile = findVirtualFileByUri(uri)
-                logger.info("applyWorkspaceEdit for uri: $uri -> resolved VirtualFile: $virtualFile with ${textEdits.size} edits")
+                logger.debug("applyWorkspaceEdit for uri: $uri -> resolved VirtualFile: $virtualFile with ${textEdits.size} edits")
                 if (virtualFile != null) {
                     val document = FileDocumentManager.getInstance().getDocument(virtualFile)
                     if (document != null) {
@@ -188,7 +188,7 @@ class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
         try {
             val workspaceEditFuture = DartLspService.willRenameFiles(project, params)
             val workspaceEdit = awaitFutureCheckingCanceled(workspaceEditFuture, 10)
-            logger.info("prepareRenaming willRenameFiles response: $workspaceEdit")
+            logger.debug("prepareRenaming willRenameFiles response: $workspaceEdit")
             if (workspaceEdit != null) {
                 applyWorkspaceEdit(project, workspaceEdit)
             }
