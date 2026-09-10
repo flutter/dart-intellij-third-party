@@ -63,6 +63,8 @@ public final class DartServerMoveDartFileHandler extends MoveFileHandler {
     final String newFilePath = moveDestination.getVirtualFile().getPath() + "/" + virtualFile.getName();
 
     if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      // Platform LSP does not currently support workspace/willRenameFiles (IJPL-249183).
+      // If JetBrains implements workspace.fileOperations in the platform, this can be retired.
       DartAnalysisServerService.getInstance(project).updateFilesContent();
       final String oldUri = DartLspRenamePsiElementProcessor.getFileUri(virtualFile.getPath());
       final String newUri = DartLspRenamePsiElementProcessor.getFileUri(newFilePath);
