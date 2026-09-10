@@ -17,6 +17,7 @@ enum class LspMethod(
     INITIALIZE("initialize"),
     // Not gated by the experimental LSP flag because there is no fallback in legacy mode.
     INLAY_HINT("textDocument/inlayHint", isExperimental = false),
+    SEMANTIC_TOKENS_FULL("textDocument/semanticTokens/full", isExperimental = true, presentableName = "syntax highlighting"),
     SHUTDOWN("shutdown"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references");
