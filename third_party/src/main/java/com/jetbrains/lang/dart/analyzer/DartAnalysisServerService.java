@@ -2836,6 +2836,13 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
+  public void sendResponse(JsonObject response) {
+    final RemoteAnalysisServerImpl server = myServer;
+    if (server != null) {
+      server.sendResponseToServer(response);
+    }
+  }
+
   /**
    * Send the request and associate it with the passed {@link com.google.dart.server.Consumer}.
    */
