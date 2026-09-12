@@ -233,16 +233,25 @@ lsp.rename.action.text=LSP-Based Rename
     with open(properties_path, "w", encoding="utf-8") as f:
         f.write(properties_content)
 
-    # 9. Modify LspCodeVisionProvider.kt to explicitly override handleExtraAction
+    # 9. Modify LspCodeVisionProvider.kt to explicitly override handleExtraAction and use unique provider ID
     code_vision_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/codeLens/LspCodeVisionProvider.kt")
     if os.path.exists(code_vision_path):
         with open(code_vision_path, "r", encoding="utf-8") as f:
             code_vision_content = f.read()
+        modified = False
         if "handleExtraAction" not in code_vision_content:
             code_vision_content = code_vision_content.replace(
                 "override val singleEntryPerLine: Boolean = false\n}",
                 "override val singleEntryPerLine: Boolean = false\n\n  override fun handleExtraAction(editor: Editor, textRange: TextRange, entry: CodeVisionEntry, actionId: String) {}\n}"
             )
+            modified = True
+        if 'LSP_CODE_VISION_PROVIDER_ID: String = "LspCodeVisionProvider"' in code_vision_content:
+            code_vision_content = code_vision_content.replace(
+                'LSP_CODE_VISION_PROVIDER_ID: String = "LspCodeVisionProvider"',
+                'LSP_CODE_VISION_PROVIDER_ID: String = "DartLspCodeVisionProvider"'
+            )
+            modified = True
+        if modified:
             with open(code_vision_path, "w", encoding="utf-8") as f:
                 f.write(code_vision_content)
 

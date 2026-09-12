@@ -183,6 +183,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-137.0.dev";
   public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
+  public static final String MIN_LSP_CODE_ACTIONS_SDK_VERSION = "3.9.0-122.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -539,10 +540,16 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion) {
-    return buildLspCapabilities(sdkVersion, false);
+    return buildLspCapabilities(sdkVersion, false, false);
   }
 
   public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion, boolean supportsLspDiagnostics) {
+    return buildLspCapabilities(sdkVersion, supportsLspDiagnostics, false);
+  }
+
+  public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion,
+                                                         boolean supportsLspDiagnostics,
+                                                         boolean supportsLspCodeActions) {
     JsonObject lspCapabilities = new JsonObject();
 
     if (isDartSdkVersionSufficientForWorkspaceApplyEdits(sdkVersion)) {
@@ -579,6 +586,28 @@ public final class DartAnalysisServerService implements Disposable {
       publishDiagnostics.add("tagSupport", tagSupport);
 
       textDocument.add("publishDiagnostics", publishDiagnostics);
+    }
+
+    if (supportsLspCodeActions) {
+      JsonObject codeAction = new JsonObject();
+      JsonObject codeActionLiteralSupport = new JsonObject();
+      JsonObject codeActionKind = new JsonObject();
+      JsonArray valueSet = new JsonArray();
+      valueSet.add("");
+      valueSet.add("quickfix");
+      valueSet.add("refactor");
+      valueSet.add("refactor.extract");
+      valueSet.add("refactor.inline");
+      valueSet.add("refactor.rewrite");
+      valueSet.add("source");
+      valueSet.add("source.organizeImports");
+      codeActionKind.add("valueSet", valueSet);
+      codeActionLiteralSupport.add("codeActionKind", codeActionKind);
+      codeAction.add("codeActionLiteralSupport", codeActionLiteralSupport);
+
+      codeAction.addProperty("dataSupport", true);
+
+      textDocument.add("codeAction", codeAction);
     }
 
     lspCapabilities.add("textDocument", textDocument);
@@ -632,8 +661,19 @@ public final class DartAnalysisServerService implements Disposable {
         return sdk != null && isDartSdkVersionSufficientForLspReferences(sdk.getVersion());
     }
 
+  public static boolean isDartSdkVersionSufficientForLspCodeActions(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_CODE_ACTIONS_SDK_VERSION) >= 0;
+  }
 
-    public boolean shouldUseCompletion2() {
+  public static boolean isLspCodeActionsEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspCodeActions(sdk.getVersion());
+  }
+
+  public boolean shouldUseCompletion2() {
     return StringUtil.compareVersionNumbers(getServerVersion(), COMPLETION_2_SERVER_VERSION) >= 0;
   }
 
@@ -2393,9 +2433,10 @@ public final class DartAnalysisServerService implements Disposable {
 
         boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
         boolean supportsLspDiagnostics = isLspPublishDiagnosticsEnabled(myProject);
+        boolean supportsLspCodeActions = isLspCodeActionsEnabled(myProject);
         startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
                                                    supportsUris,
-                                                   buildLspCapabilities(mySdkVersion, supportsLspDiagnostics));
+                                                   buildLspCapabilities(mySdkVersion, supportsLspDiagnostics, supportsLspCodeActions));
 
         myServer = startedServer;
 
@@ -2759,6 +2800,13 @@ public final class DartAnalysisServerService implements Disposable {
     final RemoteAnalysisServerImpl server = myServer;
     if (server != null) {
       server.sendRequestToServer(id, request);
+    }
+  }
+
+  public void sendResponse(JsonObject response) {
+    final RemoteAnalysisServerImpl server = myServer;
+    if (server != null) {
+      server.sendResponseToServer(response);
     }
   }
 

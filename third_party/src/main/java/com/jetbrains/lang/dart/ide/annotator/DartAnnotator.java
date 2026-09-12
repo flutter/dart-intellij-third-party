@@ -25,6 +25,7 @@ import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors;
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblem;
 import com.jetbrains.lang.dart.psi.DartSymbolLiteralExpression;
 import com.jetbrains.lang.dart.psi.DartTernaryExpression;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.AnalysisErrorSeverity;
 import org.dartlang.analysis.server.protocol.HighlightRegionType;
@@ -194,10 +195,12 @@ public final class DartAnnotator implements Annotator {
       }
     }
 
-    processDartRegionsInRange(notYetAppliedErrors, element.getTextRange(), err -> {
-      VirtualFile vFile = element.getContainingFile().getVirtualFile();
-      createAnnotation(holder, err, new DartQuickFixSet(element.getManager(), vFile, err.getOffset(), err.getCode()));
-    });
+    if (!DartAnalysisServerService.isLspPublishDiagnosticsEnabled(element.getProject())) {
+      processDartRegionsInRange(notYetAppliedErrors, element.getTextRange(), err -> {
+        VirtualFile vFile = element.getContainingFile().getVirtualFile();
+        createAnnotation(holder, err, new DartQuickFixSet(element.getManager(), vFile, err.getOffset(), err.getCode()));
+      });
+    }
 
     processDartRegionsInRange(notYetAppliedHighlighting, element.getTextRange(), region -> {
       String attributeKey = HIGHLIGHTING_TYPE_MAP.get(region.getType());

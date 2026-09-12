@@ -42,6 +42,7 @@ import com.intellij.util.ui.ColumnInfo;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
 import com.jetbrains.lang.dart.lsp.LspMethod;
@@ -530,6 +531,10 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
   public static boolean isExperimentalLspFeaturesEnabled(@NotNull Project project) {
     return PropertiesComponent.getInstance(project).getBoolean(DART_LSP_EXPERIMENTAL_ENABLED, true);
+  }
+
+  public static boolean isLspCodeActionsEnabled(@NotNull Project project) {
+    return DartAnalysisServerService.isLspCodeActionsEnabled(project);
   }
 
   public static void setExperimentalLspFeaturesEnabled(@NotNull Project project, boolean enabled) {

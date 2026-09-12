@@ -10,10 +10,12 @@ enum class LspMethod(
     val isExperimental: Boolean = false,
     val presentableName: String? = null
 ) {
+    CODE_ACTION("textDocument/codeAction", isExperimental = true, presentableName = "code actions"),
     DEFINITION("textDocument/definition", isExperimental = true, presentableName = "navigation"),
     DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = false),
     DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = true, presentableName = "read/write highlighting"),
     HOVER("textDocument/hover", isExperimental = false),
+    PUBLISH_DIAGNOSTICS("textDocument/publishDiagnostics", isExperimental = true, presentableName = "errors and warnings"),
     INITIALIZE("initialize"),
     // Not gated by the experimental LSP flag because there is no fallback in legacy mode.
     INLAY_HINT("textDocument/inlayHint", isExperimental = false),
