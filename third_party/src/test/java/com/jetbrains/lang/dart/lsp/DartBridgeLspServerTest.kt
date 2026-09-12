@@ -64,6 +64,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     private lateinit var mockServer: RemoteAnalysisServerImpl
     private val mockClient = MockLanguageClient()
     private val capturedRequests = CopyOnWriteArrayList<JsonObject>()
+    private val capturedResponses = CopyOnWriteArrayList<JsonObject>()
 
     override fun setUp() {
         super.setUp()
@@ -98,6 +99,10 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
             override fun sendRequestToServer(id: String, request: JsonObject, consumer: Consumer) {
                 capturedRequests.add(request)
+            }
+
+            override fun sendResponseToServer(response: JsonObject) {
+                capturedResponses.add(response)
             }
 
             override fun server_openUrlRequest(url: String?) {}
@@ -1046,6 +1051,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     fun testWorkspaceApplyEditRequestForwardedAndResponseSentBack() {
         val serverRequestJson = """
             {
+              "id": "das_req_1",
+              "method": "lsp.handle",
               "params": {
                 "lspMessage": {
                   "jsonrpc": "2.0",
@@ -1079,17 +1086,14 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("Sort Members", mockClient.lastApplyWorkspaceEditParams?.label)
 
         // Verify response was sent back to DAS
-        val responseJsonObject = capturedRequests.find { req ->
-            val lspMsg = req.getAsJsonObject("params")?.getAsJsonObject("lspMessage")
-            lspMsg?.get("id")?.asInt == 99
-        }
-        assertNotNull("An lsp.handle response should be sent back to DAS with id 99", responseJsonObject)
-        assertEquals("123", responseJsonObject!!.get("id").asString)
+        val responseJsonObject = capturedResponses.find { it.get("id")?.asString == "das_req_1" }
+        assertNotNull("A response should be sent back to DAS with id das_req_1", responseJsonObject)
 
-        val lspMessage = responseJsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
-        assertEquals(99, lspMessage.get("id").asInt)
-        assertNotNull("lspMessage should contain result", lspMessage.getAsJsonObject("result"))
-        assertEquals(true, lspMessage.getAsJsonObject("result").get("applied").asBoolean)
+        val lspResponse = responseJsonObject!!.getAsJsonObject("result")?.getAsJsonObject("lspResponse")
+        assertNotNull("response should contain lspResponse", lspResponse)
+        assertEquals(99, lspResponse!!.get("id").asInt)
+        assertNotNull("lspMessage should contain result", lspResponse.getAsJsonObject("result"))
+        assertEquals(true, lspResponse.getAsJsonObject("result").get("applied").asBoolean)
     }
 
     private class MockLanguageClient : LanguageClient {

@@ -168,6 +168,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
      * 2. Resolves matching pending request futures for client-initiated requests (e.g. hover, codeAction).
      */
     private fun handleDasMessage(jsonObject: JsonObject) {
+        val idElement = jsonObject.get("id")
+        val topLevelId = if (idElement != null && idElement.isJsonPrimitive) idElement.asString else null
+
         // Check if it's a server-initiated notification or request from DAS.
         if (jsonObject.has("params")) {
             val params = jsonObject.get("params").asJsonObject
@@ -180,15 +183,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 val method = msgObj.getAsJsonPrimitive("method")?.asString
                 if (method != null) {
                     // Forward server message to client.
-                    forwardServerMessageToClient(method, msgObj)
+                    forwardServerMessageToClient(topLevelId, method, msgObj)
                 }
                 return
             }
         }
 
         // Check if it's a response to a client-initiated request.
-        val idElement = jsonObject.get("id")
-        val topLevelId = if (idElement != null && idElement.isJsonPrimitive) idElement.asString else null
         if (topLevelId != null) {
             handlePendingRequestResponse(topLevelId, jsonObject)
         }
@@ -213,13 +214,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
-    private fun forwardServerMessageToClient(method: String, msgObj: JsonObject) {
+    private fun forwardServerMessageToClient(dasRequestId: String?, method: String, msgObj: JsonObject) {
         val client = this.client ?: return
         try {
             // Parse and forward notifications/requests to the LSP client proxy using lsp4j.
             when (method) {
                 "textDocument/publishDiagnostics" -> handlePublishDiagnostics(client, msgObj)
-                "workspace/applyEdit" -> handleApplyEdit(client, msgObj)
+                "workspace/applyEdit" -> handleApplyEdit(client, dasRequestId, msgObj)
                 else -> logger.debug("Ignored notification/request from DAS: $method")
             }
         } catch (e: Exception) {
@@ -237,16 +238,17 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         das.onLspDiagnosticsUpdated(params.uri, errors)
     }
 
-    private fun handleApplyEdit(client: LanguageClient, msgObj: JsonObject) {
+    private fun handleApplyEdit(client: LanguageClient, dasRequestId: String?, msgObj: JsonObject) {
         val paramsObj = msgObj.get("params")
         val params = GSON.fromJson(paramsObj, ApplyWorkspaceEditParams::class.java)
-        val id = msgObj.get("id")
+        val lspId = msgObj.get("id")
         client.applyEdit(params).whenComplete { response, error ->
-            if (id != null) {
-                val legacyId = das.generateUniqueId() ?: return@whenComplete
+            if (dasRequestId != null) {
                 val lspResponse = JsonObject().apply {
                     addProperty("jsonrpc", JSONRPC_VERSION)
-                    add("id", id)
+                    if (lspId != null) {
+                        add("id", lspId)
+                    }
                     if (error != null) {
                         val errorObj = JsonObject().apply {
                             addProperty("code", -32603)
@@ -257,15 +259,14 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                         add("result", GSON.toJsonTree(response))
                     }
                 }
-                val legacyRequest = JsonObject().apply {
-                    addProperty("id", legacyId)
-                    addProperty("method", "lsp.handle")
-                    add("params", JsonObject().apply {
-                        add("lspMessage", lspResponse)
+                val legacyResponse = JsonObject().apply {
+                    addProperty("id", dasRequestId)
+                    add("result", JsonObject().apply {
+                        add(LSP_RESPONSE_KEY, lspResponse)
                     })
                 }
                 try {
-                    das.sendRequest(legacyId, legacyRequest)
+                    das.sendResponse(legacyResponse)
                 } catch (e: Exception) {
                     logger.error("Failed to send applyEdit response to DAS", e)
                 }
@@ -375,10 +376,6 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest<List<CodeAction>>("textDocument/codeAction", params, responseType).thenApply { actions ->
             actions?.map { Either.forRight<Command, CodeAction>(it) } ?: emptyList()
         }
-    }
-
-    override fun resolveCodeAction(unresolved: CodeAction): CompletableFuture<CodeAction> {
-        return CompletableFuture.completedFuture(unresolved)
     }
 
     // Implement other TextDocumentService methods as needed, returning unsupported or forwarding.

@@ -58,7 +58,8 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
 
   override fun lsp_workspaceApplyEdit(params: DartLspApplyWorkspaceEditParams, consumer: DartLspWorkspaceApplyEditRequestConsumer) {
     if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-      consumer.workspaceEditApplied(DartLspApplyWorkspaceEditResult(true))
+      // When experimental LSP features are enabled, workspace/applyEdit is handled by DartBridgeLspServer,
+      // which forwards it to the LSP LanguageClient proxy and sends the legacy response to DAS when applied.
       return
     }
 
