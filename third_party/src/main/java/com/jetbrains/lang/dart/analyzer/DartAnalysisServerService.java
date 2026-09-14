@@ -185,7 +185,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
   public static final String MIN_LSP_CLOSING_LABELS_SDK_VERSION = "3.14.0-219.0.dev";
-  public static final String MIN_LSP_COMPLETION_SDK_VERSION = "3.14.0-174.0.dev";
+  public static final String MIN_LSP_COMPLETION_SDK_VERSION = "3.14.0-226.0.dev";
   // The first Dart SDK with dart-lang/sdk@6700ccc4316 (Analysis Server API 1.41.0), which accepts
   // `workspace/didChangeConfiguration` from the client as an `lsp.notification`. An older server
   // logs that notification as an error, so it must not be sent at all.
