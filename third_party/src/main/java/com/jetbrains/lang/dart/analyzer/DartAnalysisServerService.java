@@ -183,6 +183,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-137.0.dev";
   public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
+  public static final String MIN_LSP_HIGHLIGHTING_SDK_VERSION = "3.14.0-217.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -631,6 +632,18 @@ public final class DartAnalysisServerService implements Disposable {
         final DartSdk sdk = DartSdk.getDartSdk(project);
         return sdk != null && isDartSdkVersionSufficientForLspReferences(sdk.getVersion());
     }
+
+  public static boolean isDartSdkVersionSufficientForLspHighlighting(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_HIGHLIGHTING_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspHighlightingEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspHighlighting(sdk.getVersion());
+  }
 
 
     public boolean shouldUseCompletion2() {
@@ -2071,7 +2084,7 @@ public final class DartAnalysisServerService implements Disposable {
       if (myServer == null) return;
 
       final Map<String, List<String>> subscriptions = new HashMap<>();
-      if (!DartConfigurable.isExperimentalLspFeaturesEnabled(myProject)) {
+      if (!isLspHighlightingEnabled(myProject)) {
         subscriptions.put(AnalysisService.HIGHLIGHTS, myVisibleFileUris);
       }
       subscriptions.put(AnalysisService.NAVIGATION, myVisibleFileUris);
