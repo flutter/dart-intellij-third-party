@@ -1,3 +1,4 @@
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.structure;
 
 import com.intellij.ide.structureView.StructureViewTreeElement;
@@ -7,6 +8,7 @@ import com.intellij.openapi.util.NlsSafe;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.platform.dartlsp.impl.features.documentSymbol.LspStructureViewSupport;
+import com.intellij.pom.Navigatable;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
@@ -50,8 +52,8 @@ public class DartLspStructureViewElement extends PsiTreeElementBase<PsiElement> 
         Range range = mySymbol.getSelectionRange() != null ? mySymbol.getSelectionRange() : mySymbol.getRange();
         if (range != null && range.getStart() != null) {
             mySupport.navigate(range.getStart(), requestFocus);
-        } else if (super.canNavigate()) {
-            super.navigate(requestFocus);
+        } else if (getElement() instanceof Navigatable navigatable && navigatable.canNavigate()) {
+            navigatable.navigate(requestFocus);
         }
     }
 
@@ -100,7 +102,7 @@ public class DartLspStructureViewElement extends PsiTreeElementBase<PsiElement> 
     public boolean canNavigate() {
         return (mySymbol.getSelectionRange() != null && mySymbol.getSelectionRange().getStart() != null)
                 || (mySymbol.getRange() != null && mySymbol.getRange().getStart() != null)
-                || super.canNavigate();
+                || (getElement() instanceof Navigatable navigatable && navigatable.canNavigate());
     }
 
     @Override
