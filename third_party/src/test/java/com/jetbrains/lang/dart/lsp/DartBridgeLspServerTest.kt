@@ -1388,6 +1388,20 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(true, lspResponse.getAsJsonObject("result").get("applied").asBoolean)
     }
 
+    fun testIsDartSdkVersionSufficientForLspHighlighting() {
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-217.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-218.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.15.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("4.0.0"))
+
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-216.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-65.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.13.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.0.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.19.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.14.0"))
+    }
+
     private class MockLanguageClient : LanguageClient {
         var publishedDiagnostics: PublishDiagnosticsParams? = null
         var lastApplyWorkspaceEditParams: ApplyWorkspaceEditParams? = null
