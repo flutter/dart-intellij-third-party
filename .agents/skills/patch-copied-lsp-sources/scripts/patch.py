@@ -464,6 +464,17 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             server_content = server_content.replace(old_pattern_block, new_pattern_block)
         with open(lsp_server_impl_path, "w", encoding="utf-8") as f:
             f.write(server_content)
+    # 12. Modify LspStructureViewSupport.kt to return nullable List<DocumentSymbol>? so callers can distinguish failure (null) from empty list
+    structure_view_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/documentSymbol/LspStructureViewSupport.kt")
+    if os.path.exists(structure_view_path):
+        with open(structure_view_path, "r", encoding="utf-8") as f:
+            structure_view_content = f.read()
+        target_symbols_line = "fun getDocumentSymbols(): List<DocumentSymbol> = lspServer.requestExecutor.getDocumentSymbolsCaching(file).orEmpty()"
+        replacement_symbols_line = "fun getDocumentSymbols(): List<DocumentSymbol>? = lspServer.requestExecutor.getDocumentSymbolsCaching(file)"
+        if target_symbols_line in structure_view_content:
+            structure_view_content = structure_view_content.replace(target_symbols_line, replacement_symbols_line)
+            with open(structure_view_path, "w", encoding="utf-8") as f:
+                f.write(structure_view_content)
 
     print("Patch applied successfully!")
 
