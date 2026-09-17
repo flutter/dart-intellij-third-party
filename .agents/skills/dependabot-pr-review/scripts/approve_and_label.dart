@@ -108,16 +108,23 @@ String? fetchAuthenticatedLogin() {
 
 /// Whether [login] has already approved [pr].
 ///
+/// Only each reviewer's current state counts. The full review history would
+/// report a stale `APPROVED` even after it was dismissed or superseded by a
+/// later `CHANGES_REQUESTED`, which would skip an approval the PR still needs.
+///
 /// Fails open, returning false when the lookup itself fails: a redundant
 /// approval is harmless, whereas skipping a needed approval is not.
 bool alreadyApprovedBy(PrRef pr, String login) {
   final reviews = runCommand('gh', [
-    'api',
-    // Approvals can be pushed past the first page of 30 by review churn.
-    '--paginate',
-    'repos/${pr.repo}/pulls/${pr.number}/reviews',
+    'pr',
+    'view',
+    '${pr.number}',
+    '--repo',
+    pr.repo,
+    '--json',
+    'latestReviews',
     '--jq',
-    '.[] | select(.state == "APPROVED") | .user.login',
+    '.latestReviews[] | select(.state == "APPROVED") | .author.login',
   ]);
   if (!reviews.ok) return false;
 
