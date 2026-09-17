@@ -355,17 +355,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     override fun completion(params: CompletionParams): CompletableFuture<Either<List<CompletionItem>, CompletionList>> {
-        return forwardRequest<JsonElement>("textDocument/completion", params, JsonElement::class.java).thenApply { element ->
-            if (element == null || element.isJsonNull) {
-                Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, emptyList()))
-            } else if (element.isJsonArray) {
-                val type = object : TypeToken<List<CompletionItem>>() {}.type
-                val items: List<CompletionItem> = GSON.fromJson(element, type) ?: emptyList()
-                Either.forLeft<List<CompletionItem>, CompletionList>(items)
-            } else {
-                val list = GSON.fromJson(element, CompletionList::class.java) ?: CompletionList(false, emptyList())
-                Either.forRight<List<CompletionItem>, CompletionList>(list)
-            }
+        return forwardRequest("textDocument/completion", params, CompletionList::class.java).thenApply { list ->
+            Either.forRight<List<CompletionItem>, CompletionList>(list ?: CompletionList(false, emptyList()))
         }.exceptionally { e ->
             logger.info("textDocument/completion failed: ${e.message}")
             Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, emptyList()))
