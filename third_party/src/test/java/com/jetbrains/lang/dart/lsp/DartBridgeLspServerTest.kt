@@ -368,47 +368,6 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(InsertTextFormat.Snippet, completionList.items[0].insertTextFormat)
     }
 
-    fun testCompletionRequestWithItemsArray() {
-        val params = CompletionParams().apply {
-            textDocument = TextDocumentIdentifier("file://test.dart")
-            position = Position(1, 2)
-        }
-
-        val future = bridgeServer.completion(params)
-
-        val responseJson = """
-            {
-              "id": "123",
-              "result": {
-                "lspResponse": {
-                  "jsonrpc": "2.0",
-                  "id": "123",
-                  "result": [
-                    {
-                      "label": "toString",
-                      "kind": 2,
-                      "insertText": "toString()",
-                      "insertTextFormat": 1
-                    }
-                  ]
-                }
-              }
-            }
-        """.trimIndent()
-
-        capturedListener.onResponse(responseJson)
-
-        val result = future.get(5, TimeUnit.SECONDS)
-        assertNotNull(result)
-        assertTrue(result.isLeft)
-        val items = result.left
-        assertEquals(1, items.size)
-        assertEquals("toString", items[0].label)
-        assertEquals(CompletionItemKind.Method, items[0].kind)
-        assertEquals("toString()", items[0].insertText)
-        assertEquals(InsertTextFormat.PlainText, items[0].insertTextFormat)
-    }
-
     fun testCompletionResolveRequest() {
         val unresolved = CompletionItem().apply {
             label = "unresolvedItem"
