@@ -183,12 +183,55 @@ To run the verifier locally:
 ./gradlew verifyPlugin
 ```
 
+### How verification is gated
+
+Two independent checks run, with a deliberate division of responsibility:
+
+1. **`verifyPlugin` decides what is severe.** Its `failureLevel` in
+   `build.gradle.kts` fails the build on compatibility problems,
+   scheduled-for-removal usages, an invalid plugin, and so on.
+2. **`check_verifier_baselines.sh` decides what is *new*.** It compares each
+   report against a committed baseline and reports anything not already known,
+   so a failure points at the specific issues that changed:
+
+   ```shell
+   ./third_party/tool/check_verifier_baselines.sh check
+   ```
+
+The script intentionally does **not** classify severity — that would duplicate
+`failureLevel` in a second place and the two would drift. Its contract is
+simply: anything new relative to the baseline is surfaced and fails.
+
+A few things worth knowing:
+
+- Baselines live in `third_party/tool/baseline/<IDE branch>/verifier-baseline.txt`,
+  one per platform branch (`253`, `261`, …). The branches are discovered from
+  the reports on disk, so when `ides { recommended() }` starts resolving a new
+  EAP branch, the check fails loudly with "no baseline for IDE branch N" rather
+  than silently skipping it.
+- Each baseline line is `<section><TAB><issue>`, which keeps the report section
+  visible in the diff so you can see at a glance what kind of finding changed.
+- Findings in the vendored `com.intellij.platform.dartlsp` sources are filtered
+  out of the informational sections (deprecated, experimental, internal,
+  override-only), since those files are copied from upstream. They are **not**
+  filtered out of compatibility problems: a `NoSuchMethodError` risk is real
+  regardless of which file it lives in.
+- Each baseline records the exact IDE build it was generated from, so when a
+  new EAP build introduces issues the report says so explicitly.
+
+> [!NOTE]
+> A new IDE EAP build can introduce failures that no pull request caused. The
+> report names the IDE build and flags when it differs from the one the
+> baseline was recorded against, which usually makes this obvious.
+
 ### Updating verifier baselines
 
 If new verification issues are found that match expected platform updates, update the baseline files.
 
 > [!IMPORTANT]
-> The baseline update scripts **must be executed from the root directory of the repository**.
+> The Windows script **must be executed from the root directory of the
+> repository**. The shell script resolves its own paths and may be run from
+> anywhere.
 
 - **Linux / macOS:**
   ```shell
@@ -199,6 +242,8 @@ If new verification issues are found that match expected platform updates, updat
   ```cmd
   third_party\tool\update_baselines.bat
   ```
+  (requires the bash provided by Git for Windows)
+
 
 ## AI Coding Agent Skills
 
