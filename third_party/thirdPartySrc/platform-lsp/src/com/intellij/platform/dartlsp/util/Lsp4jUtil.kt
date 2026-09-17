@@ -4,6 +4,11 @@ package com.intellij.platform.dartlsp.util
 import com.intellij.injected.editor.DocumentWindow
 import com.intellij.openapi.diagnostic.fileLogger
 import com.intellij.openapi.editor.Document
+import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.DocumentFilter
+import org.eclipse.lsp4j.Diagnostic
+import java.lang.reflect.Method
+import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.text.StringUtilRt
 import org.eclipse.lsp4j.Position
@@ -78,6 +83,20 @@ fun getRangeInDocument(document: Document, range: Range): TextRange? {
  * because `textEdit.range` was outside the `document` text range
  */
 fun applyTextEdits(document: Document, textEdits: List<TextEdit>): Boolean {
+  val unwrappedEdits = ArrayList<TextEdit>(textEdits.size)
+  for (item in textEdits as List<*>) {
+    when (item) {
+      is TextEdit -> unwrappedEdits.add(item)
+      is Either<*, *> -> {
+        val textEdit = item.left as? TextEdit
+        if (textEdit == null) {
+          fileLogger().warn("Ignoring SnippetTextEdit, the IDE does not support it: ${item.right}")
+          return false
+        }
+        unwrappedEdits.add(textEdit)
+      }
+    }
+  }
   // Spec:
   // > All text edits ranges refer to positions in the document they are computed on. Text edits ranges must never overlap.
   // > However, it is possible that multiple edits have the same start position: multiple inserts, ...
@@ -85,7 +104,7 @@ fun applyTextEdits(document: Document, textEdits: List<TextEdit>): Boolean {
   //
   // The edits must be applied from bottom to top.
   // Edits that have the same position must be applied in the reversed order - this way the resulting text will get inserted strings in the original order.
-  textEdits
+  unwrappedEdits
     .sortedWith { edit1, edit2 ->
       (edit1.range.start.line - edit2.range.start.line).takeIf { it != 0 }
       ?: (edit1.range.start.character - edit2.range.start.character)
@@ -112,4 +131,43 @@ fun applyTextEdit(document: Document, textEdit: TextEdit): Boolean {
   val newText = StringUtilRt.convertLineSeparators(textEdit.newText)
   document.replaceString(startOffset, endOffset, newText)
   return true
+}
+
+private val diagnosticGetMessageMethod: Method by lazy {
+  Diagnostic::class.java.getMethod("getMessage")
+}
+
+private val documentFilterGetPatternMethod: Method by lazy {
+  DocumentFilter::class.java.getMethod("getPattern")
+}
+
+/**
+ * Compatible accessor for [Diagnostic.getMessage] across lsp4j 0.x (returns `String`)
+ * and lsp4j 1.0.0+ (returns `Either<String, MarkupContent>`).
+ */
+val Diagnostic.messageIfStringOrEmpty: @NlsSafe String
+  get() = when (val raw = diagnosticGetMessageMethod.invoke(this)) {
+    is String -> raw
+    is Either<*, *> -> (raw.left as? String) ?: ""
+    else -> ""
+  }
+
+/**
+ * Compatible accessor for [DocumentFilter.getPattern] across lsp4j 0.x (returns `String?`)
+ * and lsp4j 1.0.0+ (returns `Either<String, RelativePattern>?`).
+ */
+fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
+  return when (val raw = documentFilterGetPatternMethod.invoke(filter)) {
+    null -> null
+    is String -> Either.forLeft(raw)
+    is Either<*, *> -> {
+      if (raw.isLeft) {
+        (raw.left as? String)?.let { Either.forLeft(it) }
+      }
+      else {
+        raw.right?.let { Either.forRight(it) }
+      }
+    }
+    else -> null
+  }
 }

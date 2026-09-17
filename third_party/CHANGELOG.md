@@ -8,6 +8,7 @@
 ### Removed
 
 ### Fixed
+- Support lsp4j 1.0.0 in IntelliJ 2026.3 (#671)
 - Remove ambiguous "Find Usages Of" popup when invoking Find Usages with LSP references enabled (#643)
 
 ## 509.0.0

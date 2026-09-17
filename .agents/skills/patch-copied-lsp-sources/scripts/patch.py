@@ -39,28 +39,40 @@ def main():
         intellij_community_path = os.path.abspath(args.intellij_path)
         print(f"Copying sources from: {intellij_community_path}")
 
-        src_lsp_code = os.path.join(intellij_community_path, "platform/lsp/src/com/intellij/platform/lsp")
+        src_lsp_code_old = os.path.join(intellij_community_path, "platform/lsp/src/com/intellij/platform/lsp")
+        src_lsp_code_new = os.path.join(intellij_community_path, "platform/lsp/src")
+        src_lsp_impl_code_new = os.path.join(intellij_community_path, "platform/lsp-impl/src")
         src_lsp_resources = os.path.join(intellij_community_path, "platform/lsp/resources")
-
-        if not os.path.isdir(src_lsp_code) or not os.path.isdir(src_lsp_resources):
-            print(f"Error: Could not find LSP sources in {intellij_community_path}.", file=sys.stderr)
-            print(f"Expected to find:\n  {src_lsp_code}\n  {src_lsp_resources}", file=sys.stderr)
-            sys.exit(1)
+        src_lsp_impl_resources = os.path.join(intellij_community_path, "platform/lsp-impl/resources")
 
         dst_lsp_code = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp")
         dst_lsp_resources = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/resources")
 
-        # Clean existing destination directories
-        if os.path.exists(dst_lsp_code):
-            shutil.rmtree(dst_lsp_code)
-        if os.path.exists(dst_lsp_resources):
-            shutil.rmtree(dst_lsp_resources)
+        if os.path.isdir(src_lsp_code_old) and os.path.isdir(src_lsp_resources):
+            # Clean existing destination directories
+            if os.path.exists(dst_lsp_code):
+                shutil.rmtree(dst_lsp_code)
+            if os.path.exists(dst_lsp_resources):
+                shutil.rmtree(dst_lsp_resources)
 
-        # Copy code directly to com/intellij/platform/dartlsp
-        shutil.copytree(src_lsp_code, dst_lsp_code)
+            shutil.copytree(src_lsp_code_old, dst_lsp_code)
+            shutil.copytree(src_lsp_resources, dst_lsp_resources)
+        elif os.path.isdir(src_lsp_code_new) and os.path.isdir(src_lsp_impl_code_new):
+            if os.path.exists(dst_lsp_code):
+                shutil.rmtree(dst_lsp_code)
+            if os.path.exists(dst_lsp_resources):
+                shutil.rmtree(dst_lsp_resources)
 
-        # Copy resources
-        shutil.copytree(src_lsp_resources, dst_lsp_resources)
+            shutil.copytree(src_lsp_code_new, dst_lsp_code, dirs_exist_ok=True)
+            shutil.copytree(src_lsp_impl_code_new, dst_lsp_code, dirs_exist_ok=True)
+            if os.path.isdir(src_lsp_resources):
+                shutil.copytree(src_lsp_resources, dst_lsp_resources, dirs_exist_ok=True)
+            if os.path.isdir(src_lsp_impl_resources):
+                shutil.copytree(src_lsp_impl_resources, dst_lsp_resources, dirs_exist_ok=True)
+        else:
+            print(f"Error: Could not find LSP sources in {intellij_community_path}.", file=sys.stderr)
+            print(f"Expected to find:\n  {src_lsp_code_old} (or {src_lsp_code_new} + {src_lsp_impl_code_new})", file=sys.stderr)
+            sys.exit(1)
 
         # Rename intellij.platform.lsp.xml to dart-lsp-impl.xml
         xml_old_path = os.path.join(dst_lsp_resources, "META-INF/intellij.platform.lsp.xml")
@@ -74,6 +86,7 @@ def main():
             meta_inf_dir = os.path.dirname(xml_old_path)
             if os.path.exists(meta_inf_dir) and not os.listdir(meta_inf_dir):
                 os.rmdir(meta_inf_dir)
+
 
     print(f"Applying JetBrains LSP patches and renames in: {base_dir}")
 
@@ -264,7 +277,187 @@ lsp.rename.action.text=LSP-Based Rename
             with open(lsp_server_impl_path, "w", encoding="utf-8") as f:
                 f.write(lsp_server_impl_content)
 
+    # 11. Apply lsp4j 0.x / 1.0.0 cross-version compatibility patches
+    # 11a. Lsp4jUtil.kt
+    lsp4j_util_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/util/Lsp4jUtil.kt")
+    if os.path.exists(lsp4j_util_path):
+        with open(lsp4j_util_path, "r", encoding="utf-8") as f:
+            util_content = f.read()
+
+        required_imports = [
+            "import com.intellij.openapi.util.NlsSafe",
+            "import java.lang.reflect.Method",
+            "import org.eclipse.lsp4j.Diagnostic",
+            "import org.eclipse.lsp4j.DocumentFilter",
+            "import org.eclipse.lsp4j.jsonrpc.messages.Either",
+        ]
+        for imp in required_imports:
+            if imp not in util_content:
+                util_content = util_content.replace(
+                    "import com.intellij.openapi.editor.Document\n",
+                    f"import com.intellij.openapi.editor.Document\n{imp}\n"
+                )
+
+        # Remove upstream 263 SnippetTextEdit import/usage if present
+        util_content = util_content.replace("import org.eclipse.lsp4j.SnippetTextEdit\n", "")
+        util_content = util_content.replace("import org.eclipse.lsp4j.MarkupContent\n", "")
+
+        # Update applyTextEdits to safely unwrap Either<TextEdit, SnippetTextEdit> at runtime on lsp4j 1.0.0
+        old_apply_edits = """fun applyTextEdits(document: Document, textEdits: List<TextEdit>): Boolean {
+  // Spec:
+  // > All text edits ranges refer to positions in the document they are computed on. Text edits ranges must never overlap.
+  // > However, it is possible that multiple edits have the same start position: multiple inserts, ...
+  // > If multiple inserts have the same position, the order in the array defines the order in which the inserted strings appear in the resulting text.
+  //
+  // The edits must be applied from bottom to top.
+  // Edits that have the same position must be applied in the reversed order - this way the resulting text will get inserted strings in the original order.
+  textEdits
+    .sortedWith"""
+        new_apply_edits = """fun applyTextEdits(document: Document, textEdits: List<TextEdit>): Boolean {
+  val unwrappedEdits = ArrayList<TextEdit>(textEdits.size)
+  for (item in textEdits as List<*>) {
+    when (item) {
+      is TextEdit -> unwrappedEdits.add(item)
+      is Either<*, *> -> {
+        val textEdit = item.left as? TextEdit
+        if (textEdit == null) {
+          fileLogger().warn("Ignoring SnippetTextEdit, the IDE does not support it: ${item.right}")
+          return false
+        }
+        unwrappedEdits.add(textEdit)
+      }
+    }
+  }
+  // Spec:
+  // > All text edits ranges refer to positions in the document they are computed on. Text edits ranges must never overlap.
+  // > However, it is possible that multiple edits have the same start position: multiple inserts, ...
+  // > If multiple inserts have the same position, the order in the array defines the order in which the inserted strings appear in the resulting text.
+  //
+  // The edits must be applied from bottom to top.
+  // Edits that have the same position must be applied in the reversed order - this way the resulting text will get inserted strings in the original order.
+  unwrappedEdits
+    .sortedWith"""
+        if old_apply_edits in util_content:
+            util_content = util_content.replace(old_apply_edits, new_apply_edits)
+
+        # Remove upstream 263 non-reflective messageIfStringOrEmpty if present
+        upstream_message_prop = """val Diagnostic.messageIfStringOrEmpty: @NlsSafe String
+  get() = message.map({ it }, { "" })"""
+        if upstream_message_prop in util_content:
+            util_content = util_content.replace(upstream_message_prop, "")
+
+        compat_helpers = """
+private val diagnosticGetMessageMethod: Method by lazy {
+  Diagnostic::class.java.getMethod("getMessage")
+}
+
+private val documentFilterGetPatternMethod: Method by lazy {
+  DocumentFilter::class.java.getMethod("getPattern")
+}
+
+/**
+ * Compatible accessor for [Diagnostic.getMessage] across lsp4j 0.x (returns `String`)
+ * and lsp4j 1.0.0+ (returns `Either<String, MarkupContent>`).
+ */
+val Diagnostic.messageIfStringOrEmpty: @NlsSafe String
+  get() = when (val raw = diagnosticGetMessageMethod.invoke(this)) {
+    is String -> raw
+    is Either<*, *> -> (raw.left as? String) ?: ""
+    else -> ""
+  }
+
+/**
+ * Compatible accessor for [DocumentFilter.getPattern] across lsp4j 0.x (returns `String?`)
+ * and lsp4j 1.0.0+ (returns `Either<String, RelativePattern>?`).
+ */
+fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
+  return when (val raw = documentFilterGetPatternMethod.invoke(filter)) {
+    null -> null
+    is String -> Either.forLeft(raw)
+    is Either<*, *> -> {
+      if (raw.isLeft) {
+        (raw.left as? String)?.let { Either.forLeft(it) }
+      }
+      else {
+        raw.right?.let { Either.forRight(it) }
+      }
+    }
+    else -> null
+  }
+}
+"""
+        if "diagnosticGetMessageMethod" not in util_content:
+            util_content = util_content.rstrip() + "\n" + compat_helpers
+        with open(lsp4j_util_path, "w", encoding="utf-8") as f:
+            f.write(util_content)
+
+    # 11b. LspDiagnosticsCustomizer.kt
+    diag_customizer_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/api/customization/LspDiagnosticsCustomizer.kt")
+    if os.path.exists(diag_customizer_path):
+        with open(diag_customizer_path, "r", encoding="utf-8") as f:
+            dc_content = f.read()
+        imp = "import com.intellij.platform.dartlsp.util.messageIfStringOrEmpty"
+        if imp not in dc_content:
+            dc_content = dc_content.replace(
+                "import com.intellij.openapi.vfs.VirtualFile\n",
+                f"import com.intellij.openapi.vfs.VirtualFile\n{imp}\n"
+            )
+        dc_content = dc_content.replace(
+            "open fun getMessage(diagnostic: Diagnostic): String = diagnostic.message\n",
+            "open fun getMessage(diagnostic: Diagnostic): String = diagnostic.messageIfStringOrEmpty\n"
+        )
+        dc_content = dc_content.replace(
+            "open fun getTooltip(diagnostic: Diagnostic): String = diagnostic.message\n",
+            "open fun getTooltip(diagnostic: Diagnostic): String = diagnostic.messageIfStringOrEmpty\n"
+        )
+        with open(diag_customizer_path, "w", encoding="utf-8") as f:
+            f.write(dc_content)
+
+    # 11c. LspDiagnosticAndLazyQuickFixes.kt
+    diag_qf_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/highlighting/LspDiagnosticAndLazyQuickFixes.kt")
+    if os.path.exists(diag_qf_path):
+        with open(diag_qf_path, "r", encoding="utf-8") as f:
+            qf_content = f.read()
+        imp = "import com.intellij.platform.dartlsp.util.messageIfStringOrEmpty"
+        if imp not in qf_content:
+            qf_content = qf_content.replace(
+                "import com.intellij.openapi.vfs.VirtualFile\n",
+                f"import com.intellij.openapi.vfs.VirtualFile\n{imp}\n"
+            )
+        qf_content = qf_content.replace(
+            "this.message = diagnostic.message\n",
+            "this.message = diagnostic.messageIfStringOrEmpty\n"
+        )
+        with open(diag_qf_path, "w", encoding="utf-8") as f:
+            f.write(qf_content)
+
+    # 11d. LspServerImpl.kt
+    if os.path.exists(lsp_server_impl_path):
+        with open(lsp_server_impl_path, "r", encoding="utf-8") as f:
+            server_content = f.read()
+        imp = "import com.intellij.platform.dartlsp.util.getDocumentFilterPattern"
+        if imp not in server_content:
+            server_content = server_content.replace(
+                "import com.intellij.openapi.vfs.VirtualFile\n",
+                f"import com.intellij.openapi.vfs.VirtualFile\n{imp}\n"
+            )
+        old_pattern_block = """        val language = filter.language
+        val pattern = filter.pattern"""
+        new_pattern_block = """        val language = filter.language
+        val filterPattern = getDocumentFilterPattern(filter)
+        if (filterPattern != null && filterPattern.isRight) {
+          // A RelativePattern needs its baseUri resolved against the workspace folders. The IDE does not support it yet.
+          logWarn("Ignoring the document filter, its pattern is relative: ${filterPattern.right}")
+          continue
+        }
+        val pattern = filterPattern?.left"""
+        if old_pattern_block in server_content:
+            server_content = server_content.replace(old_pattern_block, new_pattern_block)
+        with open(lsp_server_impl_path, "w", encoding="utf-8") as f:
+            f.write(server_content)
+
     print("Patch applied successfully!")
 
 if __name__ == "__main__":
     main()
+

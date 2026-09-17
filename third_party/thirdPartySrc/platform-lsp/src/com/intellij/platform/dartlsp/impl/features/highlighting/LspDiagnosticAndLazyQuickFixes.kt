@@ -2,6 +2,7 @@ package com.intellij.platform.dartlsp.impl.features.highlighting
 
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.dartlsp.util.messageIfStringOrEmpty
 import com.intellij.platform.dartlsp.api.customization.LspCodeActionsSupport
 import com.intellij.platform.dartlsp.impl.LspServerImpl
 import com.intellij.platform.dartlsp.impl.features.quickFix.LspQuickFixSet
@@ -37,7 +38,7 @@ internal fun copyDiagnosticWithRange(diagnostic: Diagnostic, range: Range): Diag
   this.code = diagnostic.code
   this.codeDescription = diagnostic.codeDescription
   this.source = diagnostic.source
-  this.message = diagnostic.message
+  this.message = diagnostic.messageIfStringOrEmpty
   this.tags = diagnostic.tags
   this.relatedInformation = diagnostic.relatedInformation
   this.data = diagnostic.data

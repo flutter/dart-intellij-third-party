@@ -5,10 +5,13 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.intellij.platform.dartlsp.util.getDocumentFilterPattern
+import com.intellij.platform.dartlsp.util.messageIfStringOrEmpty
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
+import org.eclipse.lsp4j.DocumentFilter
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 
@@ -77,4 +80,28 @@ class DartLspDiagnosticConverterTest : DartCodeInsightFixtureTestCase() {
         assertEquals("todo", error.code)
         assertEquals(1, error.location.startLine)
     }
+
+    fun testLsp4jCompatibilityHelpers() {
+        val diagnostic = Diagnostic(
+            Range(Position(0, 0), Position(0, 5)),
+            "Diagnostic message",
+            DiagnosticSeverity.Warning,
+            "dart",
+            "warning_code"
+        )
+        assertEquals(
+            "Diagnostic message",
+            diagnostic.messageIfStringOrEmpty
+        )
+
+        val filter = DocumentFilter().apply {
+            language = "dart"
+            pattern = "**/*.dart"
+        }
+        val filterPattern = getDocumentFilterPattern(filter)
+        assertNotNull(filterPattern)
+        assertEquals(true, filterPattern?.isLeft)
+        assertEquals("**/*.dart", filterPattern?.left)
+    }
 }
+
