@@ -115,6 +115,17 @@ public final class DartServerData {
     }
   }
 
+  void onLspClosingLabelsUpdated(@NotNull DartFileInfo fileInfo, @NotNull List<DartClosingLabel> newClosingLabels) {
+    if (myLocalFilesWithUnsentChanges.contains(fileInfo) || myService.getProject().isDisposed()) return;
+    myClosingLabelData.put(fileInfo, newClosingLabels);
+    VirtualFile file = fileInfo.findFile();
+    if (file != null && file.isValid()) {
+      Arrays.stream(EditorFactory.getInstance().getAllEditors())
+        .filter(editor -> file.equals(editor.getVirtualFile()))
+        .forEach(editor -> DeclarativeInlayHintsPassFactory.Companion.scheduleRecompute(editor, myService.getProject()));
+    }
+  }
+
   void computedHighlights(@NotNull DartFileInfo fileInfo, @NotNull List<? extends HighlightRegion> regions) {
     if (myLocalFilesWithUnsentChanges.contains(fileInfo)) return;
 
@@ -770,7 +781,7 @@ public final class DartServerData {
   public static final class DartClosingLabel extends DartRegion {
     private final String label;
 
-    private DartClosingLabel(final int offset, final int length, final @NotNull String label) {
+    public DartClosingLabel(final int offset, final int length, final @NotNull String label) {
       super(offset, length);
       this.label = label;
     }

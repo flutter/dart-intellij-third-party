@@ -1188,9 +1188,9 @@ public final class DartAnalysisServerService implements Disposable {
     processComputedErrors(filePathOrUri, errors, false);
   }
 
-  public void onLspClosingLabelsUpdated(@NotNull String filePathUri, @NotNull List<ClosingLabel> labels) {
+  public void onLspClosingLabelsUpdated(@NotNull String filePathUri, @NotNull List<DartServerData.DartClosingLabel> labels) {
     DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathUri);
-    myServerData.computedClosingLabels(fileInfo, labels);
+    myServerData.onLspClosingLabelsUpdated(fileInfo, labels);
   }
 
   private void processComputedErrors(@NotNull String filePathOrUri,
@@ -2111,6 +2111,7 @@ public final class DartAnalysisServerService implements Disposable {
       subscriptions.put(AnalysisService.OUTLINE, myVisibleFileUris);
       subscriptions.put(AnalysisService.IMPLEMENTED, myVisibleFileUris);
       subscriptions.put(AnalysisService.CLOSING_LABELS, myVisibleFileUris);
+
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("analysis_setSubscriptions, subscriptions:\n" + subscriptions);

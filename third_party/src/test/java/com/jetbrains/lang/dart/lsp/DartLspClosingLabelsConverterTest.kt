@@ -1,3 +1,4 @@
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.lsp
 
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
@@ -30,7 +31,6 @@ class DartLspClosingLabelsConverterTest: DartCodeInsightFixtureTestCase() {
 
         val converted = DartLspClosingLabelsConverter.convertClosingLabels(
             project,
-            das,
             fileUri,
             lspLabels
         )
@@ -48,11 +48,9 @@ class DartLspClosingLabelsConverterTest: DartCodeInsightFixtureTestCase() {
     fun testConvertEmptyClosingLabels() {
         val testFile = myFixture.addFileToProject("lib/test_empty.dart", "void main() {}")
         val fileUri = "file://${testFile.virtualFile.path}"
-        val das = DartAnalysisServerService.getInstance(project)
 
         val converted = DartLspClosingLabelsConverter.convertClosingLabels(
             project,
-            das,
             fileUri,
             emptyList()
         )

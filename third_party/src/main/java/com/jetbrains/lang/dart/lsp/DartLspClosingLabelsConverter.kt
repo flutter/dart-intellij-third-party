@@ -1,3 +1,4 @@
+// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.application.ApplicationManager
@@ -9,7 +10,7 @@ import com.intellij.platform.dartlsp.util.getOffsetInDocument
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.analyzer.DartLocalFileInfo
 import com.jetbrains.lang.dart.analyzer.getDartFileInfo
-import org.dartlang.analysis.server.protocol.ClosingLabel
+import com.jetbrains.lang.dart.analyzer.DartServerData.DartClosingLabel
 import org.eclipse.lsp4j.Range
 
 data class DartPublishClosingLabelsParams(
@@ -25,11 +26,10 @@ data class DartLspClosingLabel(
 object DartLspClosingLabelsConverter {
     fun convertClosingLabels(
         project: Project,
-        das: DartAnalysisServerService,
         uri: String,
         lspLabels: List<DartLspClosingLabel>?
-    ): List<ClosingLabel> {
-        if (lspLabels.isNullOrEmpty()) return emptyList()
+    ): List<DartClosingLabel> {
+        if (project.isDisposed || lspLabels.isNullOrEmpty()) return emptyList()
 
         val fileInfo = getDartFileInfo(project, uri)
 
@@ -39,17 +39,19 @@ object DartLspClosingLabelsConverter {
                     VirtualFileManager.getInstance().findFileByUrl("temp://${it.filePath}")
                 }
                 ?: return@Computable emptyList()
+
+            if (!vFile.isValid) return@Computable emptyList()
+
             val document = FileDocumentManager.getInstance().getDocument(vFile) ?: return@Computable emptyList()
 
             lspLabels.mapNotNull { lspLabel ->
+                if (lspLabel.label.isBlank()) return@mapNotNull null
                 val startDocOffset = getOffsetInDocument(document, lspLabel.range.start) ?: return@mapNotNull null
                 val endDocOffset = getOffsetInDocument(document, lspLabel.range.end) ?: return@mapNotNull null
-
-                val offset = das.getOriginalOffset(vFile, startDocOffset)
-                val length = (das.getOriginalOffset(vFile, endDocOffset) - offset).coerceAtLeast(0)
+                val length = endDocOffset - startDocOffset
 
                 if (length > 0) {
-                    ClosingLabel(offset, length, lspLabel.label)
+                    DartClosingLabel(startDocOffset, length, lspLabel.label)
                 } else {
                     null
                 }
