@@ -4,6 +4,7 @@ import com.intellij.codeInsight.hints.declarative.*
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFile
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.jetbrains.lang.dart.lsp.DartLspClosingLabelsService
 
 class DartClosingLabelsInlayHintsProvider : InlayHintsProvider {
   companion object {
@@ -15,17 +16,34 @@ class DartClosingLabelsInlayHintsProvider : InlayHintsProvider {
       val virtualFile = file.virtualFile ?: return
       val project = file.project
 
-      val analysisServerService = DartAnalysisServerService.getInstance(project)
-      val closingLabels = analysisServerService.getClosingLabels(virtualFile)
-      closingLabels.forEach {
-        if (it.offset + it.length <= editor.document.textLength) {
-          val line = editor.document.getLineNumber(it.offset + it.length)
-          val position = EndOfLinePosition(line)
+      if (DartAnalysisServerService.isLspClosingLabelsEnabled(project)) {
+        val lspClosingLabels = DartLspClosingLabelsService.getInstance(project).getClosingLabels(virtualFile)
+        lspClosingLabels.forEach { item ->
+          val label = item.label ?: return@forEach
+          val line = item.range?.end?.line ?: return@forEach
+          if (line in 0 until editor.document.lineCount) {
+            sink.addPresentation(
+              position = EndOfLinePosition(line),
+              hintFormat = HintFormat.default) {
+              text(label)
+            }
+          }
 
-          sink.addPresentation(
-            position = position,
-            hintFormat = HintFormat.default) {
-            text(it.label)
+        }
+      } else {
+        val analysisServerService = DartAnalysisServerService.getInstance(project)
+        val closingLabels = analysisServerService.getClosingLabels(virtualFile)
+        closingLabels.forEach {
+          if (it.offset + it.length <= editor.document.textLength) {
+            val line = editor.document.getLineNumber(it.offset + it.length)
+            val position = EndOfLinePosition(line)
+
+            sink.addPresentation(
+              position = position,
+              hintFormat = HintFormat.default
+            ) {
+              text(it.label)
+            }
           }
         }
       }

@@ -225,6 +225,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                     DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, params.uri, it)
                 } ?: emptyList()
                 das.onLspDiagnosticsUpdated(params.uri, errors)
+            } else if (method == "dart/textDocument/publishClosingLabels") {
+                val paramsObj = msgObj.get("params")
+                val params = GSON.fromJson(paramsObj, DartPublishClosingLabelsParams::class.java)
+                if (params?.uri != null) {
+                    DartLspClosingLabelsService.getInstance(project).updateClosingLabels(params.uri, params.labels)
+                }
             } else {
                 logger.info("Ignored notification from DAS: $method")
             }

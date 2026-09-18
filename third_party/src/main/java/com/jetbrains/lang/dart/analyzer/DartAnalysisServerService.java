@@ -183,6 +183,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-137.0.dev";
   public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
+  public static final String MIN_LSP_CLOSING_LABELS_SDK_VERSION = "3.14.0-219.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -543,6 +544,12 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion, boolean supportsLspDiagnostics) {
+    return buildLspCapabilities(sdkVersion, supportsLspDiagnostics, false);
+  }
+
+  public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion,
+                                                         boolean supportsLspDiagnostics,
+                                                         boolean supportsLspClosingLabels) {
     JsonObject lspCapabilities = new JsonObject();
 
     if (isDartSdkVersionSufficientForWorkspaceApplyEdits(sdkVersion)) {
@@ -585,6 +592,14 @@ public final class DartAnalysisServerService implements Disposable {
       textDocument.add("publishDiagnostics", publishDiagnostics);
     }
 
+    if (supportsLspClosingLabels) {
+      JsonObject experimental = lspCapabilities.has("experimental")
+                                ? lspCapabilities.getAsJsonObject("experimental")
+                                : new JsonObject();
+      experimental.add("closingLabels", new JsonObject());
+      lspCapabilities.add("experimental", experimental);
+    }
+
     lspCapabilities.add("textDocument", textDocument);
 
     return lspCapabilities;
@@ -606,12 +621,15 @@ public final class DartAnalysisServerService implements Disposable {
     return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION) >= 0;
   }
 
-    public static boolean isDartSdkVersionSufficientForLspReferences(@NotNull String sdkVersion) {
-        return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_REFERENCES_SDK_VERSION) >= 0;
-    }
+  public static boolean isDartSdkVersionSufficientForLspReferences(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_REFERENCES_SDK_VERSION) >= 0;
+  }
 
+  public static boolean isDartSdkVersionSufficientForLspClosingLabels(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_CLOSING_LABELS_SDK_VERSION) >= 0;
+  }
 
-    public static boolean isLspPublishDiagnosticsEnabled(final @NotNull Project project) {
+  public static boolean isLspPublishDiagnosticsEnabled(final @NotNull Project project) {
     if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
       return false;
     }
@@ -628,16 +646,23 @@ public final class DartAnalysisServerService implements Disposable {
     return sdk != null && isDartSdkVersionSufficientForLspInlayHints(sdk.getVersion());
   }
 
-    public static boolean isLspReferencesEnabled(final @NotNull Project project) {
-        if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-            return false;
-        }
-        final DartSdk sdk = DartSdk.getDartSdk(project);
-        return sdk != null && isDartSdkVersionSufficientForLspReferences(sdk.getVersion());
+  public static boolean isLspReferencesEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
     }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspReferences(sdk.getVersion());
+  }
 
+  public static boolean isLspClosingLabelsEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspClosingLabels(sdk.getVersion());
+  }
 
-    public boolean shouldUseCompletion2() {
+  public boolean shouldUseCompletion2() {
     return StringUtil.compareVersionNumbers(getServerVersion(), COMPLETION_2_SERVER_VERSION) >= 0;
   }
 
@@ -2082,6 +2107,7 @@ public final class DartAnalysisServerService implements Disposable {
       subscriptions.put(AnalysisService.IMPLEMENTED, myVisibleFileUris);
       subscriptions.put(AnalysisService.CLOSING_LABELS, myVisibleFileUris);
 
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("analysis_setSubscriptions, subscriptions:\n" + subscriptions);
       }
@@ -2397,9 +2423,10 @@ public final class DartAnalysisServerService implements Disposable {
 
         boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
         boolean supportsLspDiagnostics = isLspPublishDiagnosticsEnabled(myProject);
+        boolean supportsLspClosingLabels = isLspClosingLabelsEnabled(myProject);
         startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
                                                    supportsUris,
-                                                   buildLspCapabilities(mySdkVersion, supportsLspDiagnostics));
+                                                   buildLspCapabilities(mySdkVersion, supportsLspDiagnostics, supportsLspClosingLabels));
 
         myServer = startedServer;
 

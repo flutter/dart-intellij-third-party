@@ -492,6 +492,56 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertNotSame(0, errorsHash)
     }
 
+    fun testPublishClosingLabelsNotification() {
+        val testFile = myFixture.addFileToProject(
+            "lib/widget.dart",
+            """
+                void main() {
+                  runApp(
+                    MyWidget(
+                      child: Text('Hello'),
+                    ),
+                  );
+                }
+                """.trimIndent()
+        )
+        val fileUri = "file://${testFile.virtualFile.path}"
+
+        val notificationJson = """
+                {
+                  "params": {
+                    "lspNotification": {
+                      "jsonrpc": "2.0",
+                      "method": "dart/textDocument/publishClosingLabels",
+                      "params": {
+                        "uri": "$fileUri",
+                        "labels": [
+                          {
+                            "label": "MyWidget",
+                            "range": {
+                              "start": {"line": 2, "character": 4},
+                              "end": {"line": 4, "character": 5}
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        // 1. Simulate the reverse notification arriving from DAS over the bridge
+        capturedListener.onResponse(notificationJson)
+
+        // 2. Verify DartAnalysisServerService / DartServerData processed and stored the label
+        val closingLabels = DartLspClosingLabelsService.getInstance(project).getClosingLabels(testFile.virtualFile)
+        assertEquals(1, closingLabels.size)
+        assertEquals("MyWidget", closingLabels[0].label)
+        assertEquals(2, closingLabels[0].range?.start?.line)
+        assertEquals(4, closingLabels[0].range?.end?.line)
+    }
+
+
     fun testTypeDefinitionRequest() {
         val params = TypeDefinitionParams().apply {
             textDocument = TextDocumentIdentifier("file://test.dart")
@@ -895,6 +945,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(0, result[0].range.end.line)
         assertEquals(10, result[0].range.end.character)
     }
+
+
 
     fun testIsDartSdkVersionSufficientForLspReferences() {
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("3.14.0-65.0.dev"))
