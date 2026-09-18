@@ -6,6 +6,8 @@ import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.undo.UndoManager;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -408,13 +410,33 @@ public class DartServerHighlightingTest extends CodeInsightFixtureTestCase {
 //                            """);
 //  }
 
-  public void testUpdateVisibleFilesWithoutReadAccess() throws Exception {
-    myFixture.configureByText("firstFile.dart", "class Foo {}");
+  public void testSemanticHighlightingAfterModifyingFileOutsideIntelliJAndThenOpening() {
+    // 1. Create a Dart file in the project without opening it in an editor.
+    final VirtualFile file =
+      myFixture.addFileToProject("externalFile.dart", "class InitialClass { String name; }").getVirtualFile();
     final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getProject());
-    ApplicationManager.getApplication().executeOnPooledThread(() -> {
-      assertFalse("Read access should not be allowed before calling updateVisibleFiles()",
-                  ApplicationManager.getApplication().isReadAccessAllowed());
-      service.updateVisibleFiles();
-    }).get(10, TimeUnit.SECONDS);
+
+    // 2. Simulate external modification on disk (e.g. by a coding agent outside IntelliJ).
+    // When the file is not open in an editor, document change is triggered without being in open files.
+    final Document document = FileDocumentManager.getInstance().getDocument(file);
+    assertNotNull(document);
+    ApplicationManager.getApplication().runWriteAction(() -> {
+      document.setText("class ExternalClass { String get title => 'test'; }");
+    });
+    FileDocumentManager.getInstance().saveDocument(document);
+
+    // 3. Open the file in the editor.
+    myFixture.openFileInEditor(file);
+    final FileEditorManagerEvent event =
+      new FileEditorManagerEvent(FileEditorManager.getInstance(getProject()), null, null, null, file, null, null);
+    getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER).selectionChanged(event);
+
+    // 4. Trigger highlighting pass.
+    myFixture.doHighlighting();
+
+    // 5. Verify semantic highlighting and outline are populated (Issue #656).
+    assertNotEmpty(service.getHighlight(file));
+    assertNotEmpty(service.getNavigation(file));
+    assertNotNull(service.getOutline(file));
   }
 }
