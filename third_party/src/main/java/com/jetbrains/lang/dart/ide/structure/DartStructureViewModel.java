@@ -154,20 +154,20 @@ class DartStructureViewModel extends TextEditorBasedStructureViewModel implement
     public @NotNull Collection<StructureViewTreeElement> getChildrenBase() {
         PsiFile psiFile = getValue();
         if (psiFile == null || !psiFile.isValid()) return Collections.emptyList();
-        final VirtualFile virtualFile = getValue().getVirtualFile();
+        final VirtualFile virtualFile = psiFile.getVirtualFile();
         if (virtualFile != null) {
-            final LspStructureViewSupport support = LspStructureViewSupport.find(getValue().getProject(), virtualFile);
+            final LspStructureViewSupport support = LspStructureViewSupport.find(psiFile.getProject(), virtualFile);
             if (support != null) {
                 final List<DocumentSymbol> symbols = support.getDocumentSymbols();
                 if (symbols != null) {
                     return ContainerUtil.map(symbols,
-                            documentSymbol -> new DartLspStructureViewElement(getValue(), support, documentSymbol));
+                            documentSymbol -> new DartLspStructureViewElement(psiFile, support, documentSymbol));
                 }
             }
         }
-        final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getValue().getProject());
-        final Outline outline = service.getOutline(getValue().getVirtualFile());
-        return outline != null ? Arrays.asList(new DartStructureViewElement(getValue(), outline).getChildren())
+        final DartAnalysisServerService service = DartAnalysisServerService.getInstance(psiFile.getProject());
+        final Outline outline = service.getOutline(psiFile.getVirtualFile());
+        return outline != null ? Arrays.asList(new DartStructureViewElement(psiFile, outline).getChildren())
                 : Collections.emptyList();
     }
   }
