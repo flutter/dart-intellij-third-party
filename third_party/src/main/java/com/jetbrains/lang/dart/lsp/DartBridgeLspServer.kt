@@ -15,8 +15,12 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
-import org.dartlang.analysis.server.protocol.AnalysisError
-import org.dartlang.analysis.server.protocol.DiagnosticMessage
+import org.eclipse.lsp4j.CompletionItem
+import org.eclipse.lsp4j.CompletionItemKind
+import org.eclipse.lsp4j.CompletionList
+import org.eclipse.lsp4j.CompletionOptions
+import org.eclipse.lsp4j.CompletionParams
+import org.eclipse.lsp4j.InsertTextFormat
 import org.eclipse.lsp4j.CallHierarchyIncomingCall
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
 import org.eclipse.lsp4j.CallHierarchyItem
@@ -24,8 +28,6 @@ import org.eclipse.lsp4j.CallHierarchyOutgoingCall
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.DefinitionParams
-import org.eclipse.lsp4j.Diagnostic
-import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
@@ -38,6 +40,7 @@ import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.InlayHint
 import org.eclipse.lsp4j.InlayHintParams
 import org.eclipse.lsp4j.Location
@@ -247,9 +250,14 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             setTypeHierarchyProvider(true)
             setCallHierarchyProvider(true)
             setReferencesProvider(true)
+            setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
             // Add other capabilities as we support them.
         }
         return CompletableFuture.completedFuture(InitializeResult(capabilities))
+    }
+
+    override fun initialized(params: InitializedParams) {
+        logger.info("Initialized called")
     }
 
     override fun shutdown(): CompletableFuture<Any> {
@@ -284,6 +292,24 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val type = object : TypeToken<List<LocationLink>>() {}.type
         return forwardRequest<List<LocationLink>>("textDocument/typeDefinition", params, type).thenApply { links ->
             Either.forRight(links ?: emptyList())
+        }
+    }
+
+    override fun completion(params: CompletionParams): CompletableFuture<Either<List<CompletionItem>, CompletionList>> {
+        return forwardRequest("textDocument/completion", params, CompletionList::class.java).thenApply { list ->
+            Either.forRight<List<CompletionItem>, CompletionList>(list ?: CompletionList(false, emptyList()))
+        }.exceptionally { e ->
+            logger.info("textDocument/completion failed: ${e.message}")
+            Either.forRight<List<CompletionItem>, CompletionList>(CompletionList(false, emptyList()))
+        }
+    }
+
+    override fun resolveCompletionItem(unresolved: CompletionItem): CompletableFuture<CompletionItem> {
+        return forwardRequest("completionItem/resolve", unresolved, CompletionItem::class.java).thenApply { resolved ->
+            resolved ?: unresolved
+        }.exceptionally { e ->
+            logger.info("completionItem/resolve failed: ${e.message}")
+            unresolved
         }
     }
 
