@@ -40,6 +40,7 @@ public class DartLspExperimentalFeaturesTest extends CodeInsightFixtureTestCase 
     assertFalse(LspMethod.TYPE_DEFINITION.isExperimental());
     assertTrue(LspMethod.DEFINITION.isExperimental());
     assertTrue(LspMethod.DOCUMENT_HIGHLIGHT.isExperimental());
+    assertTrue(LspMethod.DOCUMENT_SYMBOL.isExperimental());
 
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.DIAGNOSTIC_SERVER));
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.HOVER));
