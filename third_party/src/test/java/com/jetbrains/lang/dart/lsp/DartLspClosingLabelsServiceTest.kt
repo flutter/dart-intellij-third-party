@@ -6,56 +6,57 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 
-class DartLspClosingLabelsConverterTest: DartCodeInsightFixtureTestCase() {
-    fun testConvertClosingLabels() {
+class DartLspClosingLabelsServiceTest: DartCodeInsightFixtureTestCase() {
+    fun testUpdateAndGetClosingLabels() {
         val code = """
-                void main() {
-                  runApp(
-                    Center(
-                      child: Text('Hi'),
-                    ),
-                  );
-                }
-            """.trimIndent()
+                    void main() {
+                      runApp(
+                        Center(
+                          child: Text('Hi'),
+                        ),
+                      );
+                    }
+                """.trimIndent()
 
         val testFile = myFixture.addFileToProject("lib/test_labels.dart", code)
         val fileUri = "file://${testFile.virtualFile.path}"
-        val das = DartAnalysisServerService.getInstance(project)
+        val service = DartLspClosingLabelsService.getInstance(project)
 
         val lspLabels = listOf(
             DartLspClosingLabel(
                 label = "Center",
                 range = Range(Position(2, 4), Position(4, 5))
+            ),
+            // Malformed / blank labels should be filtered out safely
+            DartLspClosingLabel(
+                label = "",
+                range = Range(Position(1, 2), Position(5, 3))
+            ),
+            DartLspClosingLabel(
+                label = "MissingRange",
+                range = null
             )
         )
 
-        val converted = DartLspClosingLabelsConverter.convertClosingLabels(
-            project,
-            fileUri,
-            lspLabels
-        )
+        service.updateClosingLabels(fileUri, lspLabels)
 
-        assertEquals(1, converted.size)
-        val label = converted[0]
+        val stored = service.getClosingLabels(testFile.virtualFile)
+        assertEquals(1, stored.size)
+        val label = stored[0]
         assertEquals("Center", label.label)
-
-        val expectedStartOffset = code.indexOf("Center(")
-        val expectedEndOffset = code.lastIndexOf("),") + 1
-        assertEquals(expectedStartOffset, label.offset)
-        assertEquals(expectedEndOffset - expectedStartOffset, label.length)
+        assertEquals(2, label.range?.start?.line)
+        assertEquals(4, label.range?.end?.line)
     }
 
-    fun testConvertEmptyClosingLabels() {
+    fun testUpdateEmptyClosingLabels() {
         val testFile = myFixture.addFileToProject("lib/test_empty.dart", "void main() {}")
         val fileUri = "file://${testFile.virtualFile.path}"
+        val service = DartLspClosingLabelsService.getInstance(project)
 
-        val converted = DartLspClosingLabelsConverter.convertClosingLabels(
-            project,
-            fileUri,
-            emptyList()
-        )
+        service.updateClosingLabels(fileUri, emptyList())
 
-        assertTrue(converted.isEmpty())
+        val stored = service.getClosingLabels(testFile.virtualFile)
+        assertTrue(stored.isEmpty())
     }
 
     fun testBuildLspCapabilitiesWithClosingLabels() {

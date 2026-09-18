@@ -1188,11 +1188,6 @@ public final class DartAnalysisServerService implements Disposable {
     processComputedErrors(filePathOrUri, errors, false);
   }
 
-  public void onLspClosingLabelsUpdated(@NotNull String filePathUri, @NotNull List<DartServerData.DartClosingLabel> labels) {
-    DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathUri);
-    myServerData.onLspClosingLabelsUpdated(fileInfo, labels);
-  }
-
   private void processComputedErrors(@NotNull String filePathOrUri,
                                      @NotNull List<AnalysisError> errors,
                                      boolean updateProgressIndicator) {

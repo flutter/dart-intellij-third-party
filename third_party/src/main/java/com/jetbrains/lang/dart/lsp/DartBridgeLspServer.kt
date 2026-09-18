@@ -228,8 +228,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             } else if (method == "dart/textDocument/publishClosingLabels") {
                 val paramsObj = msgObj.get("params")
                 val params = GSON.fromJson(paramsObj, DartPublishClosingLabelsParams::class.java)
-                val labels = DartLspClosingLabelsConverter.convertClosingLabels(project, params.uri, params.labels)
-                das.onLspClosingLabelsUpdated(params.uri, labels)
+                if (params?.uri != null) {
+                    DartLspClosingLabelsService.getInstance(project).updateClosingLabels(params.uri, params.labels)
+                }
             } else {
                 logger.info("Ignored notification from DAS: $method")
             }

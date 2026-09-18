@@ -534,11 +534,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         capturedListener.onResponse(notificationJson)
 
         // 2. Verify DartAnalysisServerService / DartServerData processed and stored the label
-        val closingLabels = DartAnalysisServerService.getInstance(project).getClosingLabels(testFile.virtualFile)
+        val closingLabels = DartLspClosingLabelsService.getInstance(project).getClosingLabels(testFile.virtualFile)
         assertEquals(1, closingLabels.size)
         assertEquals("MyWidget", closingLabels[0].label)
-        assertTrue(closingLabels[0].offset > 0)
-        assertTrue(closingLabels[0].length > 0)
+        assertEquals(2, closingLabels[0].range?.start?.line)
+        assertEquals(4, closingLabels[0].range?.end?.line)
     }
 
 
