@@ -956,6 +956,7 @@ public final class DartAnalysisServerService implements Disposable {
         updateCurrentFile();
 
         if (isLocalAnalyzableFile(file)) {
+          myServerData.onFileOpened(file);
           updateVisibleFiles();
         }
       }
@@ -965,6 +966,9 @@ public final class DartAnalysisServerService implements Disposable {
         updateCurrentFile();
 
         if (isLocalAnalyzableFile(event.getOldFile()) || isLocalAnalyzableFile(event.getNewFile())) {
+          if (event.getNewFile() != null && isLocalAnalyzableFile(event.getNewFile())) {
+            myServerData.onFileOpened(event.getNewFile());
+          }
           updateVisibleFiles();
         }
       }
@@ -991,22 +995,25 @@ public final class DartAnalysisServerService implements Disposable {
       public void beforeDocumentChange(@NotNull DocumentEvent e) {
         if (myServer == null) return;
 
-        myServerData.onDocumentChanged(e);
-
         final VirtualFile file = FileDocumentManager.getInstance().getFile(e.getDocument());
         if (isLocalAnalyzableFile(file)) {
+          boolean isOpenInEditor = false;
           for (VirtualFile fileInEditor : FileEditorManager.getInstance(myProject).getOpenFiles()) {
             if (fileInEditor.equals(file)) {
+              isOpenInEditor = true;
               synchronized (myLock) {
                 myChangedDocuments.add(e.getDocument());
               }
               break;
             }
           }
-        }
 
-        myUpdateFilesAlarm.cancelAllRequests();
-        myUpdateFilesAlarm.addRequest(DartAnalysisServerService.this::updateFilesContent, UPDATE_FILES_TIMEOUT);
+          if (isOpenInEditor) {
+            myServerData.onDocumentChanged(e);
+            myUpdateFilesAlarm.cancelAllRequests();
+            myUpdateFilesAlarm.addRequest(DartAnalysisServerService.this::updateFilesContent, UPDATE_FILES_TIMEOUT);
+          }
+        }
       }
     };
 
@@ -1228,6 +1235,9 @@ public final class DartAnalysisServerService implements Disposable {
         }
         myServerData.onFilesContentUpdated();
       });
+    }
+    else if (FileDocumentManager.getInstance().getUnsavedDocuments().length == 0) {
+      myServerData.onFilesContentUpdated();
     }
   }
 
