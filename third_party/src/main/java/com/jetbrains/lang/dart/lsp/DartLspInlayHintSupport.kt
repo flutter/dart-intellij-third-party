@@ -5,6 +5,7 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintSupport
 import com.jetbrains.lang.dart.hints.DartParameterNamesInlayHintsProvider
@@ -22,9 +23,13 @@ import org.eclipse.lsp4j.InlayHintKind
  * [shouldDisplayInlayHint] drops hints whose checkbox is off, and [shouldAskServerForInlayHints]
  * skips the `textDocument/inlayHint` request entirely while both checkboxes are off.
  */
-class DartLspInlayHintSupport : LspInlayHintSupport() {
+class DartLspInlayHintSupport(private val project: Project) : LspInlayHintSupport() {
 
     override fun shouldAskServerForInlayHints(file: VirtualFile): Boolean {
+        // This runs before every inlay hint request cycle, and nothing else notices that the user
+        // has flipped a checkbox, so it is where the server learns about it.
+        DartLspConfigurationSync.getInstance(project).pushConfigurationIfChanged()
+
         return isProviderEnabled(DartParameterNamesInlayHintsProvider.PROVIDER_ID) ||
                 isProviderEnabled(DartTypesInlayHintsProvider.PROVIDER_ID)
     }

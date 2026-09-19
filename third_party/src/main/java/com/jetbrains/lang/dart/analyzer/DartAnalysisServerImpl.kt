@@ -18,6 +18,7 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.logging.PluginLogger
+import com.jetbrains.lang.dart.lsp.DartLspConfigurationSync
 import com.jetbrains.lang.dart.lsp.DartLspInlayHintsConfiguration
 import kotlinx.coroutines.launch
 import org.dartlang.analysis.server.protocol.*
@@ -86,12 +87,21 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
    * nor a read action.
    */
   override fun lsp_workspaceConfiguration(sections: List<String?>, consumer: DartLspWorkspaceConfigurationConsumer) {
+    val dartSection =
+      if (sections.contains(DART_CONFIGURATION_SECTION)) DartLspInlayHintsConfiguration.buildDartSection() else null
+
     consumer.computedConfiguration(sections.map { section ->
       when (section) {
-        DART_CONFIGURATION_SECTION -> DartLspInlayHintsConfiguration.buildDartSection()
+        DART_CONFIGURATION_SECTION -> dartSection
         else -> null
       }
     })
+
+    // Only after the answer is out: what the server now knows is the yardstick for noticing that
+    // the settings have changed, and answering must not depend on it.
+    if (dartSection != null) {
+      DartLspConfigurationSync.getInstance(project).configurationSentToServer(dartSection)
+    }
   }
 
   @RequiresWriteLock

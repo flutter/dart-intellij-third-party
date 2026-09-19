@@ -98,6 +98,7 @@ import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
+import com.jetbrains.lang.dart.lsp.DartLspConfigurationSync;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
@@ -183,6 +184,12 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-137.0.dev";
   public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
+
+  // This refers to the Analysis Server API version (from `server.connected`), not a Dart SDK
+  // version: only from this protocol version on does the server accept the `lsp.notification`
+  // notification, which is how `workspace/didChangeConfiguration` reaches it. An older server
+  // logs that notification as an error, so it must not be sent at all.
+  private static final String MIN_LSP_CONFIGURATION_SERVER_PROTOCOL_VERSION = "1.41.0";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -548,6 +555,10 @@ public final class DartAnalysisServerService implements Disposable {
     if (isDartSdkVersionSufficientForWorkspaceApplyEdits(sdkVersion)) {
       JsonObject workspace = new JsonObject();
       workspace.addProperty("applyEdit", true);
+      // Without this the server never asks for the `dart` configuration section, so the settings of
+      // Settings | Editor | Inlay Hints would never reach it. It is advertised unconditionally: a
+      // server that does not support `workspace/configuration` parses and ignores it.
+      workspace.addProperty("configuration", true);
 
       JsonObject workspaceEdit = new JsonObject();
       workspaceEdit.addProperty("documentChanges", true);
@@ -621,6 +632,18 @@ public final class DartAnalysisServerService implements Disposable {
 
   public static boolean isDartSdkVersionSufficientForLspInlayHints(@NotNull String sdkVersion) {
     return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_INLAY_HINTS_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isServerProtocolVersionSufficientForLspConfiguration(@NotNull String serverVersion) {
+    return StringUtil.compareVersionNumbers(serverVersion, MIN_LSP_CONFIGURATION_SERVER_PROTOCOL_VERSION) >= 0;
+  }
+
+  /**
+   * Whether the running server can be told that the configuration has changed, see
+   * {@link com.jetbrains.lang.dart.lsp.DartLspConfigurationSync}.
+   */
+  public boolean isLspConfigurationNotificationSupported() {
+    return isServerProtocolVersionSufficientForLspConfiguration(myServerVersion);
   }
 
   public static boolean isLspInlayHintsEnabled(final @NotNull Project project) {
@@ -2517,6 +2540,11 @@ public final class DartAnalysisServerService implements Disposable {
       mySdkHome = null;
       mySdkVersion = "";
       myServerVersion = "";
+      // The next server starts out knowing nothing about the settings of this client.
+      DartLspConfigurationSync configurationSync = myProject.getServiceIfCreated(DartLspConfigurationSync.class);
+      if (configurationSync != null) {
+        configurationSync.serverStopped();
+      }
       myFilePathWithOverlaidContentToTimestamp.clear();
       myVisibleFileUris.clear();
       myChangedDocuments.clear();

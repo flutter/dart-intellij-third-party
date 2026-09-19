@@ -239,6 +239,26 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         assertEquals(dartSection, result[0].asJsonObject)
     }
 
+    fun testClientCapabilitiesAskTheServerToPullTheConfiguration() {
+        // The server only sends workspace/configuration if the client advertises that it can answer
+        // it, and that is the only way the settings ever reach the server.
+        val capabilities = DartAnalysisServerService.buildLspCapabilities("3.14.0")
+
+        val workspace = requireNotNull(capabilities.getAsJsonObject("workspace")) {
+            "the workspace capabilities should be present, was: $capabilities"
+        }
+        assertTrue(workspace.get("configuration").asBoolean)
+    }
+
+    fun testTheConfigurationNotificationIsGatedOnTheServerProtocolVersion() {
+        // The protocol version of the server, not the version of the Dart SDK: an older server
+        // cannot handle a notification from the client and logs it as an error.
+        assertFalse(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration(""))
+        assertFalse(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.40.0"))
+        assertTrue(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.41.0"))
+        assertTrue(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.42.0"))
+    }
+
     fun testDartAnalysisServerImplSuppliesTheInlayHintSettings() {
         val server = DartAnalysisServerImpl(project, createStubSocket())
 
