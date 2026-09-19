@@ -1086,6 +1086,15 @@ public interface AnalysisServer {
 
   public void lsp_workspaceApplyEdit(DartLspApplyWorkspaceEditParams params, DartLspWorkspaceApplyEditRequestConsumer consumer);
 
+  /**
+   * Return the configuration of the given sections, one entry per requested section and in the same
+   * order, using {@code null} for a section that is not known to the client.
+   *
+   * @param sections the names of the requested configuration sections, an entry may be {@code null}
+   *          if the server asked for an unnamed section
+   */
+  public void lsp_workspaceConfiguration(List<String> sections, DartLspWorkspaceConfigurationConsumer consumer);
+
   public void lsp_connectToDtd(String uri);
 
   /**

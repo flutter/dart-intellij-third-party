@@ -23,6 +23,7 @@ import com.google.dart.server.Consumer;
 import com.google.dart.server.CreateContextConsumer;
 import com.google.dart.server.DartLspTextDocumentContentConsumer;
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer;
+import com.google.dart.server.DartLspWorkspaceConfigurationConsumer;
 import com.google.dart.server.FindElementReferencesConsumer;
 import com.google.dart.server.FindMemberDeclarationsConsumer;
 import com.google.dart.server.FindMemberReferencesConsumer;
@@ -126,6 +127,7 @@ import com.google.dart.server.utilities.instrumentation.InstrumentationBuilder;
 import com.google.dart.server.utilities.logging.Logging;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import org.dartlang.analysis.server.protocol.AnalysisOptions;
@@ -917,6 +919,9 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
     if (lspMethod.equals("workspace/applyEdit")) {
       processWorspaceApplyEditRequestFromServer(dasRequestId, lspRequestId, lspMessage.get("params"));
     }
+    else if (lspMethod.equals("workspace/configuration")) {
+      processWorkspaceConfigurationRequestFromServer(dasRequestId, lspMessage.get("id"), lspMessage.get("params"));
+    }
   }
 
   /*
@@ -964,23 +969,68 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
         JsonObject lspResultElement = new JsonObject();
         lspResultElement.addProperty("applied", result.getApplied());
 
-        JsonObject lspResponseElement = new JsonObject();
-        lspResponseElement.addProperty("id", lspRequestId);
-        lspResponseElement.addProperty("jsonrpc", "2.0");
-        lspResponseElement.add("result", lspResultElement);
-
-        JsonObject resultJsonElement = new JsonObject();
-        resultJsonElement.add("lspResponse", lspResponseElement);
-
-        JsonObject responseElement = new JsonObject();
-        responseElement.addProperty("id", dasRequestId);
-        responseElement.add("result", resultJsonElement);
-
-        sendResponseToServer(responseElement);
+        sendResponseToServer(RequestUtilities.generateLSPResponse(dasRequestId, new JsonPrimitive(lspRequestId), lspResultElement));
       }
     };
 
     lsp_workspaceApplyEdit(workspaceEditParams, consumer);
+  }
+
+  /*
+    {
+      "id": "1",
+      "method": "lsp.handle",
+      "params": {
+        "lspMessage": {
+          "id": 0,
+          "jsonrpc": "2.0",
+          "method": "workspace/configuration",
+          "params": {
+            "items": [
+              {
+                "section": "dart"
+              }
+            ]
+          }
+        }
+      }
+    }
+
+    The server blocks its initialization until it gets an answer, so this request must always be
+    answered, even if none of the requested sections is known.
+  */
+  private void processWorkspaceConfigurationRequestFromServer(String dasRequestId, JsonElement lspRequestId, JsonElement paramsElement) {
+    List<String> sections = getAsConfigurationSections(paramsElement);
+
+    DartLspWorkspaceConfigurationConsumer consumer = new DartLspWorkspaceConfigurationConsumer() {
+      @Override
+      public void computedConfiguration(List<JsonObject> configurations) {
+        // The LSP protocol expects exactly one result per requested section, in the same order.
+        JsonArray lspResultElement = new JsonArray();
+        for (int i = 0; i < sections.size(); i++) {
+          JsonObject configuration = configurations != null && i < configurations.size() ? configurations.get(i) : null;
+          lspResultElement.add(configuration != null ? configuration : JsonNull.INSTANCE);
+        }
+
+        sendResponseToServer(RequestUtilities.generateLSPResponse(dasRequestId, lspRequestId, lspResultElement));
+      }
+    };
+
+    lsp_workspaceConfiguration(sections, consumer);
+  }
+
+  private List<String> getAsConfigurationSections(JsonElement paramsElement) {
+    List<String> sections = new ArrayList<>();
+    if (!(paramsElement instanceof JsonObject)) return sections;
+
+    JsonElement itemsElement = ((JsonObject)paramsElement).get("items");
+    if (!(itemsElement instanceof JsonArray)) return sections;
+
+    for (JsonElement itemElement : itemsElement.getAsJsonArray()) {
+      JsonElement sectionElement = itemElement instanceof JsonObject ? ((JsonObject)itemElement).get("section") : null;
+      sections.add(sectionElement instanceof JsonPrimitive ? sectionElement.getAsString() : null);
+    }
+    return sections;
   }
 
   private @Nullable DartLspApplyWorkspaceEditParams getAsWorkspaceEditParams(JsonElement paramsElement) {
