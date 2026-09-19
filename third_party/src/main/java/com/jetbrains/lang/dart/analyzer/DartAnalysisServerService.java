@@ -552,13 +552,15 @@ public final class DartAnalysisServerService implements Disposable {
   public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion, boolean supportsLspDiagnostics) {
     JsonObject lspCapabilities = new JsonObject();
 
+    JsonObject workspace = new JsonObject();
+
+    // Without this the server never asks for the `dart` configuration section, so the settings of
+    // Settings | Editor | Inlay Hints would never reach it. It is advertised unconditionally: a
+    // server that does not support `workspace/configuration` parses and ignores it.
+    workspace.addProperty("configuration", true);
+
     if (isDartSdkVersionSufficientForWorkspaceApplyEdits(sdkVersion)) {
-      JsonObject workspace = new JsonObject();
       workspace.addProperty("applyEdit", true);
-      // Without this the server never asks for the `dart` configuration section, so the settings of
-      // Settings | Editor | Inlay Hints would never reach it. It is advertised unconditionally: a
-      // server that does not support `workspace/configuration` parses and ignores it.
-      workspace.addProperty("configuration", true);
 
       JsonObject workspaceEdit = new JsonObject();
       workspaceEdit.addProperty("documentChanges", true);
@@ -567,9 +569,9 @@ public final class DartAnalysisServerService implements Disposable {
       JsonObject fileOperations = new JsonObject();
       fileOperations.addProperty("willRename", true);
       workspace.add("fileOperations", fileOperations);
-
-      lspCapabilities.add("workspace", workspace);
     }
+
+    lspCapabilities.add("workspace", workspace);
 
     JsonObject textDocument = new JsonObject();
 

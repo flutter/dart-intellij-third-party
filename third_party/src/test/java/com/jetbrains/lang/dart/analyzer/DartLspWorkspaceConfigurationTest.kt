@@ -242,12 +242,15 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
     fun testClientCapabilitiesAskTheServerToPullTheConfiguration() {
         // The server only sends workspace/configuration if the client advertises that it can answer
         // it, and that is the only way the settings ever reach the server.
-        val capabilities = DartAnalysisServerService.buildLspCapabilities("3.14.0")
-
-        val workspace = requireNotNull(capabilities.getAsJsonObject("workspace")) {
-            "the workspace capabilities should be present, was: $capabilities"
+        // Unconditional: a server that does not support workspace/configuration parses and ignores
+        // the capability, and it must not depend on the SDK gate of the apply-edit capabilities.
+        for (sdkVersion in listOf("3.14.0", "3.7.0")) {
+            val capabilities = DartAnalysisServerService.buildLspCapabilities(sdkVersion)
+            val workspace = requireNotNull(capabilities.getAsJsonObject("workspace")) {
+                "the workspace capabilities should be present for $sdkVersion, was: $capabilities"
+            }
+            assertTrue("configuration should be advertised for $sdkVersion", workspace.get("configuration").asBoolean)
         }
-        assertTrue(workspace.get("configuration").asBoolean)
     }
 
     fun testTheConfigurationNotificationIsGatedOnTheServerProtocolVersion() {

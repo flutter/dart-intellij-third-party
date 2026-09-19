@@ -73,7 +73,12 @@ class DartLspWorkspaceEditTest : DartCodeInsightFixtureTestCase() {
         assertTrue("documentChanges should be true for SDK >= 3.8", workspaceEdit38.get("documentChanges").asBoolean)
 
         val caps37 = DartAnalysisServerService.buildLspCapabilities("3.7.0")
-        assertNull("workspace capability should NOT be present for SDK < 3.8", caps37.getAsJsonObject("workspace"))
+        // The workspace capabilities themselves are always sent - they also carry `configuration`,
+        // which does not depend on the SDK version - but the apply-edit part of them is not.
+        val workspace37 = caps37.getAsJsonObject("workspace")
+        assertNotNull(workspace37)
+        assertNull("applyEdit should NOT be present for SDK < 3.8", workspace37.get("applyEdit"))
+        assertNull("workspaceEdit should NOT be present for SDK < 3.8", workspace37.getAsJsonObject("workspaceEdit"))
     }
 
     fun testRemoteAnalysisServerParsesDocumentChanges() {
