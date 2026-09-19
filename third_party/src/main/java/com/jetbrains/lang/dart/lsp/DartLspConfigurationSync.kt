@@ -13,7 +13,6 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.project.Project
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
-import com.intellij.platform.dartlsp.impl.features.inlayHint.LspInlayHintsProvider
 import com.intellij.psi.PsiManager
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.eclipse.lsp4j.DidChangeConfigurationParams
@@ -33,6 +32,10 @@ private const val DID_CHANGE_CONFIGURATION = "workspace/didChangeConfiguration"
  * user flips a checkbox - so the drift is noticed in
  * [DartLspInlayHintSupport.shouldAskServerForInlayHints], which runs before every inlay hint
  * request cycle.
+ *
+ * That is the only place it is noticed: while no Dart editor is open there is no such cycle, so a
+ * change the user makes then reaches the server when the next Dart file is opened - which is early
+ * enough, because until then there are no hints to get wrong.
  */
 @Service(Service.Level.PROJECT)
 class DartLspConfigurationSync(private val project: Project) {
@@ -67,7 +70,8 @@ class DartLspConfigurationSync(private val project: Project) {
         }
 
         // The settings stay empty: the server ignores them and pulls workspace/configuration.
-        bridgeServer.forwardNotification(DID_CHANGE_CONFIGURATION, DidChangeConfigurationParams(JsonObject()))
+        val sent = bridgeServer.forwardNotification(DID_CHANGE_CONFIGURATION, DidChangeConfigurationParams(JsonObject()))
+        if (!sent) state.pushFailed()
     }
 
     /**
@@ -83,8 +87,9 @@ class DartLspConfigurationSync(private val project: Project) {
      * pass run again.
      *
      * The server applies the new configuration silently - it sends no
-     * `workspace/inlayHint/refresh` - and [LspInlayHintsProvider] never asks for hints itself, it
-     * only filters the ones the cache holds. That cache
+     * `workspace/inlayHint/refresh` - and
+     * [com.intellij.platform.dartlsp.impl.features.inlayHint.LspInlayHintsProvider] never asks for
+     * hints itself, it only filters the ones the cache holds. That cache
      * ([com.intellij.platform.dartlsp.impl.features.highlightingCommon.LspHighlightingCache]) is
      * keyed on `PsiModificationTracker.modificationCount` and asks the server again only when that
      * count has moved, which neither a daemon restart nor `forceHintsUpdateOnNextPass` does. So a
@@ -95,8 +100,9 @@ class DartLspConfigurationSync(private val project: Project) {
      * public API that does it (it fires a PSI change that `PsiModificationTrackerImpl` turns into
      * an increment, and it has to run on the EDT or in a write action); the lighter
      * `PsiModificationTrackerImpl.incCounter()` is not API, it would need a cast to an
-     * implementation class. The cost is one project-wide resolve-cache drop per settings change,
-     * i.e. per rare and explicit user action.
+     * implementation class. The cost is that every `CachedValue` keyed on the PSI modification
+     * count is recomputed once, project-wide, per settings change - i.e. per rare and explicit
+     * user action.
      *
      * The clean fix is an invalidation hook on the cache of the vendored LSP client; that is a
      * change to JetBrains-owned code and is proposed to the maintainers along with this work.
@@ -154,23 +160,24 @@ internal class DartLspConfigurationPushState {
     }
 
     /**
-     * Remembers the section that the server has just read, and returns whether that read was the
-     * answer to a notification of ours, i.e. whether the server has just changed its mind about
-     * which hints to compute.
+     * Remembers the section that the server has just read, and returns whether the server has
+     * thereby changed its mind about which hints to compute, i.e. whether the hints it computed
+     * before are stale now.
      *
-     * The server also pulls on its own, and such a pull can land while a notification of ours is
-     * still on its way. Only a pull that read what the notification was about can be its answer:
-     * the hints must not be computed again while the server may still be working with the old
-     * configuration, because the pull that really answers the notification would then find nothing
-     * left to do.
+     * Every read makes whatever notification was outstanding pointless: the server has just taken
+     * the current settings, so there is nothing left for it to be told about them. Keeping the
+     * notification would block the very same change from being pushed again - the user flips a
+     * checkbox back and forth while the notification is on its way, the server reads the old
+     * settings, and the new ones would never be sent again.
+     *
+     * A read that changed nothing needs no new hints - that is the pull the server makes while it
+     * starts up, and any pull it makes on its own afterwards.
      */
     fun configurationSentToServer(section: JsonObject): Boolean = synchronized(lock) {
-        val notifiedSection = pendingSection
+        val previousSection = lastSentSection
         lastSentSection = section
-        if (notifiedSection == null || notifiedSection != section) return false
-
         pendingSection = null
-        return true
+        return previousSection != null && previousSection != section
     }
 
     /** Forgets what the server knew; the next server has to read the settings again. */

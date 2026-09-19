@@ -25,6 +25,7 @@ import org.dartlang.analysis.server.protocol.MessageAction
 import java.net.Socket
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Future
 
 /**
  * Tests when the settings of Settings | Editor | Inlay Hints are pushed to the Dart Analysis
@@ -41,6 +42,10 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
     private val state = DartLspConfigurationPushState()
     private val capturedNotifications = CopyOnWriteArrayList<JsonObject>()
     private lateinit var bridgeServer: DartBridgeLspServer
+    private lateinit var stubServer: RemoteAnalysisServerImpl
+
+    /** Whether the stub server refuses to send, the way a server that is going away does. */
+    private var sendingNotificationsFails = false
 
     /** How often the inlay hints were asked to be computed again. */
     private var refreshes = 0
@@ -49,11 +54,12 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
     override fun setUp() {
         super.setUp()
 
-        DartAnalysisServerService.getInstance(project).setServer(object : RemoteAnalysisServerImpl(createStubSocket()) {
+        stubServer = object : RemoteAnalysisServerImpl(createStubSocket()) {
             override fun isSocketOpen(): Boolean = true
             override fun generateUniqueId(): String = "das_1"
 
             override fun sendNotificationToServer(notification: JsonObject) {
+                if (sendingNotificationsFails) throw IllegalStateException("the server is gone")
                 capturedNotifications.add(notification)
             }
 
@@ -74,7 +80,8 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
                 sections: MutableList<String?>?,
                 consumer: DartLspWorkspaceConfigurationConsumer?,
             ) {}
-        })
+        }
+        DartAnalysisServerService.getInstance(project).setServer(stubServer)
 
         bridgeServer = DartBridgeLspServer(project)
         connectBridgeToTheManager(bridgeServer)
@@ -133,7 +140,12 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         val manager = project.service<DartBridgeLspServerManager>()
         val connection = bridge?.let {
             val connectionClass = Class.forName("${DartBridgeLspServerManager::class.java.name}\$ActiveConnection")
-            val constructor = connectionClass.declaredConstructors[0].apply { isAccessible = true }
+            val constructor = connectionClass.getDeclaredConstructor(
+                DartBridgeLspServerManager::class.java,
+                Socket::class.java,
+                DartBridgeLspServer::class.java,
+                Future::class.java,
+            ).apply { isAccessible = true }
             constructor.newInstance(manager, Socket(), it, CompletableFuture.completedFuture(null))
         }
         DartBridgeLspServerManager::class.java.getDeclaredField("activeConnection")
@@ -149,6 +161,11 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
     private fun enableTypeHints() {
         DeclarativeInlayHintsSettings.getInstance()
             .setProviderEnabled(DartTypesInlayHintsProvider.PROVIDER_ID, true)
+    }
+
+    private fun disableTypeHints() {
+        DeclarativeInlayHintsSettings.getInstance()
+            .setProviderEnabled(DartTypesInlayHintsProvider.PROVIDER_ID, false)
     }
 
     private fun turnOffReturnTypes() {
@@ -230,18 +247,35 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         assertTrue(state.configurationSentToServer(currentSection()))
     }
 
-    fun testAPullThatDoesNotCarryOurChangeIsNotTheAnswerToOurNotification() {
+    fun testAPullThatCarriesNewerSettingsAlsoComputesTheHintsAgain() {
         serverReadsTheSettings()
         enableTypeHints()
         assertTrue(state.beginPush(currentSection()))
 
         // The server pulls for its own reasons while our notification is still on its way, and the
-        // settings moved on in the meantime, so what it read is not what we asked it to read.
+        // settings moved on in the meantime, so what it read is not what we asked it to read - but
+        // it is still a configuration the server did not have before, so the hints it computed from
+        // the old one are stale either way.
         turnOffReturnTypes()
-        assertFalse(
-            "the hints must not be computed again before the server has our change",
+        assertTrue(
+            "the server changed its mind about which hints to compute",
             state.configurationSentToServer(currentSection()),
         )
+    }
+
+    fun testASettingThatIsChangedBackAndForthIsStillPushed() {
+        serverReadsTheSettings()
+        enableTypeHints()
+        assertTrue(state.beginPush(currentSection()))
+
+        // The user goes back to what the server already knows before it has read our change, so
+        // the pull it answers with carries the old settings - our notification is obsolete.
+        disableTypeHints()
+        state.configurationSentToServer(currentSection())
+
+        // The very same change again: an obsolete notification must not block it forever.
+        enableTypeHints()
+        assertTrue(state.beginPush(currentSection()))
     }
 
     fun testAnObsoleteNotificationDoesNotBlockTheNextChange() {
@@ -321,14 +355,50 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         assertEquals(1, refreshes)
     }
 
-    fun testAPullTheServerMadeOnItsOwnDoesNotComputeTheHintsAgain() {
+    fun testAPullThatChangesNothingDoesNotComputeTheHintsAgain() {
         val sync = DartLspConfigurationSync.getInstance(project)
-        sync.configurationSentToServer(currentSection())
-
         enableTypeHints()
         sync.configurationSentToServer(currentSection())
 
-        assertEquals("the hints of a pull nobody asked for are up to date already", 0, refreshes)
+        // The server pulls again on its own, and nothing has changed in the meantime.
+        sync.configurationSentToServer(currentSection())
+
+        assertEquals("the hints of a pull that changed nothing are up to date already", 0, refreshes)
+    }
+
+    fun testANotificationThatCouldNotBeSentIsSentAgainOnTheNextCycle() {
+        enableTypeHints()
+        val sync = DartLspConfigurationSync.getInstance(project)
+        sync.configurationSentToServer(currentSection())
+        turnOffReturnTypes()
+
+        sendingNotificationsFails = true
+        val support = DartLspInlayHintSupport(project)
+        support.shouldAskServerForInlayHints(dartFile())
+        assertEquals("the notification never reached the server", 0, capturedNotifications.size)
+
+        sendingNotificationsFails = false
+        support.shouldAskServerForInlayHints(dartFile())
+        assertEquals("the next cycle has to try again", 1, capturedNotifications.size)
+    }
+
+    fun testANotificationThatFoundNoServerIsSentAgainOnTheNextCycle() {
+        enableTypeHints()
+        val sync = DartLspConfigurationSync.getInstance(project)
+        sync.configurationSentToServer(currentSection())
+        turnOffReturnTypes()
+
+        // The bridge outlives the analysis server process for a moment, and then there is nothing
+        // to send the notification to.
+        val das = DartAnalysisServerService.getInstance(project)
+        das.setServer(null)
+        val support = DartLspInlayHintSupport(project)
+        support.shouldAskServerForInlayHints(dartFile())
+        assertEquals("there was no server to notify", 0, capturedNotifications.size)
+
+        das.setServer(stubServer)
+        support.shouldAskServerForInlayHints(dartFile())
+        assertEquals("the next cycle has to try again", 1, capturedNotifications.size)
     }
 
     fun testTheServerIsNotNotifiedWhileItStillKnowsTheSettings() {

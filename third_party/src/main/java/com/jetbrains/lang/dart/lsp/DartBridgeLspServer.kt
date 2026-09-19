@@ -477,8 +477,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
      * the server uses for the notifications it sends to us, see [forwardNotificationToClient].
      * An `lsp.handle` request would not do: that is a legacy request, and the server answers every
      * request, while an LSP notification has no response to answer with.
+     *
+     * Returns whether the notification was handed to the analysis server. A notification is not
+     * answered, so that is as much as the caller can be told - and it has to be told, because a
+     * caller that tracks what the server knows would otherwise wait forever for an effect that
+     * never comes.
      */
-    internal fun forwardNotification(method: String, params: Any) {
+    internal fun forwardNotification(method: String, params: Any): Boolean {
         val lspNotification = JsonObject().apply {
             addProperty("jsonrpc", JSONRPC_VERSION)
             addProperty("method", method)
@@ -492,10 +497,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             })
         }
 
-        try {
-            das.sendNotification(legacyNotification)
+        return try {
+            // A server that is going away is not a plugin bug, so this must not be logged as an
+            // error: that raises an IDE fatal-error notification in internal and EAP builds.
+            das.sendNotification(legacyNotification).also {
+                if (!it) logger.warn("No analysis server to send the notification to: $legacyNotification")
+            }
         } catch (e: Exception) {
-            logger.error("Failed to send notification to DAS: $legacyNotification", e)
+            logger.warn("Failed to send notification to DAS: $legacyNotification", e)
+            false
         }
     }
 

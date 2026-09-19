@@ -233,7 +233,9 @@ public final class DartAnalysisServerService implements Disposable {
   private @Nullable RemoteAnalysisServerImpl myServer;
   private @Nullable StdioServerSocket myServerSocket;
 
-  private @NotNull String myServerVersion = "";
+  // Written on the response reader thread of the server (serverConnected), read from the thread
+  // that computes the inlay hints, see DartLspConfigurationSync.
+  private volatile @NotNull String myServerVersion = "";
   private @NotNull String mySdkVersion = "";
   private @Nullable String mySdkHome;
 
@@ -2798,12 +2800,17 @@ public final class DartAnalysisServerService implements Disposable {
 
   /**
    * Send a notification, i.e. a message that the server never answers.
+   *
+   * @return whether there was a running server to send it to; a notification has no response, so a
+   * caller that tracks what the server knows has no other way of noticing that it never went out
    */
-  public void sendNotification(JsonObject notification) {
+  public boolean sendNotification(JsonObject notification) {
     final RemoteAnalysisServerImpl server = myServer;
-    if (server != null) {
-      server.sendNotificationToServer(notification);
+    if (server == null) {
+      return false;
     }
+    server.sendNotificationToServer(notification);
+    return true;
   }
 
   /**
