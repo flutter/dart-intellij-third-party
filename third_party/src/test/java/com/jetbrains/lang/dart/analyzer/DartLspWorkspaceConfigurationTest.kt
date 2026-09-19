@@ -209,6 +209,29 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         assertTrue("a section that could not be computed must be answered with null", result[1].isJsonNull)
     }
 
+    fun testAnswerIsSentEvenIfComputingTheConfigurationFailsWithAnError() {
+        // The reader loop of the server swallows every Throwable, so an Error (a NoClassDefFoundError
+        // while the plugin is being unloaded, an AssertionError) would leave the request unanswered
+        // just like a RuntimeException does, and the server would never finish its initialization.
+        val server = object : TestRemoteAnalysisServer(createStubSocket()) {
+            override fun lsp_workspaceConfiguration(
+                sections: List<String?>,
+                consumer: DartLspWorkspaceConfigurationConsumer
+            ) {
+                throw NoClassDefFoundError("com/jetbrains/lang/dart/lsp/DartLspInlayHintsConfiguration")
+            }
+        }
+
+        server.testProcessResponse(
+            JsonParser.parseString(configurationRequest("""{ "section": "dart" }""")).asJsonObject
+        )
+
+        assertEquals("the server must always get exactly one answer", 1, server.sentResponses.size)
+        val result = requireNotNull(lspResponseOf(server).getAsJsonArray("result")) { "lspResponse should carry a result array" }
+        assertEquals("one entry per requested item", 1, result.size())
+        assertTrue("a section that could not be computed must be answered with null", result[0].isJsonNull)
+    }
+
     fun testAnswerIsSentEvenIfTheLoggerRethrowsTheFailure() {
         // The logger of the IntelliJ client rethrows control flow exceptions, and an
         // AlreadyDisposedException during teardown is one of them, so logging the failure must not

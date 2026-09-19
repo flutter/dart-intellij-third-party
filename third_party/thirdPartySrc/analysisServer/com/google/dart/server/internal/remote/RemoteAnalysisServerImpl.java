@@ -1025,11 +1025,13 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
     try {
       lsp_workspaceConfiguration(sections, consumer);
     }
-    catch (RuntimeException e) {
+    catch (Throwable e) {
       // A request that is never answered blocks the initialization of the server, so fall back to
-      // an all-null result, which makes the server use its default configuration. Answer before
-      // logging: the logger of the client may rethrow the exception, and the answer must be out by
-      // then.
+      // an all-null result, which makes the server use its default configuration. This catches
+      // Throwable, not only RuntimeException, because the reader loop swallows Errors (such as a
+      // NoClassDefFoundError while the plugin is being unloaded) as well, which would otherwise
+      // leave the request unanswered too. Answer before logging: the logger of the client may
+      // rethrow the exception, and the answer must be out by then.
       consumer.computedConfiguration(null);
       Logging.getLogger().logError("Error while answering the workspace/configuration request", e);
     }
