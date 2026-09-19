@@ -301,7 +301,9 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         sync.configurationSentToServer(currentSection())
         turnOffReturnTypes()
 
-        DartLspInlayHintSupport(project).shouldAskServerForInlayHints(dartFile())
+        val support = DartLspInlayHintSupport(project)
+        support.shouldAskServerForInlayHints(dartFile())
+        support.shouldAskServerForInlayHints(dartFile())
 
         assertEquals("an older server logs a notification from the client as an error", 0, capturedNotifications.size)
     }

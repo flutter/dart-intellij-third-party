@@ -32,6 +32,7 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
 
     override fun tearDown() {
         try {
+            setServerVersion("")
             // Logging holds a global logger; make sure that a logger of this test does not leak.
             previousLogger?.let { Logging.setLogger(it) }
         } catch (e: Throwable) {
@@ -39,6 +40,13 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         } finally {
             super.tearDown()
         }
+    }
+
+    /** The protocol version is only known once the server is connected, so fake it here. */
+    private fun setServerVersion(version: String) {
+        val field = DartAnalysisServerService::class.java.getDeclaredField("myServerVersion")
+            .apply { isAccessible = true }
+        field.set(DartAnalysisServerService.getInstance(project), version)
     }
 
     /** Installs a logger that rethrows, the way the logger of IntelliJ rethrows control flow exceptions. */
@@ -258,6 +266,8 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         // cannot handle a notification from the client and logs it as an error.
         assertFalse(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration(""))
         assertFalse(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.40.0"))
+        // A bugfix release of the last protocol version before the floor is still below it.
+        assertFalse(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.40.1"))
         assertTrue(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.41.0"))
         assertTrue(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.42.0"))
     }
@@ -285,6 +295,24 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
                 "dotShorthandTypes",
             ),
             inlayHints.keySet(),
+        )
+    }
+
+    fun testTheConfigurationIsAnsweredEvenByAServerThatCannotBeNotified() {
+        // The gate of the notification must not reach the answer: a server below the floor still
+        // pulls workspace/configuration while it starts up, and it blocks its initialization until
+        // it gets an answer. An answer without the settings would make it compute the hints of
+        // every category, so the settings the user made are honoured as far as the old server can.
+        setServerVersion("1.40.1")
+        val server = DartAnalysisServerImpl(project, createStubSocket())
+
+        var configurations: List<JsonObject?>? = null
+        server.lsp_workspaceConfiguration(listOf("dart")) { configurations = it }
+
+        val computed = requireNotNull(configurations) { "the consumer should have been called" }
+        assertNotNull(
+            "the dart section should carry the inlay hint settings, was: ${computed[0]}",
+            computed[0]?.getAsJsonObject("inlayHints"),
         )
     }
 }
