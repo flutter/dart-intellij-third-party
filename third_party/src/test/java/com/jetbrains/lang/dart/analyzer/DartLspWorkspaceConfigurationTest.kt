@@ -38,7 +38,7 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
     /** The configuration that the test server hands out for the `dart` section. */
     private val dartSection = JsonObject().apply { add("inlayHints", JsonObject()) }
 
-    private inner class TestRemoteAnalysisServer(socket: AnalysisServerSocket) : RemoteAnalysisServerImpl(socket) {
+    private open inner class TestRemoteAnalysisServer(socket: AnalysisServerSocket) : RemoteAnalysisServerImpl(socket) {
         val requestedSections = mutableListOf<String?>()
         val sentResponses = mutableListOf<JsonObject>()
 
@@ -143,6 +143,47 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
 
         val result = requireNotNull(lspResponseOf(server).getAsJsonArray("result")) { "lspResponse should carry a result array" }
         assertEquals(0, result.size())
+    }
+
+    fun testAnswerIsSentEvenIfTheConfigurationCannotBeComputed() {
+        // An unanswered request blocks the initialization of the server, so a failure to compute the
+        // configuration must still result in an answer that lets the server use its defaults.
+        val server = object : TestRemoteAnalysisServer(createStubSocket()) {
+            override fun lsp_workspaceConfiguration(
+                sections: List<String?>,
+                consumer: DartLspWorkspaceConfigurationConsumer
+            ) {
+                throw IllegalStateException("cannot read the settings")
+            }
+        }
+
+        server.testProcessResponse(
+            JsonParser.parseString(configurationRequest("""{ "section": "dart" }, { "section": "flutter" }""")).asJsonObject
+        )
+
+        assertEquals("the server must always get exactly one answer", 1, server.sentResponses.size)
+        val result = requireNotNull(lspResponseOf(server).getAsJsonArray("result")) { "lspResponse should carry a result array" }
+        assertEquals("one entry per requested item", 2, result.size())
+        assertTrue("a section that could not be computed must be answered with null", result[0].isJsonNull)
+        assertTrue("a section that could not be computed must be answered with null", result[1].isJsonNull)
+    }
+
+    fun testAnswerIsSentOnlyOnceIfTheConfigurationIsSuppliedTwice() {
+        val server = object : TestRemoteAnalysisServer(createStubSocket()) {
+            override fun lsp_workspaceConfiguration(
+                sections: List<String?>,
+                consumer: DartLspWorkspaceConfigurationConsumer
+            ) {
+                consumer.computedConfiguration(sections.map { dartSection })
+                consumer.computedConfiguration(sections.map { null })
+            }
+        }
+
+        server.testProcessResponse(JsonParser.parseString(configurationRequest("""{ "section": "dart" }""")).asJsonObject)
+
+        assertEquals("the server must always get exactly one answer", 1, server.sentResponses.size)
+        val result = requireNotNull(lspResponseOf(server).getAsJsonArray("result")) { "lspResponse should carry a result array" }
+        assertEquals(dartSection, result[0].asJsonObject)
     }
 
     fun testDartAnalysisServerImplSuppliesTheInlayHintSettings() {

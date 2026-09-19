@@ -157,6 +157,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -1002,9 +1003,13 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   private void processWorkspaceConfigurationRequestFromServer(String dasRequestId, JsonElement lspRequestId, JsonElement paramsElement) {
     List<String> sections = getAsConfigurationSections(paramsElement);
 
+    AtomicBoolean answered = new AtomicBoolean(false);
     DartLspWorkspaceConfigurationConsumer consumer = new DartLspWorkspaceConfigurationConsumer() {
       @Override
       public void computedConfiguration(List<JsonObject> configurations) {
+        // The server matches its request by the id, so it must not be answered more than once.
+        if (!answered.compareAndSet(false, true)) return;
+
         // The LSP protocol expects exactly one result per requested section, in the same order.
         JsonArray lspResultElement = new JsonArray();
         for (int i = 0; i < sections.size(); i++) {
@@ -1016,7 +1021,15 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
       }
     };
 
-    lsp_workspaceConfiguration(sections, consumer);
+    try {
+      lsp_workspaceConfiguration(sections, consumer);
+    }
+    catch (RuntimeException e) {
+      // A request that is never answered blocks the initialization of the server, so fall back to
+      // an all-null result, which makes the server use its default configuration.
+      Logging.getLogger().logError("Failed to compute the configuration for the analysis server", e);
+      consumer.computedConfiguration(null);
+    }
   }
 
   private List<String> getAsConfigurationSections(JsonElement paramsElement) {
