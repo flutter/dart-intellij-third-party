@@ -10,6 +10,7 @@ package com.google.dart.server.generated;
 
 import com.google.dart.server.*;
 import org.dartlang.analysis.server.protocol.*;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -1093,7 +1094,7 @@ public interface AnalysisServer {
    * @param sections the names of the requested configuration sections, an entry may be {@code null}
    *          if the server asked for an unnamed section
    */
-  public void lsp_workspaceConfiguration(List<String> sections, DartLspWorkspaceConfigurationConsumer consumer);
+  public void lsp_workspaceConfiguration(List<@Nullable String> sections, DartLspWorkspaceConfigurationConsumer consumer);
 
   public void lsp_connectToDtd(String uri);
 

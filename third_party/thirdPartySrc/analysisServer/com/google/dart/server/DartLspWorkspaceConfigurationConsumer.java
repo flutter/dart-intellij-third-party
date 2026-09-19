@@ -15,13 +15,17 @@ package com.google.dart.server;
 
 import com.google.gson.JsonObject;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 
 public interface DartLspWorkspaceConfigurationConsumer extends Consumer {
 
   /**
    * The configuration of the sections that the server asked for, one entry per requested section
-   * and in the same order. An entry is {@code null} if the client does not know the section.
+   * and in the same order. An entry is {@code null} if the client does not know the section, and
+   * the whole list is {@code null} if the client could not compute any configuration at all - the
+   * request is then answered as if no section were known.
    */
-  public void computedConfiguration(List<JsonObject> configurations);
+  public void computedConfiguration(@Nullable List<@Nullable JsonObject> configurations);
 }

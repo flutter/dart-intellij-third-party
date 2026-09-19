@@ -915,10 +915,9 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   }
 
   private void processLspRequestFromServer(String dasRequestId, JsonObject lspMessage) {
-    String lspRequestId = lspMessage.get("id").getAsString();
     String lspMethod = lspMessage.get("method").getAsString();
     if (lspMethod.equals("workspace/applyEdit")) {
-      processWorspaceApplyEditRequestFromServer(dasRequestId, lspRequestId, lspMessage.get("params"));
+      processWorspaceApplyEditRequestFromServer(dasRequestId, lspMessage.get("id"), lspMessage.get("params"));
     }
     else if (lspMethod.equals("workspace/configuration")) {
       processWorkspaceConfigurationRequestFromServer(dasRequestId, lspMessage.get("id"), lspMessage.get("params"));
@@ -960,7 +959,7 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
       }
     }
   */
-  private void processWorspaceApplyEditRequestFromServer(String dasRequestId, String lspRequestId, JsonElement paramsElement) {
+  private void processWorspaceApplyEditRequestFromServer(String dasRequestId, JsonElement lspRequestId, JsonElement paramsElement) {
     DartLspApplyWorkspaceEditParams workspaceEditParams = getAsWorkspaceEditParams(paramsElement);
     if (workspaceEditParams == null) return;
 
@@ -970,7 +969,9 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
         JsonObject lspResultElement = new JsonObject();
         lspResultElement.addProperty("applied", result.getApplied());
 
-        sendResponseToServer(RequestUtilities.generateLSPResponse(dasRequestId, new JsonPrimitive(lspRequestId), lspResultElement));
+        // The id is echoed as the server sent it: it may be a number or a string, and a number
+        // that came back as a string would not match the request the server is waiting for.
+        sendResponseToServer(RequestUtilities.generateLSPResponse(dasRequestId, lspRequestId, lspResultElement));
       }
     };
 
@@ -1316,6 +1317,10 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   /**
    * Sends a notification, i.e. a message that the server never answers, so unlike a request it is
    * not associated with a {@link Consumer}.
+   * <p>
+   * The request listeners see it like a request: they are notified of everything this client
+   * sends, which includes the notifications, i.e. messages that carry neither an {@code id} nor a
+   * {@code method} at the top level.
    *
    * @param notification the notification to send
    */

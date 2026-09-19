@@ -120,7 +120,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             ) {}
 
             override fun lsp_workspaceConfiguration(
-                sections: MutableList<String>?,
+                sections: MutableList<String?>?,
                 consumer: DartLspWorkspaceConfigurationConsumer?
             ) {}
         }

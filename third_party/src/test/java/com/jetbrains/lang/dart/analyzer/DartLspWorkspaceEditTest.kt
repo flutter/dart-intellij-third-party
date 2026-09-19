@@ -42,6 +42,8 @@ class DartLspWorkspaceEditTest : DartCodeInsightFixtureTestCase() {
     }
 
     private open class TestRemoteAnalysisServer(socket: AnalysisServerSocket) : RemoteAnalysisServerImpl(socket) {
+        val sentResponses = mutableListOf<JsonObject>()
+
         override fun isSocketOpen(): Boolean = true
         override fun server_openUrlRequest(url: String?) {}
         override fun server_showMessageRequest(
@@ -55,9 +57,14 @@ class DartLspWorkspaceEditTest : DartCodeInsightFixtureTestCase() {
             consumer: DartLspWorkspaceApplyEditRequestConsumer?
         ) {}
         override fun lsp_workspaceConfiguration(
-            sections: MutableList<String>?,
+            sections: MutableList<String?>?,
             consumer: DartLspWorkspaceConfigurationConsumer?
         ) {}
+
+        override fun sendResponseToServer(response: JsonObject) {
+            sentResponses.add(response)
+        }
+
         fun testProcessResponse(response: JsonObject) {
             processResponse(response)
         }
@@ -182,6 +189,59 @@ class DartLspWorkspaceEditTest : DartCodeInsightFixtureTestCase() {
         server.testProcessResponse(jsonObject)
 
         assertNull("capturedParams should be null when edit has no documentChanges", capturedParams)
+    }
+
+    fun testAnswerUsesTheLspOverLegacyEnvelope() {
+        val server = object : TestRemoteAnalysisServer(createStubSocket()) {
+            override fun lsp_workspaceApplyEdit(
+                params: DartLspApplyWorkspaceEditParams?,
+                consumer: DartLspWorkspaceApplyEditRequestConsumer?
+            ) {
+                consumer?.workspaceEditApplied(DartLspApplyWorkspaceEditResult(true))
+            }
+        }
+
+        val json = """
+        {
+          "id": "das_9",
+          "method": "lsp.handle",
+          "params": {
+            "lspMessage": {
+              "id": 7,
+              "jsonrpc": "2.0",
+              "method": "workspace/applyEdit",
+              "params": {
+                "label": "Envelope",
+                "edit": {
+                  "documentChanges": [
+                    {
+                      "textDocument": { "uri": "file:///path/to/test.dart", "version": 1 },
+                      "edits": []
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+        """.trimIndent()
+
+        server.testProcessResponse(JsonParser.parseString(json).asJsonObject)
+
+        assertEquals("the server must get exactly one answer", 1, server.sentResponses.size)
+        val response = server.sentResponses[0]
+        assertEquals("the legacy request id must be echoed", "das_9", response.get("id").asString)
+
+        val result = requireNotNull(response.getAsJsonObject("result")) { "response should carry a result: ${'$'}response" }
+        val lspResponse = requireNotNull(result.getAsJsonObject("lspResponse")) { "result should carry an lspResponse: ${'$'}result" }
+        assertEquals("2.0", lspResponse.get("jsonrpc").asString)
+        // The server sends the LSP id as a number, so it has to be echoed as a number.
+        assertTrue("the LSP request id must keep its JSON type", lspResponse.get("id").asJsonPrimitive.isNumber)
+        assertEquals(7, lspResponse.get("id").asInt)
+        assertTrue(
+            "the answer should report whether the edit was applied",
+            requireNotNull(lspResponse.getAsJsonObject("result")).get("applied").asBoolean,
+        )
     }
 
     fun testDartAnalysisServerImplAppliesDocumentChanges() {
