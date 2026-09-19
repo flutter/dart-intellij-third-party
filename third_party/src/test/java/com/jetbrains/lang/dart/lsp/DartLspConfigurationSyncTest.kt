@@ -42,6 +42,10 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
     private val capturedNotifications = CopyOnWriteArrayList<JsonObject>()
     private lateinit var bridgeServer: DartBridgeLspServer
 
+    /** How often the inlay hints were asked to be computed again. */
+    private var refreshes = 0
+    private lateinit var scheduleRealRefresh: () -> Unit
+
     override fun setUp() {
         super.setUp()
 
@@ -75,10 +79,19 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         bridgeServer = DartBridgeLspServer(project)
         connectBridgeToTheManager(bridgeServer)
         setServerVersion(newServerVersion)
+
+        // The real refresh needs the EDT, a daemon and open editors; what matters here is when it
+        // is asked for.
+        val sync = DartLspConfigurationSync.getInstance(project)
+        scheduleRealRefresh = sync.refreshInlayHints
+        sync.refreshInlayHints = { refreshes++ }
     }
 
     override fun tearDown() {
         try {
+            if (::scheduleRealRefresh.isInitialized) {
+                DartLspConfigurationSync.getInstance(project).refreshInlayHints = scheduleRealRefresh
+            }
             setServerVersion("")
             connectBridgeToTheManager(null)
             if (::bridgeServer.isInitialized) {
@@ -141,6 +154,14 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
     private fun turnOffReturnTypes() {
         DeclarativeInlayHintsSettings.getInstance().setOptionEnabled(
             DartTypesInlayHintsProvider.RETURN_TYPES_OPTION_ID,
+            DartTypesInlayHintsProvider.PROVIDER_ID,
+            false,
+        )
+    }
+
+    private fun turnOffVariableTypes() {
+        DeclarativeInlayHintsSettings.getInstance().setOptionEnabled(
+            DartTypesInlayHintsProvider.VARIABLE_TYPES_OPTION_ID,
             DartTypesInlayHintsProvider.PROVIDER_ID,
             false,
         )
@@ -209,6 +230,32 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         assertTrue(state.configurationSentToServer(currentSection()))
     }
 
+    fun testAPullThatDoesNotCarryOurChangeIsNotTheAnswerToOurNotification() {
+        serverReadsTheSettings()
+        enableTypeHints()
+        assertTrue(state.beginPush(currentSection()))
+
+        // The server pulls for its own reasons while our notification is still on its way, and the
+        // settings moved on in the meantime, so what it read is not what we asked it to read.
+        turnOffReturnTypes()
+        assertFalse(
+            "the hints must not be computed again before the server has our change",
+            state.configurationSentToServer(currentSection()),
+        )
+    }
+
+    fun testAnObsoleteNotificationDoesNotBlockTheNextChange() {
+        serverReadsTheSettings()
+        enableTypeHints()
+        assertTrue(state.beginPush(currentSection()))
+
+        turnOffReturnTypes()
+        state.configurationSentToServer(currentSection())
+
+        turnOffVariableTypes()
+        assertTrue(state.beginPush(currentSection()))
+    }
+
     fun testAPushThatCouldNotBeSentIsRetried() {
         serverReadsTheSettings()
         enableTypeHints()
@@ -257,6 +304,29 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         DartLspInlayHintSupport(project).shouldAskServerForInlayHints(dartFile())
 
         assertEquals("an older server logs a notification from the client as an error", 0, capturedNotifications.size)
+    }
+
+    fun testTheHintsAreComputedAgainOnlyOnceTheServerHasAnsweredOurNotification() {
+        enableTypeHints()
+        val sync = DartLspConfigurationSync.getInstance(project)
+        sync.configurationSentToServer(currentSection())
+        turnOffReturnTypes()
+
+        DartLspInlayHintSupport(project).shouldAskServerForInlayHints(dartFile())
+        assertEquals("the server has not applied the change yet", 0, refreshes)
+
+        sync.configurationSentToServer(currentSection())
+        assertEquals(1, refreshes)
+    }
+
+    fun testAPullTheServerMadeOnItsOwnDoesNotComputeTheHintsAgain() {
+        val sync = DartLspConfigurationSync.getInstance(project)
+        sync.configurationSentToServer(currentSection())
+
+        enableTypeHints()
+        sync.configurationSentToServer(currentSection())
+
+        assertEquals("the hints of a pull nobody asked for are up to date already", 0, refreshes)
     }
 
     fun testTheServerIsNotNotifiedWhileItStillKnowsTheSettings() {
