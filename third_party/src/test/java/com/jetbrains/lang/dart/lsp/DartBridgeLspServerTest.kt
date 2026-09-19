@@ -24,6 +24,7 @@ import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
 import org.eclipse.lsp4j.CallHierarchyItem
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
+import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.FileRename
@@ -63,6 +64,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     private lateinit var mockServer: RemoteAnalysisServerImpl
     private val mockClient = MockLanguageClient()
     private val capturedRequests = CopyOnWriteArrayList<JsonObject>()
+    private val capturedNotifications = CopyOnWriteArrayList<JsonObject>()
 
     override fun setUp() {
         super.setUp()
@@ -97,6 +99,10 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
             override fun sendRequestToServer(id: String, request: JsonObject, consumer: Consumer) {
                 capturedRequests.add(request)
+            }
+
+            override fun sendNotificationToServer(notification: JsonObject) {
+                capturedNotifications.add(notification)
             }
 
             override fun server_openUrlRequest(url: String?) {}
@@ -140,6 +146,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             dasSdkVersionField.set(das, null)
             
             capturedRequests.clear()
+            capturedNotifications.clear()
         } finally {
             super.tearDown()
         }
@@ -267,6 +274,32 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertNotNull(mockClient.publishedDiagnostics)
         assertEquals("file://test.dart", mockClient.publishedDiagnostics?.uri)
         assertTrue(mockClient.publishedDiagnostics?.diagnostics?.isEmpty() == true)
+    }
+
+    fun testForwardNotificationSendsALegacyNotification() {
+        bridgeServer.forwardNotification("workspace/didChangeConfiguration", DidChangeConfigurationParams(JsonObject()))
+
+        // The server never answers a notification, so wrapping it in an `lsp.handle` request would
+        // leave that request unanswered; it travels as a legacy `lsp.notification` instead.
+        assertEquals("a notification must not be sent as a request", 0, capturedRequests.size)
+        assertEquals(1, capturedNotifications.size)
+
+        val notification = capturedNotifications[0]
+        assertEquals("lsp.notification", notification.get("event").asString)
+        assertFalse("a legacy notification must not carry an id", notification.has("id"))
+
+        val params = requireNotNull(notification.getAsJsonObject("params")) { "notification should carry params: $notification" }
+        val lspNotification = requireNotNull(params.getAsJsonObject("lspNotification")) {
+            "params should carry the LSP notification: $params"
+        }
+        assertEquals("2.0", lspNotification.get("jsonrpc").asString)
+        assertEquals("workspace/didChangeConfiguration", lspNotification.get("method").asString)
+        assertFalse("an LSP notification must not carry an id", lspNotification.has("id"))
+
+        val settings = requireNotNull(lspNotification.getAsJsonObject("params")?.getAsJsonObject("settings")) {
+            "the notification should carry empty settings: $lspNotification"
+        }
+        assertEquals("the server re-reads the settings itself", JsonObject(), settings)
     }
 
     fun testGetFileUriFormatting() {

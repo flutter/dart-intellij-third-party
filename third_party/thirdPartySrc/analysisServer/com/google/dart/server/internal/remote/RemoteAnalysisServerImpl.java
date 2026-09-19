@@ -1313,6 +1313,20 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
     }
   }
 
+  /**
+   * Sends a notification, i.e. a message that the server never answers, so unlike a request it is
+   * not associated with a {@link Consumer}.
+   *
+   * @param notification the notification to send
+   */
+  public void sendNotificationToServer(JsonObject notification) {
+    notifyRequestListeners(notification);
+    lastRequestTime.set(System.currentTimeMillis());
+    synchronized (requestSinkLock) {
+      requestSink.add(notification);
+    }
+  }
+
   public void sendResponseToServer(JsonObject response) {
     synchronized (requestSinkLock) {
       requestSink.add(response);

@@ -2767,6 +2767,16 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   /**
+   * Send a notification, i.e. a message that the server never answers.
+   */
+  public void sendNotification(JsonObject notification) {
+    final RemoteAnalysisServerImpl server = myServer;
+    if (server != null) {
+      server.sendNotificationToServer(notification);
+    }
+  }
+
+  /**
    * Send the request and associate it with the passed {@link com.google.dart.server.Consumer}.
    */
   @SuppressWarnings("unused") // for Flutter plugin
