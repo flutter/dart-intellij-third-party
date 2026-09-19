@@ -192,6 +192,23 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         assertTrue(state.beginPush(currentSection()))
     }
 
+    fun testTheServerReadingTheSettingsOnItsOwnNeedsNoNewHints() {
+        assertFalse(
+            "the hints are computed after the server has started up anyway",
+            state.configurationSentToServer(currentSection()),
+        )
+    }
+
+    fun testTheHintsAreComputedAgainOnceTheServerHasAppliedAChange() {
+        serverReadsTheSettings()
+        enableTypeHints()
+        assertTrue(state.beginPush(currentSection()))
+
+        // The server does not send workspace/inlayHint/refresh after it has applied the new
+        // configuration, so the hints it computed from the old settings have to be replaced here.
+        assertTrue(state.configurationSentToServer(currentSection()))
+    }
+
     fun testAPushThatCouldNotBeSentIsRetried() {
         serverReadsTheSettings()
         enableTypeHints()

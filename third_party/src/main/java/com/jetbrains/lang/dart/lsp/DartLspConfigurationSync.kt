@@ -6,6 +6,9 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.google.gson.JsonObject
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
+import com.intellij.codeInsight.daemon.impl.InlayHintsPassFactoryInternal
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceIfCreated
@@ -32,7 +35,6 @@ private const val DID_CHANGE_CONFIGURATION = "workspace/didChangeConfiguration"
 class DartLspConfigurationSync(private val project: Project) {
 
     companion object {
-        @JvmStatic
         fun getInstance(project: Project): DartLspConfigurationSync = project.service()
     }
 
@@ -58,9 +60,22 @@ class DartLspConfigurationSync(private val project: Project) {
         bridgeServer.forwardNotification(DID_CHANGE_CONFIGURATION, DidChangeConfigurationParams(JsonObject()))
     }
 
-    /** Remembers the section that the server has just read. */
+    /**
+     * Remembers the section that the server has just read, and has the inlay hints computed again
+     * if it read them because the settings had changed.
+     */
     fun configurationSentToServer(section: JsonObject) {
-        state.configurationSentToServer(section)
+        if (!state.configurationSentToServer(section)) return
+
+        // The server applies the new configuration silently: it sends no
+        // workspace/inlayHint/refresh, and the client caches the hints it got with the old one.
+        // Forcing the inlay hint pass to run again is what drops them - the pass caches per editor
+        // modification stamp, which a change of the settings does not touch.
+        ApplicationManager.getApplication().invokeLater {
+            if (project.isDisposed) return@invokeLater
+            InlayHintsPassFactoryInternal.forceHintsUpdateOnNextPass()
+            DaemonCodeAnalyzer.getInstance(project).restart("Dart inlay hint settings changed")
+        }
     }
 
     /** Forgets what the server knew; the next server has to read the settings again. */
@@ -105,10 +120,16 @@ internal class DartLspConfigurationPushState {
         pushPending = false
     }
 
-    /** Remembers the section that the server has just read. */
-    fun configurationSentToServer(section: JsonObject) = synchronized(lock) {
+    /**
+     * Remembers the section that the server has just read, and returns whether that read was the
+     * answer to a notification of ours, i.e. whether the server has just changed its mind about
+     * which hints to compute.
+     */
+    fun configurationSentToServer(section: JsonObject): Boolean = synchronized(lock) {
+        val answeredOurNotification = pushPending
         pushPending = false
         lastSentSection = section
+        return answeredOurNotification
     }
 
     /** Forgets what the server knew; the next server has to read the settings again. */
