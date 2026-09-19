@@ -5,11 +5,8 @@
  */
 package com.jetbrains.lang.dart.lsp
 
-import com.intellij.codeInsight.hints.declarative.DeclarativeInlayHintsSettings
-import com.intellij.codeInsight.hints.declarative.InlayHintsProviderFactory
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintSupport
-import com.jetbrains.lang.dart.DartLanguage
 import com.jetbrains.lang.dart.hints.DartParameterNamesInlayHintsProvider
 import com.jetbrains.lang.dart.hints.DartTypesInlayHintsProvider
 import org.eclipse.lsp4j.InlayHint
@@ -42,11 +39,8 @@ class DartLspInlayHintSupport : LspInlayHintSupport() {
         }
     }
 
-    private fun isProviderEnabled(providerId: String): Boolean {
-        DeclarativeInlayHintsSettings.getInstance().isProviderEnabled(providerId)?.let { return it }
-        // The user has not toggled the checkbox yet; fall back to the isEnabledByDefault value of
-        // the provider registration in plugin.xml.
-        val providerInfo = InlayHintsProviderFactory.getProviderInfo(DartLanguage.INSTANCE, providerId)
-        return providerInfo?.isEnabledByDefault ?: false
-    }
+    // Shared with DartLspInlayHintsConfiguration, which reads the same checkboxes to build the
+    // configuration section for the server.
+    private fun isProviderEnabled(providerId: String): Boolean =
+        DartLspInlayHintsConfiguration.isProviderEnabled(providerId)
 }

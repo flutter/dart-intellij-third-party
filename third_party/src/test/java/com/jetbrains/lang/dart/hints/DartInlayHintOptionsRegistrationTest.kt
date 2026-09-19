@@ -38,7 +38,12 @@ class DartInlayHintOptionsRegistrationTest : DartCodeInsightFixtureTestCase() {
   fun testParameterNamesOptionsAreRegistered() {
     val providerId = DartParameterNamesInlayHintsProvider.PROVIDER_ID
     assertEquals(setOf("dart.parameter.names.only.literal"), optionsOf(providerId).keys)
-    assertOption(providerId, "dart.parameter.names.only.literal", false, "Only for literal arguments")
+    assertOption(
+      providerId,
+      DartParameterNamesInlayHintsProvider.ONLY_LITERAL_OPTION_ID,
+      false,
+      "Only for literal arguments",
+    )
   }
 
   fun testTypesOptionsAreRegistered() {
@@ -53,10 +58,10 @@ class DartInlayHintOptionsRegistrationTest : DartCodeInsightFixtureTestCase() {
       ),
       optionsOf(providerId).keys,
     )
-    assertOption(providerId, "dart.types.variable", true, "Variable types")
-    assertOption(providerId, "dart.types.return", true, "Return types")
-    assertOption(providerId, "dart.types.parameter", true, "Parameter types")
-    assertOption(providerId, "dart.types.type.arguments", true, "Type arguments")
-    assertOption(providerId, "dart.types.dot.shorthand", true, "Dot shorthand types")
+    assertOption(providerId, DartTypesInlayHintsProvider.VARIABLE_TYPES_OPTION_ID, true, "Variable types")
+    assertOption(providerId, DartTypesInlayHintsProvider.RETURN_TYPES_OPTION_ID, true, "Return types")
+    assertOption(providerId, DartTypesInlayHintsProvider.PARAMETER_TYPES_OPTION_ID, true, "Parameter types")
+    assertOption(providerId, DartTypesInlayHintsProvider.TYPE_ARGUMENTS_OPTION_ID, true, "Type arguments")
+    assertOption(providerId, DartTypesInlayHintsProvider.DOT_SHORTHAND_TYPES_OPTION_ID, true, "Dot shorthand types")
   }
 }
