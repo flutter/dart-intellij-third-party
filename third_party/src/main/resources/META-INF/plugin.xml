@@ -171,6 +171,11 @@
                                           bundle="messages.DartBundle"
                                           nameKey="dart.inlay.hints.parameter.names.name"
                                           descriptionKey="dart.inlay.hints.parameter.names.description">
+      <option optionId="dart.parameter.names.only.literal"
+              enabledByDefault="false"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.parameter.names.only.literal.name"
+              descriptionKey="dart.inlay.hints.parameter.names.only.literal.description"/>
     </codeInsight.declarativeInlayProvider>
 
     <codeInsight.declarativeInlayProvider language="Dart"
@@ -181,6 +186,36 @@
                                           bundle="messages.DartBundle"
                                           nameKey="dart.inlay.hints.types.name"
                                           descriptionKey="dart.inlay.hints.types.description">
+      <option optionId="dart.types.variable"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.variable.name"
+              descriptionKey="dart.inlay.hints.types.variable.description"
+              showInTree="true"/>
+      <option optionId="dart.types.return"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.return.name"
+              descriptionKey="dart.inlay.hints.types.return.description"
+              showInTree="true"/>
+      <option optionId="dart.types.parameter"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.parameter.name"
+              descriptionKey="dart.inlay.hints.types.parameter.description"
+              showInTree="true"/>
+      <option optionId="dart.types.type.arguments"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.type.arguments.name"
+              descriptionKey="dart.inlay.hints.types.type.arguments.description"
+              showInTree="true"/>
+      <option optionId="dart.types.dot.shorthand"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.dot.shorthand.name"
+              descriptionKey="dart.inlay.hints.types.dot.shorthand.description"
+              showInTree="true"/>
     </codeInsight.declarativeInlayProvider>
 
     <lang.surroundDescriptor language="Dart"
