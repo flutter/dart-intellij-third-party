@@ -5,11 +5,9 @@
  */
 package com.jetbrains.lang.dart.lsp
 
-import com.intellij.codeInsight.hints.declarative.DeclarativeInlayHintsSettings
-import com.intellij.codeInsight.hints.declarative.InlayHintsProviderFactory
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintSupport
-import com.jetbrains.lang.dart.DartLanguage
 import com.jetbrains.lang.dart.hints.DartParameterNamesInlayHintsProvider
 import com.jetbrains.lang.dart.hints.DartTypesInlayHintsProvider
 import org.eclipse.lsp4j.InlayHint
@@ -25,9 +23,13 @@ import org.eclipse.lsp4j.InlayHintKind
  * [shouldDisplayInlayHint] drops hints whose checkbox is off, and [shouldAskServerForInlayHints]
  * skips the `textDocument/inlayHint` request entirely while both checkboxes are off.
  */
-class DartLspInlayHintSupport : LspInlayHintSupport() {
+class DartLspInlayHintSupport(private val project: Project) : LspInlayHintSupport() {
 
     override fun shouldAskServerForInlayHints(file: VirtualFile): Boolean {
+        // This runs before every inlay hint request cycle, and nothing else notices that the user
+        // has flipped a checkbox, so it is where the server learns about it.
+        DartLspConfigurationSync.getInstance(project).pushConfigurationIfChanged()
+
         return isProviderEnabled(DartParameterNamesInlayHintsProvider.PROVIDER_ID) ||
                 isProviderEnabled(DartTypesInlayHintsProvider.PROVIDER_ID)
     }
@@ -42,11 +44,8 @@ class DartLspInlayHintSupport : LspInlayHintSupport() {
         }
     }
 
-    private fun isProviderEnabled(providerId: String): Boolean {
-        DeclarativeInlayHintsSettings.getInstance().isProviderEnabled(providerId)?.let { return it }
-        // The user has not toggled the checkbox yet; fall back to the isEnabledByDefault value of
-        // the provider registration in plugin.xml.
-        val providerInfo = InlayHintsProviderFactory.getProviderInfo(DartLanguage.INSTANCE, providerId)
-        return providerInfo?.isEnabledByDefault ?: false
-    }
+    // Shared with DartLspInlayHintsConfiguration, which reads the same checkboxes to build the
+    // configuration section for the server.
+    private fun isProviderEnabled(providerId: String): Boolean =
+        DartLspInlayHintsConfiguration.isProviderEnabled(providerId)
 }

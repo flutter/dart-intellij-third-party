@@ -48,7 +48,7 @@ class DartLspInlayHintSupportTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testHintsHiddenAndServerNotAskedByDefault() {
-        val support = DartLspInlayHintSupport()
+        val support = DartLspInlayHintSupport(project)
         val file = dartFile()
 
         assertFalse(support.shouldAskServerForInlayHints(file))
@@ -59,7 +59,7 @@ class DartLspInlayHintSupportTest : DartCodeInsightFixtureTestCase() {
     fun testParameterNamesCheckboxControlsParameterHints() {
         DeclarativeInlayHintsSettings.getInstance()
             .setProviderEnabled(DartParameterNamesInlayHintsProvider.PROVIDER_ID, true)
-        val support = DartLspInlayHintSupport()
+        val support = DartLspInlayHintSupport(project)
         val file = dartFile()
 
         assertTrue(support.shouldAskServerForInlayHints(file))
@@ -70,7 +70,7 @@ class DartLspInlayHintSupportTest : DartCodeInsightFixtureTestCase() {
     fun testTypesCheckboxControlsTypeHints() {
         DeclarativeInlayHintsSettings.getInstance()
             .setProviderEnabled(DartTypesInlayHintsProvider.PROVIDER_ID, true)
-        val support = DartLspInlayHintSupport()
+        val support = DartLspInlayHintSupport(project)
         val file = dartFile()
 
         assertTrue(support.shouldAskServerForInlayHints(file))
@@ -81,7 +81,7 @@ class DartLspInlayHintSupportTest : DartCodeInsightFixtureTestCase() {
     fun testHintWithoutKindIsDisplayed() {
         DeclarativeInlayHintsSettings.getInstance()
             .setProviderEnabled(DartTypesInlayHintsProvider.PROVIDER_ID, true)
-        val support = DartLspInlayHintSupport()
+        val support = DartLspInlayHintSupport(project)
         val file = dartFile()
 
         // The Dart Analysis Server sets a kind on every hint; a hint without a kind cannot be

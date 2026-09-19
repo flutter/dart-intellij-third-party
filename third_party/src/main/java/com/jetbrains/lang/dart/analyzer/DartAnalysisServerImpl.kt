@@ -3,6 +3,7 @@ package com.jetbrains.lang.dart.analyzer
 
 import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
+import com.google.dart.server.DartLspWorkspaceConfigurationConsumer
 import com.google.dart.server.ShowMessageRequestConsumer
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.intellij.ide.BrowserUtil
@@ -17,10 +18,15 @@ import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.logging.PluginLogger
+import com.jetbrains.lang.dart.lsp.DartLspConfigurationSync
+import com.jetbrains.lang.dart.lsp.DartLspInlayHintsConfiguration
 import kotlinx.coroutines.launch
 import org.dartlang.analysis.server.protocol.*
 
 private val LOG = PluginLogger.createLogger(DartAnalysisServerImpl::class.java)
+
+/** The name of the configuration section of the Dart Analysis Server. */
+private const val DART_CONFIGURATION_SECTION = "dart"
 
 internal class DartAnalysisServerImpl(private val project: Project, socket: AnalysisServerSocket) : RemoteAnalysisServerImpl(socket) {
 
@@ -69,6 +75,32 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
       }
       consumer.workspaceEditApplied(DartLspApplyWorkspaceEditResult(result.getOrDefault(false)))
       result.getOrThrow()
+    }
+  }
+
+  /**
+   * Answers the `workspace/configuration` request of the server. The server blocks its
+   * initialization until it gets an answer, so every requested section gets an entry: the settings
+   * of the Dart plugin for the `dart` section, `null` for anything else.
+   *
+   * Called on the response reader thread of the server; reading the settings needs neither the EDT
+   * nor a read action.
+   */
+  override fun lsp_workspaceConfiguration(sections: List<String?>, consumer: DartLspWorkspaceConfigurationConsumer) {
+    val dartSection =
+      if (sections.contains(DART_CONFIGURATION_SECTION)) DartLspInlayHintsConfiguration.buildDartSection() else null
+
+    consumer.computedConfiguration(sections.map { section ->
+      when (section) {
+        DART_CONFIGURATION_SECTION -> dartSection
+        else -> null
+      }
+    })
+
+    // Only after the answer is out: what the server now knows is the yardstick for noticing that
+    // the settings have changed, and answering must not depend on it.
+    if (dartSection != null) {
+      DartLspConfigurationSync.getInstance(project).configurationSentToServer(dartSection)
     }
   }
 
