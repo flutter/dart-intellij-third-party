@@ -13,6 +13,8 @@ import com.google.dart.server.internal.remote.ByteLineReaderStream
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
+import com.google.dart.server.utilities.logging.Logger
+import com.google.dart.server.utilities.logging.Logging
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
@@ -25,6 +27,30 @@ import org.dartlang.analysis.server.protocol.MessageAction
  * that answer, so the shape of the response is what matters here.
  */
 class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
+
+    private var previousLogger: Logger? = null
+
+    override fun tearDown() {
+        try {
+            // Logging holds a global logger; make sure that a logger of this test does not leak.
+            previousLogger?.let { Logging.setLogger(it) }
+        } catch (e: Throwable) {
+            addSuppressedException(e)
+        } finally {
+            super.tearDown()
+        }
+    }
+
+    /** Installs a logger that rethrows, the way the logger of IntelliJ rethrows control flow exceptions. */
+    private fun installRethrowingLogger() {
+        previousLogger = Logging.getLogger()
+        Logging.setLogger(object : Logger {
+            override fun logError(message: String?) {}
+            override fun logError(message: String?, exception: Throwable) = throw exception
+            override fun logInformation(message: String?) {}
+            override fun logInformation(message: String?, exception: Throwable?) {}
+        })
+    }
 
     private fun createStubSocket(): AnalysisServerSocket = object : AnalysisServerSocket {
         override fun getErrorStream(): ByteLineReaderStream? = null
@@ -166,6 +192,33 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         assertEquals("one entry per requested item", 2, result.size())
         assertTrue("a section that could not be computed must be answered with null", result[0].isJsonNull)
         assertTrue("a section that could not be computed must be answered with null", result[1].isJsonNull)
+    }
+
+    fun testAnswerIsSentEvenIfTheLoggerRethrowsTheFailure() {
+        // The logger of the IntelliJ client rethrows control flow exceptions, and an
+        // AlreadyDisposedException during teardown is one of them, so logging the failure must not
+        // be able to skip the answer.
+        installRethrowingLogger()
+        val server = object : TestRemoteAnalysisServer(createStubSocket()) {
+            override fun lsp_workspaceConfiguration(
+                sections: List<String?>,
+                consumer: DartLspWorkspaceConfigurationConsumer
+            ) {
+                throw IllegalStateException("cannot read the settings")
+            }
+        }
+
+        try {
+            server.testProcessResponse(JsonParser.parseString(configurationRequest("""{ "section": "dart" }""")).asJsonObject)
+            fail("the rethrown failure should reach the caller")
+        } catch (expected: IllegalStateException) {
+            // The reader loop of the server handles it; what matters is that the answer went out first.
+        }
+
+        assertEquals("the server must always get exactly one answer", 1, server.sentResponses.size)
+        val result = requireNotNull(lspResponseOf(server).getAsJsonArray("result")) { "lspResponse should carry a result array" }
+        assertEquals("one entry per requested item", 1, result.size())
+        assertTrue("a section that could not be computed must be answered with null", result[0].isJsonNull)
     }
 
     fun testAnswerIsSentOnlyOnceIfTheConfigurationIsSuppliedTwice() {

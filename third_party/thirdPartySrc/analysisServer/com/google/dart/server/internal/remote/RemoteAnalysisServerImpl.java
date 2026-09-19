@@ -1026,9 +1026,11 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
     }
     catch (RuntimeException e) {
       // A request that is never answered blocks the initialization of the server, so fall back to
-      // an all-null result, which makes the server use its default configuration.
-      Logging.getLogger().logError("Failed to compute the configuration for the analysis server", e);
+      // an all-null result, which makes the server use its default configuration. Answer before
+      // logging: the logger of the client may rethrow the exception, and the answer must be out by
+      // then.
       consumer.computedConfiguration(null);
+      Logging.getLogger().logError("Error while answering the workspace/configuration request", e);
     }
   }
 
