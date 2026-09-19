@@ -29,7 +29,7 @@ class DartLspInlayHintsConfigurationTest : DartCodeInsightFixtureTestCase() {
 
     private fun inlayHints(): JsonObject {
         val dartSection = DartLspInlayHintsConfiguration.buildDartSection()
-        return requireNotNull(dartSection.getAsJsonObject("inlayHints")) {
+        return requireNotNull(dartSection.getAsJsonObject(DartLspInlayHintsConfiguration.INLAY_HINTS_KEY)) {
             "The 'dart' configuration section should contain an 'inlayHints' object, was: $dartSection"
         }
     }
@@ -38,24 +38,33 @@ class DartLspInlayHintsConfigurationTest : DartCodeInsightFixtureTestCase() {
         val category = requireNotNull(inlayHints().getAsJsonObject(key)) {
             "inlayHints should contain an object for '$key'"
         }
-        assertEquals("Wrong 'enabled' value for '$key'", expected, category.get("enabled").asBoolean)
+        assertEquals(
+            "Wrong 'enabled' value for '$key'",
+            expected,
+            category.get(DartLspInlayHintsConfiguration.ENABLED_KEY).asBoolean,
+        )
     }
 
     private fun assertParameterNames(expected: String) {
-        val category = requireNotNull(inlayHints().getAsJsonObject("parameterNames")) {
-            "inlayHints should contain an object for 'parameterNames'"
+        val key = DartLspInlayHintsConfiguration.PARAMETER_NAMES_KEY
+        val category = requireNotNull(inlayHints().getAsJsonObject(key)) {
+            "inlayHints should contain an object for '$key'"
         }
-        assertEquals("Wrong 'enabled' value for 'parameterNames'", expected, category.get("enabled").asString)
+        assertEquals(
+            "Wrong 'enabled' value for '$key'",
+            expected,
+            category.get(DartLspInlayHintsConfiguration.ENABLED_KEY).asString,
+        )
     }
 
     fun testEverythingIsDisabledByDefault() {
         // Both parent checkboxes are off by default, so the server must not compute any hints.
         assertParameterNames("none")
-        assertTypeCategory("variableTypes", false)
-        assertTypeCategory("returnTypes", false)
-        assertTypeCategory("parameterTypes", false)
-        assertTypeCategory("typeArguments", false)
-        assertTypeCategory("dotShorthandTypes", false)
+        assertTypeCategory(DartLspInlayHintsConfiguration.VARIABLE_TYPES_KEY, false)
+        assertTypeCategory(DartLspInlayHintsConfiguration.RETURN_TYPES_KEY, false)
+        assertTypeCategory(DartLspInlayHintsConfiguration.PARAMETER_TYPES_KEY, false)
+        assertTypeCategory(DartLspInlayHintsConfiguration.TYPE_ARGUMENTS_KEY, false)
+        assertTypeCategory(DartLspInlayHintsConfiguration.DOT_SHORTHAND_TYPES_KEY, false)
     }
 
     fun testTypeCategoriesFollowTheirOptionsWhenTheParentIsOn() {
@@ -66,12 +75,12 @@ class DartLspInlayHintsConfigurationTest : DartCodeInsightFixtureTestCase() {
             false,
         )
 
-        assertTypeCategory("returnTypes", false)
+        assertTypeCategory(DartLspInlayHintsConfiguration.RETURN_TYPES_KEY, false)
         // The other options are on by default and stay on.
-        assertTypeCategory("variableTypes", true)
-        assertTypeCategory("parameterTypes", true)
-        assertTypeCategory("typeArguments", true)
-        assertTypeCategory("dotShorthandTypes", true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.VARIABLE_TYPES_KEY, true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.PARAMETER_TYPES_KEY, true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.TYPE_ARGUMENTS_KEY, true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.DOT_SHORTHAND_TYPES_KEY, true)
     }
 
     fun testTypeOptionsAreIgnoredWhileTheParentIsOff() {
@@ -81,7 +90,7 @@ class DartLspInlayHintsConfigurationTest : DartCodeInsightFixtureTestCase() {
             true,
         )
 
-        assertTypeCategory("variableTypes", false)
+        assertTypeCategory(DartLspInlayHintsConfiguration.VARIABLE_TYPES_KEY, false)
     }
 
     fun testParameterNamesIsAllWhenOnlyTheParentIsOn() {
@@ -116,14 +125,16 @@ class DartLspInlayHintsConfigurationTest : DartCodeInsightFixtureTestCase() {
         settings().setProviderEnabled(DartTypesInlayHintsProvider.PROVIDER_ID, true)
 
         assertParameterNames("all")
-        assertTypeCategory("variableTypes", true)
-        assertTypeCategory("returnTypes", true)
-        assertTypeCategory("parameterTypes", true)
-        assertTypeCategory("typeArguments", true)
-        assertTypeCategory("dotShorthandTypes", true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.VARIABLE_TYPES_KEY, true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.RETURN_TYPES_KEY, true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.PARAMETER_TYPES_KEY, true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.TYPE_ARGUMENTS_KEY, true)
+        assertTypeCategory(DartLspInlayHintsConfiguration.DOT_SHORTHAND_TYPES_KEY, true)
     }
 
     fun testSectionContainsExactlyTheServerSideKeys() {
+        // The only place that spells the wire format out; everything else goes through the
+        // constants, so a typo in one of them has to fail here.
         assertEquals(setOf("inlayHints"), DartLspInlayHintsConfiguration.buildDartSection().keySet())
         assertEquals(
             setOf(

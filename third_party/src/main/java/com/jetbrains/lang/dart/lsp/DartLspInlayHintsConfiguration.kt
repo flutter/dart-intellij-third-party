@@ -26,8 +26,17 @@ import com.jetbrains.lang.dart.hints.DartTypesInlayHintsProvider
  */
 object DartLspInlayHintsConfiguration {
 
-    private const val INLAY_HINTS_KEY = "inlayHints"
-    private const val ENABLED_KEY = "enabled"
+    internal const val INLAY_HINTS_KEY = "inlayHints"
+    internal const val ENABLED_KEY = "enabled"
+
+    // The names the server gives its hint categories; they are the wire format of the `dart`
+    // configuration section and are spelled out once, here.
+    internal const val PARAMETER_NAMES_KEY = "parameterNames"
+    internal const val VARIABLE_TYPES_KEY = "variableTypes"
+    internal const val RETURN_TYPES_KEY = "returnTypes"
+    internal const val PARAMETER_TYPES_KEY = "parameterTypes"
+    internal const val TYPE_ARGUMENTS_KEY = "typeArguments"
+    internal const val DOT_SHORTHAND_TYPES_KEY = "dotShorthandTypes"
 
     private const val PARAMETER_NAMES_NONE = "none"
     private const val PARAMETER_NAMES_LITERAL = "literal"
@@ -35,12 +44,16 @@ object DartLspInlayHintsConfiguration {
 
     /** The type categories of the server, paired with the option that switches them on and off. */
     private val TYPE_CATEGORIES = listOf(
-        "variableTypes" to DartTypesInlayHintsProvider.VARIABLE_TYPES_OPTION_ID,
-        "returnTypes" to DartTypesInlayHintsProvider.RETURN_TYPES_OPTION_ID,
-        "parameterTypes" to DartTypesInlayHintsProvider.PARAMETER_TYPES_OPTION_ID,
-        "typeArguments" to DartTypesInlayHintsProvider.TYPE_ARGUMENTS_OPTION_ID,
-        "dotShorthandTypes" to DartTypesInlayHintsProvider.DOT_SHORTHAND_TYPES_OPTION_ID,
+        VARIABLE_TYPES_KEY to DartTypesInlayHintsProvider.VARIABLE_TYPES_OPTION_ID,
+        RETURN_TYPES_KEY to DartTypesInlayHintsProvider.RETURN_TYPES_OPTION_ID,
+        PARAMETER_TYPES_KEY to DartTypesInlayHintsProvider.PARAMETER_TYPES_OPTION_ID,
+        TYPE_ARGUMENTS_KEY to DartTypesInlayHintsProvider.TYPE_ARGUMENTS_OPTION_ID,
+        DOT_SHORTHAND_TYPES_KEY to DartTypesInlayHintsProvider.DOT_SHORTHAND_TYPES_OPTION_ID,
     )
+
+    /** Every hint category the `inlayHints` object carries. */
+    internal val SERVER_CATEGORY_KEYS: Set<String> =
+        linkedSetOf(PARAMETER_NAMES_KEY) + TYPE_CATEGORIES.map { it.first }
 
     /**
      * Builds the whole `dart` configuration section, i.e. `{"inlayHints": {...}}`.
@@ -50,7 +63,7 @@ object DartLspInlayHintsConfiguration {
 
         val parameterNames = JsonObject()
         parameterNames.addProperty(ENABLED_KEY, parameterNamesMode())
-        inlayHints.add("parameterNames", parameterNames)
+        inlayHints.add(PARAMETER_NAMES_KEY, parameterNames)
 
         val typesEnabled = isProviderEnabled(DartTypesInlayHintsProvider.PROVIDER_ID)
         for ((serverKey, optionId) in TYPE_CATEGORIES) {

@@ -18,6 +18,7 @@ import com.google.dart.server.utilities.logging.Logging
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
+import com.jetbrains.lang.dart.lsp.DartLspInlayHintsConfiguration
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
 
@@ -32,9 +33,14 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
 
     override fun tearDown() {
         try {
+            // Logging holds a global logger; make sure that a logger of this test does not leak,
+            // whatever else fails while tearing down.
+            try {
+                previousLogger?.let { Logging.setLogger(it) }
+            } catch (e: Throwable) {
+                addSuppressedException(e)
+            }
             setServerVersion("")
-            // Logging holds a global logger; make sure that a logger of this test does not leak.
-            previousLogger?.let { Logging.setLogger(it) }
         } catch (e: Throwable) {
             addSuppressedException(e)
         } finally {
@@ -70,7 +76,8 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
     }
 
     /** The configuration that the test server hands out for the `dart` section. */
-    private val dartSection = JsonObject().apply { add("inlayHints", JsonObject()) }
+    private val dartSection =
+        JsonObject().apply { add(DartLspInlayHintsConfiguration.INLAY_HINTS_KEY, JsonObject()) }
 
     private open inner class TestRemoteAnalysisServer(socket: AnalysisServerSocket) : RemoteAnalysisServerImpl(socket) {
         val requestedSections = mutableListOf<String?>()
@@ -282,20 +289,10 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         assertEquals("one entry per requested section", 2, computed.size)
         assertNull("an unknown section should be answered with null", computed[1])
 
-        val inlayHints = requireNotNull(computed[0]?.getAsJsonObject("inlayHints")) {
+        val inlayHints = requireNotNull(computed[0]?.getAsJsonObject(DartLspInlayHintsConfiguration.INLAY_HINTS_KEY)) {
             "the dart section should carry the inlay hint settings, was: ${computed[0]}"
         }
-        assertEquals(
-            setOf(
-                "parameterNames",
-                "variableTypes",
-                "returnTypes",
-                "parameterTypes",
-                "typeArguments",
-                "dotShorthandTypes",
-            ),
-            inlayHints.keySet(),
-        )
+        assertEquals(DartLspInlayHintsConfiguration.SERVER_CATEGORY_KEYS, inlayHints.keySet())
     }
 
     fun testTheConfigurationIsAnsweredEvenByAServerThatCannotBeNotified() {
@@ -312,7 +309,7 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         val computed = requireNotNull(configurations) { "the consumer should have been called" }
         assertNotNull(
             "the dart section should carry the inlay hint settings, was: ${computed[0]}",
-            computed[0]?.getAsJsonObject("inlayHints"),
+            computed[0]?.getAsJsonObject(DartLspInlayHintsConfiguration.INLAY_HINTS_KEY),
         )
     }
 }

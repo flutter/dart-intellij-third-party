@@ -190,32 +190,27 @@
               enabledByDefault="true"
               bundle="messages.DartBundle"
               nameKey="dart.inlay.hints.types.variable.name"
-              descriptionKey="dart.inlay.hints.types.variable.description"
-              showInTree="true"/>
+              descriptionKey="dart.inlay.hints.types.variable.description"/>
       <option optionId="dart.types.return"
               enabledByDefault="true"
               bundle="messages.DartBundle"
               nameKey="dart.inlay.hints.types.return.name"
-              descriptionKey="dart.inlay.hints.types.return.description"
-              showInTree="true"/>
+              descriptionKey="dart.inlay.hints.types.return.description"/>
       <option optionId="dart.types.parameter"
               enabledByDefault="true"
               bundle="messages.DartBundle"
               nameKey="dart.inlay.hints.types.parameter.name"
-              descriptionKey="dart.inlay.hints.types.parameter.description"
-              showInTree="true"/>
+              descriptionKey="dart.inlay.hints.types.parameter.description"/>
       <option optionId="dart.types.type.arguments"
               enabledByDefault="true"
               bundle="messages.DartBundle"
               nameKey="dart.inlay.hints.types.type.arguments.name"
-              descriptionKey="dart.inlay.hints.types.type.arguments.description"
-              showInTree="true"/>
+              descriptionKey="dart.inlay.hints.types.type.arguments.description"/>
       <option optionId="dart.types.dot.shorthand"
               enabledByDefault="true"
               bundle="messages.DartBundle"
               nameKey="dart.inlay.hints.types.dot.shorthand.name"
-              descriptionKey="dart.inlay.hints.types.dot.shorthand.description"
-              showInTree="true"/>
+              descriptionKey="dart.inlay.hints.types.dot.shorthand.description"/>
     </codeInsight.declarativeInlayProvider>
 
     <lang.surroundDescriptor language="Dart"
