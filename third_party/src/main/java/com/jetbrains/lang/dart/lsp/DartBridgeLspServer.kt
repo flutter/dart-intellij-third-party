@@ -8,11 +8,9 @@ package com.jetbrains.lang.dart.lsp
 import com.google.dart.server.ResponseListener
 import com.google.gson.Gson
 import com.google.gson.JsonElement
-import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
-import com.google.gson.stream.JsonReader
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -20,7 +18,6 @@ import com.jetbrains.lang.dart.logging.PluginLogger
 import org.dartlang.analysis.server.protocol.AnalysisError
 import org.dartlang.analysis.server.protocol.DiagnosticMessage
 import org.eclipse.lsp4j.ApplyWorkspaceEditParams
-import org.eclipse.lsp4j.ApplyWorkspaceEditResponse
 import org.eclipse.lsp4j.CallHierarchyIncomingCall
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
 import org.eclipse.lsp4j.CallHierarchyItem
@@ -28,7 +25,6 @@ import org.eclipse.lsp4j.CallHierarchyOutgoingCall
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.CodeAction
-import org.eclipse.lsp4j.CodeActionOptions
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.DefinitionParams
@@ -68,14 +64,11 @@ import org.eclipse.lsp4j.TypeHierarchySupertypesParams
 import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.WorkspaceServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
-import org.eclipse.lsp4j.jsonrpc.json.JsonRpcMethod
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
-import org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
-import org.eclipse.lsp4j.services.LanguageServer
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
 import java.lang.reflect.Type
@@ -117,17 +110,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         private const val LSP_RESPONSE_KEY = "lspResponse"
         private const val JSONRPC_VERSION = "2.0"
         
-        @JvmField
-        internal val GSON: Gson = run {
-            val supportedMethods = LinkedHashMap<String, JsonRpcMethod>()
-            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(LanguageServer::class.java))
-            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(TextDocumentService::class.java))
-            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(WorkspaceService::class.java))
-            supportedMethods.putAll(ServiceEndpoints.getSupportedMethods(LanguageClient::class.java))
-            MessageJsonHandler(supportedMethods).gson.newBuilder()
-                .serializeNulls()
-                .create()
-        }
+        // We use a JSON handler with default lsp4j configuration to serialize/deserialize lsp4j objects.
+        private val JSON_HANDLER = MessageJsonHandler(mapOf())
+        private val GSON: Gson = JSON_HANDLER.gson
     }
 
     private var client: LanguageClient? = null
@@ -425,63 +410,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     override fun executeCommand(params: ExecuteCommandParams): CompletableFuture<Any> {
-        logger.debug("Client executeCommand called: command=${params.command}")
-
-        val forwardedParams = normalizeExecuteCommandParams(params)
-
-        return forwardRequest("workspace/executeCommand", forwardedParams, Any::class.java)
-    }
-
-    private fun normalizeExecuteCommandParams(params: ExecuteCommandParams): ExecuteCommandParams {
-        if (params.command != "dart.edit.codeAction.apply" || params.arguments.isNullOrEmpty()) {
-            return params
-        }
-        val arg0Tree = GSON.toJsonTree(params.arguments[0])
-        if (!arg0Tree.isJsonObject) {
-            return params
-        }
-        val obj = arg0Tree.asJsonObject
-        if (!obj.has("textDocument") || !obj.has("range") || !obj.has("kind")) {
-            return params
-        }
-
-        val td = obj.get("textDocument")
-        val normalizedTd = if (td.isJsonObject) {
-            val tdObj = td.asJsonObject
-            val nTd = JsonObject()
-            val uriElem = tdObj.get("uri")
-            val uriStr = when {
-                uriElem == null -> ""
-                uriElem.isJsonPrimitive -> uriElem.asString
-                uriElem.isJsonObject && uriElem.asJsonObject.has("path") -> {
-                    "file://" + uriElem.asJsonObject.get("path").asString
-                }
-                else -> uriElem.toString()
-            }
-            nTd.addProperty("uri", uriStr)
-            if (tdObj.has("version") && !tdObj.get("version").isJsonNull) {
-                val ver = tdObj.get("version")
-                if (ver.isJsonPrimitive && ver.asJsonPrimitive.isNumber) {
-                    nTd.addProperty("version", ver.asInt)
-                } else {
-                    nTd.add("version", JsonNull.INSTANCE)
-                }
-            } else {
-                nTd.add("version", JsonNull.INSTANCE)
-            }
-            nTd
-        } else {
-            td
-        }
-        val normalizedMap = JsonObject().apply {
-            add("textDocument", normalizedTd)
-            add("range", obj.get("range"))
-            add("kind", obj.get("kind"))
-        }
-        return ExecuteCommandParams(
-            params.command,
-            listOf(normalizedMap)
-        )
+        return forwardRequest("workspace/executeCommand", params, Any::class.java)
     }
 
     override fun didChangeConfiguration(params: DidChangeConfigurationParams) {

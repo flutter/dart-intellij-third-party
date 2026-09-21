@@ -14,7 +14,6 @@ import com.google.dart.server.internal.remote.ByteLineReaderStream
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
-import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
@@ -33,6 +32,7 @@ import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
+import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InlayHintKind
@@ -284,40 +284,38 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("dart.edit.codeAction.apply", result[1].right.command.command)
     }
 
-    fun testExecuteCommandNormalizationPreservesVersionNull() {
-        val gson = DartBridgeLspServer.GSON
+    fun testExecuteCommandRequest() {
+        val params = ExecuteCommandParams("dart.edit.sortMembers", listOf(JsonObject().apply {
+            addProperty("path", "/path/to/main.dart")
+        }))
 
-        val tdObj = JsonObject().apply {
-            addProperty("uri", "file:///path/to/main.dart")
-        }
-        val rangeObj = JsonObject().apply {
-            add("start", JsonObject().apply { addProperty("line", 10); addProperty("character", 5) })
-            add("end", JsonObject().apply { addProperty("line", 10); addProperty("character", 5) })
-        }
-        val rawMap = JsonObject().apply {
-            add("textDocument", tdObj)
-            add("range", rangeObj)
-            addProperty("kind", "quickfix.import.librarySdk")
-        }
+        val future = bridgeServer.executeCommand(params)
 
-        // Verify that normalizing textDocument ensures "version": null (JsonNull) is included
-        // and serialized when serializeNulls is enabled
-        val td = rawMap.get("textDocument").asJsonObject
-        val normalizedTd = JsonObject().apply {
-            addProperty("uri", td.get("uri").asString)
-            add("version", JsonNull.INSTANCE)
+        val jsonObject = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
         }
-        val normalizedMap = JsonObject().apply {
-            add("textDocument", normalizedTd)
-            add("range", rawMap.get("range"))
-            add("kind", rawMap.get("kind"))
-        }
+        assertEquals("123", jsonObject.get("id").asString)
 
-        val serialized = gson.toJson(listOf(normalizedMap))
-        assertTrue("Serialized output must explicitly contain \"version\":null for OptionalVersionedTextDocumentIdentifier validation",
-            serialized.contains("\"version\":null"))
-        assertTrue("Serialized output must explicitly contain valid string uri",
-            serialized.contains("\"uri\":\"file:///path/to/main.dart\""))
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("workspace/executeCommand", lspMessage.get("method").asString)
+        assertEquals("dart.edit.sortMembers", lspMessage.getAsJsonObject("params").get("command").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+        assertNull(future.get(5, TimeUnit.SECONDS))
     }
 
     fun testDiagnosticServerRequest() {
