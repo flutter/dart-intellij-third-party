@@ -26,8 +26,8 @@ final class DartPostFormatProcessor implements PostFormatProcessor {
 
   @Override
   public @NotNull TextRange processText(final @NotNull PsiFile psiFile,
-                                         final @NotNull TextRange rangeToReformat,
-                                         final @NotNull CodeStyleSettings settings) {
+                                        final @NotNull TextRange rangeToReformat,
+                                        final @NotNull CodeStyleSettings settings) {
     if (!isApplicable(psiFile)) return rangeToReformat;
     final VirtualFile vFile = psiFile.getVirtualFile();
     if (vFile != null && DartLspFormattingRouting.isLspOwnedEditorFormatting(psiFile.getProject(), vFile)) {
@@ -45,6 +45,6 @@ final class DartPostFormatProcessor implements PostFormatProcessor {
     final Module module = ModuleUtilCore.findModuleForPsiElement(psiFile);
     if (module == null || !DartSdkLibUtil.isDartSdkEnabled(module)) return false;
     if (!ProjectFileIndex.getInstance(project).isInContent(vFile)) return false;
-    return DartAnalysisServerService.getInstance(project).serverReadyForRequest();
+      return DartAnalysisServerService.getInstance(project).serverReadyForRequest();
   }
 }

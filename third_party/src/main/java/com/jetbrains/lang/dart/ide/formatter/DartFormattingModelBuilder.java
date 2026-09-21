@@ -19,7 +19,6 @@ public final class DartFormattingModelBuilder implements FormattingModelBuilder 
     final PsiFile psiFile = formattingContext.getContainingFile();
     CodeStyleSettings settings = formattingContext.getCodeStyleSettings();
     final ASTNode rootNode = psiFile instanceof DartFile ? psiFile.getNode() : formattingContext.getNode();
-
     final DartBlockContext context = new DartBlockContext(settings, formattingContext.getFormattingMode());
     final DartBlock rootBlock = new DartBlock(rootNode, null, null, settings, context);
     return new DocumentBasedFormattingModel(rootBlock, formattingContext.getProject(), settings, psiFile.getFileType(), psiFile);

@@ -542,3 +542,4 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 }
+
