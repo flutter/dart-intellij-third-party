@@ -1,5 +1,5 @@
 # Plugin verifier baseline for IDE branch 262.
-# Generated from IU-262.10315.125 by third_party/tool/update_baselines.sh -- do not edit by hand.
+# Generated from IU-262.10968.63 by third_party/tool/update_baselines.sh -- do not edit by hand.
 Deprecated API usages	Deprecated constructor com.intellij.codeInsight.template.TemplateContextType.<init>(java.lang.String id, java.lang.String presentableName, java.lang.Class baseContextType) is invoked in com.jetbrains.lang.dart.ide.template.DartTemplateContextType.<init>(String, String, Class)
 Deprecated API usages	Deprecated constructor com.intellij.execution.configuration.EnvironmentVariablesComponent.<init>() is invoked in com.jetbrains.lang.dart.ide.runner.server.ui.DartCommandLineConfigurationEditorForm.$$$setupUI$$$() : void
 Deprecated API usages	Deprecated constructor com.intellij.execution.configuration.EnvironmentVariablesComponent.<init>() is invoked in com.jetbrains.lang.dart.ide.runner.test.ui.DartTestConfigurationEditorForm.$$$setupUI$$$() : void
@@ -10,7 +10,7 @@ Deprecated API usages	Deprecated method com.google.dart.server.generated.Analysi
 Deprecated API usages	Deprecated method com.google.dart.server.generated.AnalysisServer.completion_registerLibraryPaths(java.util.List arg0) : void is overridden in class com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 Deprecated API usages	Deprecated method com.google.dart.server.generated.AnalysisServer.execution_setSubscriptions(java.util.List arg0) : void is overridden in class com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 Deprecated API usages	Deprecated method com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.restart() : void is invoked in com.jetbrains.lang.dart.analyzer.DartServerData.lambda$forceFileAnnotation$5(Project) : void
-Deprecated API usages	Deprecated method com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.restart() : void is invoked in com.jetbrains.lang.dart.sdk.DartConfigurable.lambda$apply$6(boolean) : void
+Deprecated API usages	Deprecated method com.intellij.codeInsight.daemon.DaemonCodeAnalyzer.restart() : void is invoked in com.jetbrains.lang.dart.sdk.DartConfigurable.lambda$apply$6(boolean, boolean) : void
 Deprecated API usages	Deprecated method com.intellij.openapi.application.ActionsKt.runReadAction(kotlin.jvm.functions.Function0 runnable) : T is invoked in com.jetbrains.lang.dart.lsp.DartBridgeLspServer.forwardRequest(String, Object, Type) : CompletableFuture
 Deprecated API usages	Deprecated method com.intellij.openapi.application.ActionsKt.runReadAction(kotlin.jvm.functions.Function0 runnable) : T is invoked in com.jetbrains.lang.dart.lsp.DartLspDiagnosticConverter.resolveLocation(Project, DartAnalysisServerService, String, Range) : Location
 Deprecated API usages	Deprecated method com.intellij.openapi.application.ReadAction.compute(com.intellij.openapi.util.ThrowableComputable action) : T is invoked in com.jetbrains.lang.dart.ide.findUsages.DartServerFindUsagesHandler.processElementUsages(PsiElement, Processor, FindUsagesOptions) : boolean
