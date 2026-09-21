@@ -9,6 +9,7 @@ import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.platform.dartlsp.util.getOffsetInDocument
+import com.intellij.platform.dartlsp.util.messageIfStringOrEmpty
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.analyzer.DartLocalFileInfo
 import com.jetbrains.lang.dart.analyzer.getDartFileInfo
@@ -56,7 +57,7 @@ object DartLspDiagnosticConverter {
             severity,
             type,
             location,
-            diagnostic.message,
+            diagnostic.messageIfStringOrEmpty,
             null,
             codeStr,
             url,
