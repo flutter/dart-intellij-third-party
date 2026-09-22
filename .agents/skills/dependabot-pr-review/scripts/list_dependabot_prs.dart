@@ -702,11 +702,14 @@ Options validateOptions(Map<String, String> values) {
 
   // An empty author list would query nothing and report "no PRs found",
   // which reads as a clean queue rather than as the misconfiguration it is.
-  final authors = [
+  //
+  // A set literal deduplicates while preserving insertion order, so a repeated
+  // entry does not cost an extra query per repository.
+  final authors = {
     for (final author
         in (values['--authors'] ?? defaultAuthors.join(',')).split(','))
       if (author.trim().isNotEmpty) author.trim(),
-  ];
+  }.toList();
   if (authors.isEmpty) {
     stderr.writeln('--authors must name at least one author.');
     exit(exitBadUsage);
