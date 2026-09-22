@@ -1236,7 +1236,7 @@ public final class DartAnalysisServerService implements Disposable {
         myServerData.onFilesContentUpdated();
       });
     }
-    else if (FileDocumentManager.getInstance().getUnsavedDocuments().length == 0) {
+    else {
       myServerData.onFilesContentUpdated();
     }
   }

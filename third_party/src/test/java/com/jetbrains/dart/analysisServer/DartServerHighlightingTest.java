@@ -410,6 +410,16 @@ public class DartServerHighlightingTest extends CodeInsightFixtureTestCase {
 //                            """);
 //  }
 
+  public void testUpdateVisibleFilesWithoutReadAccess() throws Exception {
+    myFixture.configureByText("firstFile.dart", "class Foo {}");
+    final DartAnalysisServerService service = DartAnalysisServerService.getInstance(getProject());
+    ApplicationManager.getApplication().executeOnPooledThread(() -> {
+      assertFalse("Read access should not be allowed before calling updateVisibleFiles()",
+                  ApplicationManager.getApplication().isReadAccessAllowed());
+      service.updateVisibleFiles();
+    }).get(10, TimeUnit.SECONDS);
+  }
+
   public void testSemanticHighlightingAfterModifyingFileOutsideIntelliJAndThenOpening() {
     // 1. Create a Dart file in the project without opening it in an editor.
     final VirtualFile file =
