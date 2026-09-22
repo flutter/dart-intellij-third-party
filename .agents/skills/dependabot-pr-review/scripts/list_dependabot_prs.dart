@@ -604,13 +604,24 @@ void writeJson(String path, List<PullRequest> prs, String label) {
 }
 
 /// Reports results to stdout/stderr, keeping failures visually distinct.
+///
+/// [totalQueries] is the number of (repo, author) queries attempted, used to
+/// tell a total failure apart from a partial one.
 void reportResults(
   List<PullRequest> prs,
   List<String> failedQueries,
+  int totalQueries,
   Options options,
 ) {
-  if (prs.isEmpty && failedQueries.isNotEmpty) {
+  if (prs.isEmpty && failedQueries.length == totalQueries) {
     stderr.writeln('Could not list any PRs: every query failed.');
+  } else if (prs.isEmpty && failedQueries.isNotEmpty) {
+    // Some queries failed and the rest came back empty. Do not claim total
+    // failure: an author that does not operate on a repo, such as the SDK
+    // roller on the Dart plugin, legitimately returns nothing.
+    stderr.writeln(
+      'Could not list any PRs: some queries failed and the rest found none.',
+    );
   } else if (prs.isEmpty) {
     stdout.writeln('No open automated dependency PRs found.');
   } else {
@@ -762,8 +773,14 @@ void main(List<String> args) {
   // separately and the results merged. Authors are expected to be disjoint,
   // but dedupe by ref anyway so an overlap cannot list a PR twice.
   final seen = <String>{};
+
+  // Counted at the point of the call rather than derived from
+  // repos.length * authors.length, so it stays accurate if the loop ever
+  // gains a skip condition.
+  var attemptedQueries = 0;
   for (final repo in repos) {
     for (final author in options.authors) {
+      attemptedQueries++;
       final fetched = fetchPullRequests(
         repo,
         author,
@@ -787,7 +804,7 @@ void main(List<String> args) {
     },
   );
 
-  reportResults(prs, failedQueries, options);
+  reportResults(prs, failedQueries, attemptedQueries, options);
 
   exit(failedQueries.isEmpty ? 0 : exitQueryFailed);
 }

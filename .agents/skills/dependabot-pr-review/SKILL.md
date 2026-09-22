@@ -95,6 +95,11 @@ progress lines and any failure warning name both.
 > listing is **incomplete**: report the failure to the user and stop. Never
 > present partial results as "nothing to do". `2` means the arguments were
 > invalid.
+>
+> `1` covers both a total failure, where every query failed, and a partial one,
+> where some queries failed and the rest found nothing. The wording differs but
+> the response does not: in both cases the listing is incomplete. A `WARNING`
+> is only ever printed alongside exit `1`.
 
 Per-PR build status is one of:
 
