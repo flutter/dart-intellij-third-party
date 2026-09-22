@@ -43,7 +43,6 @@ import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.InlayHintKind
 import org.eclipse.lsp4j.InlayHintParams
-import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InsertTextFormat
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
