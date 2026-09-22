@@ -2463,15 +2463,8 @@ public final class DartAnalysisServerService implements Disposable {
 
         mySdkVersion = sdk.getVersion();
 
-        boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
-        boolean supportsLspDiagnostics = isLspPublishDiagnosticsEnabled(myProject);
-        boolean supportsLspClosingLabels = isLspClosingLabelsEnabled(myProject);
-        boolean supportsLspCodeActions = isLspCodeActionsEnabled(myProject);
-        startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
-                                                   supportsUris,
-                                                   buildLspCapabilities(mySdkVersion, supportsLspDiagnostics, supportsLspClosingLabels, supportsLspCodeActions));
-
         myServer = startedServer;
+        updateClientCapabilities();
 
         // Clear any dart view notifications.
         ApplicationManager.getApplication().invokeLater(
@@ -2833,6 +2826,19 @@ public final class DartAnalysisServerService implements Disposable {
     final RemoteAnalysisServerImpl server = myServer;
     if (server != null) {
       server.sendRequestToServer(id, request);
+    }
+  }
+
+  public void updateClientCapabilities() {
+    final RemoteAnalysisServerImpl server = myServer;
+    if (server != null) {
+      boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
+      boolean supportsLspDiagnostics = isLspPublishDiagnosticsEnabled(myProject);
+      boolean supportsLspClosingLabels = isLspClosingLabelsEnabled(myProject);
+      boolean supportsLspCodeActions = isLspCodeActionsEnabled(myProject);
+      server.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
+                                          supportsUris,
+                                          buildLspCapabilities(mySdkVersion, supportsLspDiagnostics, supportsLspClosingLabels, supportsLspCodeActions));
     }
   }
 

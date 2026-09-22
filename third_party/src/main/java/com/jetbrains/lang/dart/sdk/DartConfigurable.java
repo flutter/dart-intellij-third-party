@@ -393,6 +393,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
     ApplicationManager.getApplication().runWriteAction(runnable);
 
     if (myEnableDartSupportCheckBox.isSelected() && initialExperimentalEnabled != currentExperimentalEnabled) {
+      DartAnalysisServerService.getInstance(myProject).updateClientCapabilities();
       DartBridgeLspServerManager bridgeManager = myProject.getService(DartBridgeLspServerManager.class);
       bridgeManager.stopBridgeServer();
       bridgeManager.startBridgeServer();
