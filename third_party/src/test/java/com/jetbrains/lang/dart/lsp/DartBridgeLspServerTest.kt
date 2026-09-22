@@ -30,14 +30,20 @@ import org.eclipse.lsp4j.CodeAction
 import org.eclipse.lsp4j.CodeActionContext
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
+import org.eclipse.lsp4j.CompletionItem
+import org.eclipse.lsp4j.CompletionItemKind
+import org.eclipse.lsp4j.CompletionParams
+import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
+import org.eclipse.lsp4j.InitializeParams
+import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.InlayHintKind
 import org.eclipse.lsp4j.InlayHintParams
-import org.eclipse.lsp4j.InitializeParams
+import org.eclipse.lsp4j.InsertTextFormat
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
 import org.eclipse.lsp4j.Position
@@ -428,6 +434,239 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(DocumentHighlightKind.Read, result[1].kind)
     }
 
+    fun testCompletionRequest() {
+        val params = CompletionParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            position = Position(1, 2)
+        }
+
+        val future = bridgeServer.completion(params)
+
+        val jsonObject = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }
+        assertEquals("123", jsonObject.get("id")?.asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("textDocument/completion", lspMessage.get("method").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "isIncomplete": false,
+                    "items": [
+                      {
+                        "label": "print",
+                        "kind": 3,
+                        "detail": "void print(Object? object)",
+                        "insertText": "print(${'$'}{1:object})",
+                        "insertTextFormat": 2
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertTrue(result.isRight)
+        val completionList = result.right
+        assertEquals(1, completionList.items.size)
+        assertEquals("print", completionList.items[0].label)
+        assertEquals(CompletionItemKind.Function, completionList.items[0].kind)
+        assertEquals("print(\${1:object})", completionList.items[0].insertText)
+        assertEquals(InsertTextFormat.Snippet, completionList.items[0].insertTextFormat)
+    }
+
+    fun testCompletionResolveRequest() {
+        val unresolved = CompletionItem().apply {
+            label = "unresolvedItem"
+        }
+
+        val future = bridgeServer.resolveCompletionItem(unresolved)
+
+        val jsonObject = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }
+        assertEquals("123", jsonObject.get("id")?.asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("completionItem/resolve", lspMessage.get("method").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "label": "unresolvedItem",
+                    "detail": "Resolved Detail",
+                    "documentation": {
+                      "kind": "markdown",
+                      "value": "Resolved Docs"
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals("unresolvedItem", result.label)
+        assertEquals("Resolved Detail", result.detail)
+        assertEquals("Resolved Docs", result.documentation.right.value)
+    }
+
+    fun testCompletionResolveRequestWithNullResult() {
+        val unresolved = CompletionItem().apply {
+            label = "unresolvedItem"
+            detail = "Original Detail"
+        }
+
+        val future = bridgeServer.resolveCompletionItem(unresolved)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals("unresolvedItem", result.label)
+        assertEquals("Original Detail", result.detail)
+    }
+
+    fun testCompletionResolveRequestWithErrorResponse() {
+        val unresolved = CompletionItem().apply {
+            label = "unresolvedItem"
+            detail = "Original Detail"
+        }
+
+        val future = bridgeServer.resolveCompletionItem(unresolved)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32603,
+                    "message": "Internal error"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals("unresolvedItem", result.label)
+        assertEquals("Original Detail", result.detail)
+    }
+
+    fun testCompletionRequestWithErrorResponse() {
+        val params = CompletionParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            position = Position(1, 2)
+        }
+
+        val future = bridgeServer.completion(params)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32601,
+                    "message": "Method not found"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertTrue(result.isRight)
+        assertTrue(result.right.items.isEmpty())
+    }
+
+    fun testCompletionRequestWithNullResult() {
+        val params = CompletionParams().apply {
+            textDocument = TextDocumentIdentifier("file://test.dart")
+            position = Position(1, 2)
+        }
+
+        val future = bridgeServer.completion(params)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertTrue(result.isRight)
+        assertTrue(result.right.items.isEmpty())
+    }
+
+    fun testCompletionSupportIconMapping() {
+        val support = DartLspCompletionSupport
+        val constructorItem = CompletionItem().apply { kind = CompletionItemKind.Constructor }
+        assertEquals(com.intellij.icons.AllIcons.Nodes.ClassInitializer, support.getIcon(constructorItem))
+
+        val functionItem = CompletionItem().apply { kind = CompletionItemKind.Function }
+        assertEquals(com.intellij.icons.AllIcons.Nodes.Lambda, support.getIcon(functionItem))
+
+        val methodItem = CompletionItem().apply { kind = CompletionItemKind.Method }
+        assertEquals(com.intellij.icons.AllIcons.Nodes.Method, support.getIcon(methodItem))
+    }
+
     fun testClientCapabilities() {
         val lspCaps = JsonObject().apply {
             addProperty("testCap", true)
@@ -589,6 +828,28 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val experimentalNames = LspMethod.getExperimentalFeatures().mapNotNull { it.presentableName }
         assertTrue("Experimental features list should contain 'code actions'", experimentalNames.contains("code actions"))
         assertTrue("Experimental features list should contain 'errors and warnings'", experimentalNames.contains("errors and warnings"))
+    }
+
+    fun testBuildLspCapabilitiesIncludesCompletion() {
+        val lspCapabilitiesOlder = DartAnalysisServerService.buildLspCapabilities("3.8.0")
+        val textDocumentOlder = lspCapabilitiesOlder.getAsJsonObject("textDocument")
+        assertNotNull(textDocumentOlder)
+        assertNull(textDocumentOlder.getAsJsonObject("completion"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.8.0"))
+
+        val lspCapabilitiesSufficient = DartAnalysisServerService.buildLspCapabilities("3.14.0-226.0.dev")
+        val textDocumentSufficient = lspCapabilitiesSufficient.getAsJsonObject("textDocument")
+        assertNotNull(textDocumentSufficient)
+        val completion = textDocumentSufficient.getAsJsonObject("completion")
+        assertNotNull(completion)
+        val completionItem = completion.getAsJsonObject("completionItem")
+        assertNotNull(completionItem)
+        assertTrue(completionItem.get("snippetSupport").asBoolean)
+        assertTrue(completionItem.get("labelDetailsSupport").asBoolean)
+        assertTrue(completionItem.get("deprecatedSupport").asBoolean)
+        assertTrue(completionItem.get("insertReplaceSupport").asBoolean)
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.14.0-226.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.15.0"))
     }
 
     fun testPublishDiagnosticsNotification() {

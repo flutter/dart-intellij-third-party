@@ -184,6 +184,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
   public static final String MIN_LSP_CLOSING_LABELS_SDK_VERSION = "3.14.0-219.0.dev";
+  public static final String MIN_LSP_COMPLETION_SDK_VERSION = "3.14.0-226.0.dev";
   // Although textDocument/codeAction was added in 3.9.0-122.0.dev, we match
   // MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION because LSP quick fixes in the JetBrains LSP client
   // depend on publishDiagnostics notifications.
@@ -603,6 +604,17 @@ public final class DartAnalysisServerService implements Disposable {
       textDocument.add("publishDiagnostics", publishDiagnostics);
     }
 
+    if (isDartSdkVersionSufficientForLspCompletion(sdkVersion)) {
+      JsonObject completion = new JsonObject();
+      JsonObject completionItem = new JsonObject();
+      completionItem.addProperty("snippetSupport", true);
+      completionItem.addProperty("labelDetailsSupport", true);
+      completionItem.addProperty("deprecatedSupport", true);
+      completionItem.addProperty("insertReplaceSupport", true);
+      completion.add("completionItem", completionItem);
+      textDocument.add("completion", completion);
+    }
+
     if (supportsLspClosingLabels) {
       JsonObject experimental = lspCapabilities.has("experimental")
                                 ? lspCapabilities.getAsJsonObject("experimental")
@@ -648,6 +660,18 @@ public final class DartAnalysisServerService implements Disposable {
     }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspNavigation(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspCompletion(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_COMPLETION_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspCompletionEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspCompletion(sdk.getVersion());
   }
 
   public static boolean isDartSdkVersionSufficientForLspPublishDiagnostics(@NotNull String sdkVersion) {
