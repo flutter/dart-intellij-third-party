@@ -12,17 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Lists open Dependabot pull requests and summarizes their CI status.
+/// Lists open automated dependency pull requests and summarizes their CI
+/// status.
+///
+/// Covers Dependabot version bumps and bot-authored SDK rolls, which share a
+/// lifecycle: opened by automation, labeled for auto-submit, and stalled when
+/// that label is stripped.
 ///
 /// Emits a human readable markdown table on stdout and, optionally, a JSON
 /// payload for downstream processing.
 ///
 /// Usage:
-///   dart run list_dependabot_prs.dart [--repo both] [--label autosubmit]
-///       [--limit 50] [--output-file <path>]
+///   dart run list_dependabot_prs.dart [--repo both] [--authors a,b]
+///       [--label autosubmit] [--limit 50] [--output-file <path>]
 ///
-/// Exits 0 on success, 1 if any repository query failed, and 2 for invalid
-/// arguments. A failed query is never reported as "no PRs found".
+/// Exits 0 on success, 1 if any query failed, and 2 for invalid arguments.
+/// A failed query is never reported as "no PRs found".
 library;
 
 import 'dart:convert';
@@ -32,6 +37,40 @@ const defaultRepos = <String>[
   'flutter/dart-intellij-third-party',
   'flutter/flutter-intellij',
 ];
+
+/// PR authors treated as automated dependency updates.
+///
+/// `gh pr list` accepts only one `--author`, so each is queried separately.
+const defaultAuthors = <String>['app/dependabot', 'flutteractionsbot'];
+
+/// What kind of automation opened a pull request.
+enum PrSource {
+  /// A Dependabot version bump of a single library or action.
+  dependabot('dependabot'),
+
+  /// A bot-authored roll of a pinned SDK or toolchain version.
+  ///
+  /// Broader blast radius than a library bump: it repoints the toolchain
+  /// every CI job builds against.
+  sdkRoll('sdk-roll'),
+
+  /// An author supplied via `--authors` that maps to no known category.
+  other('other');
+
+  const PrSource(this.label);
+
+  /// Short label used in the summary table and JSON payload.
+  final String label;
+
+  /// Classifies a PR by its [author] login.
+  static PrSource forAuthor(String author) => switch (author.toLowerCase()) {
+    'app/dependabot' ||
+    'dependabot' ||
+    'dependabot[bot]' => PrSource.dependabot,
+    'flutteractionsbot' => PrSource.sdkRoll,
+    _ => PrSource.other,
+  };
+}
 
 /// The `--json` fields requested from `gh pr list`.
 const prFields =
@@ -147,10 +186,22 @@ final class DependencyBump {
     caseSensitive: false,
   );
 
+  /// Matches SDK-roll titles like:
+  ///   ci: bump pinned Flutter SDK to version 3.47.5
+  ///
+  /// These name only a target version, never an origin, so [fromVersion] is
+  /// left null.
+  static final _pinnedRoll = RegExp(
+    r'^(?:ci:\s*)?'
+    r'(?:bump|update|roll)\s+pinned\s+'
+    r'(?<name>.+?)\s+to\s+(?:version\s+)?(?<to>\S+)$',
+    caseSensitive: false,
+  );
+
   /// Trailing `in /some/path` qualifier, stripped from fallback names.
   static final _inPathSuffix = RegExp(r'\s+in\s+\S+$');
 
-  /// Extracts the bumped dependency from a Dependabot PR [title].
+  /// Extracts the bumped dependency from a PR [title].
   ///
   /// Falls back to a lightly cleaned up title when the format is unrecognized,
   /// so an unusual title still shows something meaningful.
@@ -161,6 +212,13 @@ final class DependencyBump {
       return DependencyBump(
         name: _unquote(match.namedGroup('name')!),
         fromVersion: match.namedGroup('from'),
+        toVersion: match.namedGroup('to'),
+      );
+    }
+
+    if (_pinnedRoll.firstMatch(trimmed) case final match?) {
+      return DependencyBump(
+        name: _unquote(match.namedGroup('name')!),
         toVersion: match.namedGroup('to'),
       );
     }
@@ -182,10 +240,13 @@ final class DependencyBump {
   final String? fromVersion;
   final String? toVersion;
 
-  /// A compact `from -> to` description, or `'-'` when either version is
-  /// unknown (for example, for grouped updates).
+  /// A compact `from -> to` description.
+  ///
+  /// Renders `-> to` when only the target is known, as for SDK rolls, and
+  /// `'-'` when neither is (for example, for grouped updates).
   String get versionChange => switch ((fromVersion, toVersion)) {
     (final from?, final to?) => '$from -> $to',
+    (null, final to?) => '-> $to',
     _ => '-',
   };
 
@@ -273,6 +334,12 @@ final class PullRequest {
   /// The dependency being bumped, parsed from [title].
   final DependencyBump dependency;
 
+  /// What kind of automation opened this PR, derived from [author].
+  ///
+  /// Surfaced so a toolchain roll is never silently reviewed as though it
+  /// were an ordinary library bump.
+  PrSource get source => PrSource.forAuthor(author);
+
   /// The `owner/repo#number` reference accepted by `approve_and_label.dart`.
   String get ref => '$repo#$number';
 
@@ -281,6 +348,7 @@ final class PullRequest {
     'number': number,
     'title': title,
     'dependency': dependency.toJson(),
+    'source': source.label,
     'url': url,
     'author': author,
     'createdAt': createdAt,
@@ -420,20 +488,29 @@ List<Object?>? decodePrList(String raw, String repo) {
   return decoded;
 }
 
-/// Fetches open Dependabot PRs for a single repository.
+/// Fetches open PRs opened by [author] for a single repository.
 ///
 /// Returns null when the query itself fails, which callers must distinguish
 /// from an empty list: "the query broke" and "this repo is clean" demand
 /// opposite responses from the operator.
-List<PullRequest>? fetchPullRequests(String repo, int limit, String label) {
-  stderr.writeln('--- Fetching open Dependabot PRs for $repo ---');
+///
+/// An empty list is entirely normal for an author that does not operate on a
+/// given repo, such as the SDK roller, which only files against the Flutter
+/// plugin.
+List<PullRequest>? fetchPullRequests(
+  String repo,
+  String author,
+  int limit,
+  String label,
+) {
+  stderr.writeln('--- Fetching open PRs by $author for $repo ---');
   final raw = runCommand('gh', [
     'pr',
     'list',
     '--repo',
     repo,
     '--author',
-    'app/dependabot',
+    author,
     '--state',
     'open',
     '--limit',
@@ -464,10 +541,12 @@ String escapeCell(String value) => value.replaceAll('|', r'\|');
 /// Prints the markdown summary table for [prs].
 void printTable(List<PullRequest> prs) {
   stdout.writeln(
-    '| Repo | PR | Dependency | Version | Build | Checks (pass/fail/pending) | '
-    'Review | Mergeable | Has label |',
+    '| Repo | PR | Dependency | Version | Source | Build | '
+    'Checks (pass/fail/pending) | Review | Mergeable | Has label |',
   );
-  stdout.writeln('| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+  stdout.writeln(
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+  );
 
   for (final pr in prs) {
     final checks = pr.checks;
@@ -479,6 +558,7 @@ void printTable(List<PullRequest> prs) {
       '| #${pr.number} '
       '| ${escapeCell(pr.dependency.name)} '
       '| ${escapeCell(pr.dependency.versionChange)} '
+      '| ${pr.source.label} '
       '| ${checks.status.label} '
       '| $counts '
       '| ${escapeCell(pr.reviewDecision)} '
@@ -526,21 +606,21 @@ void writeJson(String path, List<PullRequest> prs, String label) {
 /// Reports results to stdout/stderr, keeping failures visually distinct.
 void reportResults(
   List<PullRequest> prs,
-  List<String> failedRepos,
+  List<String> failedQueries,
   Options options,
 ) {
-  if (prs.isEmpty && failedRepos.isNotEmpty) {
-    stderr.writeln('Could not list any PRs: every repository query failed.');
+  if (prs.isEmpty && failedQueries.isNotEmpty) {
+    stderr.writeln('Could not list any PRs: every query failed.');
   } else if (prs.isEmpty) {
-    stdout.writeln('No open Dependabot PRs found.');
+    stdout.writeln('No open automated dependency PRs found.');
   } else {
     printTable(prs);
     printFootnotes(prs, options.label);
   }
 
-  if (failedRepos.isNotEmpty) {
+  if (failedQueries.isNotEmpty) {
     stderr.writeln(
-      '\nWARNING: failed to query ${failedRepos.join(', ')}. '
+      '\nWARNING: failed to query ${failedQueries.join(', ')}. '
       'These results are INCOMPLETE; do not treat them as "nothing to do".',
     );
   }
@@ -550,16 +630,22 @@ void reportResults(
   }
 }
 
-const usage = '''
-Lists open Dependabot PRs and their build status.
+final usage =
+    '''
+Lists open automated dependency PRs and their build status.
+
+Covers Dependabot bumps and bot-authored SDK rolls.
 
 Usage: dart run list_dependabot_prs.dart [options]
 
 Options:
   --repo <owner/repo>   Repository to query, or "both" for the Dart and
                         Flutter IntelliJ plugin repos. (default: both)
+  --authors <a,b>       Comma-separated PR authors to include.
+                        (default: ${defaultAuthors.join(',')})
   --label <name>        Label checked for on each PR. (default: autosubmit)
-  --limit <n>           Maximum PRs to fetch per repo. (default: 50)
+  --limit <n>           Maximum PRs to fetch per repo, per author.
+                        (default: 50)
   --output-file <path>  Optional path to save the results as JSON.
   -h, --help            Show this help text.
 
@@ -572,7 +658,13 @@ Exit codes:
 ''';
 
 /// Parsed command line options.
-typedef Options = ({String repo, String label, int limit, String? outputFile});
+typedef Options = ({
+  String repo,
+  List<String> authors,
+  String label,
+  int limit,
+  String? outputFile,
+});
 
 /// Splits `--flag=value` into its parts. The value is null for a bare flag.
 (String, String?) splitFlag(String arg) => switch (arg.indexOf('=')) {
@@ -597,8 +689,21 @@ Options validateOptions(Map<String, String> values) {
     exit(exitBadUsage);
   }
 
+  // An empty author list would query nothing and report "no PRs found",
+  // which reads as a clean queue rather than as the misconfiguration it is.
+  final authors = [
+    for (final author
+        in (values['--authors'] ?? defaultAuthors.join(',')).split(','))
+      if (author.trim().isNotEmpty) author.trim(),
+  ];
+  if (authors.isEmpty) {
+    stderr.writeln('--authors must name at least one author.');
+    exit(exitBadUsage);
+  }
+
   return (
     repo: repo,
+    authors: authors,
     label: values['--label'] ?? 'autosubmit',
     limit: limit,
     outputFile: values['--output-file'],
@@ -610,7 +715,7 @@ Options validateOptions(Map<String, String> values) {
 ///
 /// Returns null when help was requested and the caller should exit quietly.
 Options? parseArgs(List<String> args) {
-  const known = {'--repo', '--label', '--limit', '--output-file'};
+  const known = {'--repo', '--authors', '--label', '--limit', '--output-file'};
   final values = <String, String>{};
 
   for (var i = 0; i < args.length; i++) {
@@ -651,18 +756,38 @@ void main(List<String> args) {
 
   final repos = options.repo == 'both' ? defaultRepos : [options.repo];
   final prs = <PullRequest>[];
-  final failedRepos = <String>[];
+  final failedQueries = <String>[];
 
+  // `gh pr list` accepts a single --author, so each author is queried
+  // separately and the results merged. Authors are expected to be disjoint,
+  // but dedupe by ref anyway so an overlap cannot list a PR twice.
+  final seen = <String>{};
   for (final repo in repos) {
-    final fetched = fetchPullRequests(repo, options.limit, options.label);
-    if (fetched == null) {
-      failedRepos.add(repo);
-    } else {
-      prs.addAll(fetched);
+    for (final author in options.authors) {
+      final fetched = fetchPullRequests(
+        repo,
+        author,
+        options.limit,
+        options.label,
+      );
+      if (fetched == null) {
+        failedQueries.add('$repo (as $author)');
+        continue;
+      }
+      for (final pr in fetched) {
+        if (seen.add(pr.ref)) prs.add(pr);
+      }
     }
   }
 
-  reportResults(prs, failedRepos, options);
+  prs.sort(
+    (a, b) => switch (a.repo.compareTo(b.repo)) {
+      0 => a.number.compareTo(b.number),
+      final byRepo => byRepo,
+    },
+  );
 
-  exit(failedRepos.isEmpty ? 0 : exitQueryFailed);
+  reportResults(prs, failedQueries, options);
+
+  exit(failedQueries.isEmpty ? 0 : exitQueryFailed);
 }

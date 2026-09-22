@@ -1,14 +1,25 @@
 ---
 name: dependabot-pr-review
-description: Reviews open Dependabot pull requests in the Dart (flutter/dart-intellij-third-party) and Flutter (flutter/flutter-intellij) IntelliJ plugin repositories. Lists each PR with its build status, asks the user which ones to approve, then approves them and applies the "autosubmit" label.
+description: Reviews open automated dependency pull requests in the Dart (flutter/dart-intellij-third-party) and Flutter (flutter/flutter-intellij) IntelliJ plugin repositories. Covers Dependabot version bumps and bot-authored Flutter SDK rolls. Lists each PR with its build status, asks the user which ones to approve, then approves them and applies the "autosubmit" label.
 ---
 
 # Dependabot PR Review Skill
 
-This skill triages open Dependabot dependency-bump PRs across the two IntelliJ
+This skill triages open automated dependency PRs across the two IntelliJ
 plugin repositories. It reports build health for each PR, gets explicit user
 confirmation for each one, then approves the confirmed PRs and applies the
 `autosubmit` label.
+
+Two kinds of PR are in scope, because they share one lifecycle: opened by
+automation, labeled for auto-submit, and stalled when that label is stripped.
+
+| Source | Author | Example title |
+| --- | --- | --- |
+| `dependabot` | `app/dependabot` | `Bump org.jetbrains.kotlin.jvm from 2.4.10 to 2.4.20` |
+| `sdk-roll` | `flutteractionsbot` | `ci: bump pinned Flutter SDK to version 3.47.5` |
+
+SDK rolls appear only in `flutter/flutter-intellij`; the Dart repo has no SDK
+roller, so an empty result there is normal, not a failure.
 
 > [!IMPORTANT]
 > Never approve or label a PR that the user has not confirmed. The user may
@@ -22,14 +33,16 @@ This skill never merges anything. It approves and labels; the `auto-submit` bot
 does the merging. Understanding the label's lifecycle explains what this skill
 is really fixing:
 
-1. Dependabot applies `autosubmit` itself at PR creation, configured under
-   `labels:` in each repo's `.github/dependabot.yml`.
+1. The opening automation applies `autosubmit` itself at PR creation. For
+   Dependabot this is configured under `labels:` in each repo's
+   `.github/dependabot.yml`; SDK rolls are labeled by the workflow that files
+   them.
 2. The `auto-submit` bot tries to merge, and **removes the label** if any
    requirement is unmet, leaving a comment explaining why.
 3. The label does not come back on its own. The PR stalls until a human
    resolves the blocker and re-applies it.
 
-So an open Dependabot PR **without** the label has already been rejected once,
+So an open automated PR **without** the label has already been rejected once,
 and the comment says why. The two common cases:
 
 | Build | Bot's reason | What this skill does |
@@ -56,7 +69,7 @@ Default to **both** repositories:
 Only narrow the scope if the user explicitly asks for a single repository, in
 which case pass `--repo <owner/repo>` in the next step.
 
-### Step 2: List the Dependabot PRs and Their Build Status
+### Step 2: List the PRs and Their Build Status
 
 Run the listing script from the `dart-intellij-third-party` workspace root:
 
@@ -69,13 +82,19 @@ The script is dependency-free, so it runs directly with `dart run` without a
 `pub get` step. It prints a markdown table and writes the full JSON payload to
 the scratch file.
 
+By default it queries both `app/dependabot` and `flutteractionsbot`. Pass
+`--authors <a,b>` to narrow or extend that list, for example
+`--authors app/dependabot` to skip SDK rolls. Because `gh pr list` accepts only
+one `--author`, the script runs one query per repository **per author**, so the
+progress lines and any failure warning name both.
+
 > [!IMPORTANT]
-> Check the exit code. `0` means every repository was queried successfully.
-> `1` means at least one query failed (expired `gh` auth, network problem,
-> rate limit), and the script prints a `WARNING` naming the failed repos. In
-> that case the listing is **incomplete**: report the failure to the user and
-> stop. Never present partial results as "nothing to do". `2` means the
-> arguments were invalid.
+> Check the exit code. `0` means every query succeeded. `1` means at least one
+> query failed (expired `gh` auth, network problem, rate limit), and the script
+> prints a `WARNING` naming the failed repo and author. In that case the
+> listing is **incomplete**: report the failure to the user and stop. Never
+> present partial results as "nothing to do". `2` means the arguments were
+> invalid.
 
 Per-PR build status is one of:
 
@@ -89,9 +108,9 @@ Per-PR build status is one of:
 ### Step 3: Present the Results
 
 Show the user the table of PRs. For each PR include the repository, PR number
-and link, the dependency being bumped and its version change, the build status,
-the current review decision, the mergeable state, and whether the `autosubmit`
-label is already present.
+and link, the dependency being bumped and its version change, the source, the
+build status, the current review decision, the mergeable state, and whether the
+`autosubmit` label is already present.
 
 Call out anything that needs judgement before presenting the approval question:
 
@@ -101,10 +120,17 @@ Call out anything that needs judgement before presenting the approval question:
   label (these usually need no further action).
 
 Identify each PR by its **dependency name** (for example
-`org.jetbrains.kotlin.jvm`) rather than the full PR title. The script parses
-this out of the Dependabot title, along with the version change, and exposes it
-in the `Dependency` and `Version` table columns and under `dependency` in the
-JSON payload. Unrecognized title formats fall back to a cleaned up title.
+`org.jetbrains.kotlin.jvm`, or `Flutter SDK` for a roll) rather than the full
+PR title. The script parses this out of the title, along with the version
+change, and exposes it in the `Dependency` and `Version` table columns and
+under `dependency` in the JSON payload. Unrecognized title formats fall back to
+a cleaned up title.
+
+The `Source` column (`source` in JSON) distinguishes a `dependabot` library
+bump from an `sdk-roll`. Always mention the source for a roll: it repoints the
+toolchain every CI job builds against, which is a wider change than a single
+library bump even when the build is green. A version with no origin, such as
+`-> 3.47.5`, is normal for a roll, whose title names only the target.
 
 ### Step 4: Ask the User About Each PR
 
@@ -115,6 +141,7 @@ naming the dependency, for example:
 
 - `Approve and label ALL 2 passing PRs — cli_util, org.jetbrains.kotlin.jvm`
 - `Approve and label dart-intellij-third-party#665 — org.jetbrains.kotlin.jvm 2.4.10 -> 2.4.20 (build PASSING)`
+- `Approve and label flutter-intellij#9131 — Flutter SDK -> 3.47.5 (sdk-roll, build PASSING)`
 - `Approve and label flutter-intellij#8123 — actions/checkout 4 -> 5 (build FAILING: verify-plugin, label will likely bounce)`
 
 Guidelines for the question:
@@ -128,6 +155,11 @@ Guidelines for the question:
   user knows exactly what they are agreeing to.
 - Omit the bulk option when fewer than two PRs are passing, since it would
   duplicate a single individual option.
+- Tag SDK rolls inline as `sdk-roll`, in their individual option and in the
+  bulk option's dependency list, for example
+  `ALL 3 passing PRs — cli_util, kotlin.jvm, Flutter SDK (sdk-roll)`. A green
+  roll is eligible for bulk approval like any other passing PR, but the user
+  should never approve one without noticing it is a toolchain change.
 - Annotate non-passing PRs inline so risk is visible at the point of decision,
   and note that the bot will strip the label from a failing PR.
 - Exclude PRs that already have the `autosubmit` label, and mention in your
@@ -176,16 +208,24 @@ anyway, tell the user to expect the bot to remove the label again.
 
 - Requires the GitHub CLI (`gh`) to be installed and authenticated with write
   access to both repositories, plus a Dart SDK on the path.
+- If `dart` or `gh` is not found, prefix the command with an explicit `PATH`,
+  for example
+  `PATH="/opt/homebrew/bin:$HOME/src/repos/flutter/bin:$PATH"`. A sandboxed
+  shell often has neither on its default `PATH`.
 - Both scripts are standalone Dart files that import only `dart:` libraries, so
   no `pubspec.yaml` or `dart pub get` is needed.
-- Dependabot PRs are identified with `--author "app/dependabot"`.
+- PRs are identified by author: `app/dependabot` for version bumps and
+  `flutteractionsbot` for SDK rolls. Override with `--authors`.
+- `approve_and_label.dart` is source-agnostic: it takes `owner/repo#number` and
+  treats every PR the same, so no flag is needed to approve a roll.
 - The label name is configurable via `--label` on both scripts, but
   `autosubmit` is the correct default for these repositories.
 - Both scripts support `--help`.
 
 ## Bundled Resources
 
-- **`scripts/list_dependabot_prs.dart`**: Lists open Dependabot PRs with a
-  normalized CI status summary; writes JSON and prints a markdown table.
+- **`scripts/list_dependabot_prs.dart`**: Lists open automated dependency PRs
+  (Dependabot bumps and SDK rolls) with a normalized CI status summary; writes
+  JSON and prints a markdown table.
 - **`scripts/approve_and_label.dart`**: Approves the confirmed PRs and applies
   the `autosubmit` label, queueing them for the `auto-submit` bot.
