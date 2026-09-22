@@ -38,7 +38,6 @@ import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InlayHintKind
 import org.eclipse.lsp4j.InlayHintParams
-import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
 import org.eclipse.lsp4j.Position
