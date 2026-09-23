@@ -63,6 +63,6 @@ Here is the details of the changes made by the patch script:
    - Add reflective compatibility helpers in `Lsp4jUtil.kt` (`Diagnostic.messageIfStringOrEmpty` and `getDocumentFilterPattern`) so bytecode does not directly invoke `Diagnostic.getMessage()` or `DocumentFilter.getPattern()`, whose return types changed from `String` in lsp4j 0.x (IntelliJ 253–262) to `Either` in lsp4j 1.0.0 (IntelliJ 263+).
    - Update `applyTextEdits` in `Lsp4jUtil.kt` to unwrap `Either<TextEdit, SnippetTextEdit>` elements when running on lsp4j 1.0.0.
    - Update `LspDiagnosticsCustomizer.kt`, `LspDiagnosticAndLazyQuickFixes.kt`, and `LspServerImpl.kt` to use these helpers.
-10. **Nullable Document Symbols Support**:
-   - Modify `LspStructureViewSupport.getDocumentSymbols()` to return `List<DocumentSymbol>?` instead of non-null list, allowing callers to distinguish request failures (`null`) from empty file symbols (`emptyList()`).
+10. **LSP Structure View Support**:
+   - Copy `platform/lsp-impl/structureView/src` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`, register `LspStructureViewFactory` and `LspStructureViewProjectActivity` in `dart-lsp-impl.xml`, and make `LspStructureViewFactory` public (`class LspStructureViewFactory`) so `DartStructureViewFactory` can delegate to it.
 
