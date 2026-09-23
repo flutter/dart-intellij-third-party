@@ -42,6 +42,7 @@ def main():
         src_lsp_code_old = os.path.join(intellij_community_path, "platform/lsp/src/com/intellij/platform/lsp")
         src_lsp_code_new = os.path.join(intellij_community_path, "platform/lsp/src")
         src_lsp_impl_code_new = os.path.join(intellij_community_path, "platform/lsp-impl/src")
+        src_lsp_structure_view_code = os.path.join(intellij_community_path, "platform/lsp-impl/structureView/src")
         src_lsp_resources = os.path.join(intellij_community_path, "platform/lsp/resources")
         src_lsp_impl_resources = os.path.join(intellij_community_path, "platform/lsp-impl/resources")
 
@@ -65,6 +66,8 @@ def main():
 
             shutil.copytree(src_lsp_code_new, dst_lsp_code, dirs_exist_ok=True)
             shutil.copytree(src_lsp_impl_code_new, dst_lsp_code, dirs_exist_ok=True)
+            if os.path.isdir(src_lsp_structure_view_code):
+                shutil.copytree(src_lsp_structure_view_code, dst_lsp_code, dirs_exist_ok=True)
             if os.path.isdir(src_lsp_resources):
                 shutil.copytree(src_lsp_resources, dst_lsp_resources, dirs_exist_ok=True)
             if os.path.isdir(src_lsp_impl_resources):
@@ -145,6 +148,16 @@ def main():
             '<descriptionDirectoryName>LspIntention</descriptionDirectoryName>',
             '<descriptionDirectoryName>DartLspIntention</descriptionDirectoryName>'
         )
+
+        structure_view_exts = (
+            '    <lang.psiStructureViewFactory language="" implementationClass="com.intellij.platform.dartlsp.impl.structureView.LspStructureViewFactory"/>\n'
+            '    <postStartupActivity implementation="com.intellij.platform.dartlsp.impl.structureView.LspStructureViewProjectActivity"/>'
+        )
+        if "LspStructureViewFactory" not in xml_content:
+            xml_content = xml_content.replace(
+                'order="last, after PsiFileBreadcrumbsCollector"/>',
+                'order="last, after PsiFileBreadcrumbsCollector"/>\n' + structure_view_exts
+            )
 
         def remove_ids(match):
             tag_content = match.group(0)
@@ -464,17 +477,19 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             server_content = server_content.replace(old_pattern_block, new_pattern_block)
         with open(lsp_server_impl_path, "w", encoding="utf-8") as f:
             f.write(server_content)
-    # 12. Modify LspStructureViewSupport.kt to return nullable List<DocumentSymbol>? so callers can distinguish failure (null) from empty list
-    structure_view_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/documentSymbol/LspStructureViewSupport.kt")
-    if os.path.exists(structure_view_path):
-        with open(structure_view_path, "r", encoding="utf-8") as f:
-            structure_view_content = f.read()
-        target_symbols_line = "fun getDocumentSymbols(): List<DocumentSymbol> = lspServer.requestExecutor.getDocumentSymbolsCaching(file).orEmpty()"
-        replacement_symbols_line = "fun getDocumentSymbols(): List<DocumentSymbol>? = lspServer.requestExecutor.getDocumentSymbolsCaching(file)"
-        if target_symbols_line in structure_view_content:
-            structure_view_content = structure_view_content.replace(target_symbols_line, replacement_symbols_line)
-            with open(structure_view_path, "w", encoding="utf-8") as f:
-                f.write(structure_view_content)
+
+    # 12. Make LspStructureViewFactory public so DartStructureViewFactory (Java) can delegate to it
+    structure_view_factory_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/structureView/LspStructureViewFactory.kt")
+    if os.path.exists(structure_view_factory_path):
+        with open(structure_view_factory_path, "r", encoding="utf-8") as f:
+            factory_content = f.read()
+        if "internal class LspStructureViewFactory" in factory_content:
+            factory_content = factory_content.replace(
+                "internal class LspStructureViewFactory",
+                "class LspStructureViewFactory"
+            )
+            with open(structure_view_factory_path, "w", encoding="utf-8") as f:
+                f.write(factory_content)
 
     print("Patch applied successfully!")
 

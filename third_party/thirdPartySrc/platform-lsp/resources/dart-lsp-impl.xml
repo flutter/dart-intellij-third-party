@@ -65,6 +65,8 @@
       implementation="com.intellij.platform.dartlsp.impl.features.workspaceSymbol.LspWorkspaceSymbolEqualityProvider"/>
     <fileBreadcrumbsCollector implementation="com.intellij.platform.dartlsp.impl.features.documentSymbol.LspFileBreadcrumbsCollector"
                               order="last, after PsiFileBreadcrumbsCollector"/>
+    <lang.psiStructureViewFactory language="" implementationClass="com.intellij.platform.dartlsp.impl.structureView.LspStructureViewFactory"/>
+    <postStartupActivity implementation="com.intellij.platform.dartlsp.impl.structureView.LspStructureViewProjectActivity"/>
     <platform.lang.lsWidget.itemsProvider
                                           implementation="com.intellij.platform.dartlsp.impl.lsWidget.LspWidgetItemsProvider"/>
     <applicationService serviceInterface="com.intellij.platform.dartlsp.api.lsWidget.LspWidgetInternalService"

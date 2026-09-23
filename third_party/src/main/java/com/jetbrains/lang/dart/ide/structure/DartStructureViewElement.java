@@ -135,29 +135,25 @@ final class DartStructureViewElement extends PsiTreeElementBase<PsiElement> {
     DartAnalysisServerService das = DartAnalysisServerService.getInstance(psiFile.getProject());
     int startOffset = das.getConvertedOffset(psiFile.getVirtualFile(), outline.getCodeOffset());
     int endOffset = das.getConvertedOffset(psiFile.getVirtualFile(), outline.getCodeOffset() + outline.getCodeLength());
-    return findBestPsiElementForRange(psiFile, TextRange.create(startOffset, endOffset));
-  }
+    TextRange outlineRange = TextRange.create(startOffset, endOffset);
 
-  static @Nullable PsiElement findBestPsiElementForRange(@NotNull PsiFile psiFile, @NotNull TextRange outlineRange) {
-      int startOffset = outlineRange.getStartOffset();
-      int endOffset = outlineRange.getEndOffset();
-      PsiElement element = psiFile.findElementAt(startOffset);
-
-      while ((element instanceof PsiComment || element instanceof PsiWhiteSpace) && element.getTextRange().getEndOffset() < endOffset) {
-          PsiElement next = element.getNextSibling();
-          if (next != null) {
-              element = PsiTreeUtil.getDeepestFirst(next);
-          } else {
-              break;
-          }
+    PsiElement element = psiFile.findElementAt(startOffset);
+    while ((element instanceof PsiComment || element instanceof PsiWhiteSpace) && element.getTextRange().getEndOffset() < endOffset) {
+      PsiElement next = element.getNextSibling();
+      if (next != null) {
+        element = PsiTreeUtil.getDeepestFirst(next);
       }
-
-      if (element != null) {
-          while (!(element instanceof PsiFile) && element.getParent() != null && outlineRange.contains(element.getParent().getTextRange())) {
-              element = element.getParent();
-          }
+      else {
+        break;
       }
+    }
 
-      return element;
+    if (element != null) {
+      while (!(element instanceof PsiFile) && element.getParent() != null && outlineRange.contains(element.getParent().getTextRange())) {
+        element = element.getParent();
+      }
+    }
+
+    return element;
   }
 }
