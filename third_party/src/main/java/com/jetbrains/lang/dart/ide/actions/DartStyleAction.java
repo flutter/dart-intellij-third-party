@@ -3,8 +3,8 @@ package com.jetbrains.lang.dart.ide.actions;
 
 import com.intellij.CommonBundle;
 import com.intellij.application.options.CodeStyle;
+import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
-
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.diagnostic.Logger;
@@ -30,6 +30,7 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartLanguage;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.lsp.DartLspFormattingRouting;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -40,8 +41,29 @@ import java.util.Map;
 
 import static com.intellij.openapi.util.text.StringUtil.isWhiteSpace;
 
+/**
+ * Legacy built-in formatting action used when experimental LSP is disabled.
+ * The public {@code runDartfmt} compatibility API remains available independently of that setting.
+ * @deprecated Use the registered Dart formatting action or standard Reformat Code instead.
+ */
+@Deprecated
 public class DartStyleAction extends AbstractDartFileProcessingAction {
   private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartStyleAction.class);
+
+  @Override
+  public void update(@NotNull AnActionEvent event) {
+    if (event.getProject() != null && DartConfigurable.isExperimentalLspFeaturesEnabled(event.getProject())) {
+      event.getPresentation().setEnabledAndVisible(false);
+      return;
+    }
+    super.update(event);
+  }
+
+  @Override
+  public void actionPerformed(@NotNull AnActionEvent event) {
+    if (event.getProject() != null && DartConfigurable.isExperimentalLspFeaturesEnabled(event.getProject())) return;
+    super.actionPerformed(event);
+  }
 
   @Override
   protected @NotNull String getActionTextForEditor() {
@@ -157,6 +179,7 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
 
   @Override
   protected void runOverFiles(final @NotNull Project project, final @NotNull List<VirtualFile> dartFiles) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) return;
     if (dartFiles.isEmpty()) {
       Messages
         .showInfoMessage(project, DartBundle.message("dart.style.files.no.dart.files"), DartBundle.message("action.Dart.DartStyle.text"));
@@ -172,7 +195,11 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
     runDartfmt(project, dartFiles);
   }
 
-  // keep public to be accessible in 3rd party plugins
+  /**
+   * Legacy compatibility API for third-party plugins; intentionally independent of the LSP feature flag.
+   * @deprecated Built-in actions should use the platform formatting pipeline instead.
+   */
+  @Deprecated
   public static void runDartfmt(final @NotNull Project project, final @NotNull List<? extends VirtualFile> dartFiles) {
     final Map<VirtualFile, String> fileToNewContentMap = new HashMap<>();
     final int lineLength = getRightMargin(project);

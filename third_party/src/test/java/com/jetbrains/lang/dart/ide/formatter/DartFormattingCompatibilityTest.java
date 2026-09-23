@@ -13,12 +13,14 @@ import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl;
 import com.google.dart.server.internal.remote.RequestSink;
 import com.google.dart.server.internal.remote.ResponseStream;
 import com.intellij.application.options.CodeStyle;
+import com.intellij.openapi.actionSystem.*;
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.TestDialog;
 import com.intellij.openapi.ui.TestDialogManager;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
@@ -64,6 +66,7 @@ public class DartFormattingCompatibilityTest extends DartCodeInsightFixtureTestC
   public void testDirectEditorRoutingChangesOnlyWhenLegacyOwnsFormatting() {
     Document document = configure("void main(){bad();}");
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), false);
+    myFixture.getEditor().getSelectionModel().setSelection(12, 17);
     exposedAction().runEditor(getProject(), myFixture.getEditor(), myFixture.getFile());
     assertEquals("void main() {\n  formatted();\n}", document.getText());
     assertEquals(1, formattedRequests.size());
@@ -112,7 +115,7 @@ public class DartFormattingCompatibilityTest extends DartCodeInsightFixtureTestC
     assertEquals(1, formattedRequests.size());
   }
 
-  public void testPublicAndBatchFormattingKeepPartialSuccessUnderLspFlag() {
+  public void testPublicFormattingKeepsPartialSuccessUnderLspFlag() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
     VirtualFile success = myFixture.addFileToProject("lib/success.dart", "void main(){bad();}").getVirtualFile();
     VirtualFile failure = myFixture.addFileToProject("lib/failure.dart", "void main(){broken").getVirtualFile();
@@ -121,10 +124,40 @@ public class DartFormattingCompatibilityTest extends DartCodeInsightFixtureTestC
     assertEquals("void main(){broken", getDocument(failure).getText());
     assertEquals(2, formattedRequests.size());
 
-    formattedRequests.clear();
-    withOkDialog(() -> exposedAction().runFiles(getProject(), List.of(success)));
-    assertEquals("void main() {\n  formatted();\n}", getDocument(success).getText());
+  }
+
+  public void testLegacyBatchEntryPointCannotRunWithLspEnabled() {
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    VirtualFile file = myFixture.addFileToProject("lib/batch.dart", "void main(){bad();}").getVirtualFile();
+    withOkDialog(() -> exposedAction().runFiles(getProject(), List.of(file)));
+    assertEquals("void main(){bad();}", getDocument(file).getText());
+    assertTrue(formattedRequests.isEmpty());
+  }
+
+  public void testLegacyBatchStillRunsWithLspDisabled() {
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), false);
+    VirtualFile file = myFixture.addFileToProject("lib/batch.dart", "void main(){bad();}").getVirtualFile();
+    withOkDialog(() -> exposedAction().runFiles(getProject(), List.of(file)));
+    assertEquals("void main() {\n  formatted();\n}", getDocument(file).getText());
     assertEquals(1, formattedRequests.size());
+  }
+
+  public void testRegisteredLspActionNeverFallsBackToLegacyOnDirectInvocation() {
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    Document document = configure("void main(){bad();}");
+    var action = ActionManager.getInstance().getAction("Dart.DartStyle");
+    VirtualFile file = myFixture.getFile().getVirtualFile();
+    for (boolean includeEditor : new boolean[]{false, true}) {
+      for (String place : new String[]{ActionPlaces.PROJECT_VIEW_POPUP, ActionPlaces.EDITOR_POPUP}) {
+        var context = SimpleDataContext.builder().add(CommonDataKeys.PROJECT, getProject())
+          .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{file});
+        if (includeEditor) context.add(CommonDataKeys.EDITOR, myFixture.getEditor());
+        var event = AnActionEvent.createEvent(action, context.build(), null, place, ActionUiKind.NONE, null);
+        withOkDialog(() -> action.actionPerformed(event));
+        assertEquals("void main(){bad();}", document.getText());
+        assertTrue(formattedRequests.isEmpty());
+      }
+    }
   }
 
   public void testSdkDisabledPostProcessorDoesNotRequestFormatting() {

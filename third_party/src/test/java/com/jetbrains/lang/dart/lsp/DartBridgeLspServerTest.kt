@@ -9,15 +9,15 @@ import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.Consumer
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
 import com.google.dart.server.ResponseListener
-import com.google.dart.server.UpdateContentConsumer
 import com.google.dart.server.ShowMessageRequestConsumer
+import com.google.dart.server.UpdateContentConsumer
 import com.google.dart.server.internal.remote.ByteLineReaderStream
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
 import com.google.gson.JsonObject
-import com.intellij.openapi.editor.impl.DocumentImpl
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.impl.DocumentImpl
 import com.intellij.platform.dartlsp.util.applyTextEdits
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService

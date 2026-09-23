@@ -28,12 +28,12 @@ final class DartPostFormatProcessor implements PostFormatProcessor {
   public @NotNull TextRange processText(final @NotNull PsiFile psiFile,
                                         final @NotNull TextRange rangeToReformat,
                                         final @NotNull CodeStyleSettings settings) {
-    if (!isApplicable(psiFile)) return rangeToReformat;
     final VirtualFile vFile = psiFile.getVirtualFile();
     if (vFile != null && DartLspFormattingRouting.isLspOwnedEditorFormatting(psiFile.getProject(), vFile)) {
       return rangeToReformat;
     }
 
+    if (!isApplicable(psiFile)) return rangeToReformat;
     return DartStyleAction.reformatRangeAsPostFormatProcessor(psiFile, rangeToReformat);
   }
 

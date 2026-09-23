@@ -6,8 +6,8 @@ package com.jetbrains.lang.dart.lsp;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.platform.dartlsp.api.customization.LspFormattingDisabled;
 import com.intellij.platform.dartlsp.api.customization.LspFormattingSupport;
-import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
 import com.intellij.testFramework.LightVirtualFile;
+import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 
 import java.util.concurrent.atomic.AtomicInteger;

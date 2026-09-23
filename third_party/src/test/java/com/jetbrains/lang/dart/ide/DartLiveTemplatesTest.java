@@ -13,8 +13,8 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
-import com.jetbrains.lang.dart.util.DartTestUtils;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
+import com.jetbrains.lang.dart.util.DartTestUtils;
 
 /**
  * Test the Dart live templates.
