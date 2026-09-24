@@ -132,6 +132,7 @@ These skills are located in the [.agents/skills/](.agents/skills/) directory. Th
 * **[Code Review](.agents/skills/code-review/SKILL.md):** Performs a pedantic, multi-perspective code review (covering logic, correctness, resource safety, design, and styleguide compliance) on your uncommitted changes.
 * **[Dependabot PR Review](.agents/skills/dependabot-pr-review/SKILL.md):** Lists open Dependabot PRs in the Dart and Flutter IntelliJ plugins with their build status, then approves the ones you confirm and applies the `autosubmit` label.
 * **[Implement Dart Language Feature](.agents/skills/implement-dart-language-feature/SKILL.md):** Guidelines for implementing and reviewing new Dart language features, parsing logic, and grammar modifications.
+* **[Load Repository Context](.agents/skills/load-repo-context/SKILL.md):** Primes understanding of repository architecture by navigating hierarchical ABOUT.md manifests.
 * **[Migrate DAS to LSP](.agents/skills/migrate-das-to-lsp/SKILL.md):** Guide for converting legacy Dart Analysis Server (DAS) feature implementations to JetBrains LSP in the Dart IntelliJ plugin.
 * **[Monthly Release](.agents/skills/monthly-release/SKILL.md):** Step-by-step guide for preparing, validating, testing, and publishing monthly releases of the Dart IntelliJ plugin.
 * **[Patch Copied LSP Sources](.agents/skills/patch-copied-lsp-sources/SKILL.md):** Automates copying and patching of JetBrains LSP sources.
