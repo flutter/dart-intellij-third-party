@@ -30,6 +30,7 @@ import org.dartlang.analysis.server.protocol.MessageAction
 class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
 
     private var previousLogger: Logger? = null
+    private var previousSdkVersion: String? = null
 
     override fun tearDown() {
         try {
@@ -40,7 +41,7 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
             } catch (e: Throwable) {
                 addSuppressedException(e)
             }
-            setServerVersion("")
+            previousSdkVersion?.let { setSdkVersion(it) }
         } catch (e: Throwable) {
             addSuppressedException(e)
         } finally {
@@ -48,11 +49,13 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         }
     }
 
-    /** The protocol version is only known once the server is connected, so fake it here. */
-    private fun setServerVersion(version: String) {
-        val field = DartAnalysisServerService::class.java.getDeclaredField("myServerVersion")
+    /** Fakes the version of the SDK that the running server was started from. */
+    private fun setSdkVersion(version: String) {
+        val service = DartAnalysisServerService.getInstance(project)
+        val field = DartAnalysisServerService::class.java.getDeclaredField("mySdkVersion")
             .apply { isAccessible = true }
-        field.set(DartAnalysisServerService.getInstance(project), version)
+        if (previousSdkVersion == null) previousSdkVersion = field.get(service) as String
+        field.set(service, version)
     }
 
     /** Installs a logger that rethrows, the way the logger of IntelliJ rethrows control flow exceptions. */
@@ -291,15 +294,16 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         }
     }
 
-    fun testTheConfigurationNotificationIsGatedOnTheServerProtocolVersion() {
-        // The protocol version of the server, not the version of the Dart SDK: an older server
+    fun testTheConfigurationNotificationIsGatedOnTheSdkVersion() {
+        // 3.14.0-258.0.dev is the first Dart SDK with dart-lang/sdk@6700ccc4316; an older server
         // cannot handle a notification from the client and logs it as an error.
-        assertFalse(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration(""))
-        assertFalse(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.40.0"))
-        // A bugfix release of the last protocol version before the floor is still below it.
-        assertFalse(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.40.1"))
-        assertTrue(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.41.0"))
-        assertTrue(DartAnalysisServerService.isServerProtocolVersionSufficientForLspConfiguration("1.42.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspInlayHintsConfiguration("3.14.0-258.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspInlayHintsConfiguration("3.14.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspInlayHintsConfiguration("3.15.0-1.0.dev"))
+
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspInlayHintsConfiguration(""))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspInlayHintsConfiguration("3.14.0-257.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspInlayHintsConfiguration("3.13.0"))
     }
 
     fun testDartAnalysisServerImplSuppliesTheInlayHintSettings() {
@@ -323,7 +327,7 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         // pulls workspace/configuration while it starts up, and it blocks its initialization until
         // it gets an answer. An answer without the settings would make it compute the hints of
         // every category, so the settings the user made are honoured as far as the old server can.
-        setServerVersion("1.40.1")
+        setSdkVersion("3.14.0-257.0.dev")
         val server = DartAnalysisServerImpl(project, createStubSocket())
 
         var configurations: List<JsonObject?>? = null

@@ -185,16 +185,14 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
   public static final String MIN_LSP_CLOSING_LABELS_SDK_VERSION = "3.14.0-219.0.dev";
+  // The first Dart SDK with dart-lang/sdk@6700ccc4316 (Analysis Server API 1.41.0), which accepts
+  // `workspace/didChangeConfiguration` from the client as an `lsp.notification`. An older server
+  // logs that notification as an error, so it must not be sent at all.
+  public static final String MIN_LSP_INLAY_HINTS_CONFIGURATION_SDK_VERSION = "3.14.0-258.0.dev";
   // Although textDocument/codeAction was added in 3.9.0-122.0.dev, we match
   // MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION because LSP quick fixes in the JetBrains LSP client
   // depend on publishDiagnostics notifications.
   public static final String MIN_LSP_CODE_ACTIONS_SDK_VERSION = MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION;
-
-  // This refers to the Analysis Server API version (from `server.connected`), not a Dart SDK
-  // version: only from this protocol version on does the server accept the `lsp.notification`
-  // notification, which is how `workspace/didChangeConfiguration` reaches it. An older server
-  // logs that notification as an error, so it must not be sent at all.
-  private static final String MIN_LSP_CONFIGURATION_SERVER_PROTOCOL_VERSION = "1.41.0";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -238,10 +236,10 @@ public final class DartAnalysisServerService implements Disposable {
   private @Nullable RemoteAnalysisServerImpl myServer;
   private @Nullable StdioServerSocket myServerSocket;
 
-  // Written on the response reader thread of the server (serverConnected), read from the thread
-  // that computes the inlay hints, see DartLspConfigurationSync.
-  private volatile @NotNull String myServerVersion = "";
-  private @NotNull String mySdkVersion = "";
+  private @NotNull String myServerVersion = "";
+  // Written when the server starts or stops, read from the thread that computes the inlay hints,
+  // see DartLspConfigurationSync.
+  private volatile @NotNull String mySdkVersion = "";
   private @Nullable String mySdkHome;
 
   private final DartServerRootsHandler myRootsHandler;
@@ -689,16 +687,17 @@ public final class DartAnalysisServerService implements Disposable {
     return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_INLAY_HINTS_SDK_VERSION) >= 0;
   }
 
-  public static boolean isServerProtocolVersionSufficientForLspConfiguration(@NotNull String serverVersion) {
-    return StringUtil.compareVersionNumbers(serverVersion, MIN_LSP_CONFIGURATION_SERVER_PROTOCOL_VERSION) >= 0;
+  public static boolean isDartSdkVersionSufficientForLspInlayHintsConfiguration(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_INLAY_HINTS_CONFIGURATION_SDK_VERSION) >= 0;
   }
 
   /**
    * Whether the running server can be told that the configuration has changed, see
-   * {@link com.jetbrains.lang.dart.lsp.DartLspConfigurationSync}.
+   * {@link com.jetbrains.lang.dart.lsp.DartLspConfigurationSync}. Checks the SDK that the running
+   * server was started from, because that is the server the notification goes to.
    */
   public boolean isLspConfigurationNotificationSupported() {
-    return isServerProtocolVersionSufficientForLspConfiguration(myServerVersion);
+    return isDartSdkVersionSufficientForLspInlayHintsConfiguration(mySdkVersion);
   }
 
   public static boolean isLspInlayHintsEnabled(final @NotNull Project project) {

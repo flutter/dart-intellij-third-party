@@ -36,8 +36,9 @@ import java.util.concurrent.Future
 class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
 
     /** The first protocol version of the server that understands a notification from the client. */
-    private val newServerVersion = "1.41.0"
-    private val oldServerVersion = "1.40.0"
+    private val newSdkVersion = "3.14.0-258.0.dev"
+    private val oldSdkVersion = "3.14.0-257.0.dev"
+    private var previousSdkVersion: String? = null
 
     private val state = DartLspConfigurationPushState()
     private val capturedNotifications = CopyOnWriteArrayList<JsonObject>()
@@ -85,7 +86,7 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
 
         bridgeServer = DartBridgeLspServer(project)
         connectBridgeToTheManager(bridgeServer)
-        setServerVersion(newServerVersion)
+        setSdkVersion(newSdkVersion)
 
         // The real refresh needs the EDT, a daemon and open editors; what matters here is when it
         // is asked for.
@@ -99,7 +100,7 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
             if (::scheduleRealRefresh.isInitialized) {
                 DartLspConfigurationSync.getInstance(project).refreshInlayHints = scheduleRealRefresh
             }
-            setServerVersion("")
+            previousSdkVersion?.let { setSdkVersion(it) }
             connectBridgeToTheManager(null)
             if (::bridgeServer.isInitialized) {
                 bridgeServer.stop()
@@ -125,11 +126,13 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
         override fun stop() {}
     }
 
-    /** The protocol version is only known once the server is connected, so fake it here. */
-    private fun setServerVersion(version: String) {
-        val field = DartAnalysisServerService::class.java.getDeclaredField("myServerVersion")
+    /** Fakes the version of the SDK that the running server was started from. */
+    private fun setSdkVersion(version: String) {
+        val service = DartAnalysisServerService.getInstance(project)
+        val field = DartAnalysisServerService::class.java.getDeclaredField("mySdkVersion")
             .apply { isAccessible = true }
-        field.set(DartAnalysisServerService.getInstance(project), version)
+        if (previousSdkVersion == null) previousSdkVersion = field.get(service) as String
+        field.set(service, version)
     }
 
     /**
@@ -329,7 +332,7 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testTheSettingsAreNotPushedToAServerThatCannotHandleTheNotification() {
-        setServerVersion(oldServerVersion)
+        setSdkVersion(oldSdkVersion)
         enableTypeHints()
         val sync = DartLspConfigurationSync.getInstance(project)
         sync.configurationSentToServer(currentSection())
