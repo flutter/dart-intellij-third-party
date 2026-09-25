@@ -8,6 +8,7 @@
 - Quick fixes, assists, source actions, and refactorings via LSP code actions (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#526)
 
 ### Changed
+- Syntax highlighting implemented with JetBrains LSP as an experimental feature (#401)
 
 ### Removed
 
