@@ -44,10 +44,12 @@ public class DartReformatAction extends AnAction implements DumbAware {
       return;
     }
     // CodeFormatGroup already contains the standard Reformat Code action.
-    PsiFile file = ActionPlaces.MAIN_MENU.equals(event.getPlace()) ? null : getLspEditorFile(event);
-    event.getPresentation().setText(reformatText());
-    event.getPresentation().setDescription(ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_REFORMAT)
-                                           .getTemplatePresentation().getDescription());
+    AnAction reformatAction = getStandardReformatAction();
+    PsiFile file = reformatAction == null || ActionPlaces.MAIN_MENU.equals(event.getPlace()) ? null : getLspEditorFile(event);
+    event.getPresentation().setText(reformatText(reformatAction));
+    if (reformatAction != null) {
+      event.getPresentation().setDescription(reformatAction.getTemplatePresentation().getDescription());
+    }
     event.getPresentation().setVisible(file != null);
     FormattingService service = file == null ? null : getLspFormattingService();
     event.getPresentation().setEnabled(service != null && service.canFormat(file));
@@ -83,7 +85,7 @@ public class DartReformatAction extends AnAction implements DumbAware {
   }
 
   void performStandardReformat(@NotNull AnActionEvent event) {
-    AnAction reformatAction = ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_REFORMAT);
+    AnAction reformatAction = getStandardReformatAction();
     if (reformatAction == null) return;
     AnActionEvent reformatEvent = AnActionEvent.createEvent(reformatAction, event.getDataContext(), null, event.getPlace(),
                                                           ActionUiKind.NONE, event.getInputEvent());
@@ -103,7 +105,11 @@ public class DartReformatAction extends AnAction implements DumbAware {
            DartLspFormattingRouting.isLspOwnedEditorFormatting(project, file.getVirtualFile()) ? file : null;
   }
 
-  private static String reformatText() {
-    return ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_REFORMAT).getTemplatePresentation().getText();
+  private static @Nullable AnAction getStandardReformatAction() {
+    return ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_REFORMAT);
+  }
+
+  private static String reformatText(@Nullable AnAction reformatAction) {
+    return reformatAction != null ? reformatAction.getTemplatePresentation().getText() : DartBundle.message("action.Dart.DartStyle.text");
   }
 }
