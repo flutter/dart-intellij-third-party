@@ -11,6 +11,7 @@ import com.intellij.psi.codeStyle.CommonCodeStyleSettings;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.DartLanguage;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.jetbrains.annotations.NotNull;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
@@ -247,17 +248,20 @@ public class DartTypingTest extends DartCodeInsightFixtureTestCase {
   }
 
   public void testEnterInSwitch() {
-    doTypingTest('\n',
-                 """
-                   void bar() {
-                     switch (1) {<caret>
-                   }""",
-                 """
-                   void bar() {
-                     switch (1) {
-                       <caret>
-                     }
-                   }""");
+    for (boolean lspEnabled : new boolean[]{false, true}) {
+      DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), lspEnabled);
+      doTypingTest('\n',
+                   """
+                     void bar() {
+                       switch (1) {<caret>
+                     }""",
+                   """
+                     void bar() {
+                       switch (1) {
+                         <caret>
+                       }
+                     }""");
+    }
   }
 
   public void testEnterAfterCase() {

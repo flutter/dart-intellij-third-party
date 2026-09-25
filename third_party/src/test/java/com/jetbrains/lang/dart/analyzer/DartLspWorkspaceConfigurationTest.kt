@@ -58,6 +58,17 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
         field.set(service, version)
     }
 
+    /** Prevents expected configuration failures from failing the test through IntelliJ's logger. */
+    private fun installExpectedFailureLogger() {
+        previousLogger = Logging.getLogger()
+        Logging.setLogger(object : Logger {
+            override fun logError(message: String?) {}
+            override fun logError(message: String?, exception: Throwable) {}
+            override fun logInformation(message: String?) {}
+            override fun logInformation(message: String?, exception: Throwable?) {}
+        })
+    }
+
     /** Installs a logger that rethrows, the way the logger of IntelliJ rethrows control flow exceptions. */
     private fun installRethrowingLogger() {
         previousLogger = Logging.getLogger()
@@ -190,6 +201,7 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testAnswerIsSentEvenIfTheConfigurationCannotBeComputed() {
+        installExpectedFailureLogger()
         // An unanswered request blocks the initialization of the server, so a failure to compute the
         // configuration must still result in an answer that lets the server use its defaults.
         val server = object : TestRemoteAnalysisServer(createStubSocket()) {
@@ -213,6 +225,7 @@ class DartLspWorkspaceConfigurationTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testAnswerIsSentEvenIfComputingTheConfigurationFailsWithAnError() {
+        installExpectedFailureLogger()
         // The reader loop of the server swallows every Throwable, so an Error (a NoClassDefFoundError
         // while the plugin is being unloaded, an AssertionError) would leave the request unanswered
         // just like a RuntimeException does, and the server would never finish its initialization.

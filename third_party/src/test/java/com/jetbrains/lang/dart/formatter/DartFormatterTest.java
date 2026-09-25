@@ -15,6 +15,12 @@ import com.jetbrains.lang.dart.util.DartTestUtils;
 public class DartFormatterTest extends FormatterTestCase {
 
   @Override
+  protected void setUp() throws Exception {
+    super.setUp();
+    com.jetbrains.lang.dart.sdk.DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), false);
+  }
+
+  @Override
   protected String getFileExtension() {
     return DartFileType.DEFAULT_EXTENSION;
   }
@@ -179,5 +185,10 @@ public class DartFormatterTest extends FormatterTestCase {
 
   public void testConstructorsWithoutNew() throws Exception {
     doTest();
+  }
+
+  public void testLspFlagPreservesLegacyFormatterForUnmigratedConsumers() throws Exception {
+    com.jetbrains.lang.dart.sdk.DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    doTextTest("void main(){\nprint('hello');\n}", "void main() {\n  print('hello');\n}");
   }
 }

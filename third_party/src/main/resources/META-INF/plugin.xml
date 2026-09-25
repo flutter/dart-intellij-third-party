@@ -345,7 +345,7 @@
     </action>
     <action id="Dart.Analyzer.Diagnostics" class="com.jetbrains.lang.dart.ide.errorTreeView.AnalysisServerDiagnosticsAction">
     </action>
-    <action id="Dart.DartStyle" class="com.jetbrains.lang.dart.ide.actions.DartStyleAction">
+    <action id="Dart.DartStyle" class="com.jetbrains.lang.dart.ide.actions.DartReformatAction">
       <add-to-group group-id="CodeFormatGroup" anchor="last"/>
       <add-to-group group-id="EditorPopupMenu" relative-to-action="EditorPopupMenu1" anchor="after"/>
       <add-to-group group-id="ProjectViewPopupMenuModifyGroup" anchor="before" relative-to-action="$Delete"/>
