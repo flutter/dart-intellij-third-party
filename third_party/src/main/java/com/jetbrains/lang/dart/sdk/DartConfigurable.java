@@ -382,9 +382,6 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
         }
 
         setWebdevPort(myProject, myPortField.getNumber());
-        if (initialExperimentalEnabled == currentExperimentalEnabled) {
-          setExperimentalLspFeaturesEnabled(myProject, currentExperimentalEnabled);
-        }
       }
       else {
         if (!myModulesWithDartSdkLibAttachedInitial.isEmpty() && mySdkInitial != null) {
