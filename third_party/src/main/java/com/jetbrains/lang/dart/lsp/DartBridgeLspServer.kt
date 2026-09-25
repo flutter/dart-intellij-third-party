@@ -110,6 +110,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         private val logger = PluginLogger.createLogger(DartBridgeLspServer::class.java)
         private const val LSP_MESSAGE_KEY = "lspMessage"
         private const val LSP_NOTIFICATION_KEY = "lspNotification"
+        private const val LSP_NOTIFICATION_EVENT = "lsp.notification"
         private const val LSP_RESPONSE_KEY = "lspResponse"
         private const val JSONRPC_VERSION = "2.0"
         
@@ -549,31 +550,39 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     /**
      * Forwards an LSP notification to the legacy DAS.
      *
-     * It wraps the LSP notification in a legacy DAS `lsp.handle` request.
-     * Since LSP notifications do not expect a response, we do not register a future to track it.
-     * DAS will still return a dummy legacy response acknowledging the `lsp.handle` request,
-     * which we will receive and safely ignore (as no pending request will match its ID).
+     * It wraps the LSP notification in a legacy `lsp.notification` notification - the same envelope
+     * the server uses for the notifications it sends to us, see [forwardNotificationToClient].
+     * An `lsp.handle` request would not do: that is a legacy request, and the server answers every
+     * request, while an LSP notification has no response to answer with.
+     *
+     * Returns whether the notification was handed to the analysis server. A notification is not
+     * answered, so that is as much as the caller can be told - and it has to be told, because a
+     * caller that tracks what the server knows would otherwise wait forever for an effect that
+     * never comes.
      */
-    private fun forwardNotification(method: String, params: Any) {
-        val legacyId = das.generateUniqueId()
+    internal fun forwardNotification(method: String, params: Any): Boolean {
         val lspNotification = JsonObject().apply {
             addProperty("jsonrpc", JSONRPC_VERSION)
             addProperty("method", method)
             add("params", GSON.toJsonTree(params))
         }
 
-        val legacyRequest = JsonObject().apply {
-            addProperty("id", legacyId)
-            addProperty("method", "lsp.handle")
+        val legacyNotification = JsonObject().apply {
+            addProperty("event", LSP_NOTIFICATION_EVENT)
             add("params", JsonObject().apply {
-                add("lspMessage", lspNotification)
+                add(LSP_NOTIFICATION_KEY, lspNotification)
             })
         }
 
-        try {
-            das.sendRequest(legacyId, legacyRequest)
+        return try {
+            // A server that is going away is not a plugin bug, so this must not be logged as an
+            // error: that raises an IDE fatal-error notification in internal and EAP builds.
+            das.sendNotification(legacyNotification).also {
+                if (!it) logger.warn("No analysis server to send the notification to: $legacyNotification")
+            }
         } catch (e: Exception) {
-            logger.error("Failed to send notification to DAS for method: $method", e)
+            logger.warn("Failed to send notification to DAS for method: $method", e)
+            false
         }
     }
 

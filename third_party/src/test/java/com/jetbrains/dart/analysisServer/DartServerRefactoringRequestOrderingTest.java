@@ -5,6 +5,7 @@ package com.jetbrains.dart.analysisServer;
 
 import com.google.dart.server.AnalysisServerSocket;
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer;
+import com.google.dart.server.DartLspWorkspaceConfigurationConsumer;
 import com.google.dart.server.GetRefactoringConsumer;
 import com.google.dart.server.ShowMessageRequestConsumer;
 import com.google.dart.server.UpdateContentConsumer;
@@ -252,6 +253,10 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
 
     @Override
     public void lsp_workspaceApplyEdit(DartLspApplyWorkspaceEditParams params, DartLspWorkspaceApplyEditRequestConsumer consumer) {
+    }
+
+    @Override
+    public void lsp_workspaceConfiguration(List<String> sections, DartLspWorkspaceConfigurationConsumer consumer) {
     }
 
     @Override

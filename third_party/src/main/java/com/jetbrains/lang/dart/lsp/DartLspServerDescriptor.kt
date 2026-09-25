@@ -170,7 +170,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val foldingRangeCustomizer = LspFoldingRangeDisabled
         override val inlayHintCustomizer: LspInlayHintCustomizer
             get() = if (DartAnalysisServerService.isLspInlayHintsEnabled(project)) {
-                DartLspInlayHintSupport()
+                DartLspInlayHintSupport(project)
             } else {
                 LspInlayHintDisabled
             }

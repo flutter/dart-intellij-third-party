@@ -16,6 +16,9 @@ import com.intellij.psi.PsiFile
 class DartParameterNamesInlayHintsProvider : InlayHintsProvider {
   companion object {
     const val PROVIDER_ID: String = "dart.parameter.names"
+
+    /** Option id of the "Only for literal arguments" sub-checkbox, see plugin.xml. */
+    const val ONLY_LITERAL_OPTION_ID: String = "dart.parameter.names.only.literal"
   }
 
   override fun createCollector(file: PsiFile, editor: Editor): InlayHintsCollector? = null
