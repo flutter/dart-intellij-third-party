@@ -115,6 +115,14 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         }
 
     override val lspCustomization: LspCustomization = object : LspCustomization() {
+        private val lspFormattingSupport = object : LspFormattingSupport() {
+            override fun shouldFormatThisFileExclusivelyByServer(
+                file: VirtualFile,
+                ideCanFormatThisFileItself: Boolean,
+                serverExplicitlyWantsToFormatThisFile: Boolean
+            ): Boolean = DartLspFormattingRouting.isLspOwnedEditorFormatting(project, file)
+        }
+
         override val hoverCustomizer = LspHoverSupport()
         
         override val goToDefinitionCustomizer: LspGoToDefinitionCustomizer
@@ -146,13 +154,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             }
         override val formattingCustomizer: LspFormattingCustomizer
             get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-                object : LspFormattingSupport() {
-                    override fun shouldFormatThisFileExclusivelyByServer(
-                        file: VirtualFile,
-                        ideCanFormatThisFileItself: Boolean,
-                        serverExplicitlyWantsToFormatThisFile: Boolean
-                    ): Boolean = DartLspFormattingRouting.isLspOwnedEditorFormatting(project, file)
-                }
+                lspFormattingSupport
             } else {
                 LspFormattingDisabled
             }
