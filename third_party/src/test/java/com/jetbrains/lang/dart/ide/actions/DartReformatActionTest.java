@@ -84,54 +84,67 @@ public class DartReformatActionTest extends DartCodeInsightFixtureTestCase {
     }
   }
 
-  public void testLspDispatchesSelectionAndDocumentToFormattingService() {
+  public void testLspDelegatesToStandardReformatPreservingSelection() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
     RecordingFormatter formatter = new RecordingFormatter();
-    DartReformatAction action = actionWithFormatter(formatter);
+    RecordingReformatAction action = new RecordingReformatAction(formatter);
     AnActionEvent event = event(ActionPlaces.EDITOR_POPUP, true);
     action.update(event);
     assertTrue(event.getPresentation().isEnabled());
 
     myFixture.getEditor().getSelectionModel().setSelection(12, 26);
     action.actionPerformed(event);
-    assertEquals(List.of(new TextRange(12, 26)), formatter.ranges);
-    formatter.ranges.clear();
+    assertSame(event, action.lastEvent);
+    assertEquals(List.of(new TextRange(12, 26)), action.selections);
+
     myFixture.getEditor().getSelectionModel().removeSelection();
     action.actionPerformed(event);
-    TextRange wholeDocument = TextRange.from(0, myFixture.getEditor().getDocument().getTextLength());
-    assertEquals(List.of(wholeDocument), formatter.ranges);
+    assertEquals(2, action.selections.size());
+    assertNull("No selection must remain distinct from Select All", action.selections.get(1));
 
-    formatter.ranges.clear();
+    TextRange wholeDocument = TextRange.from(0, myFixture.getEditor().getDocument().getTextLength());
     myFixture.getEditor().getSelectionModel().setSelection(wholeDocument.getStartOffset(), wholeDocument.getEndOffset());
-    assertTrue(myFixture.getEditor().getSelectionModel().hasSelection());
     action.actionPerformed(event);
-    // Select All intentionally passes the same bounds as no selection. The platform LSP service
-    // classifies these full-document bounds as document formatting, not range formatting.
-    assertEquals(List.of(wholeDocument), formatter.ranges);
+    assertEquals(3, action.selections.size());
+    assertEquals(wholeDocument, action.selections.get(2));
   }
 
   public void testDirectProjectInvocationCannotReachAvailableLspFormatter() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
     RecordingFormatter formatter = new RecordingFormatter();
-    actionWithFormatter(formatter).actionPerformed(event(ActionPlaces.PROJECT_VIEW_POPUP, true,
-                                                        myFixture.getFile().getVirtualFile()));
-    assertTrue(formatter.ranges.isEmpty());
+    RecordingReformatAction action = new RecordingReformatAction(formatter);
+    action.actionPerformed(event(ActionPlaces.PROJECT_VIEW_POPUP, true, myFixture.getFile().getVirtualFile()));
+    assertTrue(action.selections.isEmpty());
+    assertNull(action.lastEvent);
   }
 
-  private DartReformatAction actionWithFormatter(FormattingService formatter) {
-    return new DartReformatAction() {
-      @Override FormattingService getLspFormattingService() { return formatter; }
-    };
+  private static class RecordingReformatAction extends DartReformatAction {
+    private final FormattingService formatter;
+    private final List<TextRange> selections = new ArrayList<>();
+    private AnActionEvent lastEvent;
+
+    private RecordingReformatAction(FormattingService formatter) {
+      this.formatter = formatter;
+    }
+
+    @Override FormattingService getLspFormattingService() { return formatter; }
+
+    @Override void performStandardReformat(AnActionEvent event) {
+      lastEvent = event;
+      var editor = event.getData(CommonDataKeys.EDITOR);
+      assertNotNull(editor);
+      var selection = editor.getSelectionModel();
+      selections.add(selection.hasSelection() ? new TextRange(selection.getSelectionStart(), selection.getSelectionEnd()) : null);
+    }
   }
 
-  /** Records the action/service boundary; actual LSP method forwarding is covered by bridge tests. */
+  /** Makes LSP formatting available without allowing the action to bypass standard reformat. */
   private static class RecordingFormatter extends AbstractDocumentFormattingService {
-    private final List<TextRange> ranges = new ArrayList<>();
     @Override public Set<Feature> getFeatures() { return Set.of(Feature.FORMAT_FRAGMENTS); }
     @Override public boolean canFormat(PsiFile file) { return true; }
     @Override public void formatDocument(Document document, List<TextRange> ranges, FormattingContext context,
                                          boolean canChangeWhiteSpaceOnly, boolean quickFormat) {
-      this.ranges.addAll(ranges);
+      junit.framework.Assert.fail("The Dart action must delegate to standard reformat, not invoke the formatting service directly");
     }
   }
 

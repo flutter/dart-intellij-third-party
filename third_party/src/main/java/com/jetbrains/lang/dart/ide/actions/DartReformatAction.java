@@ -4,17 +4,14 @@
 package com.jetbrains.lang.dart.ide.actions;
 
 import com.intellij.codeInsight.hint.HintManager;
-import com.intellij.formatting.FormatTextRanges;
 import com.intellij.formatting.service.FormattingService;
 import com.intellij.formatting.service.FormattingServiceUtil;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.ReadonlyStatusHandler;
 import com.intellij.platform.dartlsp.impl.features.formatter.LspFormattingService;
 import com.intellij.psi.PsiDocumentManager;
@@ -68,10 +65,10 @@ public class DartReformatAction extends AnAction implements DumbAware {
     Editor editor = event.getData(CommonDataKeys.EDITOR);
     if (file == null || editor == null) return; // Also guards project popups carrying an editor.
     Analytics.report(AnalyticsData.forAction(this, event));
-    formatWithLsp(project, editor, file);
+    formatWithLsp(event, project, editor, file);
   }
 
-  private void formatWithLsp(Project project, Editor editor, PsiFile file) {
+  private void formatWithLsp(AnActionEvent event, Project project, Editor editor, PsiFile file) {
     FormattingService service = getLspFormattingService();
     if (service == null || !service.canFormat(file)) {
       ApplicationManager.getApplication().invokeLater(() -> {
@@ -82,14 +79,15 @@ public class DartReformatAction extends AnAction implements DumbAware {
     }
     if (!ReadonlyStatusHandler.ensureDocumentWritable(project, editor.getDocument())) return;
     PsiDocumentManager.getInstance(project).commitDocument(editor.getDocument());
-    var selection = editor.getSelectionModel();
-    TextRange range = selection.hasSelection()
-                      ? new TextRange(selection.getSelectionStart(), selection.getSelectionEnd())
-                      : TextRange.from(0, editor.getDocument().getTextLength());
-    // Invoke only the LSP service: generic formatter selection could fall back to IDE/legacy formatting.
-    // Its async document pipeline owns applying edits and undo, just as for standard Reformat Code.
-    WriteCommandAction.runWriteCommandAction(project, reformatText(), null,
-      () -> service.formatRanges(file, new FormatTextRanges(range, true), false, false), file);
+    performStandardReformat(event);
+  }
+
+  void performStandardReformat(@NotNull AnActionEvent event) {
+    AnAction reformatAction = ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_REFORMAT);
+    if (reformatAction == null) return;
+    AnActionEvent reformatEvent = AnActionEvent.createEvent(reformatAction, event.getDataContext(), null, event.getPlace(),
+                                                          ActionUiKind.NONE, event.getInputEvent());
+    reformatAction.actionPerformed(reformatEvent);
   }
 
   @Nullable FormattingService getLspFormattingService() {
