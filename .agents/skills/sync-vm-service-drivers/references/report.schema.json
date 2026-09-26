@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JetBrains/intellij-plugins/dart/vm-service-driver-report.schema.json",
+  "title": "VM Service driver synchronization report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_by",
+    "readiness",
+    "source",
+    "plugin",
+    "drift",
+    "semantic_changes",
+    "change_candidates",
+    "required_work",
+    "preconditions",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "generated_by": { "const": "sync-vm-service-drivers/audit.py" },
+    "readiness": {
+      "enum": ["up_to_date", "update_required", "ready_with_warning", "incomplete_history", "blocked"]
+    },
+    "source": { "$ref": "#/$defs/source" },
+    "plugin": { "$ref": "#/$defs/plugin" },
+    "drift": { "$ref": "#/$defs/drift" },
+    "semantic_changes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/revisionNote" }
+    },
+    "change_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "required_work": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workItem" }
+    },
+    "preconditions": { "$ref": "#/$defs/preconditions" },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitSha": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+    "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "target", "latest_known_remote_sha", "latest_known_source", "checkout", "warnings", "history_complete"],
+      "properties": {
+        "kind": { "enum": ["sdk_checkout", "service_md", "github"] },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["protocol_version", "sdk_commit", "service_sha256"],
+          "properties": {
+            "protocol_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+            "sdk_commit": { "$ref": "#/$defs/gitSha" },
+            "service_sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "latest_known_remote_sha": { "$ref": "#/$defs/gitSha" },
+        "latest_known_source": { "type": "string" },
+        "checkout": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["path", "head", "branch", "clean", "remote_status"],
+          "properties": {
+            "path": { "type": "string" },
+            "head": { "$ref": "#/$defs/gitSha" },
+            "branch": { "type": "string" },
+            "clean": { "type": "boolean" },
+            "remote_status": { "enum": ["current", "stale", "ahead", "diverged", "unknown"] }
+          }
+        },
+        "warnings": { "type": "array", "items": { "$ref": "#/$defs/warning" } },
+        "history_complete": { "type": "boolean" }
+      }
+    },
+    "fileHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol_version", "driver_root", "baseline", "files"],
+      "properties": {
+        "protocol_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "driver_root": { "$ref": "#/$defs/path" },
+        "baseline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["protocol_version", "sdk_commit", "service_md_sha256", "generator_commit"],
+          "properties": {
+            "protocol_version": { "type": "string" },
+            "sdk_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "service_md_sha256": { "$ref": "#/$defs/sha256" },
+            "generator_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+          }
+        },
+        "files": { "type": "array", "items": { "$ref": "#/$defs/fileHash" } }
+      }
+    },
+    "pathList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/path" },
+      "uniqueItems": true
+    },
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "changed", "removed"],
+      "properties": {
+        "added": { "$ref": "#/$defs/pathList" },
+        "changed": { "$ref": "#/$defs/pathList" },
+        "removed": { "$ref": "#/$defs/pathList" }
+      }
+    },
+    "customization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "baseline_sha256", "plugin_sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "baseline_sha256": { "$ref": "#/$defs/sha256" },
+        "plugin_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline_to_target", "plugin_to_target", "plugin_owned_files", "customized_generated_files", "overlapping_changes"],
+      "properties": {
+        "baseline_to_target": { "$ref": "#/$defs/delta" },
+        "plugin_to_target": { "$ref": "#/$defs/delta" },
+        "plugin_owned_files": { "$ref": "#/$defs/pathList" },
+        "customized_generated_files": { "type": "array", "items": { "$ref": "#/$defs/customization" } },
+        "overlapping_changes": { "$ref": "#/$defs/pathList" }
+      }
+    },
+    "revisionNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "comments"],
+      "properties": {
+        "version": { "type": "string" },
+        "comments": { "type": "string" }
+      }
+    },
+    "affectedSymbol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "change"],
+      "properties": {
+        "name": { "type": "string" },
+        "change": { "enum": ["added", "changed", "removed"] }
+      }
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "line", "symbols"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "line": { "type": "integer", "minimum": 1 },
+        "symbols": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order", "sdk_commit", "title", "protocol_before", "protocol_after", "revision_notes", "affected_rpcs", "affected_types", "generated_delta", "plugin_usage_sites", "existing_test_sites", "artifacts"],
+      "properties": {
+        "order": { "type": "integer", "minimum": 1 },
+        "sdk_commit": { "$ref": "#/$defs/gitSha" },
+        "title": { "type": "string" },
+        "protocol_before": { "type": "string" },
+        "protocol_after": { "type": "string" },
+        "revision_notes": { "type": "array", "items": { "$ref": "#/$defs/revisionNote" } },
+        "affected_rpcs": { "type": "array", "items": { "$ref": "#/$defs/affectedSymbol" } },
+        "affected_types": { "type": "array", "items": { "$ref": "#/$defs/affectedSymbol" } },
+        "generated_delta": { "$ref": "#/$defs/delta" },
+        "plugin_usage_sites": { "type": "array", "items": { "$ref": "#/$defs/site" } },
+        "existing_test_sites": { "type": "array", "items": { "$ref": "#/$defs/site" } },
+        "artifacts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spec_snapshot", "service_diff", "generated_diff"],
+          "properties": {
+            "spec_snapshot": { "$ref": "#/$defs/path" },
+            "service_diff": { "$ref": "#/$defs/path" },
+            "generated_diff": { "$ref": "#/$defs/path" }
+          }
+        }
+      }
+    },
+    "workItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path"],
+      "properties": {
+        "kind": { "enum": ["add_generated_file", "update_generated_file", "remove_generated_file", "resolve_customization_overlap"] },
+        "path": { "$ref": "#/$defs/path" }
+      }
+    },
+    "preconditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["plugin_files", "baseline_service_sha256", "target_service_sha256"],
+      "properties": {
+        "plugin_files": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/path" },
+          "additionalProperties": { "$ref": "#/$defs/sha256" }
+        },
+        "baseline_service_sha256": { "$ref": "#/$defs/sha256" },
+        "target_service_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

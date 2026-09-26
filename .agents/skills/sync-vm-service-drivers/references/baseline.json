@@ -1,0 +1,7 @@
+{
+  "protocol_version": "4.3",
+  "sdk_commit": "67f3e1f4a0dfe57c07192607095892a9d107a9d1",
+  "service_md_path": "runtime/vm/service/service.md",
+  "service_md_sha256": "e241c6faddc5d5cbbe56c0e396c1e8c5dae938b50646ff72ac685ee12b4159d9",
+  "generator_commit": "fb930ea325b6404cdca06b9c20b57af180cb4c21"
+}

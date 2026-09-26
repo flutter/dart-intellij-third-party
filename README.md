@@ -139,6 +139,7 @@ These skills are located in the [.agents/skills/](.agents/skills/) directory. Th
 * **[Plugin Issue Triage](.agents/skills/plugin-issue-triage/SKILL.md):** (Experimental) Automates the triage of GitHub issues in the Dart and Flutter IntelliJ plugins.
 * **[Port PR](.agents/skills/port-pr/SKILL.md):** Fetches a Pull Request from either the dart-intellij-third-party or flutter-intellij repository and conceptually ports its changes to the other repository.
 * **[Root Cause Regression](.agents/skills/root-cause-regression/SKILL.md):** Investigates a GitHub issue reporting a regression, analyzes recent commits, and identifies possible culprits.
+* **[Sync VM Service Drivers](.agents/skills/sync-vm-service-drivers/SKILL.md):** Advances the generated VM Service Java drivers one protocol version at a time with a user-reviewed, test-first workflow.
 
 ### How to use:
 Tell your AI assistant to run the desired skill (e.g. by typing `/code-review` or asking *"Run the code-review skill on my changes"*). The agent will automatically find, load, and follow the instructions in the corresponding `SKILL.md` file.

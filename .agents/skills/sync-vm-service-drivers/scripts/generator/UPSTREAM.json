@@ -1,0 +1,18 @@
+{
+  "repository": "https://github.com/dart-lang/sdk",
+  "commit": "fb930ea325b6404cdca06b9c20b57af180cb4c21",
+  "description": "Final Dart SDK revision before removal of the Java VM Service generator",
+  "files": {
+    "lib/common/generate_common.dart": "037aee0057499cc9b2d2aa65578f439d3471f1716673e2b000968be8289b58d7",
+    "lib/common/parser.dart": "fa2173f0d70e716b956a02a9f35bf201d7b097ce448c2957e23d38ec0e00e913",
+    "lib/common/src_gen_common.dart": "0fd3ca3bb6cdc13de5436ff6fc6f59a765d6a5daf23af0a287f06dcbceee5f16",
+    "lib/java/src_gen_java.dart": "7442bd2e96863b4e3f8b8b8861aefe62278a48cf5c2dbf73625bfa5ac4b42b20"
+  },
+  "local_patches": {
+    "lib/java/generate_java.dart": {
+      "upstream_sha256": "825a4372ce547a30e2bacf9dffe0e75b4cc7012338e5ab06d3bf51cb80db6d7c",
+      "sha256": "1716413925d090a3afc222649985bcd5d470ea3a6ddaa780b13d684f78644f03",
+      "description": "Generate timestamp accessors through Element.getAsLong."
+    }
+  }
+}
