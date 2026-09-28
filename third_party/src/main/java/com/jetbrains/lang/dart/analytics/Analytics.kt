@@ -284,8 +284,27 @@ object Analytics {
   fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
     AnalyticsConfigurationManager.getConfiguration(sdk, project, logger)
 
+  private val testObserver = ThreadLocal<java.util.function.Consumer<AnalyticsData>>()
+
+  /** Observes attempted reports on this thread without changing consent or delivery. */
+  @org.jetbrains.annotations.TestOnly
   @JvmStatic
-  fun report(data: AnalyticsData) = data.reportTo(reporter)
+  fun withReportObserver(observer: java.util.function.Consumer<AnalyticsData>, action: Runnable) {
+    check(ApplicationManager.getApplication().isUnitTestMode)
+    val previous = testObserver.get()
+    testObserver.set(observer)
+    try {
+      action.run()
+    } finally {
+      if (previous == null) testObserver.remove() else testObserver.set(previous)
+    }
+  }
+
+  @JvmStatic
+  fun report(data: AnalyticsData) {
+    testObserver.get()?.accept(data)
+    data.reportTo(reporter)
+  }
 
   @JvmStatic
   fun recordRunOrDebugSession(mechanism: String, executor: Executor, project: Project?) {
@@ -507,7 +526,7 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     }
   }
 
-  private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
+  internal fun createEventParams(dataMap: Map<String, Any>): JsonObject {
     val params = JsonObject()
     params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
@@ -529,6 +548,11 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
 
     // Note: encoded as a string.
     params.addProperty(UnifiedAnalytics.Property.EVENT, event.toString())
+    return params
+  }
+
+  private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
+    val params = createEventParams(dataMap)
 
     // TODO (pq): temporary
     // print(params.toString())
