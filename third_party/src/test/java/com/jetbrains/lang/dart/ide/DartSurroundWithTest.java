@@ -8,6 +8,7 @@ import com.jetbrains.lang.dart.ide.surroundWith.expression.DartWithBracketsExpre
 import com.jetbrains.lang.dart.ide.surroundWith.expression.DartWithNotParenthesisExpressionSurrounder;
 import com.jetbrains.lang.dart.ide.surroundWith.expression.DartWithParenthesisExpressionSurrounder;
 import com.jetbrains.lang.dart.ide.surroundWith.statement.*;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.jetbrains.annotations.NotNull;
 
@@ -24,10 +25,13 @@ public class DartSurroundWithTest extends LightPlatformCodeInsightTestCase {
   }
 
   private void doTest(final Surrounder handler) {
-    configureByFile(getTestName(false) + ".dart");
-    SurroundWithHandler.invoke(getProject(), getEditor(), getFile(), handler);
+    for (boolean lspEnabled : new boolean[]{false, true}) {
+      DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), lspEnabled);
+      configureByFile(getTestName(false) + ".dart");
+      SurroundWithHandler.invoke(getProject(), getEditor(), getFile(), handler);
 
-    checkResultByFile(getTestName(false) + ".after.dart");
+      checkResultByFile(getTestName(false) + ".after.dart");
+    }
   }
 
   public void testDoWhile1() {
@@ -102,4 +106,5 @@ public class DartSurroundWithTest extends LightPlatformCodeInsightTestCase {
   public void testBrackets2() {
     doTest(new DartWithBracketsExpressionSurrounder());
   }
+
 }

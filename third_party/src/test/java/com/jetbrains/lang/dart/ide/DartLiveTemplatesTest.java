@@ -13,6 +13,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
 /**
@@ -56,13 +57,16 @@ public class DartLiveTemplatesTest extends BasePlatformTestCase {
   }
 
   private void doTest(String... files) {
-    myFixture.configureByFiles(files);
-    expandTemplate(myFixture.getEditor());
-    WriteCommandAction.runWriteCommandAction(null, () -> {
-      CodeStyleManager.getInstance(myFixture.getProject()).reformat(myFixture.getFile());
-    });
-    myFixture.getEditor().getSelectionModel().removeSelection();
-    myFixture.checkResultByFile(getTestName(false) + ".after.dart");
+    for (boolean lspEnabled : new boolean[]{false, true}) {
+      DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), lspEnabled);
+      myFixture.configureByFiles(files);
+      expandTemplate(myFixture.getEditor());
+      WriteCommandAction.runWriteCommandAction(null, () -> {
+        CodeStyleManager.getInstance(myFixture.getProject()).reformat(myFixture.getFile());
+      });
+      myFixture.getEditor().getSelectionModel().removeSelection();
+      myFixture.checkResultByFile(getTestName(false) + ".after.dart");
+    }
   }
 
   public void testItar1() {
