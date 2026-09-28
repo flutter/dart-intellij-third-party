@@ -11,6 +11,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
+import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -486,7 +487,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             return future
         }
 
-        if (com.intellij.openapi.application.ApplicationManager.getApplication().isReadAccessAllowed) {
+        ApplicationManagerEx.getApplicationEx().tryRunReadAction {
             das.updateFilesContent()
         }
 

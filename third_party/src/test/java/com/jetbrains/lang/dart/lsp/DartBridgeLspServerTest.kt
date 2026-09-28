@@ -17,6 +17,10 @@ import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.EditorFactory
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
@@ -1285,6 +1289,45 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(99, lspResponse!!.get("id").asInt)
         assertNotNull("lspMessage should contain result", lspResponse.getAsJsonObject("result"))
         assertEquals(true, lspResponse.getAsJsonObject("result").get("applied").asBoolean)
+    }
+
+    fun testForwardRequestUpdatesFilesContentFromBackgroundThread() {
+        val das = DartAnalysisServerService.getInstance(project)
+        val changedDocsField = DartAnalysisServerService::class.java.getDeclaredField("myChangedDocuments").apply {
+            isAccessible = true
+        }
+        @Suppress("UNCHECKED_CAST")
+        val changedDocs = changedDocsField.get(das) as MutableSet<Document>
+        val dummyDoc = EditorFactory.getInstance().createDocument("void main() {}")
+        changedDocs.add(dummyDoc)
+
+        val bgTask = ApplicationManager.getApplication().executeOnPooledThread {
+            assertFalse(
+                "Background thread should not start with read access",
+                ApplicationManager.getApplication().isReadAccessAllowed
+            )
+            val params = HoverParams(TextDocumentIdentifier("file:///test.dart"), Position(1, 2))
+            bridgeServer.hover(params)
+        }
+        bgTask.get(5, TimeUnit.SECONDS)
+
+        assertTrue(
+            "updateFilesContent() should have been called and cleared myChangedDocuments",
+            changedDocs.isEmpty()
+        )
+        assertEquals(1, capturedRequests.size)
+    }
+
+    fun testForwardRequestDoesNotDeadlockDuringWriteAction() {
+        WriteAction.run<Throwable> {
+            val bgTask = ApplicationManager.getApplication().executeOnPooledThread {
+                val params = RenameFilesParams(listOf(FileRename("file:///old.dart", "file:///new.dart")))
+                bridgeServer.willRenameFiles(params)
+            }
+            // Should complete without deadlocking even while EDT holds the write lock
+            bgTask.get(5, TimeUnit.SECONDS)
+        }
+        assertEquals(1, capturedRequests.size)
     }
 
     private class MockLanguageClient : LanguageClient {
