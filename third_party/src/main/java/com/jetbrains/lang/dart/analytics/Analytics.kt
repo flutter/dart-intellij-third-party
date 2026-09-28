@@ -30,9 +30,11 @@ import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.PrintingLogger
 import com.jetbrains.lang.dart.websocket.WebSocketException
+import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.function.Consumer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -284,12 +286,12 @@ object Analytics {
   fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
     AnalyticsConfigurationManager.getConfiguration(sdk, project, logger)
 
-  private val testObserver = ThreadLocal<java.util.function.Consumer<AnalyticsData>>()
+  private val testObserver = ThreadLocal<Consumer<AnalyticsData>>()
 
   /** Observes attempted reports on this thread without changing consent or delivery. */
-  @org.jetbrains.annotations.TestOnly
+  @TestOnly
   @JvmStatic
-  fun withReportObserver(observer: java.util.function.Consumer<AnalyticsData>, action: Runnable) {
+  fun withReportObserver(observer: Consumer<AnalyticsData>, action: Runnable) {
     check(ApplicationManager.getApplication().isUnitTestMode)
     val previous = testObserver.get()
     testObserver.set(observer)
