@@ -7,6 +7,7 @@
 - Quick fixes, assists, source actions, and refactorings via LSP code actions (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#526)
 
 ### Changed
+- Highlighting read vs write variable occurrences via LSP is now enabled for all users
 
 ### Removed
 
