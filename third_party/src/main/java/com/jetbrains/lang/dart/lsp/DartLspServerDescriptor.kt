@@ -203,56 +203,39 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
     }
 
     override val tokenTypes: List<String> = listOf(
-        SemanticTokenTypes.Namespace,
-        SemanticTokenTypes.Type,
-        SemanticTokenTypes.Class,
-        SemanticTokenTypes.Enum,
-        SemanticTokenTypes.Interface,
-        SemanticTokenTypes.Struct,
-        SemanticTokenTypes.TypeParameter,
-        SemanticTokenTypes.Parameter,
-        SemanticTokenTypes.Variable,
-        SemanticTokenTypes.Property,
-        SemanticTokenTypes.EnumMember,
-        SemanticTokenTypes.Event,
-        SemanticTokenTypes.Function,
-        SemanticTokenTypes.Method,
-        SemanticTokenTypes.Macro,
-        SemanticTokenTypes.Keyword,
-        SemanticTokenTypes.Modifier,
-        SemanticTokenTypes.Comment,
-        SemanticTokenTypes.String,
-        SemanticTokenTypes.Number,
-        SemanticTokenTypes.Regexp,
-        SemanticTokenTypes.Operator,
-        SemanticTokenTypes.Decorator,
-        // Dart custom semantic token types:
         "annotation",
-        "boolean",
+        SemanticTokenTypes.Class,
+        SemanticTokenTypes.Comment,
+        SemanticTokenTypes.Method,
+        SemanticTokenTypes.Variable,
+        SemanticTokenTypes.Parameter,
+        SemanticTokenTypes.Enum,
+        SemanticTokenTypes.EnumMember,
+        SemanticTokenTypes.Type,
+        "source",
+        SemanticTokenTypes.Property,
+        SemanticTokenTypes.Keyword,
         "label",
-        "source"
+        SemanticTokenTypes.Namespace,
+        "boolean",
+        SemanticTokenTypes.Number,
+        SemanticTokenTypes.String,
+        SemanticTokenTypes.Function,
+        SemanticTokenTypes.TypeParameter
     )
 
     override val tokenModifiers: List<String> = listOf(
-        SemanticTokenModifiers.Declaration,
-        SemanticTokenModifiers.Definition,
-        SemanticTokenModifiers.Readonly,
-        SemanticTokenModifiers.Static,
-        SemanticTokenModifiers.Deprecated,
-        SemanticTokenModifiers.Abstract,
-        SemanticTokenModifiers.Async,
-        SemanticTokenModifiers.Modification,
         SemanticTokenModifiers.Documentation,
-        SemanticTokenModifiers.DefaultLibrary,
-        // Dart custom semantic token modifiers:
+        "constructor",
+        SemanticTokenModifiers.Declaration,
+        "importPrefix",
+        "instance",
+        SemanticTokenModifiers.Static,
+        "escape",
         "annotation",
         "control",
-        "importPrefix",
         "label",
-        "constructor",
-        "escape",
         "interpolation",
-        "instance",
         "source",
         "void",
         "wildcard"
@@ -263,10 +246,17 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
         val isStatic = modifiers.contains(SemanticTokenModifiers.Static)
         val isInstance = modifiers.contains("instance")
 
+        if (modifiers.contains("annotation") || tokenType == "annotation" || tokenType == SemanticTokenTypes.Decorator) {
+            return DartSyntaxHighlighterColors.ANNOTATION
+        }
+
         return when (tokenType) {
             SemanticTokenTypes.Class,
             SemanticTokenTypes.Interface,
-            SemanticTokenTypes.Struct -> DartSyntaxHighlighterColors.CLASS
+            SemanticTokenTypes.Struct -> when {
+                modifiers.contains("constructor") -> DartSyntaxHighlighterColors.CONSTRUCTOR
+                else -> DartSyntaxHighlighterColors.CLASS
+            }
 
             SemanticTokenTypes.Enum -> DartSyntaxHighlighterColors.ENUM
             SemanticTokenTypes.EnumMember -> DartSyntaxHighlighterColors.ENUM_CONSTANT
@@ -308,6 +298,7 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             SemanticTokenTypes.Comment -> if (modifiers.contains(SemanticTokenModifiers.Documentation)) DartSyntaxHighlighterColors.DOC_COMMENT else DartSyntaxHighlighterColors.LINE_COMMENT
             SemanticTokenTypes.Number -> DartSyntaxHighlighterColors.NUMBER
             SemanticTokenTypes.Operator -> DartSyntaxHighlighterColors.OPERATION_SIGN
+            "source" -> DartSyntaxHighlighterColors.IDENTIFIER
             else -> super.getTextAttributesKey(tokenType, modifiers)
         }
     }
