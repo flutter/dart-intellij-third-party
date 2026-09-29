@@ -113,6 +113,9 @@ intellijPlatform {
             VerifyPluginTask.FailureLevel.COMPATIBILITY_WARNINGS,
             VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
             //            VerifyPluginTask.FailureLevel.DEPRECATED_API_USAGES,
+            // TODO: Re-enable once copied platform-lsp sources (LspCodeVisionProvider.computeForEditor)
+            // are removed (when minimum supported version is 2026.2+) and SimpleListCellRenderer.create
+            // usages are updated. New usages in non-vendored code are still caught by check_verifier_baselines.sh.
             //            VerifyPluginTask.FailureLevel.SCHEDULED_FOR_REMOVAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.EXPERIMENTAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
