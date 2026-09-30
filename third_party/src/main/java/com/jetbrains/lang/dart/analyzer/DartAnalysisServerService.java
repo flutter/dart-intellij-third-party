@@ -1025,22 +1025,17 @@ public final class DartAnalysisServerService implements Disposable {
 
         final VirtualFile file = FileDocumentManager.getInstance().getFile(e.getDocument());
         if (isLocalAnalyzableFile(file)) {
-          boolean isOpenInEditor = false;
+          myServerData.onDocumentChanged(e);
           for (VirtualFile fileInEditor : FileEditorManager.getInstance(myProject).getOpenFiles()) {
             if (fileInEditor.equals(file)) {
-              isOpenInEditor = true;
               synchronized (myLock) {
                 myChangedDocuments.add(e.getDocument());
               }
               break;
             }
           }
-
-          if (isOpenInEditor) {
-            myServerData.onDocumentChanged(e);
-            myUpdateFilesAlarm.cancelAllRequests();
-            myUpdateFilesAlarm.addRequest(DartAnalysisServerService.this::updateFilesContent, UPDATE_FILES_TIMEOUT);
-          }
+          myUpdateFilesAlarm.cancelAllRequests();
+          myUpdateFilesAlarm.addRequest(DartAnalysisServerService.this::updateFilesContent, UPDATE_FILES_TIMEOUT);
         }
       }
     };
