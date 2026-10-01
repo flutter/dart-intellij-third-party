@@ -57,4 +57,95 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
         assertFalse(DartConfigurable.isExperimentalLspFeaturesEnabled(project))
         assertNull(evaluator.getTargetCandidates(reference))
     }
+
+    fun testDeclarationResolvesToLspSearchTargetViaDeclarationProvider() {
+        val file = myFixture.configureByText(
+            "test.dart",
+            """
+            void help<caret>er() {}
+            void main() {
+              helper();
+            }
+            """.trimIndent()
+        )
+        val vFile = file.virtualFile
+        val descriptor = com.jetbrains.lang.dart.lsp.DartLspServerDescriptor(project)
+
+        val server = com.intellij.platform.dartlsp.impl.LspServerImpl(
+            com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider::class.java,
+            descriptor,
+            object : com.intellij.platform.dartlsp.api.LspServerManagerListener {}
+        )
+
+        val initResult = org.eclipse.lsp4j.InitializeResult(
+            org.eclipse.lsp4j.ServerCapabilities().apply {
+                setDefinitionProvider(true)
+                setReferencesProvider(true)
+            }
+        )
+
+        com.intellij.platform.dartlsp.impl.LspServerImpl::class.java.getDeclaredField("initializeResult").apply {
+            isAccessible = true
+            set(server, initResult)
+        }
+        com.intellij.platform.dartlsp.impl.LspServerImpl::class.java.getDeclaredField("state").apply {
+            isAccessible = true
+            set(server, com.intellij.platform.dartlsp.api.LspServerState.Running)
+        }
+        com.intellij.platform.dartlsp.impl.documentSync.LspDocumentSyncManager::class.java.getDeclaredField("openedFiles").apply {
+            isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            (get(server.documentSyncManager) as MutableSet<com.intellij.openapi.vfs.VirtualFile>).add(vFile)
+        }
+
+        val manager = com.intellij.platform.dartlsp.impl.LspServerManagerImpl.getInstanceImpl(project)
+        val lspServersField = com.intellij.platform.dartlsp.impl.LspServerManagerImpl::class.java.getDeclaredField("lspServers").apply {
+            isAccessible = true
+        }
+        @Suppress("UNCHECKED_CAST")
+        val lspServers = lspServersField.get(manager) as MutableCollection<com.intellij.platform.dartlsp.impl.LspServerImpl>
+        lspServers.add(server)
+
+        try {
+            val caretOffset = myFixture.caretOffset
+            val namedElement = com.intellij.psi.util.PsiTreeUtil.getParentOfType(
+                file.findElementAt(caretOffset),
+                com.jetbrains.lang.dart.psi.DartNamedElement::class.java
+            )
+            assertNotNull("Expected DartNamedElement at caret", namedElement)
+            if (namedElement == null) return
+
+            // 1. With LSP references enabled, DartLspSymbolDeclarationProvider yields a SearchTargetSymbol backed by LspSearchTarget
+            PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
+            if (DartAnalysisServerService.isLspReferencesEnabled(project)) {
+                val declarations = DartLspSymbolDeclarationProvider().getDeclarations(namedElement, 0)
+                assertEquals(1, declarations.size)
+                val symbol = declarations.single().symbol
+                assertTrue(
+                    "Expected SearchTargetSymbol, got: $symbol",
+                    symbol is com.intellij.find.usages.symbol.SearchTargetSymbol
+                )
+                val searchTarget = (symbol as com.intellij.find.usages.symbol.SearchTargetSymbol).searchTarget
+                assertTrue(
+                    "Expected LspSearchTarget, got: $searchTarget",
+                    searchTarget is com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget
+                )
+
+                val targetSymbols = com.intellij.model.psi.impl.targetSymbols(file, caretOffset)
+                assertEquals(1, targetSymbols.size)
+                assertEquals(symbol, targetSymbols.single())
+
+                val targets = com.intellij.find.usages.impl.searchTargets(file, caretOffset)
+                assertEquals(1, targets.size)
+                assertTrue(targets.single() is com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget)
+            }
+
+            // 2. With LSP references disabled, DartLspSymbolDeclarationProvider returns emptyList so legacy PSI handles it
+            PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", false, true)
+            val disabledDeclarations = DartLspSymbolDeclarationProvider().getDeclarations(namedElement, 0)
+            assertTrue("Expected empty declarations when LSP references are disabled", disabledDeclarations.isEmpty())
+        } finally {
+            lspServers.remove(server)
+        }
+    }
 }
