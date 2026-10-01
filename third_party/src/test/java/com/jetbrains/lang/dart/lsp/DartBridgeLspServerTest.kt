@@ -41,9 +41,9 @@ import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
+import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InlayHintKind
 import org.eclipse.lsp4j.InlayHintParams
-import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
 import org.eclipse.lsp4j.Position
@@ -52,6 +52,9 @@ import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ReferenceContext
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
+import org.eclipse.lsp4j.SemanticTokenModifiers
+import org.eclipse.lsp4j.SemanticTokenTypes
+import org.eclipse.lsp4j.SemanticTokensParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
 import org.eclipse.lsp4j.SymbolKind
 import org.eclipse.lsp4j.TextDocumentIdentifier
@@ -64,6 +67,7 @@ import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CompletableFuture
@@ -633,6 +637,205 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue("Experimental features list should contain 'code actions'", experimentalNames.contains("code actions"))
         assertTrue("Experimental features list should contain 'errors and warnings'", experimentalNames.contains("errors and warnings"))
         assertFalse("DOCUMENT_HIGHLIGHT should not be experimental", LspMethod.getExperimentalFeatures().contains(LspMethod.DOCUMENT_HIGHLIGHT))
+    }
+
+    fun testInitialize_semanticTokensProvider() {
+        val future = bridgeServer.initialize(InitializeParams())
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        val capabilities = result.capabilities
+        assertNotNull(capabilities)
+        val semanticTokensProvider = capabilities.semanticTokensProvider
+        assertNotNull(semanticTokensProvider)
+        val legend = semanticTokensProvider.legend
+        assertNotNull(legend)
+        assertTrue("Legend should contain standard types like 'class'", legend.tokenTypes.contains(SemanticTokenTypes.Class))
+        assertTrue("Legend should contain Dart custom type 'annotation'", legend.tokenTypes.contains("annotation"))
+        assertTrue("Legend should contain Dart custom type 'boolean'", legend.tokenTypes.contains("boolean"))
+        assertTrue("Legend should contain Dart custom type 'label'", legend.tokenTypes.contains("label"))
+        assertTrue("Legend should contain Dart custom type 'source'", legend.tokenTypes.contains("source"))
+        assertTrue("Legend should contain modifier 'declaration'", legend.tokenModifiers.contains(SemanticTokenModifiers.Declaration))
+        assertTrue("Legend should contain modifier 'static'", legend.tokenModifiers.contains(SemanticTokenModifiers.Static))
+        assertTrue("Legend should contain custom modifier 'constructor'", legend.tokenModifiers.contains("constructor"))
+        assertTrue("Legend should contain custom modifier 'importPrefix'", legend.tokenModifiers.contains("importPrefix"))
+        assertTrue("Legend should contain custom modifier 'instance'", legend.tokenModifiers.contains("instance"))
+    }
+
+    fun testSemanticTokensFull_success() {
+        val params = SemanticTokensParams(TextDocumentIdentifier("file:///test.dart"))
+        val future = bridgeServer.semanticTokensFull(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("textDocument/semanticTokens/full", lspMessage.get("method").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "data": [0, 4, 3, 0, 0, 1, 2, 5, 1, 2]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(listOf(0, 4, 3, 0, 0, 1, 2, 5, 1, 2), result.data)
+    }
+
+    fun testSemanticTokensFull_errorReturnsNull() {
+        val params = SemanticTokensParams(TextDocumentIdentifier("file:///test.dart"))
+        val future = bridgeServer.semanticTokensFull(params)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32601,
+                    "message": "Method not found"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNull("DAS error on semanticTokensFull should gracefully complete with null", result)
+    }
+
+    fun testDartLspSemanticTokensSupport_shouldAskServerForSemanticTokens() {
+        val dartFile = myFixture.configureByText("test.dart", "class Foo {}")
+        assertTrue("Should ask server for .dart files", DartLspSemanticTokensSupport.shouldAskServerForSemanticTokens(dartFile))
+
+        val txtFile = myFixture.configureByText("test.txt", "some text")
+        assertFalse("Should not ask server for .txt files", DartLspSemanticTokensSupport.shouldAskServerForSemanticTokens(txtFile))
+    }
+
+    fun testDartLspSemanticTokensSupport_getTextAttributesKey() {
+        assertEquals(DartSyntaxHighlighterColors.CLASS, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Class, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.CONSTRUCTOR, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Class, listOf("constructor")))
+        assertEquals(DartSyntaxHighlighterColors.ANNOTATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Class, listOf("annotation")))
+        assertEquals(DartSyntaxHighlighterColors.ENUM, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Enum, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.ENUM_CONSTANT, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.EnumMember, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.TYPE_PARAMETER, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.TypeParameter, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.TYPE_ALIAS, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Type, emptyList()))
+
+        assertEquals(DartSyntaxHighlighterColors.CONSTRUCTOR, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf("constructor")))
+        assertEquals(DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static)))
+        assertEquals(DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf("instance", SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf("instance")))
+
+        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static)))
+        assertEquals(DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.LOCAL_FUNCTION_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Function, emptyList()))
+
+        assertEquals(DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static)))
+        assertEquals(DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf("instance", SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf("instance")))
+        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, emptyList()))
+
+        assertEquals(DartSyntaxHighlighterColors.IMPORT_PREFIX, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Variable, listOf("importPrefix")))
+        assertEquals(DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Static)))
+        assertEquals(DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Variable, emptyList()))
+
+        assertEquals(DartSyntaxHighlighterColors.PARAMETER_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Parameter, listOf(SemanticTokenModifiers.Declaration)))
+        assertEquals(DartSyntaxHighlighterColors.PARAMETER_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Parameter, emptyList()))
+
+        assertEquals(DartSyntaxHighlighterColors.ANNOTATION, DartLspSemanticTokensSupport.getTextAttributesKey("annotation", emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.LABEL, DartLspSemanticTokensSupport.getTextAttributesKey("label", emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.LIBRARY_NAME, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Namespace, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.KEYWORD, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Keyword, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.KEYWORD, DartLspSemanticTokensSupport.getTextAttributesKey("boolean", emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.VALID_STRING_ESCAPE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.String, listOf("escape")))
+        assertEquals(DartSyntaxHighlighterColors.STRING, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.String, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.DOC_COMMENT, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Comment, listOf(SemanticTokenModifiers.Documentation)))
+        assertEquals(DartSyntaxHighlighterColors.LINE_COMMENT, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Comment, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.NUMBER, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Number, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.OPERATION_SIGN, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Operator, emptyList()))
+        assertEquals(DartSyntaxHighlighterColors.IDENTIFIER, DartLspSemanticTokensSupport.getTextAttributesKey("source", emptyList()))
+    }
+
+    fun testDartLspSemanticTokensSupport_legendMatchesDartAnalysisServer() {
+        val expectedTokenTypes = listOf(
+            "annotation", "class", "comment", "method", "variable",
+            "parameter", "enum", "enumMember", "type", "source",
+            "property", "keyword", "label", "namespace", "boolean",
+            "number", "string", "function", "typeParameter"
+        )
+        val expectedTokenModifiers = listOf(
+            "documentation", "constructor", "declaration", "importPrefix",
+            "instance", "static", "escape", "annotation", "control",
+            "label", "interpolation", "source", "void", "wildcard"
+        )
+
+        assertEquals("Token types must strictly match DAS legend", expectedTokenTypes, DartLspSemanticTokensSupport.tokenTypes)
+        assertEquals("Token modifiers must strictly match DAS legend", expectedTokenModifiers, DartLspSemanticTokensSupport.tokenModifiers)
+    }
+
+    fun testDartLspSemanticTokensDecodingWithDasLegend() {
+        // Simulates decoding the tokens sent by DAS using the legend in DartLspSemanticTokensSupport
+        fun decodeToken(typeIndex: Int, modifierMask: Int): Pair<String, List<String>> {
+            val type = DartLspSemanticTokensSupport.tokenTypes[typeIndex]
+            val modifiers = mutableListOf<String>()
+            for ((index, modifier) in DartLspSemanticTokensSupport.tokenModifiers.withIndex()) {
+                if (modifierMask and (1 shl index) != 0) {
+                    modifiers.add(modifier)
+                }
+            }
+            return type to modifiers
+        }
+
+        // Token 1: `import` (DAS type 11 = keyword, mod 0)
+        val (type1, mods1) = decodeToken(11, 0)
+        assertEquals("keyword", type1)
+        assertEquals(DartSyntaxHighlighterColors.KEYWORD, DartLspSemanticTokensSupport.getTextAttributesKey(type1, mods1))
+
+        // Token 2: `'package:flutter/material.dart';` (DAS type 16 = string, mod 0)
+        val (type2, mods2) = decodeToken(16, 0)
+        assertEquals("string", type2)
+        assertEquals(DartSyntaxHighlighterColors.STRING, DartLspSemanticTokensSupport.getTextAttributesKey(type2, mods2))
+
+        // Token 3: `void` (DAS type 11 = keyword, mod 4096 = bit 12 = void)
+        val (type3, mods3) = decodeToken(11, 4096)
+        assertEquals("keyword", type3)
+        assertTrue(mods3.contains("void"))
+        assertEquals(DartSyntaxHighlighterColors.KEYWORD, DartLspSemanticTokensSupport.getTextAttributesKey(type3, mods3))
+
+        // Token 4: `main` (DAS type 17 = function, mod 36 = bits 2 & 5 = declaration & static)
+        val (type4, mods4) = decodeToken(17, 36)
+        assertEquals("function", type4)
+        assertTrue(mods4.contains("declaration"))
+        assertTrue(mods4.contains("static"))
+        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(type4, mods4))
+
+        // Token 5: `MyApp` in `const MyApp()` (DAS type 1 = class, mod 2 = bit 1 = constructor)
+        val (type5, mods5) = decodeToken(1, 2)
+        assertEquals("class", type5)
+        assertTrue(mods5.contains("constructor"))
+        assertEquals(DartSyntaxHighlighterColors.CONSTRUCTOR, DartLspSemanticTokensSupport.getTextAttributesKey(type5, mods5))
     }
 
     fun testPublishDiagnosticsNotification() {
@@ -1328,6 +1531,20 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             bgTask.get(5, TimeUnit.SECONDS)
         }
         assertEquals(1, capturedRequests.size)
+    }
+
+    fun testIsDartSdkVersionSufficientForLspHighlighting() {
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-217.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-218.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.15.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("4.0.0"))
+
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-216.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-65.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.13.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.0.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.19.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.14.0"))
     }
 
     private class MockLanguageClient : LanguageClient {
