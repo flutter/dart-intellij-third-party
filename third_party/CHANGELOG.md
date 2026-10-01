@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Added
+- Code completion with JetBrains LSP (experimental feature) (#399)
 
 ### Changed
 
