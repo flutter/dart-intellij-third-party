@@ -17,14 +17,10 @@ import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import org.eclipse.lsp4j.CompletionItem
-import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.CompletionList
 import org.eclipse.lsp4j.CompletionOptions
 import org.eclipse.lsp4j.CompletionParams
-import org.dartlang.analysis.server.protocol.AnalysisError
-import org.dartlang.analysis.server.protocol.DiagnosticMessage
 import org.eclipse.lsp4j.ApplyWorkspaceEditParams
-import org.eclipse.lsp4j.InsertTextFormat
 import org.eclipse.lsp4j.CallHierarchyIncomingCall
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
 import org.eclipse.lsp4j.CallHierarchyItem
