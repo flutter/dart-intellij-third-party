@@ -17,6 +17,7 @@ import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
@@ -46,7 +47,6 @@ import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
-import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.InlayHintKind
 import org.eclipse.lsp4j.InlayHintParams
 import org.eclipse.lsp4j.InsertTextFormat
@@ -701,13 +701,13 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     fun testCompletionSupportIconMapping() {
         val support = DartLspCompletionSupport
         val constructorItem = CompletionItem().apply { kind = CompletionItemKind.Constructor }
-        assertEquals(com.intellij.icons.AllIcons.Nodes.ClassInitializer, support.getIcon(constructorItem))
+        assertEquals(AllIcons.Nodes.ClassInitializer, support.getIcon(constructorItem))
 
         val functionItem = CompletionItem().apply { kind = CompletionItemKind.Function }
-        assertEquals(com.intellij.icons.AllIcons.Nodes.Lambda, support.getIcon(functionItem))
+        assertEquals(AllIcons.Nodes.Lambda, support.getIcon(functionItem))
 
         val methodItem = CompletionItem().apply { kind = CompletionItemKind.Method }
-        assertEquals(com.intellij.icons.AllIcons.Nodes.Method, support.getIcon(methodItem))
+        assertEquals(AllIcons.Nodes.Method, support.getIcon(methodItem))
     }
 
     fun testClientCapabilities() {
