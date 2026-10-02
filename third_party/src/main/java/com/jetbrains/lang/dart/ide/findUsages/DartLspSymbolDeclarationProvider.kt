@@ -5,14 +5,15 @@
  */
 package com.jetbrains.lang.dart.ide.findUsages
 
-import com.intellij.find.usages.api.SearchTarget
 import com.intellij.find.usages.symbol.SearchTargetSymbol
 import com.intellij.model.Pointer
 import com.intellij.model.Symbol
 import com.intellij.model.psi.PsiSymbolDeclaration
 import com.intellij.model.psi.PsiSymbolDeclarationProvider
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesSupport
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
 import com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget
@@ -20,6 +21,7 @@ import com.intellij.platform.dartlsp.util.getLsp4jPosition
 import com.intellij.psi.PsiElement
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.psi.DartNamedElement
+import org.eclipse.lsp4j.Position
 
 /**
  * Provides LSP-backed [SearchTargetSymbol] declarations for [DartNamedElement]s when
@@ -47,34 +49,69 @@ class DartLspSymbolDeclarationProvider : PsiSymbolDeclarationProvider {
       return emptyList()
     }
 
+    val nameIdentifier = declaringElement.nameIdentifier ?: return emptyList()
+    val relativeStart = nameIdentifier.textRange.startOffset - declaringElement.textRange.startOffset
+    val nameRangeInParent = TextRange.from(relativeStart, nameIdentifier.textLength)
+    if (offsetInElement > 0 && !nameRangeInParent.containsOffset(offsetInElement)) {
+      return emptyList()
+    }
+
     val psiFile = declaringElement.containingFile ?: return emptyList()
     val file = psiFile.virtualFile ?: return emptyList()
     val document = FileDocumentManager.getInstance().getDocument(file) ?: return emptyList()
 
     val lspServers = LspServerManagerImpl.getInstanceImpl(project)
       .getServersWithThisFileOpen(file)
-      .filter { it.descriptor.lspCustomization.findReferencesCustomizer is LspFindReferencesSupport }
-      .filter { it.supportsFindReferences(file) }
+      .filter {
+        it.descriptor.lspCustomization.findReferencesCustomizer is LspFindReferencesSupport &&
+          it.supportsFindReferences(file)
+      }
       .ifEmpty { return emptyList() }
 
-    val position = getLsp4jPosition(document, declaringElement.textRange.startOffset)
+    val position = getLsp4jPosition(document, nameIdentifier.textRange.startOffset)
     val searchTarget = LspSearchTarget(lspServers, file, position)
 
-    return listOf(DartLspSymbolDeclaration(declaringElement, DartLspSearchTargetSymbol(searchTarget)))
+    val symbol = DartLspSearchTargetSymbol(searchTarget, project, file, position)
+    return listOf(DartLspSymbolDeclaration(declaringElement, nameRangeInParent, symbol))
   }
 }
 
-private class DartLspSymbolDeclaration(
+private data class DartLspSymbolDeclaration(
   private val element: PsiElement,
+  private val rangeInElement: TextRange,
   private val symbol: Symbol,
 ) : PsiSymbolDeclaration {
   override fun getDeclaringElement(): PsiElement = element
-  override fun getRangeInDeclaringElement(): TextRange = TextRange(0, element.textLength)
+  override fun getRangeInDeclaringElement(): TextRange = rangeInElement
   override fun getSymbol(): Symbol = symbol
 }
 
 private data class DartLspSearchTargetSymbol(
   override val searchTarget: LspSearchTarget,
+  private val project: Project,
+  private val file: VirtualFile,
+  private val position: Position,
 ) : SearchTargetSymbol {
-  override fun createPointer(): Pointer<out Symbol> = Pointer.hardPointer(this)
+  override fun createPointer(): Pointer<DartLspSearchTargetSymbol> =
+    DartLspSearchTargetSymbolPointer(project, file, position)
+}
+
+private class DartLspSearchTargetSymbolPointer(
+  private val project: Project,
+  private val file: VirtualFile,
+  private val position: Position,
+) : Pointer<DartLspSearchTargetSymbol> {
+  override fun dereference(): DartLspSearchTargetSymbol? {
+    if (project.isDisposed || !file.isValid) return null
+    val lspServers = LspServerManagerImpl.getInstanceImpl(project)
+      .getServersWithThisFileOpen(file)
+      .filter {
+        it.descriptor.lspCustomization.findReferencesCustomizer is LspFindReferencesSupport &&
+          it.supportsFindReferences(file)
+      }
+      .ifEmpty { return null }
+
+    val searchTarget = LspSearchTarget(lspServers, file, position)
+    return DartLspSearchTargetSymbol(searchTarget, project, file, position)
+  }
 }
