@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Added
+- File Structure view implemented with JetBrains LSP (experimental feature) (#673)
 
 ### Changed
 
