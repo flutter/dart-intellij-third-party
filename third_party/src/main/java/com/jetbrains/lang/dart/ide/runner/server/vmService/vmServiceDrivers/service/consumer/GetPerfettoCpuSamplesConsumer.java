@@ -13,10 +13,13 @@
  */
 package com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer;
 
-import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.PerfettoTimeline;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.PerfettoCpuSamples;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Sentinel;
 
 @SuppressWarnings({"WeakerAccess", "unused"})
-public interface PerfettoTimelineConsumer extends Consumer {
+public interface GetPerfettoCpuSamplesConsumer extends Consumer {
 
-  void received(PerfettoTimeline response);
+  void received(PerfettoCpuSamples response);
+
+  void received(Sentinel response);
 }

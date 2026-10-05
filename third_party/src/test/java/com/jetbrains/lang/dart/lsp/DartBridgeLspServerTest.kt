@@ -646,6 +646,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val experimentalNames = LspMethod.getExperimentalFeatures().mapNotNull { it.presentableName }
         assertTrue("Experimental features list should contain 'code actions'", experimentalNames.contains("code actions"))
         assertTrue("Experimental features list should contain 'errors and warnings'", experimentalNames.contains("errors and warnings"))
+        assertFalse("DOCUMENT_HIGHLIGHT should not be experimental", LspMethod.getExperimentalFeatures().contains(LspMethod.DOCUMENT_HIGHLIGHT))
     }
 
     fun testPublishDiagnosticsNotification() {

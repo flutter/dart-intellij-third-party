@@ -13,7 +13,7 @@ enum class LspMethod(
     CODE_ACTION("textDocument/codeAction", isExperimental = true, presentableName = "code actions"),
     DEFINITION("textDocument/definition", isExperimental = true, presentableName = "navigation"),
     DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = false),
-    DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = true, presentableName = "read/write highlighting"),
+    DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = false),
     FORMATTING("textDocument/formatting", isExperimental = true, presentableName = "formatting"),
     HOVER("textDocument/hover", isExperimental = false),
     PUBLISH_DIAGNOSTICS("textDocument/publishDiagnostics", isExperimental = true, presentableName = "errors and warnings"),

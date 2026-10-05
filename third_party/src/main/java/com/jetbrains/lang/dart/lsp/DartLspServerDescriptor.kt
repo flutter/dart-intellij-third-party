@@ -30,7 +30,6 @@ import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDiagnosticsSupport
 import com.intellij.platform.dartlsp.api.customization.LspDocumentColorDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsCustomizer
-import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsSupport
 import com.intellij.platform.dartlsp.api.customization.LspDocumentLinkDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentSymbolDisabled
@@ -174,14 +173,10 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             } else {
                 LspInlayHintDisabled
             }
-        override val documentHighlightsCustomizer: LspDocumentHighlightsCustomizer
-            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-                object : LspDocumentHighlightsSupport() {
-                    // The default implementation only serves plain-text/TextMate files.
-                    override fun shouldAskServerForDocumentHighlights(psiFile: PsiFile): Boolean = true
-                }
-            } else {
-                LspDocumentHighlightsDisabled
+        override val documentHighlightsCustomizer: LspDocumentHighlightsCustomizer =
+            object : LspDocumentHighlightsSupport() {
+                // The default implementation only serves plain-text/TextMate files.
+                override fun shouldAskServerForDocumentHighlights(psiFile: PsiFile): Boolean = true
             }
         override val signatureHelpCustomizer = LspSignatureHelpDisabled
         override val documentSymbolCustomizer = LspDocumentSymbolDisabled

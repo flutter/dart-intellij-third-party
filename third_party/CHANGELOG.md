@@ -11,6 +11,7 @@
 ### Changed
 - Experimental LSP formatting leaves width selection to Dart through the file URI; IntelliJ right margin and `dart.lineLength` are not sent on this path.
 - Experimental LSP hides the dedicated Dart formatting action in the project tree and renames the selection-aware editor action to Reformat Code. Disabling LSP restores the legacy action; the public `runDartfmt` compatibility API remains available regardless of this setting.
+- Highlighting read vs write variable occurrences via LSP is now enabled for all users
 
 ### Removed
 
