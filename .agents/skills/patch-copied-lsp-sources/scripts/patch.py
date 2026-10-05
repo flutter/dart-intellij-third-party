@@ -150,14 +150,19 @@ def main():
         )
 
         structure_view_exts = (
-            '    <lang.psiStructureViewFactory language="" implementationClass="com.intellij.platform.dartlsp.impl.structureView.LspStructureViewFactory"/>\n'
             '    <postStartupActivity implementation="com.intellij.platform.dartlsp.impl.structureView.LspStructureViewProjectActivity"/>'
         )
-        if "LspStructureViewFactory" not in xml_content:
+        if "LspStructureViewProjectActivity" not in xml_content:
             xml_content = xml_content.replace(
                 'order="last, after PsiFileBreadcrumbsCollector"/>',
                 'order="last, after PsiFileBreadcrumbsCollector"/>\n' + structure_view_exts
             )
+
+        xml_content = re.sub(
+            r'\s*<lang\.psiStructureViewFactory\s+language=""\s+implementationClass="com\.intellij\.platform\.dartlsp\.impl\.structureView\.LspStructureViewFactory"/>',
+            '',
+            xml_content
+        )
 
         def remove_ids(match):
             tag_content = match.group(0)
