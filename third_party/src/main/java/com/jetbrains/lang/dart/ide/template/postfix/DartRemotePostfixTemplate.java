@@ -3,6 +3,7 @@ package com.jetbrains.lang.dart.ide.template.postfix;
 
 import com.intellij.CommonBundle;
 import com.intellij.codeInsight.template.postfix.templates.PostfixTemplate;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
@@ -73,6 +74,11 @@ public class DartRemotePostfixTemplate extends PostfixTemplate {
   }
 
   @Override
+  public boolean startInWriteAction() {
+    return false;
+  }
+
+  @Override
   public void expand(@NotNull PsiElement context, @NotNull Editor editor) {
     final Project project = context.getProject();
     final PsiFile psiFile = context.getContainingFile();
@@ -82,11 +88,13 @@ public class DartRemotePostfixTemplate extends PostfixTemplate {
     final SourceChange sourceChange = service.edit_getPostfixCompletion(psiFile.getVirtualFile(), offset, getKey());
     if (sourceChange != null) {
       try {
-        AssistUtils.applySourceChange(project, sourceChange, false);
-        Position position = sourceChange.getSelection();
-        if (position != null) {
-          editor.getCaretModel().moveToOffset(service.getConvertedOffset(psiFile.getVirtualFile(), position.getOffset()));
-        }
+        WriteAction.run(() -> {
+          AssistUtils.applySourceChange(project, sourceChange, false);
+          Position position = sourceChange.getSelection();
+          if (position != null) {
+            editor.getCaretModel().moveToOffset(service.getConvertedOffset(psiFile.getVirtualFile(), position.getOffset()));
+          }
+        });
       }
       catch (DartSourceEditException e) {
         CommonRefactoringUtil.showErrorHint(project, editor, e.getMessage(), CommonBundle.getErrorTitle(), null);
