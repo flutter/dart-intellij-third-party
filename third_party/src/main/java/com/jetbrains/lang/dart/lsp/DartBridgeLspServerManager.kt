@@ -37,10 +37,17 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
 
     private var serverSocket: ServerSocket? = null
     private var listenFuture: Future<*>? = null
+    // Written on the thread that accepts the client connections and read from the threads that
+    // talk to the server, e.g. the one that pushes the configuration.
+    @Volatile
     private var activeConnection: ActiveConnection? = null
-    
+
     val port: Int
         get() = serverSocket?.localPort ?: -1
+
+    /** The bridge of the connected LSP client, or `null` while no client is connected. */
+    internal val bridgeServer: DartBridgeLspServer?
+        get() = activeConnection?.bridgeServer
 
 
     fun startBridgeServer() {

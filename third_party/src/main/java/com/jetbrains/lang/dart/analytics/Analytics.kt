@@ -30,9 +30,11 @@ import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.PrintingLogger
 import com.jetbrains.lang.dart.websocket.WebSocketException
+import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.function.Consumer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -284,8 +286,27 @@ object Analytics {
   fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
     AnalyticsConfigurationManager.getConfiguration(sdk, project, logger)
 
+  private val testObserver = ThreadLocal<Consumer<AnalyticsData>>()
+
+  /** Observes attempted reports on this thread without changing consent or delivery. */
+  @TestOnly
   @JvmStatic
-  fun report(data: AnalyticsData) = data.reportTo(reporter)
+  fun withReportObserver(observer: Consumer<AnalyticsData>, action: Runnable) {
+    check(ApplicationManager.getApplication().isUnitTestMode)
+    val previous = testObserver.get()
+    testObserver.set(observer)
+    try {
+      action.run()
+    } finally {
+      if (previous == null) testObserver.remove() else testObserver.set(previous)
+    }
+  }
+
+  @JvmStatic
+  fun report(data: AnalyticsData) {
+    testObserver.get()?.accept(data)
+    data.reportTo(reporter)
+  }
 
   @JvmStatic
   fun recordRunOrDebugSession(mechanism: String, executor: Executor, project: Project?) {
@@ -507,7 +528,7 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     }
   }
 
-  private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
+  internal fun createEventParams(dataMap: Map<String, Any>): JsonObject {
     val params = JsonObject()
     params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
@@ -529,6 +550,11 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
 
     // Note: encoded as a string.
     params.addProperty(UnifiedAnalytics.Property.EVENT, event.toString())
+    return params
+  }
+
+  private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
+    val params = createEventParams(dataMap)
 
     // TODO (pq): temporary
     // print(params.toString())

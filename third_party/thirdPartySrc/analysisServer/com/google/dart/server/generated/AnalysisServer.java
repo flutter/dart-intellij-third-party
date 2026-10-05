@@ -6,10 +6,38 @@
  * This file has been automatically generated. Please do not edit it manually.
  * To regenerate the file, use the script "pkg/analysis_server/tool/spec/generate_files".
  */
+
+/*
+ * THIS FILE IS NO LONGER GENERATED: IT IS MAINTAINED BY HAND. DO NOT REGENERATE IT.
+ *
+ * The header above comes from the Dart SDK generator. This copy was last updated from the
+ * generator output in July 2023 (protocol version 1.34.0) and has been edited by hand since, so it
+ * has drifted from what the generator produces today:
+ * - It declares methods that the generator cannot produce, because the spec only knows the generic
+ *   lsp.handle request: lsp_connectToDtd sends the dart/connectToDtd LSP request, and
+ *   lsp_workspaceApplyEdit and lsp_workspaceConfiguration handle the workspace/applyEdit and
+ *   workspace/configuration requests that the server sends to the client.
+ * - It still declares requests that the SDK has removed, such as completion.getSuggestions and
+ *   completion.setSubscriptions of the old completion protocol, and it lacks lsp.handle, which the
+ *   plugin sends without this interface.
+ * - Parameters and consumer types differ, for example edit_bulkFixes still takes inTestMode, and
+ *   completion_getSuggestions2 takes a GetSuggestionsConsumer2 instead of a
+ *   GetSuggestions2Consumer.
+ *
+ * Regenerating the file would drop the methods above, and the result would not compile against the
+ * consumer types in this repository. Edit the interface by hand instead, together with its
+ * implementation in RemoteAnalysisServerImpl. For reference, the current generator output is
+ * checked in to the Dart SDK as pkg/analysis_server/tool/spec/generated/java/AnalysisServer.java.
+ *
+ * The interface only serves the legacy analysis server protocol, which the plugin is replacing with
+ * LSP, so it is not kept in sync with the SDK anymore. See the discussion in
+ * https://github.com/flutter/dart-intellij-third-party/pull/679#discussion_r4097263068.
+ */
 package com.google.dart.server.generated;
 
 import com.google.dart.server.*;
 import org.dartlang.analysis.server.protocol.*;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -1085,6 +1113,15 @@ public interface AnalysisServer {
   public void server_showMessageRequest(String type, String message, List<MessageAction> actions, ShowMessageRequestConsumer consumer);
 
   public void lsp_workspaceApplyEdit(DartLspApplyWorkspaceEditParams params, DartLspWorkspaceApplyEditRequestConsumer consumer);
+
+  /**
+   * Return the configuration of the given sections, one entry per requested section and in the same
+   * order, using {@code null} for a section that is not known to the client.
+   *
+   * @param sections the names of the requested configuration sections, an entry may be {@code null}
+   *          if the server asked for an unnamed section
+   */
+  public void lsp_workspaceConfiguration(List<@Nullable String> sections, DartLspWorkspaceConfigurationConsumer consumer);
 
   public void lsp_connectToDtd(String uri);
 

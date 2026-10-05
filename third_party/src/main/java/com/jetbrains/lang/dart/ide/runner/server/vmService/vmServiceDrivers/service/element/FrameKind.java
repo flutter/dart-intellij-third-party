@@ -19,6 +19,9 @@ package com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.ser
 @SuppressWarnings({"WeakerAccess", "unused"})
 public enum FrameKind {
 
+  /**
+   * Deprecated since version 4.7 of the protocol. Will not occur in responses.
+   */
   AsyncActivation,
 
   AsyncCausal,

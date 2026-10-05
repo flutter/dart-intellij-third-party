@@ -8,6 +8,7 @@ package com.jetbrains.lang.dart.lsp
 import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.Consumer
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
+import com.google.dart.server.DartLspWorkspaceConfigurationConsumer
 import com.google.dart.server.ResponseListener
 import com.google.dart.server.ShowMessageRequestConsumer
 import com.google.dart.server.internal.remote.ByteLineReaderStream
@@ -16,6 +17,10 @@ import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.EditorFactory
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
@@ -30,6 +35,7 @@ import org.eclipse.lsp4j.CodeAction
 import org.eclipse.lsp4j.CodeActionContext
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
+import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.DocumentSymbolParams
@@ -73,6 +79,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     private val mockClient = MockLanguageClient()
     private val capturedRequests = CopyOnWriteArrayList<JsonObject>()
     private val capturedResponses = CopyOnWriteArrayList<JsonObject>()
+    private val capturedNotifications = CopyOnWriteArrayList<JsonObject>()
 
     override fun setUp() {
         super.setUp()
@@ -113,6 +120,10 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
                 capturedResponses.add(response)
             }
 
+            override fun sendNotificationToServer(notification: JsonObject) {
+                capturedNotifications.add(notification)
+            }
+
             override fun server_openUrlRequest(url: String?) {}
 
             override fun server_showMessageRequest(
@@ -125,6 +136,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             override fun lsp_workspaceApplyEdit(
                 params: DartLspApplyWorkspaceEditParams?,
                 consumer: DartLspWorkspaceApplyEditRequestConsumer?
+            ) {}
+
+            override fun lsp_workspaceConfiguration(
+                sections: MutableList<String?>?,
+                consumer: DartLspWorkspaceConfigurationConsumer?
             ) {}
         }
 
@@ -149,6 +165,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             dasSdkVersionField.set(das, null)
             
             capturedRequests.clear()
+            capturedNotifications.clear()
         } finally {
             super.tearDown()
         }
@@ -378,6 +395,32 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(mockClient.publishedDiagnostics?.diagnostics?.isEmpty() == true)
     }
 
+    fun testForwardNotificationSendsALegacyNotification() {
+        bridgeServer.forwardNotification("workspace/didChangeConfiguration", DidChangeConfigurationParams(JsonObject()))
+
+        // The server never answers a notification, so wrapping it in an `lsp.handle` request would
+        // leave that request unanswered; it travels as a legacy `lsp.notification` instead.
+        assertEquals("a notification must not be sent as a request", 0, capturedRequests.size)
+        assertEquals(1, capturedNotifications.size)
+
+        val notification = capturedNotifications[0]
+        assertEquals("lsp.notification", notification.get("event").asString)
+        assertFalse("a legacy notification must not carry an id", notification.has("id"))
+
+        val params = requireNotNull(notification.getAsJsonObject("params")) { "notification should carry params: $notification" }
+        val lspNotification = requireNotNull(params.getAsJsonObject("lspNotification")) {
+            "params should carry the LSP notification: $params"
+        }
+        assertEquals("2.0", lspNotification.get("jsonrpc").asString)
+        assertEquals("workspace/didChangeConfiguration", lspNotification.get("method").asString)
+        assertFalse("an LSP notification must not carry an id", lspNotification.has("id"))
+
+        val settings = requireNotNull(lspNotification.getAsJsonObject("params")?.getAsJsonObject("settings")) {
+            "the notification should carry empty settings: $lspNotification"
+        }
+        assertEquals("the server re-reads the settings itself", JsonObject(), settings)
+    }
+
     fun testGetFileUriFormatting() {
         val descriptor = DartLspServerDescriptor(project)
         val file = myFixture.configureByText("foo.dart", "void main() {}").virtualFile
@@ -590,6 +633,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val experimentalNames = LspMethod.getExperimentalFeatures().mapNotNull { it.presentableName }
         assertTrue("Experimental features list should contain 'code actions'", experimentalNames.contains("code actions"))
         assertTrue("Experimental features list should contain 'errors and warnings'", experimentalNames.contains("errors and warnings"))
+        assertFalse("DOCUMENT_HIGHLIGHT should not be experimental", LspMethod.getExperimentalFeatures().contains(LspMethod.DOCUMENT_HIGHLIGHT))
     }
 
     fun testPublishDiagnosticsNotification() {
@@ -1308,6 +1352,45 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(99, lspResponse!!.get("id").asInt)
         assertNotNull("lspMessage should contain result", lspResponse.getAsJsonObject("result"))
         assertEquals(true, lspResponse.getAsJsonObject("result").get("applied").asBoolean)
+    }
+
+    fun testForwardRequestUpdatesFilesContentFromBackgroundThread() {
+        val das = DartAnalysisServerService.getInstance(project)
+        val changedDocsField = DartAnalysisServerService::class.java.getDeclaredField("myChangedDocuments").apply {
+            isAccessible = true
+        }
+        @Suppress("UNCHECKED_CAST")
+        val changedDocs = changedDocsField.get(das) as MutableSet<Document>
+        val dummyDoc = EditorFactory.getInstance().createDocument("void main() {}")
+        changedDocs.add(dummyDoc)
+
+        val bgTask = ApplicationManager.getApplication().executeOnPooledThread {
+            assertFalse(
+                "Background thread should not start with read access",
+                ApplicationManager.getApplication().isReadAccessAllowed
+            )
+            val params = HoverParams(TextDocumentIdentifier("file:///test.dart"), Position(1, 2))
+            bridgeServer.hover(params)
+        }
+        bgTask.get(5, TimeUnit.SECONDS)
+
+        assertTrue(
+            "updateFilesContent() should have been called and cleared myChangedDocuments",
+            changedDocs.isEmpty()
+        )
+        assertEquals(1, capturedRequests.size)
+    }
+
+    fun testForwardRequestDoesNotDeadlockDuringWriteAction() {
+        WriteAction.run<Throwable> {
+            val bgTask = ApplicationManager.getApplication().executeOnPooledThread {
+                val params = RenameFilesParams(listOf(FileRename("file:///old.dart", "file:///new.dart")))
+                bridgeServer.willRenameFiles(params)
+            }
+            // Should complete without deadlocking even while EDT holds the write lock
+            bgTask.get(5, TimeUnit.SECONDS)
+        }
+        assertEquals(1, capturedRequests.size)
     }
 
     private class MockLanguageClient : LanguageClient {
