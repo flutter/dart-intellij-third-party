@@ -136,7 +136,6 @@ These skills are located in the [.agents/skills/](.agents/skills/) directory. Th
 * **[Migrate DAS to LSP](.agents/skills/migrate-das-to-lsp/SKILL.md):** Guide for converting legacy Dart Analysis Server (DAS) feature implementations to JetBrains LSP in the Dart IntelliJ plugin.
 * **[Monthly Release](.agents/skills/monthly-release/SKILL.md):** Step-by-step guide for preparing, validating, testing, and publishing monthly releases of the Dart IntelliJ plugin.
 * **[Patch Copied LSP Sources](.agents/skills/patch-copied-lsp-sources/SKILL.md):** Automates copying and patching of JetBrains LSP sources.
-* **[Plugin Issue Triage](.agents/skills/plugin-issue-triage/SKILL.md):** (Experimental) Automates the triage of GitHub issues in the Dart and Flutter IntelliJ plugins.
 * **[Port PR](.agents/skills/port-pr/SKILL.md):** Fetches a Pull Request from either the dart-intellij-third-party or flutter-intellij repository and conceptually ports its changes to the other repository.
 * **[Root Cause Regression](.agents/skills/root-cause-regression/SKILL.md):** Investigates a GitHub issue reporting a regression, analyzes recent commits, and identifies possible culprits.
 

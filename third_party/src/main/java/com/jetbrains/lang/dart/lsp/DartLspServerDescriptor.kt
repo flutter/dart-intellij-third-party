@@ -32,7 +32,9 @@ import com.intellij.platform.dartlsp.api.customization.LspDocumentColorDisabled
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspDocumentHighlightsSupport
 import com.intellij.platform.dartlsp.api.customization.LspDocumentLinkDisabled
+import com.intellij.platform.dartlsp.api.customization.LspDocumentSymbolCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspDocumentSymbolDisabled
+import com.intellij.platform.dartlsp.api.customization.LspDocumentSymbolSupport
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesSupport
@@ -179,7 +181,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 override fun shouldAskServerForDocumentHighlights(psiFile: PsiFile): Boolean = true
             }
         override val signatureHelpCustomizer = LspSignatureHelpDisabled
-        override val documentSymbolCustomizer = LspDocumentSymbolDisabled
+        override val documentSymbolCustomizer: LspDocumentSymbolCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                LspDocumentSymbolSupport()
+            } else {
+                LspDocumentSymbolDisabled
+            }
         override val workspaceSymbolCustomizer = LspWorkspaceSymbolDisabled
         override val callHierarchyCustomizer: LspCallHierarchyCustomizer
             get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {

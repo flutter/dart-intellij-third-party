@@ -9,6 +9,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.7.0"
+  checked_yaml:
+    dependency: transitive
+    description:
+      name: checked_yaml
+      sha256: "959525d3162f249993882720d52b7e0c833978df229be20702b33d48d91de70f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.4"
   collection:
     dependency: transitive
     description:
@@ -57,14 +65,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.9.1"
+  pub_semver:
+    dependency: transitive
+    description:
+      name: pub_semver
+      sha256: "261236774e8b1d69cfc6b9eabbc96c40f25e7a2d6b171f3385d4f65d5734fb24"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.1"
+  pubspec_parse:
+    dependency: transitive
+    description:
+      name: pubspec_parse
+      sha256: c38b81cbf34450b67e0265d73433569d12e34782e30ed769c9cc99c9d5f2e796
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
   skills_lint:
     dependency: "direct dev"
     description:
       name: skills_lint
-      sha256: "5daeff89c8c9d812cfa811e119ae88a32bb81d28c73aa7e899155885b2e63a63"
+      sha256: "5638b7ea79b265f0b2029abec61013296590e545eb6ecdb474bee1b94c06af79"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.1"
+    version: "0.5.2"
   source_span:
     dependency: transitive
     description:

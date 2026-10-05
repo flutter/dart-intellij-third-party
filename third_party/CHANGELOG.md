@@ -2,6 +2,19 @@
 
 ### Added
 - Experimental JetBrains LSP formatting for Reformat Code document and selection operations (#634)
+- File Structure view implemented with JetBrains LSP (experimental feature) (#673)
+
+### Changed
+- Experimental LSP formatting leaves width selection to Dart through the file URI; IntelliJ right margin and `dart.lineLength` are not sent on this path.
+- Experimental LSP hides the dedicated Dart formatting action in the project tree and renames the selection-aware editor action to Reformat Code. Disabling LSP restores the legacy action; the public `runDartfmt` compatibility API remains available regardless of this setting.
+
+### Removed
+
+### Fixed
+
+## 510.0.0
+
+### Added
 - Inlay hints for types and parameter names, configurable in Settings | Editor | Inlay Hints (JetBrains LSP; requires Dart SDK 3.14.0-139.0.dev or newer) (#617)
 - Per-category options for the Dart inlay hints in Settings | Editor | Inlay Hints (JetBrains LSP; requires Dart SDK 3.14.0-258.0.dev or newer) (#679)
 - Updating Dart imports when renaming or moving files and directories via LSP `workspace/willRenameFiles` (experimental feature) (#638)
@@ -9,15 +22,14 @@
 - Quick fixes, assists, source actions, and refactorings via LSP code actions (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#526)
 
 ### Changed
-- Experimental LSP formatting leaves width selection to Dart through the file URI; IntelliJ right margin and `dart.lineLength` are not sent on this path.
-- Experimental LSP hides the dedicated Dart formatting action in the project tree and renames the selection-aware editor action to Reformat Code. Disabling LSP restores the legacy action; the public `runDartfmt` compatibility API remains available regardless of this setting.
-- Highlighting read vs write variable occurrences via LSP is now enabled for all users
+- Highlighting read vs write variable occurrences via LSP is now enabled for all users (#693)
 
 ### Removed
 
 ### Fixed
 - Support lsp4j 1.0.0 in IntelliJ 2026.3 (#671)
-- Remove ambiguous "Find Usages Of" popup when invoking Find Usages with LSP references enabled (#643)
+- Avoid ambiguous "Find Usages Of" popup when invoking Find Usages with LSP references enabled (#643)
+- Class and method grouping for LSP Find Usages (#650)
 
 ## 509.0.0
 

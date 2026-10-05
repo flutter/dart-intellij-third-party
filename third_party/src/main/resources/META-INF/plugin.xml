@@ -323,6 +323,11 @@
   </extensions>
 
 
+  <applicationListeners>
+    <listener class="com.jetbrains.lang.dart.analytics.DartNavigationActionListener"
+              topic="com.intellij.openapi.actionSystem.ex.AnActionListener"/>
+  </applicationListeners>
+
   <projectListeners>
     <listener class="com.jetbrains.lang.dart.DartWorkspaceModelChangeListener" topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>
     <listener class="com.jetbrains.lang.dart.ide.errorTreeView.DartAnalysisToolWindowFactory$DartToolWindowManagerListener"

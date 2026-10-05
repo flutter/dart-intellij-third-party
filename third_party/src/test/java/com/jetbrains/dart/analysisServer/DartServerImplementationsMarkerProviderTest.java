@@ -1,6 +1,14 @@
 package com.jetbrains.dart.analysisServer;
 
 import com.intellij.codeInsight.daemon.GutterMark;
+import com.intellij.codeInsight.daemon.LineMarkerInfo;
+import com.intellij.psi.util.PsiTreeUtil;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
+import com.jetbrains.lang.dart.ide.marker.DartServerImplementationsMarkerProvider;
+import com.jetbrains.lang.dart.psi.DartComponentName;
+
+import java.util.ArrayList;
 import com.intellij.icons.AllIcons;
 import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
@@ -29,13 +37,17 @@ public class DartServerImplementationsMarkerProviderTest extends CodeInsightFixt
     final String testName = getTestName(false);
     myFixture.configureByFile(testName + ".dart");
 
-    myFixture.doHighlighting(); // make sure server is warmed up
+    List<AnalyticsData> events = new ArrayList<>();
+    Analytics.withReportObserver(events::add, () -> {
+      myFixture.doHighlighting(); // make sure server is warmed up
 
-    if (!someGutterHasIcon(myFixture.findGuttersAtCaret(), expectedIcon)) {
-      TimeoutUtil.sleep(200); // wait a bit for info about line markers 'up' to arrive
-    }
+      if (!someGutterHasIcon(myFixture.findGuttersAtCaret(), expectedIcon)) {
+        TimeoutUtil.sleep(200); // wait a bit for info about line markers 'up' to arrive
+      }
 
-    DartServerOverrideMarkerProviderTest.checkGutter(myFixture.findGuttersAtCaret(), expectedText, expectedIcon);
+      DartServerOverrideMarkerProviderTest.checkGutter(myFixture.findGuttersAtCaret(), expectedText, expectedIcon);
+    });
+    assertTrue("Marker construction must not report", events.isEmpty());
   }
 
   private static boolean someGutterHasIcon(@NotNull final List<GutterMark> gutters, @NotNull final Icon icon) {
@@ -45,6 +57,17 @@ public class DartServerImplementationsMarkerProviderTest extends CodeInsightFixt
       }
     }
     return false;
+  }
+
+  public void testClickAfterTargetsDisappear() throws Exception {
+    myFixture.configureByText("empty.dart", "class Empty {}");
+    myFixture.doHighlighting();
+    DartComponentName name = PsiTreeUtil.findChildOfType(myFixture.getFile(), DartComponentName.class);
+    // Recreate a stale marker without requiring an asynchronous server-update race.
+    var factory = DartServerImplementationsMarkerProvider.class.getDeclaredMethod("createMarkerClass", DartComponentName.class);
+    factory.setAccessible(true);
+    LineMarkerInfo<?> marker = (LineMarkerInfo<?>)factory.invoke(null, name);
+    DartServerOverrideMarkerProviderTest.checkGutter(List.of(marker.createGutterRenderer()), "Has subclasses", AllIcons.Gutter.OverridenMethod);
   }
 
   public void testClassExtended() {

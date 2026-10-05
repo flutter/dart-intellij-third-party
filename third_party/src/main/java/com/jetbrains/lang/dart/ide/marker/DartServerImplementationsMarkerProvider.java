@@ -12,6 +12,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.DartNavigationAnalytics;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.analyzer.DartServerData;
 import com.jetbrains.lang.dart.ide.actions.DartInheritorsSearcher;
@@ -74,6 +75,7 @@ public final class DartServerImplementationsMarkerProvider implements LineMarker
                 AllIcons.Gutter.OverridenMethod,
                 element -> accessibleName,
                 (e, __) -> {
+                    DartNavigationAnalytics.SUBCLASSES.report(name.getProject());
                     String findUsagesTitle = DartBundle.message("tab.title.subclasses.of.0", name.getName());
                     String popupTitle = DaemonBundle.message("navigation.title.subclass", name.getName(), 0, "");
                     new PsiTargetNavigator<>(() -> {
@@ -107,6 +109,7 @@ public final class DartServerImplementationsMarkerProvider implements LineMarker
                 AllIcons.Gutter.OverridenMethod,
                 element -> accessibleName,
                 (e, __) -> {
+                    DartNavigationAnalytics.OVERRIDING_METHODS.report(name.getProject());
                     String findUsagesTitle = DartBundle.message("tab.title.overriding.methods.of.0", name.getName());
                     String popupTitle = DaemonBundle.message("navigation.title.overrider.method", name.getName(), "");
                     new PsiTargetNavigator<>(() -> {

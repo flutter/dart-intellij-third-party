@@ -17,7 +17,11 @@ import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
 import com.google.gson.JsonObject
+import com.google.gson.reflect.TypeToken
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.impl.DocumentImpl
 import com.intellij.platform.dartlsp.util.applyTextEdits
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
@@ -38,6 +42,7 @@ import org.eclipse.lsp4j.DocumentFormattingParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.DocumentRangeFormattingParams
+import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.FormattingOptions
@@ -1453,6 +1458,70 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertFalse(options.has("formatter.page_width"))
     }
 
+    fun testDocumentSymbolRequest() {
+        val params = DocumentSymbolParams(TextDocumentIdentifier("file:///test.dart"))
+        val future = bridgeServer.documentSymbol(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+
+        val lspMessage = jsonObject!!.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("textDocument/documentSymbol", lspMessage.get("method").asString)
+
+        val responseJson = """
+                {
+                  "id": "123",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "123",
+                      "result": [
+                        {
+                          "name": "MyClass",
+                          "kind": 5,
+                          "range": {
+                            "start": { "line": 0, "character": 0 },
+                            "end": { "line": 4, "character": 1 }
+                          },
+                          "selectionRange": {
+                            "start": { "line": 0, "character": 6 },
+                            "end": { "line": 0, "character": 13 }
+                          },
+                          "children": [
+                            {
+                              "name": "myMethod",
+                              "detail": "(String name)",
+                              "kind": 6,
+                              "range": {
+                                "start": { "line": 1, "character": 2 },
+                                "end": { "line": 3, "character": 3 }
+                              },
+                              "selectionRange": {
+                                "start": { "line": 1, "character": 7 },
+                                "end": { "line": 1, "character": 15 }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+            """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.size)
+        val rootSymbol = result[0].right
+        assertEquals("MyClass", rootSymbol.name)
+        assertEquals(SymbolKind.Class, rootSymbol.kind)
+        assertEquals(1, rootSymbol.children.size)
+        assertEquals("myMethod", rootSymbol.children[0].name)
+        assertEquals("(String name)", rootSymbol.children[0].detail)
+    }
+
     fun testIsDartSdkVersionSufficientForLspReferences() {
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("3.14.0-65.0.dev"))
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReferences("3.15.0"))
@@ -1603,6 +1672,45 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(99, lspResponse!!.get("id").asInt)
         assertNotNull("lspMessage should contain result", lspResponse.getAsJsonObject("result"))
         assertEquals(true, lspResponse.getAsJsonObject("result").get("applied").asBoolean)
+    }
+
+    fun testForwardRequestUpdatesFilesContentFromBackgroundThread() {
+        val das = DartAnalysisServerService.getInstance(project)
+        val changedDocsField = DartAnalysisServerService::class.java.getDeclaredField("myChangedDocuments").apply {
+            isAccessible = true
+        }
+        @Suppress("UNCHECKED_CAST")
+        val changedDocs = changedDocsField.get(das) as MutableSet<Document>
+        val dummyDoc = EditorFactory.getInstance().createDocument("void main() {}")
+        changedDocs.add(dummyDoc)
+
+        val bgTask = ApplicationManager.getApplication().executeOnPooledThread {
+            assertFalse(
+                "Background thread should not start with read access",
+                ApplicationManager.getApplication().isReadAccessAllowed
+            )
+            val params = HoverParams(TextDocumentIdentifier("file:///test.dart"), Position(1, 2))
+            bridgeServer.hover(params)
+        }
+        bgTask.get(5, TimeUnit.SECONDS)
+
+        assertTrue(
+            "updateFilesContent() should have been called and cleared myChangedDocuments",
+            changedDocs.isEmpty()
+        )
+        assertEquals(1, capturedRequests.size)
+    }
+
+    fun testForwardRequestDoesNotDeadlockDuringWriteAction() {
+        WriteAction.run<Throwable> {
+            val bgTask = ApplicationManager.getApplication().executeOnPooledThread {
+                val params = RenameFilesParams(listOf(FileRename("file:///old.dart", "file:///new.dart")))
+                bridgeServer.willRenameFiles(params)
+            }
+            // Should complete without deadlocking even while EDT holds the write lock
+            bgTask.get(5, TimeUnit.SECONDS)
+        }
+        assertEquals(1, capturedRequests.size)
     }
 
     private class MockLanguageClient : LanguageClient {

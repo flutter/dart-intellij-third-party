@@ -23,7 +23,8 @@ enum class LspMethod(
     SHUTDOWN("shutdown"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
-    RANGE_FORMATTING("textDocument/rangeFormatting", isExperimental = true, presentableName = "range formatting");
+    RANGE_FORMATTING("textDocument/rangeFormatting", isExperimental = true, presentableName = "range formatting"),
+    DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols");
 
     companion object {
         fun fromMethod(method: String): LspMethod? = entries.find { it.method == method }
