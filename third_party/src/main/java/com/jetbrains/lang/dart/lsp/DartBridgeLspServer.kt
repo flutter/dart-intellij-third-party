@@ -11,8 +11,8 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ex.ApplicationManagerEx
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
@@ -79,6 +79,8 @@ import org.eclipse.lsp4j.services.WorkspaceService
 import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * DartBridgeLspServer acts as a lightweight translation bridge between the JetBrains LSP client
@@ -123,6 +125,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     private var client: LanguageClient? = null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
+    private val pendingDiagnostics = ConcurrentLinkedQueue<PublishDiagnosticsParams>()
+    private val isDrainingDiagnostics = AtomicBoolean(false)
     private var dasMessageListener: ResponseListener? = null
 
     private val das: DartAnalysisServerService
@@ -231,10 +235,44 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val paramsObj = msgObj.get("params")
         val params = GSON.fromJson(paramsObj, PublishDiagnosticsParams::class.java)
         client.publishDiagnostics(params)
-        val errors = params.diagnostics?.map {
-            DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, params.uri, it)
-        } ?: emptyList()
-        das.onLspDiagnosticsUpdated(params.uri, errors)
+        pendingDiagnostics.add(params)
+        if (!ApplicationManagerEx.getApplicationEx().tryRunReadAction { drainPendingDiagnostics() }) {
+            scheduleDrainPendingDiagnostics()
+        }
+    }
+
+    private fun scheduleDrainPendingDiagnostics() {
+        if (isDrainingDiagnostics.compareAndSet(false, true)) {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                try {
+                    while (pendingDiagnostics.isNotEmpty() && !project.isDisposed) {
+                        ApplicationManager.getApplication().runReadAction {
+                            drainPendingDiagnostics()
+                        }
+                    }
+                } finally {
+                    isDrainingDiagnostics.set(false)
+                    if (pendingDiagnostics.isNotEmpty() && !project.isDisposed) {
+                        scheduleDrainPendingDiagnostics()
+                    }
+                }
+            }
+        }
+    }
+
+    @Synchronized
+    private fun drainPendingDiagnostics() {
+        while (true) {
+            val next = pendingDiagnostics.poll() ?: break
+            if (project.isDisposed) {
+                pendingDiagnostics.clear()
+                break
+            }
+            val errors = next.diagnostics?.map {
+                DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, next.uri, it)
+            } ?: emptyList()
+            das.onLspDiagnosticsUpdated(next.uri, errors)
+        }
     }
 
     private fun handlePublishClosingLabels(msgObj: JsonObject) {
@@ -283,6 +321,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     fun stop() {
         dasMessageListener?.let { das.removeResponseListener(it) }
+        pendingDiagnostics.clear()
         pendingRequests.forEach { (_, pending) ->
             pending.future.cancel(true)
         }
@@ -517,7 +556,11 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val ready = if (das.isServerProcessActive) {
             true
         } else {
-            runCatching { runReadAction { das.serverReadyForRequest() } }.getOrDefault(false)
+            var isReady = false
+            ApplicationManagerEx.getApplicationEx().tryRunReadAction {
+                isReady = runCatching { das.serverReadyForRequest() }.getOrDefault(false)
+            }
+            isReady
         }
         if (!ready) {
             future.completeExceptionally(ResponseErrorException(ResponseError(-32001, "Dart Analysis Server is not ready", null)))

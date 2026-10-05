@@ -1653,6 +1653,61 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(1, capturedRequests.size)
     }
 
+    fun testPublishDiagnosticsDoesNotDeadlockDuringWriteAction() {
+        val testFile = myFixture.addFileToProject(
+            "lib/test_deadlock.dart",
+            """
+            void main() {
+              int x = "string";
+            }
+            """.trimIndent()
+        )
+        val fileUri = "file://${testFile.virtualFile.path}"
+        val notificationJson = """
+            {
+              "params": {
+                "lspNotification": {
+                  "jsonrpc": "2.0",
+                  "method": "textDocument/publishDiagnostics",
+                  "params": {
+                    "uri": "$fileUri",
+                    "diagnostics": [
+                      {
+                        "range": {
+                          "start": {"line": 1, "character": 10},
+                          "end": {"line": 1, "character": 18}
+                        },
+                        "severity": 1,
+                        "code": "invalid_assignment",
+                        "message": "A value of type 'String' can't be assigned to a variable of type 'int'.",
+                        "source": "dart"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        WriteAction.run<Throwable> {
+            val bgTask = ApplicationManager.getApplication().executeOnPooledThread {
+                capturedListener.onResponse(notificationJson)
+            }
+            // ServerResponseReaderThread must not block on runReadAction while EDT holds the write lock
+            bgTask.get(5, TimeUnit.SECONDS)
+        }
+
+        assertNotNull(mockClient.publishedDiagnostics)
+        assertEquals(fileUri, mockClient.publishedDiagnostics?.uri)
+
+        val das = DartAnalysisServerService.getInstance(project)
+        val deadline = System.currentTimeMillis() + 5000
+        while (das.getErrors(testFile.virtualFile).isEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10)
+        }
+        assertEquals(1, das.getErrors(testFile.virtualFile).size)
+    }
+
     private class MockLanguageClient : LanguageClient {
         var publishedDiagnostics: PublishDiagnosticsParams? = null
         var lastApplyWorkspaceEditParams: ApplyWorkspaceEditParams? = null
