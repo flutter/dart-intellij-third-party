@@ -12,6 +12,7 @@
 ### Fixed
 - Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
 - Restore semantic syntax highlighting after external file modification (#656)
+- Support Go to Declaration or Usages and Find Usages on declaration sites when experimental LSP is enabled (#699)
 
 ## 510.0.0
 
