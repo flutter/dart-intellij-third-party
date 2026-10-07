@@ -706,11 +706,20 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
 
   @Override
   public void server_setClientCapabilities(List<String> requests, boolean supportsUris, Object lspCapabilities) {
+    server_setClientCapabilities(requests, supportsUris, lspCapabilities, null);
+  }
+
+  @Override
+  public void server_setClientCapabilities(List<String> requests, boolean supportsUris, Object lspCapabilities, Consumer consumer) {
     String id = generateUniqueId();
     if (requests == null) {
       requests = StringUtilities.EMPTY_LIST;
     }
-    sendRequestToServer(id, RequestUtilities.generateClientCapabilities(id, requests, supportsUris, lspCapabilities));
+    if (consumer != null) {
+      sendRequestToServer(id, RequestUtilities.generateClientCapabilities(id, requests, supportsUris, lspCapabilities), consumer);
+    } else {
+      sendRequestToServer(id, RequestUtilities.generateClientCapabilities(id, requests, supportsUris, lspCapabilities));
+    }
   }
 
   @Override
