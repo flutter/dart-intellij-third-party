@@ -9,6 +9,7 @@
 ### Removed
 
 ### Fixed
+- Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
 
 ## 510.0.0
 
