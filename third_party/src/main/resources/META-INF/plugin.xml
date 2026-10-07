@@ -88,6 +88,7 @@
 
     <langCodeStyleSettingsProvider implementation="com.jetbrains.lang.dart.ide.formatter.settings.DartLanguageCodeStyleSettingsProvider"/>
     <lang.importOptimizer language="Dart" implementationClass="com.jetbrains.lang.dart.ide.imports.DartImportOptimizer"/>
+    <lang.importOptimizer language="Dart" implementationClass="com.jetbrains.lang.dart.ide.imports.DartLspImportOptimizer"/>
 
     <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartServerRenameHandler"/>
     <renamePsiElementProcessor implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspRenamePsiElementProcessor" order="first"/>
