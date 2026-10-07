@@ -9,6 +9,7 @@ import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.Consumer
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
 import com.google.dart.server.DartLspWorkspaceConfigurationConsumer
+import com.google.dart.server.JsonConsumer
 import com.google.dart.server.ResponseListener
 import com.google.dart.server.ShowMessageRequestConsumer
 import com.google.dart.server.internal.remote.ByteLineReaderStream
@@ -16,16 +17,20 @@ import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import com.intellij.icons.AllIcons
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.jetbrains.lang.dart.sdk.DartSdk
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
+import org.dartlang.analysis.server.protocol.RequestError
 import org.eclipse.lsp4j.ApplyWorkspaceEditParams
 import org.eclipse.lsp4j.ApplyWorkspaceEditResponse
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
@@ -60,6 +65,7 @@ import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.SemanticTokenModifiers
 import org.eclipse.lsp4j.SemanticTokenTypes
+import org.eclipse.lsp4j.SemanticTokensLegend
 import org.eclipse.lsp4j.SemanticTokensParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
 import org.eclipse.lsp4j.SymbolKind
@@ -89,6 +95,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     private val capturedRequests = CopyOnWriteArrayList<JsonObject>()
     private val capturedResponses = CopyOnWriteArrayList<JsonObject>()
     private val capturedNotifications = CopyOnWriteArrayList<JsonObject>()
+    private var capturedConsumer: Consumer? = null
 
     override fun setUp() {
         super.setUp()
@@ -123,6 +130,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
             override fun sendRequestToServer(id: String, request: JsonObject, consumer: Consumer) {
                 capturedRequests.add(request)
+                capturedConsumer = consumer
             }
 
             override fun sendResponseToServer(response: JsonObject) {
@@ -175,6 +183,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             
             capturedRequests.clear()
             capturedNotifications.clear()
+            capturedResponses.clear()
+            capturedConsumer = null
         } finally {
             super.tearDown()
         }
@@ -922,6 +932,108 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue("Legend should contain custom modifier 'instance'", legend.tokenModifiers.contains("instance"))
     }
 
+    fun testInitialize_semanticTokensDynamicLegendFromDas() {
+        val customTypes = listOf("customClass", "customMethod")
+        val customModifiers = listOf("customStatic", "customDecl")
+        val das = DartAnalysisServerService.getInstance(project)
+        das.semanticTokensLegend = SemanticTokensLegend(customTypes, customModifiers)
+
+        val future = bridgeServer.initialize(InitializeParams())
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        val legend = result.capabilities?.semanticTokensProvider?.legend
+        assertNotNull(legend)
+        assertEquals(customTypes, legend!!.tokenTypes)
+        assertEquals(customModifiers, legend.tokenModifiers)
+    }
+
+    fun testUpdateClientCapabilities_parsesSemanticTokensLegendFromDas() {
+        val responseJson = """
+            {
+              "lspCapabilities": {
+                "semanticTokensProvider": {
+                  "legend": {
+                    "tokenTypes": ["annotation", "class", "customType"],
+                    "tokenModifiers": ["documentation", "customModifier"]
+                  },
+                  "full": { "delta": false },
+                  "range": true
+                }
+              }
+            }
+        """.trimIndent()
+        val resultObj = JsonParser.parseString(responseJson).asJsonObject
+        val das = DartAnalysisServerService.getInstance(project)
+        das.handleClientCapabilitiesResponse(resultObj, null)
+
+        val legend = das.semanticTokensLegend
+        assertNotNull("Dynamic legend should be parsed from DAS capabilities response", legend)
+        assertEquals(listOf("annotation", "class", "customType"), legend!!.tokenTypes)
+        assertEquals(listOf("documentation", "customModifier"), legend.tokenModifiers)
+    }
+
+    fun testUpdateClientCapabilities_endToEnd() {
+        val das = DartAnalysisServerService.getInstance(project)
+        das.semanticTokensLegend = null
+
+        das.updateClientCapabilities()
+
+        val setCapsReq = capturedRequests.find { it.get("method")?.asString == "server.setClientCapabilities" }
+        assertNotNull("server.setClientCapabilities request should be sent", setCapsReq)
+        assertNotNull("Consumer should be captured", capturedConsumer)
+
+        val responseJson = """
+            {
+              "lspCapabilities": {
+                "semanticTokensProvider": {
+                  "legend": {
+                    "tokenTypes": ["class", "method", "variable"],
+                    "tokenModifiers": ["declaration", "static"]
+                  },
+                  "full": { "delta": false },
+                  "range": true
+                }
+              }
+            }
+        """.trimIndent()
+        val resultObj = JsonParser.parseString(responseJson).asJsonObject
+
+        val jsonConsumer = capturedConsumer as JsonConsumer
+        jsonConsumer.onResponse(resultObj, null)
+
+        val legend = das.semanticTokensLegend
+        assertNotNull("Dynamic legend should be set on DAS", legend)
+        assertEquals(listOf("class", "method", "variable"), legend?.tokenTypes)
+        assertEquals(listOf("declaration", "static"), legend?.tokenModifiers)
+
+        val futureLegend = das.semanticTokensLegendFuture.get(5, TimeUnit.SECONDS)
+        assertEquals(legend, futureLegend)
+    }
+
+    fun testUpdateClientCapabilities_handlesMissingLspCapabilitiesGracefully() {
+        val das = DartAnalysisServerService.getInstance(project)
+        das.updateClientCapabilities()
+
+        val jsonConsumer = capturedConsumer as JsonConsumer
+        jsonConsumer.onResponse(JsonObject(), null)
+
+        assertNull("Legend should be null when lspCapabilities is missing", das.semanticTokensLegend)
+        val futureLegend = das.semanticTokensLegendFuture.get(5, TimeUnit.SECONDS)
+        assertNull("Future should resolve to null when lspCapabilities is missing", futureLegend)
+    }
+
+    fun testUpdateClientCapabilities_handlesRequestErrorGracefully() {
+        val das = DartAnalysisServerService.getInstance(project)
+        das.updateClientCapabilities()
+
+        val jsonConsumer = capturedConsumer as JsonConsumer
+        jsonConsumer.onResponse(null, RequestError("SERVER_ERROR", "Error message", null))
+
+        assertNull("Legend should be null on request error", das.semanticTokensLegend)
+        val futureLegend = das.semanticTokensLegendFuture.get(5, TimeUnit.SECONDS)
+        assertNull("Future should resolve to null on request error", futureLegend)
+    }
+
     fun testSemanticTokensFull_success() {
         val params = SemanticTokensParams(TextDocumentIdentifier("file:///test.dart"))
         val future = bridgeServer.semanticTokensFull(params)
@@ -1052,8 +1164,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             "label", "interpolation", "source", "void", "wildcard"
         )
 
-        assertEquals("Token types must strictly match DAS legend", expectedTokenTypes, DartLspSemanticTokensSupport.tokenTypes)
-        assertEquals("Token modifiers must strictly match DAS legend", expectedTokenModifiers, DartLspSemanticTokensSupport.tokenModifiers)
+        assertEquals("Default fallback token types must match standard DAS legend", expectedTokenTypes, DartLspSemanticTokensSupport.DEFAULT_TOKEN_TYPES)
+        assertEquals("Default fallback token modifiers must match standard DAS legend", expectedTokenModifiers, DartLspSemanticTokensSupport.DEFAULT_TOKEN_MODIFIERS)
     }
 
     fun testDartLspSemanticTokensDecodingWithDasLegend() {
@@ -1097,6 +1209,42 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("class", type5)
         assertTrue(mods5.contains("constructor"))
         assertEquals(DartSyntaxHighlighterColors.CONSTRUCTOR, DartLspSemanticTokensSupport.getTextAttributesKey(type5, mods5))
+    }
+
+    fun testDartLspSemanticTokensDecoding_withServerProvidedLegend() {
+        // Simulates dynamic legend where server returned different ordering than default legend
+        val dynamicTokenTypes = listOf("string", "keyword", "function", "class")
+        val dynamicTokenModifiers = listOf("constructor", "static", "declaration")
+
+        fun decodeDynamicToken(typeIndex: Int, modifierMask: Int): Pair<String, List<String>> {
+            val type = dynamicTokenTypes[typeIndex]
+            val modifiers = mutableListOf<String>()
+            for ((index, modifier) in dynamicTokenModifiers.withIndex()) {
+                if (modifierMask and (1 shl index) != 0) {
+                    modifiers.add(modifier)
+                }
+            }
+            return type to modifiers
+        }
+
+        // In this dynamic legend, type 0 is string (in default legend it's index 16)
+        val (type1, mods1) = decodeDynamicToken(0, 0)
+        assertEquals("string", type1)
+        assertEquals(DartSyntaxHighlighterColors.STRING, DartLspSemanticTokensSupport.getTextAttributesKey(type1, mods1))
+
+        // In this dynamic legend, type 3 is class, and modifier bit 0 is constructor (mod 1)
+        val (type2, mods2) = decodeDynamicToken(3, 1)
+        assertEquals("class", type2)
+        assertTrue(mods2.contains("constructor"))
+        assertEquals(DartSyntaxHighlighterColors.CONSTRUCTOR, DartLspSemanticTokensSupport.getTextAttributesKey(type2, mods2))
+
+        // In this dynamic legend, type 2 is function, and modifier bits 1 and 2 are static and declaration
+        // bit 1 is static (1 shl 1 = 2), bit 2 is declaration (1 shl 2 = 4) -> mask = 6
+        val (type3, mods3) = decodeDynamicToken(2, (1 shl 1) or (1 shl 2))
+        assertEquals("function", type3)
+        assertTrue(mods3.contains("static"))
+        assertTrue(mods3.contains("declaration"))
+        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(type3, mods3))
     }
 
     fun testPublishDiagnosticsNotification() {
@@ -1857,17 +2005,34 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testIsDartSdkVersionSufficientForLspHighlighting() {
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-217.0.dev"))
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-218.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-307.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-308.0.dev"))
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.15.0"))
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("4.0.0"))
 
-        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-216.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-306.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-217.0.dev"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-65.0.dev"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.13.0"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.0.0"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.19.0"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.14.0"))
+    }
+
+    fun testIsLspHighlightingEnabled() {
+        val properties = PropertiesComponent.getInstance(project)
+        try {
+            properties.setValue("dart.lsp.experimental.enabled", true, true)
+            val sdk = DartSdk.getDartSdk(project)
+            assertNotNull(sdk)
+            val isSufficient = DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting(sdk!!.version)
+            assertEquals(isSufficient, DartAnalysisServerService.isLspHighlightingEnabled(project))
+
+            properties.setValue("dart.lsp.experimental.enabled", false, true)
+            assertFalse(DartAnalysisServerService.isLspHighlightingEnabled(project))
+        } finally {
+            properties.unsetValue("dart.lsp.experimental.enabled")
+        }
     }
 
     private class MockLanguageClient : LanguageClient {

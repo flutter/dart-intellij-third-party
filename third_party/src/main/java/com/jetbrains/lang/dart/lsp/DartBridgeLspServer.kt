@@ -83,6 +83,7 @@ import org.eclipse.lsp4j.services.WorkspaceService
 import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 /**
  * DartBridgeLspServer acts as a lightweight translation bridge between the JetBrains LSP client
@@ -297,37 +298,48 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
-        val capabilities = ServerCapabilities().apply {
-            setHoverProvider(true)
-            setDefinitionProvider(true)
-            setTypeDefinitionProvider(true)
-            setDocumentHighlightProvider(true)
-            setInlayHintProvider(true)
-            setTypeHierarchyProvider(true)
-            setCallHierarchyProvider(true)
-            setReferencesProvider(true)
-            setDocumentSymbolProvider(true)
-            setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
-            val semanticTokensLegend = SemanticTokensLegend(
-                DartLspSemanticTokensSupport.tokenTypes,
-                DartLspSemanticTokensSupport.tokenModifiers
-            )
-            setSemanticTokensProvider(SemanticTokensWithRegistrationOptions().apply {
-                legend = semanticTokensLegend
-                setFull(true)
-                setRange(false)
-            })
-            val fileOperationsCaps = FileOperationsServerCapabilities().apply {
-                willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
-            }
-            workspace = WorkspaceServerCapabilities().apply {
-                fileOperations = fileOperationsCaps
-            }
-            setCodeActionProvider(true)
-            setExecuteCommandProvider(ExecuteCommandOptions())
-            // Add other capabilities as we support them.
+        val legendFuture = das.semanticTokensLegendFuture
+        val legendCompletableFuture = if (legendFuture.isDone) {
+            CompletableFuture.completedFuture(das.semanticTokensLegend)
+        } else if (das.isServerProcessActive) {
+            legendFuture.completeOnTimeout(null, 1, TimeUnit.SECONDS)
+        } else {
+            CompletableFuture.completedFuture(null)
         }
-        return CompletableFuture.completedFuture(InitializeResult(capabilities))
+
+        return legendCompletableFuture.thenApply { serverLegend ->
+            val semanticTokensLegend = serverLegend ?: SemanticTokensLegend(
+                DartLspSemanticTokensSupport.DEFAULT_TOKEN_TYPES,
+                DartLspSemanticTokensSupport.DEFAULT_TOKEN_MODIFIERS
+            )
+            val capabilities = ServerCapabilities().apply {
+                setHoverProvider(true)
+                setDefinitionProvider(true)
+                setTypeDefinitionProvider(true)
+                setDocumentHighlightProvider(true)
+                setInlayHintProvider(true)
+                setTypeHierarchyProvider(true)
+                setCallHierarchyProvider(true)
+                setReferencesProvider(true)
+                setDocumentSymbolProvider(true)
+                setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
+                setSemanticTokensProvider(SemanticTokensWithRegistrationOptions().apply {
+                    legend = semanticTokensLegend
+                    setFull(true)
+                    setRange(false)
+                })
+                val fileOperationsCaps = FileOperationsServerCapabilities().apply {
+                    willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
+                }
+                workspace = WorkspaceServerCapabilities().apply {
+                    fileOperations = fileOperationsCaps
+                }
+                setCodeActionProvider(true)
+                setExecuteCommandProvider(ExecuteCommandOptions())
+                // Add other capabilities as we support them.
+            }
+            InitializeResult(capabilities)
+        }
     }
 
     override fun initialized(params: InitializedParams) {
