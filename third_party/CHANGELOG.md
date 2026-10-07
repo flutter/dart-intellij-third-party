@@ -3,7 +3,7 @@
 ### Added
 - File Structure view implemented with JetBrains LSP (experimental feature) (#673)
 - Code completion with JetBrains LSP (experimental feature) (#399)
-- Optimize Imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
+- Optimizing imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
 
 ### Changed
 

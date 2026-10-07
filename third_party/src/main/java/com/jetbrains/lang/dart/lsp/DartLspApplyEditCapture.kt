@@ -51,7 +51,10 @@ class DartLspApplyEditCapture(private val project: Project) {
     internal var nanoTime: () -> Long = System::nanoTime
 
     /** Starts capturing the next `workspace/applyEdit` that only edits the file at [filePath]. */
-    fun start(filePath: String): Capture = Capture(filePath).also { captures += it }
+    fun start(filePath: String): Capture {
+        removeExpiredCaptures()
+        return Capture(filePath).also { captures += it }
+    }
 
     /**
      * Returns the answer to [params] if they belong to a capture, or `null` if the client should handle them as usual.
@@ -63,6 +66,8 @@ class DartLspApplyEditCapture(private val project: Project) {
         removeExpiredCaptures()
         if (captures.isEmpty()) return null
         val (fileUri, edits) = singleFileTextEdits(params.edit) ?: return null
+        // Only parses the URI (no PSI or VFS access), so no read action is needed on the LSP client's thread. A read
+        // action would also make this answer wait for pending write actions while processFile waits for the answer.
         val filePath = (getDartFileInfo(project, fileUri) as? DartLocalFileInfo)?.filePath ?: return null
         for (capture in captures) {
             if (!FileUtil.pathsEqual(capture.filePath, filePath)) continue
