@@ -228,7 +228,12 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
         return psiFile.fileType == DartFileType.INSTANCE
     }
 
-    override val tokenTypes: List<String> = listOf(
+    /**
+     * Default fallback token types matching Dart Analysis Server's standard legend.
+     * In Dart SDK 3.14.0-307.0.dev+, the active legend used to decode tokens is dynamically provided
+     * by DAS via server.setClientCapabilities and populated in DartBridgeLspServer.initialize.
+     */
+    val DEFAULT_TOKEN_TYPES: List<String> = listOf(
         "annotation",
         SemanticTokenTypes.Class,
         SemanticTokenTypes.Comment,
@@ -250,7 +255,12 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
         SemanticTokenTypes.TypeParameter
     )
 
-    override val tokenModifiers: List<String> = listOf(
+    /**
+     * Default fallback token modifiers matching Dart Analysis Server's standard legend.
+     * In Dart SDK 3.14.0-307.0.dev+, the active legend used to decode tokens is dynamically provided
+     * by DAS via server.setClientCapabilities and populated in DartBridgeLspServer.initialize.
+     */
+    val DEFAULT_TOKEN_MODIFIERS: List<String> = listOf(
         SemanticTokenModifiers.Documentation,
         "constructor",
         SemanticTokenModifiers.Declaration,
@@ -266,6 +276,10 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
         "void",
         "wildcard"
     )
+
+    override val tokenTypes: List<String> = DEFAULT_TOKEN_TYPES
+
+    override val tokenModifiers: List<String> = DEFAULT_TOKEN_MODIFIERS
 
     override fun getTextAttributesKey(tokenType: String, modifiers: List<String>): TextAttributesKey? {
         val isDecl = modifiers.contains(SemanticTokenModifiers.Declaration)
