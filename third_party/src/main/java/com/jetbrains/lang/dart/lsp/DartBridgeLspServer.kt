@@ -390,10 +390,6 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
 
         return legendCompletableFuture.thenApply { serverLegend ->
-            val semanticTokensLegend = serverLegend ?: SemanticTokensLegend(
-                DartLspSemanticTokensSupport.DEFAULT_TOKEN_TYPES,
-                DartLspSemanticTokensSupport.DEFAULT_TOKEN_MODIFIERS
-            )
             val capabilities = ServerCapabilities().apply {
                 setHoverProvider(true)
                 setDefinitionProvider(true)
@@ -405,11 +401,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 setReferencesProvider(true)
                 setDocumentSymbolProvider(true)
                 setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
-                setSemanticTokensProvider(SemanticTokensWithRegistrationOptions().apply {
-                    legend = semanticTokensLegend
-                    setFull(true)
-                    setRange(false)
-                })
+                if (serverLegend != null) {
+                    setSemanticTokensProvider(SemanticTokensWithRegistrationOptions().apply {
+                        legend = serverLegend
+                        setFull(true)
+                        setRange(false)
+                    })
+                }
                 val fileOperationsCaps = FileOperationsServerCapabilities().apply {
                     willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
                 }
