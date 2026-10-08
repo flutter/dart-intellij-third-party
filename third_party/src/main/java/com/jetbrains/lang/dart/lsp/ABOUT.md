@@ -11,6 +11,7 @@ Dart LSP server integration connecting IntelliJ Platform LSP infrastructure with
 - com.jetbrains.lang.dart.lsp.DartLanguageServer
 - com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
 - com.jetbrains.lang.dart.lsp.DartLspDiagnosticConverter
+- com.jetbrains.lang.dart.lsp.DartLspApplyEditCapture
 - com.jetbrains.lang.dart.lsp.LspMethod
 
 ## Invariants

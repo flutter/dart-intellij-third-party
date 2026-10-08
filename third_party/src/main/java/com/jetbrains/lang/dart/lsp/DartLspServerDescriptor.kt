@@ -11,8 +11,10 @@ import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.platform.dartlsp.api.Lsp4jClient
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
@@ -118,6 +120,13 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             }
             return LspCommunicationChannel.Socket(port, startProcess = false)
         }
+
+    /**
+     * Lets [DartLspApplyEditCapture] take `workspace/applyEdit` edits that plugin code applies itself, such as the
+     * one of Optimize Imports ([com.jetbrains.lang.dart.ide.imports.DartLspImportOptimizer]).
+     */
+    override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
+        Lsp4jClient(DartLspServerNotificationsHandler(handler, DartLspApplyEditCapture.getInstance(project)))
 
     override val lspCustomization: LspCustomization = object : LspCustomization() {
         override val hoverCustomizer = LspHoverSupport()
