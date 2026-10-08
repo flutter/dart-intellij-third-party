@@ -235,6 +235,7 @@
     <findUsagesHandlerFactory implementation="com.jetbrains.lang.dart.ide.findUsages.DartServerFindUsagesHandlerFactory"/>
     <!-- Transitional LSP migration hook: suppresses legacy PSI search target candidates when LSP references are active -->
     <targetElementEvaluator language="Dart" implementationClass="com.jetbrains.lang.dart.ide.findUsages.DartTargetElementEvaluator"/>
+    <psi.declarationProvider implementation="com.jetbrains.lang.dart.ide.findUsages.DartLspSymbolDeclarationProvider"/>
     <fileStructureGroupRuleProvider implementation="com.jetbrains.lang.dart.ide.findUsages.DartUnitMemberGroupRuleProvider"/>
     <fileStructureGroupRuleProvider implementation="com.jetbrains.lang.dart.ide.findUsages.DartClassMemberGroupRuleProvider"/>
     <elementDescriptionProvider implementation="com.jetbrains.lang.dart.psi.DartElementDescriptionProvider"/>
