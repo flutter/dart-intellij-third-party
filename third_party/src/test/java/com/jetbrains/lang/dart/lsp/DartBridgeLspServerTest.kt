@@ -910,41 +910,41 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.15.0"))
     }
 
-    fun testInitialize_semanticTokensProvider() {
+    fun testInitialize_semanticTokensProvider_notAdvertisedWhenLegendNotProvided() {
         val future = bridgeServer.initialize(InitializeParams())
         val result = future.get(5, TimeUnit.SECONDS)
         assertNotNull(result)
         val capabilities = result.capabilities
         assertNotNull(capabilities)
-        val semanticTokensProvider = capabilities.semanticTokensProvider
-        assertNotNull(semanticTokensProvider)
-        val legend = semanticTokensProvider.legend
-        assertNotNull(legend)
-        assertTrue("Legend should contain standard types like 'class'", legend.tokenTypes.contains(SemanticTokenTypes.Class))
-        assertTrue("Legend should contain Dart custom type 'annotation'", legend.tokenTypes.contains("annotation"))
-        assertTrue("Legend should contain Dart custom type 'boolean'", legend.tokenTypes.contains("boolean"))
-        assertTrue("Legend should contain Dart custom type 'label'", legend.tokenTypes.contains("label"))
-        assertTrue("Legend should contain Dart custom type 'source'", legend.tokenTypes.contains("source"))
-        assertTrue("Legend should contain modifier 'declaration'", legend.tokenModifiers.contains(SemanticTokenModifiers.Declaration))
-        assertTrue("Legend should contain modifier 'static'", legend.tokenModifiers.contains(SemanticTokenModifiers.Static))
-        assertTrue("Legend should contain custom modifier 'constructor'", legend.tokenModifiers.contains("constructor"))
-        assertTrue("Legend should contain custom modifier 'importPrefix'", legend.tokenModifiers.contains("importPrefix"))
-        assertTrue("Legend should contain custom modifier 'instance'", legend.tokenModifiers.contains("instance"))
+        assertNull("Semantic tokens provider should not be advertised if DAS did not provide a legend", capabilities.semanticTokensProvider)
     }
 
     fun testInitialize_semanticTokensDynamicLegendFromDas() {
-        val customTypes = listOf("customClass", "customMethod")
-        val customModifiers = listOf("customStatic", "customDecl")
+        val dasLegendTypes = listOf(
+            "annotation", "class", "comment", "method", "variable",
+            "parameter", "enum", "enumMember", "type", "source",
+            "property", "keyword", "label", "namespace", "boolean",
+            "number", "string", "function", "typeParameter"
+        )
+        val dasLegendModifiers = listOf(
+            "documentation", "constructor", "declaration", "importPrefix",
+            "instance", "static", "escape", "annotation", "control",
+            "label", "interpolation", "source", "void", "wildcard"
+        )
         val das = DartAnalysisServerService.getInstance(project)
-        das.semanticTokensLegend = SemanticTokensLegend(customTypes, customModifiers)
+        das.semanticTokensLegend = SemanticTokensLegend(dasLegendTypes, dasLegendModifiers)
 
         val future = bridgeServer.initialize(InitializeParams())
         val result = future.get(5, TimeUnit.SECONDS)
         assertNotNull(result)
         val legend = result.capabilities?.semanticTokensProvider?.legend
         assertNotNull(legend)
-        assertEquals(customTypes, legend!!.tokenTypes)
-        assertEquals(customModifiers, legend.tokenModifiers)
+        assertEquals(dasLegendTypes, legend!!.tokenTypes)
+        assertEquals(dasLegendModifiers, legend.tokenModifiers)
+        assertTrue("Legend should contain standard types like 'class'", legend.tokenTypes.contains(SemanticTokenTypes.Class))
+        assertTrue("Legend should contain Dart custom type 'annotation'", legend.tokenTypes.contains("annotation"))
+        assertTrue("Legend should contain modifier 'declaration'", legend.tokenModifiers.contains(SemanticTokenModifiers.Declaration))
+        assertTrue("Legend should contain custom modifier 'constructor'", legend.tokenModifiers.contains("constructor"))
     }
 
     fun testUpdateClientCapabilities_parsesSemanticTokensLegendFromDas() {
@@ -1151,29 +1151,23 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(DartSyntaxHighlighterColors.IDENTIFIER, DartLspSemanticTokensSupport.getTextAttributesKey("source", emptyList()))
     }
 
-    fun testDartLspSemanticTokensSupport_legendMatchesDartAnalysisServer() {
-        val expectedTokenTypes = listOf(
+    fun testDartLspSemanticTokensDecodingWithDasLegend() {
+        val dasTokenTypes = listOf(
             "annotation", "class", "comment", "method", "variable",
             "parameter", "enum", "enumMember", "type", "source",
             "property", "keyword", "label", "namespace", "boolean",
             "number", "string", "function", "typeParameter"
         )
-        val expectedTokenModifiers = listOf(
+        val dasTokenModifiers = listOf(
             "documentation", "constructor", "declaration", "importPrefix",
             "instance", "static", "escape", "annotation", "control",
             "label", "interpolation", "source", "void", "wildcard"
         )
-
-        assertEquals("Default fallback token types must match standard DAS legend", expectedTokenTypes, DartLspSemanticTokensSupport.DEFAULT_TOKEN_TYPES)
-        assertEquals("Default fallback token modifiers must match standard DAS legend", expectedTokenModifiers, DartLspSemanticTokensSupport.DEFAULT_TOKEN_MODIFIERS)
-    }
-
-    fun testDartLspSemanticTokensDecodingWithDasLegend() {
-        // Simulates decoding the tokens sent by DAS using the legend in DartLspSemanticTokensSupport
+        // Simulates decoding the tokens sent by DAS using the legend received from DAS
         fun decodeToken(typeIndex: Int, modifierMask: Int): Pair<String, List<String>> {
-            val type = DartLspSemanticTokensSupport.tokenTypes[typeIndex]
+            val type = dasTokenTypes[typeIndex]
             val modifiers = mutableListOf<String>()
-            for ((index, modifier) in DartLspSemanticTokensSupport.tokenModifiers.withIndex()) {
+            for ((index, modifier) in dasTokenModifiers.withIndex()) {
                 if (modifierMask and (1 shl index) != 0) {
                     modifiers.add(modifier)
                 }

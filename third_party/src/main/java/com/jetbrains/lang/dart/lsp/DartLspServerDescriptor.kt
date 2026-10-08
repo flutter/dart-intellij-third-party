@@ -228,59 +228,6 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
         return psiFile.fileType == DartFileType.INSTANCE
     }
 
-    /**
-     * Default fallback token types matching Dart Analysis Server's standard legend.
-     * In Dart SDK 3.14.0-307.0.dev+, the active legend used to decode tokens is dynamically provided
-     * by DAS via server.setClientCapabilities and populated in DartBridgeLspServer.initialize.
-     */
-    val DEFAULT_TOKEN_TYPES: List<String> = listOf(
-        "annotation",
-        SemanticTokenTypes.Class,
-        SemanticTokenTypes.Comment,
-        SemanticTokenTypes.Method,
-        SemanticTokenTypes.Variable,
-        SemanticTokenTypes.Parameter,
-        SemanticTokenTypes.Enum,
-        SemanticTokenTypes.EnumMember,
-        SemanticTokenTypes.Type,
-        "source",
-        SemanticTokenTypes.Property,
-        SemanticTokenTypes.Keyword,
-        "label",
-        SemanticTokenTypes.Namespace,
-        "boolean",
-        SemanticTokenTypes.Number,
-        SemanticTokenTypes.String,
-        SemanticTokenTypes.Function,
-        SemanticTokenTypes.TypeParameter
-    )
-
-    /**
-     * Default fallback token modifiers matching Dart Analysis Server's standard legend.
-     * In Dart SDK 3.14.0-307.0.dev+, the active legend used to decode tokens is dynamically provided
-     * by DAS via server.setClientCapabilities and populated in DartBridgeLspServer.initialize.
-     */
-    val DEFAULT_TOKEN_MODIFIERS: List<String> = listOf(
-        SemanticTokenModifiers.Documentation,
-        "constructor",
-        SemanticTokenModifiers.Declaration,
-        "importPrefix",
-        "instance",
-        SemanticTokenModifiers.Static,
-        "escape",
-        "annotation",
-        "control",
-        "label",
-        "interpolation",
-        "source",
-        "void",
-        "wildcard"
-    )
-
-    override val tokenTypes: List<String> = DEFAULT_TOKEN_TYPES
-
-    override val tokenModifiers: List<String> = DEFAULT_TOKEN_MODIFIERS
-
     override fun getTextAttributesKey(tokenType: String, modifiers: List<String>): TextAttributesKey? {
         val isDecl = modifiers.contains(SemanticTokenModifiers.Declaration)
         val isStatic = modifiers.contains(SemanticTokenModifiers.Static)
