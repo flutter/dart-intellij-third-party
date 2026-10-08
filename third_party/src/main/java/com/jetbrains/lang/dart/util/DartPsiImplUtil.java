@@ -123,9 +123,13 @@ public final class DartPsiImplUtil {
     assert uriElement != null : "[" + partOfStatement + "]";
 
     final String uri = uriElement.getUriStringAndItsRange().first;
-    final VirtualFile file = DartResolveUtil.getRealVirtualFile(partOfStatement.getContainingFile());
-    final VirtualFile targetFile = file == null ? null : DartResolveUtil.getImportedFile(partOfStatement.getProject(), file, uri);
-    final PsiFile targetPsiFile = targetFile == null || file.equals(targetFile) ? null : partOfStatement.getManager().findFile(targetFile);
+    final PsiFile containingFile = partOfStatement.getContainingFile();
+    final VirtualFile file = DartResolveUtil.getRealVirtualFile(containingFile);
+    // The parent file may itself be a part file (parts with imports), so look at the library at the top of the 'part of' chain.
+    final List<VirtualFile> libraryFiles = DartResolveUtil.findLibrary(containingFile);
+    // A legacy 'part of name;' may match several libraries; any of them is an acceptable answer here, so take the first.
+    final VirtualFile targetFile = libraryFiles.isEmpty() ? null : libraryFiles.getFirst();
+    final PsiFile targetPsiFile = targetFile == null || targetFile.equals(file) ? null : partOfStatement.getManager().findFile(targetFile);
     final DartLibraryStatement libraryStatement = targetPsiFile == null
                                                   ? null
                                                   : PsiTreeUtil.getChildOfType(targetPsiFile, DartLibraryStatement.class);
@@ -134,7 +138,7 @@ public final class DartPsiImplUtil {
       return nameElement.getName();
     }
 
-    return PathUtil.getFileName(uri);
+    return targetPsiFile != null ? targetPsiFile.getName() : PathUtil.getFileName(uri);
   }
 
   public static @NotNull List<DartMetadata> getMetadataList(@NotNull DartLabel element) {

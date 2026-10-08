@@ -113,6 +113,7 @@
 
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartImportAndExportIndex"/>
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartPartUriIndex"/>
+    <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartPartOfIndex"/>
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartClassIndex"/>
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartLibraryIndex"/>
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartComponentIndex"/>
