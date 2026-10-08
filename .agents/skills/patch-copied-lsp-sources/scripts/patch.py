@@ -163,7 +163,6 @@ def main():
             '',
             xml_content
         )
-
         def remove_ids(match):
             tag_content = match.group(0)
             if tag_content.startswith("<notificationGroup"):
