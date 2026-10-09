@@ -266,8 +266,10 @@ merges them only once it is satisfied. For any failing PR that was labeled
 anyway, tell the user to expect the bot to remove the label again.
 
 For a re-run, say that the build has been requested, not that it passed. The
-PR still needs approval: suggest running this skill again once the new build
-finishes, when it will show up as a passing PR.
+script ends by listing re-run PRs as `NOT queued for auto-submit yet`; relay
+that plainly. The PR stays open until someone approves and labels it, so tell
+the user to run this skill again once the new build finishes, when it will
+show up as a passing PR.
 
 ---
 

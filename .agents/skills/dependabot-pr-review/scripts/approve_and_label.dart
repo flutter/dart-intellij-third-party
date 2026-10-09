@@ -519,11 +519,30 @@ void main(List<String> args) {
     );
     if (!ok) failures++;
   }
+  final rerun = <PrRef>[];
   for (final pr in reruns) {
-    if (!rerunKokoro(pr)) failures++;
+    if (rerunKokoro(pr)) {
+      rerun.add(pr);
+    } else {
+      failures++;
+    }
   }
 
   final total = approvals.length + reruns.length;
   stdout.writeln('\nProcessed $total PR(s); $failures failure(s).');
+  remindToApprove(rerun, label: options.label);
   exit(failures > 0 ? exitFailure : 0);
+}
+
+/// Reminds the user that [rerun] PRs still need approving and [label]ing.
+///
+/// A re-run deliberately leaves both for later, so without this the PR sits
+/// open after its new build passes.
+void remindToApprove(List<PrRef> rerun, {required String label}) {
+  if (rerun.isEmpty) return;
+  stdout.writeln(
+    '\nNOT queued for auto-submit yet: ${rerun.map(describe).join(', ')}.\n'
+    'Once the new Kokoro build passes, run this again with --pr to approve '
+    "and add '$label' (or re-run the dependabot-pr-review skill).",
+  );
 }
