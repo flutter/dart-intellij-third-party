@@ -45,6 +45,7 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.flutter.FlutterUtil;
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
+import com.jetbrains.lang.dart.lsp.DartLspFeatureToggleLifecycle;
 import com.jetbrains.lang.dart.lsp.LspMethod;
 import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import org.jetbrains.annotations.Nls;
@@ -381,7 +382,6 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
         }
 
         setWebdevPort(myProject, myPortField.getNumber());
-        setExperimentalLspFeaturesEnabled(myProject, currentExperimentalEnabled);
       }
       else {
         if (!myModulesWithDartSdkLibAttachedInitial.isEmpty() && mySdkInitial != null) {
@@ -392,11 +392,16 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
 
     ApplicationManager.getApplication().runWriteAction(runnable);
 
-    if (myEnableDartSupportCheckBox.isSelected() && initialExperimentalEnabled != currentExperimentalEnabled) {
-      DartAnalysisServerService.getInstance(myProject).updateClientCapabilities();
-      DartBridgeLspServerManager bridgeManager = myProject.getService(DartBridgeLspServerManager.class);
-      bridgeManager.stopBridgeServer();
-      bridgeManager.startBridgeServer();
+    if (myEnableDartSupportCheckBox.isSelected()) {
+      DartLspFeatureToggleLifecycle.applyIfChanged(initialExperimentalEnabled, currentExperimentalEnabled,
+                                                   enabled -> setExperimentalLspFeaturesEnabled(myProject, enabled),
+                                                   () -> {
+                                                     DartAnalysisServerService.getInstance(myProject).updateClientCapabilities();
+                                                     DartBridgeLspServerManager bridgeManager =
+                                                       myProject.getService(DartBridgeLspServerManager.class);
+                                                     bridgeManager.stopBridgeServer();
+                                                     bridgeManager.startBridgeServer();
+                                                   });
     }
 
     reset(); // because we rely on remembering initial state

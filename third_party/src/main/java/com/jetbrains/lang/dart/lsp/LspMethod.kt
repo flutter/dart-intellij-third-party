@@ -16,6 +16,7 @@ enum class LspMethod(
     DEFINITION("textDocument/definition", isExperimental = true, presentableName = "navigation"),
     DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = false),
     DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = false),
+    FORMATTING("textDocument/formatting", isExperimental = true, presentableName = "formatting"),
     HOVER("textDocument/hover", isExperimental = false),
     PUBLISH_DIAGNOSTICS("textDocument/publishDiagnostics", isExperimental = true, presentableName = "errors and warnings"),
     INITIALIZE("initialize"),
@@ -24,6 +25,7 @@ enum class LspMethod(
     SHUTDOWN("shutdown"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
+    RANGE_FORMATTING("textDocument/rangeFormatting", isExperimental = true, presentableName = "range formatting"),
     DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols");
 
     companion object {

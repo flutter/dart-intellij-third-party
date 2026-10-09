@@ -35,6 +35,12 @@ import java.util.regex.Pattern;
  */
 public abstract class DartStyleTest extends FormatterTestCase {
 
+  @Override
+  protected void setUp() throws Exception {
+    super.setUp();
+    com.jetbrains.lang.dart.sdk.DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), false);
+  }
+
   /**
    * The set of tests that are known to fail in all test modes.
    */

@@ -42,7 +42,9 @@ import com.intellij.platform.dartlsp.api.customization.LspFindReferencesCustomiz
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesSupport
 import com.intellij.platform.dartlsp.api.customization.LspFoldingRangeDisabled
+import com.intellij.platform.dartlsp.api.customization.LspFormattingCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspFormattingDisabled
+import com.intellij.platform.dartlsp.api.customization.LspFormattingSupport
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionDisabled
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionSupport
@@ -120,6 +122,14 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         }
 
     override val lspCustomization: LspCustomization = object : LspCustomization() {
+        private val lspFormattingSupport = object : LspFormattingSupport() {
+            override fun shouldFormatThisFileExclusivelyByServer(
+                file: VirtualFile,
+                ideCanFormatThisFileItself: Boolean,
+                serverExplicitlyWantsToFormatThisFile: Boolean
+            ): Boolean = DartLspFormattingRouting.isLspOwnedEditorFormatting(project, file)
+        }
+
         override val hoverCustomizer = LspHoverSupport()
         
         override val goToDefinitionCustomizer: LspGoToDefinitionCustomizer
@@ -154,7 +164,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             } else {
                 LspCommandsDisabled
             }
-        override val formattingCustomizer = LspFormattingDisabled
+        override val formattingCustomizer: LspFormattingCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                lspFormattingSupport
+            } else {
+                LspFormattingDisabled
+            }
         override val findReferencesCustomizer: LspFindReferencesCustomizer
             get() = if (DartAnalysisServerService.isLspReferencesEnabled(project)) {
                 LspFindReferencesSupport()

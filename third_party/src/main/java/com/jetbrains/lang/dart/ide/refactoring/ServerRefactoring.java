@@ -188,9 +188,9 @@ public abstract class ServerRefactoring {
     synchronized (pendingRequestIds) {
       id = ++lastId;
       pendingRequestIds.add(id);
+      serverErrorStatus = null;
     }
     // do request
-    serverErrorStatus = null;
     final CountDownLatch latch = new CountDownLatch(1);
     RefactoringOptions options = getOptions();
     DartAnalysisServerService.getInstance(myProject).updateFilesContent();
@@ -203,16 +203,21 @@ public abstract class ServerRefactoring {
                                          RefactoringFeedback feedback,
                                          SourceChange _change,
                                          List<String> _potentialEdits) {
-          if (feedback != null) {
-            setFeedback(feedback);
-          }
-          initialStatus = toRefactoringStatus(initialProblems);
-          optionsStatus = toRefactoringStatus(optionsProblems);
-          finalStatus = toRefactoringStatus(finalProblems);
-          change = _change;
-          potentialEdits.clear();
-          if (_potentialEdits != null) {
-            potentialEdits.addAll(_potentialEdits);
+          synchronized (pendingRequestIds) {
+            // A superseded request must finish without publishing over the latest request.
+            if (id == lastId) {
+              if (feedback != null) {
+                setFeedback(feedback);
+              }
+              initialStatus = toRefactoringStatus(initialProblems);
+              optionsStatus = toRefactoringStatus(optionsProblems);
+              finalStatus = toRefactoringStatus(finalProblems);
+              change = _change;
+              potentialEdits.clear();
+              if (_potentialEdits != null) {
+                potentialEdits.addAll(_potentialEdits);
+              }
+            }
           }
           latch.countDown();
           requestDone(id);
@@ -220,8 +225,12 @@ public abstract class ServerRefactoring {
 
         @Override
         public void onError(RequestError requestError) {
-          String message = "Server error: " + requestError.getMessage();
-          serverErrorStatus = RefactoringStatus.createFatalErrorStatus(message);
+          synchronized (pendingRequestIds) {
+            if (id == lastId) {
+              String message = "Server error: " + requestError.getMessage();
+              serverErrorStatus = RefactoringStatus.createFatalErrorStatus(message);
+            }
+          }
           latch.countDown();
           requestDone(id);
         }
