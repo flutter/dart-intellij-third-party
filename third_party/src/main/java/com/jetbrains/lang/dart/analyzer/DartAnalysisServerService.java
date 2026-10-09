@@ -993,9 +993,12 @@ public final class DartAnalysisServerService implements Disposable {
       public void selectionChanged(@NotNull FileEditorManagerEvent event) {
         updateCurrentFile();
 
-        if (isLocalAnalyzableFile(event.getOldFile()) || isLocalAnalyzableFile(event.getNewFile())) {
-          if (event.getNewFile() != null && isLocalAnalyzableFile(event.getNewFile())) {
-            myServerData.onFileOpened(event.getNewFile());
+        final VirtualFile newFile = event.getNewFile();
+        final boolean isNewFileAnalyzable = isLocalAnalyzableFile(newFile);
+
+        if (isLocalAnalyzableFile(event.getOldFile()) || isNewFileAnalyzable) {
+          if (isNewFileAnalyzable) {
+            myServerData.onFileOpened(newFile);
           }
           updateVisibleFiles();
         }

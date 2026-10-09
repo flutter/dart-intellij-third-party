@@ -418,11 +418,9 @@ public final class DartServerData {
   }
 
   void onFileOpened(final @NotNull VirtualFile file) {
-    DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myService.getProject(), file);
-    if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-      if (!FileDocumentManager.getInstance().isFileModified(file)) {
-        myLocalFilesWithUnsentChanges.remove(localFileInfo);
-      }
+    if (DartFileInfoKt.getDartFileInfo(myService.getProject(), file) instanceof DartLocalFileInfo localFileInfo
+        && !FileDocumentManager.getInstance().isFileModified(file)) {
+      myLocalFilesWithUnsentChanges.remove(localFileInfo);
     }
   }
 
