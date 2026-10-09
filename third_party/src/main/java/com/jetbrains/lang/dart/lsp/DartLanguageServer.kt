@@ -11,7 +11,9 @@ import com.intellij.openapi.util.Computable
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspServerManager
 import com.intellij.util.concurrency.AppExecutorUtil
+import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.RenameFilesParams
+import org.eclipse.lsp4j.TextDocumentPositionParams
 import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest
 import java.util.concurrent.CompletableFuture
@@ -20,6 +22,10 @@ import java.util.concurrent.CompletableFuture
  * Custom Language Server interface for Dart to support custom LSP requests.
  */
 interface DartLanguageServer : Lsp4jServer {
+    /** The single effective superclass, overridden member or super constructor, if any. */
+    @JsonRequest("dart/textDocument/super")
+    fun getSuper(params: TextDocumentPositionParams): CompletableFuture<Location?>
+
     /**
      * Returns the port of the diagnostic server.
      */

@@ -6,6 +6,7 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.google.dart.server.AnalysisServerSocket
+import com.google.dart.server.GetTypeHierarchyConsumer
 import com.google.dart.server.Consumer
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
 import com.google.dart.server.JsonConsumer
@@ -24,6 +25,10 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.psi.search.searches.DefinitionsScopedSearch
+import com.intellij.psi.util.PsiTreeUtil
+import com.jetbrains.lang.dart.psi.DartClass
+import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartSdk
@@ -52,6 +57,7 @@ import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
+import org.eclipse.lsp4j.ImplementationParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InlayHintKind
 import org.eclipse.lsp4j.InlayHintParams
@@ -97,6 +103,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     private val capturedResponses = CopyOnWriteArrayList<JsonObject>()
     private val capturedNotifications = CopyOnWriteArrayList<JsonObject>()
     private var capturedConsumer: Consumer? = null
+    private var legacyHierarchyRequests = 0
+    private val legacyHierarchyArguments = CopyOnWriteArrayList<Triple<String, Int, Boolean>>()
 
     override fun setUp() {
         super.setUp()
@@ -121,6 +129,12 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
                 super.addResponseListener(listener)
             }
             
+            override fun search_getTypeHierarchy(file: String, offset: Int, superOnly: Boolean, consumer: GetTypeHierarchyConsumer) {
+                legacyHierarchyRequests++
+                legacyHierarchyArguments.add(Triple(file, offset, superOnly))
+                consumer.computedHierarchy(emptyList())
+            }
+
             override fun generateUniqueId(): String = "123"
 
             override fun isSocketOpen(): Boolean = true
@@ -1319,6 +1333,189 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(result.isRight)
         assertEquals(1, result.right.size)
         assertEquals("file://target.dart", result.right[0].targetUri)
+    }
+
+    fun testImplementationEnabledWithoutServerDoesNotRequestLegacyHierarchy() {
+        checkImplementationRouting(true, 0)
+    }
+
+    fun testImplementationDisabledPreservesLegacyHierarchy() {
+        checkImplementationRouting(false, 1)
+    }
+
+    private fun checkImplementationRouting(enabled: Boolean, expectedLegacyRequests: Int) {
+        val previous = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
+        try {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, enabled)
+            val file = myFixture.configureByText("source.dart", "class Source {}")
+            val declaration = requireNotNull(PsiTreeUtil.findChildOfType(file, DartClass::class.java))
+            DefinitionsScopedSearch.search(declaration).findAll()
+            assertEquals(expectedLegacyRequests, legacyHierarchyRequests)
+        } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, previous)
+        }
+    }
+
+    fun testSuperEnabledWithoutServerDoesNotRequestLegacyHierarchy() {
+        checkSuperRouting(true)
+    }
+
+    fun testSuperDisabledPreservesLegacyHierarchy() {
+        checkSuperRouting(false)
+    }
+
+    private fun checkSuperRouting(enabled: Boolean) {
+        val previous = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
+        try {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, enabled)
+            val file = myFixture.configureByText("source.dart", "class Sou<caret>rce {}")
+            assertEmpty("No hierarchy work should precede the action", legacyHierarchyArguments)
+            com.jetbrains.lang.dart.ide.actions.DartServerGotoSuperHandler().invoke(project, myFixture.editor, file)
+            if (enabled) {
+                assertEquals(0, legacyHierarchyRequests)
+                assertEmpty(legacyHierarchyArguments)
+            } else {
+                // Routing, not supplier invocation count, is the legacy action's contract.
+                assertTrue("OFF must request legacy hierarchy", legacyHierarchyArguments.isNotEmpty())
+                val expected = Triple(DartAnalysisServerService.getInstance(project).getFileUri(file.virtualFile), 6, true)
+                assertTrue("Unexpected legacy requests: $legacyHierarchyArguments", legacyHierarchyArguments.all { it == expected })
+            }
+            assertFalse("Neither OFF nor ON without a server may send a custom Super request", capturedRequests.any {
+                it.get("method")?.asString == "lsp.handle" &&
+                    it.getAsJsonObject("params")?.getAsJsonObject("lspMessage")?.get("method")?.asString == "dart/textDocument/super"
+            })
+        } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, previous)
+        }
+    }
+
+    fun testCanceledSuperActionDoesNotRequestLegacyHierarchy() {
+        val previous = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
+        try {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+            val file = myFixture.configureByText("source.dart", "class Sou<caret>rce {}")
+            val editor = myFixture.editor
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val indicator = com.intellij.openapi.progress.EmptyProgressIndicator()
+                try {
+                    com.intellij.openapi.progress.ProgressManager.getInstance().runProcess(Runnable {
+                        indicator.cancel()
+                        com.jetbrains.lang.dart.ide.actions.DartServerGotoSuperHandler().invoke(project, editor, file)
+                    }, indicator)
+                    fail("Canceled Super action must propagate cancellation")
+                } catch (_: com.intellij.openapi.progress.ProcessCanceledException) {
+                    // The action must not convert cancellation into legacy navigation.
+                }
+            }.get(5, TimeUnit.SECONDS)
+            assertEquals(0, legacyHierarchyRequests)
+        } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, previous)
+        }
+    }
+
+    fun testSuperRequestReturnsOneNativeLocation() {
+        val params = org.eclipse.lsp4j.TextDocumentPositionParams(TextDocumentIdentifier("file:///source.dart"), Position(2, 17))
+        val future = bridgeServer.getSuper(params)
+        val request = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" })
+        val message = request.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("dart/textDocument/super", message.get("method").asString)
+        assertEquals("file:///source.dart", message.getAsJsonObject("params").getAsJsonObject("textDocument").get("uri").asString)
+        assertEquals(2, message.getAsJsonObject("params").getAsJsonObject("position").get("line").asInt)
+        assertEquals(17, message.getAsJsonObject("params").getAsJsonObject("position").get("character").asInt)
+        capturedListener.onResponse("""
+            {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123","result":
+              {"uri":"file:///parent.dart","range":{"start":{"line":1,"character":7},"end":{"line":1,"character":13}}}
+            }}}
+        """.trimIndent())
+        val result = requireNotNull(future.get(5, TimeUnit.SECONDS))
+        assertEquals("file:///parent.dart", result.uri)
+        assertEquals(Position(1, 7), result.range.start)
+        assertEquals(0, legacyHierarchyRequests)
+    }
+
+    fun testSuperNullResultDoesNotRequestLegacyHierarchy() {
+        val future = bridgeServer.getSuper(org.eclipse.lsp4j.TextDocumentPositionParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 0)))
+        capturedListener.onResponse("""
+            {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123","result":null}}}
+        """.trimIndent())
+        assertNull(future.get(5, TimeUnit.SECONDS))
+        assertEquals(0, legacyHierarchyRequests)
+    }
+
+    fun testSuperUnsupportedAndErrorResponsesDoNotRequestLegacyHierarchy() {
+        for (code in listOf(-32601, -32603)) {
+            val future = bridgeServer.getSuper(org.eclipse.lsp4j.TextDocumentPositionParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 0)))
+            capturedListener.onResponse("""
+                {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123",
+                "error":{"code":$code,"message":"Unavailable"}}}}
+            """.trimIndent())
+            try {
+                future.get(5, TimeUnit.SECONDS)
+                fail("The public LSP client must receive the error")
+            } catch (e: java.util.concurrent.ExecutionException) {
+                assertTrue(e.cause is org.eclipse.lsp4j.jsonrpc.ResponseErrorException)
+            }
+        }
+        assertEquals(0, legacyHierarchyRequests)
+    }
+
+    fun testInitializeAdvertisesImplementation() {
+        val capabilities = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS).capabilities
+        assertNotNull("Implementation capability must be advertised", capabilities.implementationProvider)
+        assertTrue(capabilities.implementationProvider.isLeft)
+        assertEquals(true, capabilities.implementationProvider.left)
+    }
+
+    fun testImplementationRequestReturnsLocations() {
+        val params = ImplementationParams().apply {
+            textDocument = TextDocumentIdentifier("file:///source.dart")
+            position = Position(1, 6)
+        }
+        val future = bridgeServer.implementation(params)
+        val request = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" })
+        val message = request.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("textDocument/implementation", message.get("method").asString)
+        val sentParams = message.getAsJsonObject("params")
+        assertEquals("file:///source.dart", sentParams.getAsJsonObject("textDocument").get("uri").asString)
+        assertEquals(1, sentParams.getAsJsonObject("position").get("line").asInt)
+        assertEquals(6, sentParams.getAsJsonObject("position").get("character").asInt)
+        assertFalse(capturedRequests.any { it.get("method")?.asString == "search.getTypeHierarchy" })
+
+        capturedListener.onResponse("""
+            {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123","result":[
+              {"uri":"file:///target.dart","range":{"start":{"line":2,"character":6},"end":{"line":2,"character":11}}}
+            ]}}}
+        """.trimIndent())
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertTrue("Implementation uses Location, not LocationLink", result.isLeft)
+        assertEquals(1, result.left.size)
+        assertEquals("file:///target.dart", result.left.single().uri)
+        assertEquals(Position(2, 6), result.left.single().range.start)
+    }
+
+    fun testImplementationNullResultIsEmpty() {
+        val future = bridgeServer.implementation(ImplementationParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 0)))
+        capturedListener.onResponse("""
+            {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123","result":null}}}
+        """.trimIndent())
+        assertTrue(future.get(5, TimeUnit.SECONDS).left.isEmpty())
+    }
+
+    fun testImplementationErrorDoesNotRequestLegacyHierarchy() {
+        val future = bridgeServer.implementation(ImplementationParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 0)))
+        capturedListener.onResponse("""
+            {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123",
+            "error":{"code":-32601,"message":"Method not found"}}}}
+        """.trimIndent())
+        try {
+            future.get(5, TimeUnit.SECONDS)
+            fail("The public LSP request API must receive the server error")
+        } catch (e: java.util.concurrent.ExecutionException) {
+            assertTrue(e.cause is org.eclipse.lsp4j.jsonrpc.ResponseErrorException)
+        }
+        assertEquals(0, legacyHierarchyRequests)
+        assertFalse(capturedRequests.any { it.get("method")?.asString == "search.getTypeHierarchy" })
     }
 
     // --- Hierarchy ---

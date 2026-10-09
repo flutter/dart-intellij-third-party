@@ -151,6 +151,8 @@ The output ZIP file will be placed in `third_party/build/distributions/`.
 
 ## Running plugin tests
 
+For sandbox navigation checks and protocol evidence, see [Testing direct Implementation and Super navigation](docs/testing/issue-404-lsp-navigation.md).
+
 The test suite is split between unit tests under `src/main/test/java/com/jetbrains/lang/dart` and Dart Analysis Server tests under `src/main/test/java/com/jetbrains/dart/analysisServer`.
 
 ### Using the command line

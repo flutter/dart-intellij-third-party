@@ -18,11 +18,13 @@ enum class LspMethod(
     DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = false),
     HOVER("textDocument/hover", isExperimental = false),
     PUBLISH_DIAGNOSTICS("textDocument/publishDiagnostics", isExperimental = true, presentableName = "errors and warnings"),
+    IMPLEMENTATION("textDocument/implementation", isExperimental = true, presentableName = "implementations"),
     INITIALIZE("initialize"),
     // Not gated by the experimental LSP flag because there is no fallback in legacy mode.
     INLAY_HINT("textDocument/inlayHint", isExperimental = false),
     SEMANTIC_TOKENS_FULL("textDocument/semanticTokens/full", isExperimental = true, presentableName = "syntax highlighting"),
     SHUTDOWN("shutdown"),
+    SUPER("dart/textDocument/super", isExperimental = true, presentableName = "super navigation"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
     DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols");
