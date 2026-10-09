@@ -3,6 +3,7 @@ package com.jetbrains.lang.dart.ide.actions;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.QueryExecutorBase;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -15,6 +16,8 @@ import com.jetbrains.lang.dart.DartComponentType;
 import com.jetbrains.lang.dart.DartLanguage;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
+import com.jetbrains.lang.dart.lsp.DartLspNavigationService;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.psi.DartComponent;
 import com.jetbrains.lang.dart.psi.DartComponentName;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
@@ -58,6 +61,12 @@ public final class DartInheritorsSearcher extends QueryExecutorBase<PsiElement, 
     prepare(parameters, fileRef, offsetRef, componentTypeRef);
 
     if (fileRef.isNull() || offsetRef.isNull() || componentTypeRef.isNull()) return;
+
+    final Project project = ReadAction.compute(() -> parameters.getElement().getProject());
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      DartLspNavigationService.processImplementations(project, fileRef.get(), offsetRef.get(), parameters.getScope(), consumer);
+      return;
+    }
 
     ApplicationManager.getApplication().runReadAction(() -> {
       List<TypeHierarchyItem> hierarchyItems = getHierarchyItems(parameters.getElement().getProject(), fileRef.get(), offsetRef.get());
