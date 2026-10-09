@@ -144,8 +144,7 @@ public class DartWorkflowTest extends DartCodeInsightFixtureTestCase {
     final WorkspaceModel workspaceModel = WorkspaceModel.getInstance(getProject());
     ApplicationManager.getApplication().runWriteAction(() -> {
       workspaceModel.updateProjectModel("Test batch exclude Dart folders", storage -> {
-        DartStartupActivityKt.applyExclusionsToWorkspaceModel(
-          storage, workspaceModel.getVirtualFileUrlManager(), exclusionsByModule);
+        DartStartupActivityKt.applyExclusionsToWorkspaceModel(storage, exclusionsByModule);
         return Unit.INSTANCE;
       });
     });

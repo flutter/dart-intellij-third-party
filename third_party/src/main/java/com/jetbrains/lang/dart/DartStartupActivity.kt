@@ -23,7 +23,6 @@ import com.intellij.platform.workspace.jps.entities.ModuleId
 import com.intellij.platform.workspace.jps.entities.modifyContentRootEntity
 import com.intellij.platform.workspace.storage.EntitySource
 import com.intellij.platform.workspace.storage.MutableEntityStorage
-import com.intellij.platform.workspace.storage.url.VirtualFileUrlManager
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -59,10 +58,8 @@ class DartStartupActivity : ProjectActivity {
       // Apply all exclusions in a single WorkspaceModel update without per-URL legacy bridge snapshots
       // See: https://github.com/flutter/dart-intellij-third-party/issues/728
       if (exclusionsByModule.isNotEmpty()) {
-        val workspaceModel = WorkspaceModel.getInstance(project)
-        val virtualFileUrlManager = workspaceModel.getVirtualFileUrlManager()
-        workspaceModel.update("Exclude Dart build and tool cache folders") { storage ->
-          applyExclusionsToWorkspaceModel(storage, virtualFileUrlManager, exclusionsByModule)
+        WorkspaceModel.getInstance(project).update("Exclude Dart build and tool cache folders") { storage ->
+          applyExclusionsToWorkspaceModel(storage, exclusionsByModule)
         }
         DartFileListener.scheduleDartPackageRootsUpdate(project)
       }
@@ -156,27 +153,24 @@ fun collectExclusionsByModule(project: Project): Map<Module, Map<String, Set<Str
 @VisibleForTesting
 fun applyExclusionsToWorkspaceModel(
   storage: MutableEntityStorage,
-  virtualFileUrlManager: VirtualFileUrlManager,
   exclusionsByModule: Map<Module, Map<String, Set<String>>>,
 ) {
   for ((module, contentRootUrlToUrls) in exclusionsByModule) {
     if (module.isDisposed) continue
     val moduleEntity = storage.resolve(ModuleId(module.name)) ?: continue
-    val contentRootEntitiesByUrl = moduleEntity.contentRoots.associateBy { it.url }
+    val contentRootEntitiesByUrl = moduleEntity.contentRoots.associateBy { it.url.url }
     for ((contentRootUrlString, urls) in contentRootUrlToUrls) {
-      val contentRootUrl = virtualFileUrlManager.getOrCreateFromUrl(contentRootUrlString)
-      val contentRootEntity = contentRootEntitiesByUrl[contentRootUrl] ?: continue
-      val existingUrls = contentRootEntity.excludedUrls.mapTo(HashSet()) { it.url }
-      val newUrls = urls.mapNotNull { url ->
-        val vfu = virtualFileUrlManager.getOrCreateFromUrl(url)
-        if (existingUrls.add(vfu)) vfu else null
-      }
+      val contentRootEntity = contentRootEntitiesByUrl[contentRootUrlString] ?: continue
+      val existingUrls = contentRootEntity.excludedUrls.mapTo(HashSet()) { it.url.url }
+      val prefix = "$contentRootUrlString/"
+      val newUrls = urls
+        .filter { it.startsWith(prefix) && existingUrls.add(it) }
+        .map { contentRootEntity.url.append(it.removePrefix(prefix)) }
       if (newUrls.isEmpty()) continue
 
       storage.modifyContentRootEntity(contentRootEntity) {
         val entitySource = getInternalFileSource(this.entitySource) ?: this.entitySource
-        val newExcludeEntities = newUrls.map { ExcludeUrlEntity(it, entitySource) }
-        this.excludedUrls = this.excludedUrls + newExcludeEntities
+        this.excludedUrls = this.excludedUrls + newUrls.map { ExcludeUrlEntity(it, entitySource) }
       }
     }
   }
@@ -203,11 +197,10 @@ fun excludeBuildAndToolCacheFolders(module: Module, pubspecYamlFile: VirtualFile
 
   val exclusionsByModule = mapOf(module to mapOf(contentRoot.url to urlsToExclude))
   val workspaceModel = WorkspaceModel.getInstance(project)
-  val virtualFileUrlManager = workspaceModel.getVirtualFileUrlManager()
   ApplicationManager.getApplication().runWriteAction {
     if (!module.isDisposed) {
       workspaceModel.updateProjectModel("Exclude Dart build and tool cache folders") { storage ->
-        applyExclusionsToWorkspaceModel(storage, virtualFileUrlManager, exclusionsByModule)
+        applyExclusionsToWorkspaceModel(storage, exclusionsByModule)
       }
     }
   }
