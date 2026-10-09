@@ -323,12 +323,20 @@ bool rerunKokoro(PrRef pr) {
   final info = fetchPrInfo(pr);
   final recreate = needsRecreate(pr);
 
-  if (recreate && info?.author != dependabotLogin) {
-    stderr.writeln(
-      '$ref: FAILED: re-running Kokoro here needs a Dependabot PR '
-      "(author: ${info?.author ?? 'unknown'}).",
-    );
-    return false;
+  if (recreate) {
+    if (info == null) {
+      stderr.writeln(
+        "$ref: FAILED: could not read the PR to confirm it's from Dependabot.",
+      );
+      return false;
+    }
+    if (info.author != dependabotLogin) {
+      stderr.writeln(
+        '$ref: FAILED: re-running Kokoro here needs a Dependabot PR '
+        '(author: ${info.author}).',
+      );
+      return false;
+    }
   }
 
   if (info?.labels.contains(kokoroRunLabel) ?? false) {
