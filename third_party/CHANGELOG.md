@@ -11,6 +11,7 @@
 
 ### Fixed
 - Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
+- Avoid UI freeze during project startup by updating excluded folders directly via `WorkspaceModel` (#728)
 
 ## 510.0.0
 

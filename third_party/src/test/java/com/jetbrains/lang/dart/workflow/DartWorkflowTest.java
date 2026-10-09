@@ -2,15 +2,20 @@
 package com.jetbrains.lang.dart.workflow;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.module.Module;
 import com.intellij.openapi.roots.ContentEntry;
 import com.intellij.openapi.roots.ModifiableRootModel;
 import com.intellij.openapi.roots.ModuleRootManager;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.backend.workspace.WorkspaceModel;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.DartStartupActivityKt;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
+import java.util.Map;
+import java.util.Set;
+import kotlin.Unit;
 
 /**
  * Test the Dart workflow.
@@ -133,6 +138,40 @@ public class DartWorkflowTest extends DartCodeInsightFixtureTestCase {
                        rootUrl + "/dir2/example/nonexistent/packages",
                        rootUrl + "/dir2/example/packages/oldProject3Name"
     );
+
+    final Map<Module, Map<String, Set<String>>> exclusionsByModule =
+      DartStartupActivityKt.collectExclusionsByModule(getProject());
+    final WorkspaceModel workspaceModel = WorkspaceModel.getInstance(getProject());
+    ApplicationManager.getApplication().runWriteAction(() -> {
+      workspaceModel.updateProjectModel("Test batch exclude Dart folders", storage -> {
+        DartStartupActivityKt.applyExclusionsToWorkspaceModel(storage, exclusionsByModule);
+        return Unit.INSTANCE;
+      });
+    });
+
+    assertSameElements(ModuleRootManager.getInstance(getModule()).getContentEntries()[0].getExcludeFolderUrls(),
+                       rootUrl + "/dir1/someFolder",
+                       rootUrl + "/dir1/.pub",
+                       rootUrl + "/dir1/.dart_tool",
+                       rootUrl + "/dir1/build",
+                       rootUrl + "/dir2/.pub",
+                       rootUrl + "/dir2/.dart_tool",
+                       rootUrl + "/dir2/build",
+                       rootUrl + "/dir2/someFolder",
+                       rootUrl + "/dir2/lib/someFolder",
+                       rootUrl + "/dir2/example/.pub",
+                       rootUrl + "/dir2/example/.dart_tool",
+                       rootUrl + "/dir2/example/build",
+                       rootUrl + "/dir1/packages/project1",
+                       rootUrl + "/dir1/web/packages",
+                       rootUrl + "/dir2/packages/oldProject2Name",
+                       rootUrl + "/dir2/packages",
+                       rootUrl + "/dir2/web/packages",
+                       rootUrl + "/dir2/example/nonexistent/packages",
+                       rootUrl + "/dir2/example/packages/oldProject3Name"
+    );
+
+    assertTrue(DartStartupActivityKt.collectExclusionsByModule(getProject()).isEmpty());
   }
 
   public void testDartUrlResolver() {
