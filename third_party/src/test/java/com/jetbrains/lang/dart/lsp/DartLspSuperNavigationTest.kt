@@ -178,7 +178,7 @@ class DartLspSuperNavigationTest : DartCodeInsightFixtureTestCase() {
         ))
         try {
             withSession(owned, source, target) { session ->
-                val response = CancelIgnoringFuture<Location?>()
+                val response = CompletableFuture<Location?>()
                 session.response.set(response)
                 session.invokePending()
                 session.assertPending()
@@ -186,11 +186,12 @@ class DartLspSuperNavigationTest : DartCodeInsightFixtureTestCase() {
                 ProjectManagerEx.getInstanceEx().forceCloseProject(owned, false)
                 assertTrue("Only the separately owned project is disposed", owned.isDisposed)
                 assertFalse(project.isDisposed)
+                session.assertShutdownCancelled(response)
+                session.awaitProcessTermination()
+                // Process termination and the subsequent UI callbacks are distinct boundaries.
                 session.awaitCompletion()
                 assertFalse("Disposed project must never open the destination", session.editors.isFileOpen(target))
                 session.assertNoLegacy()
-                // Disposal closes the transport; unlike the late-response test, delivery is not claimed.
-                response.complete(session.destination())
             }
         } finally {
             if (!owned.isDisposed) ProjectManagerEx.getInstanceEx().forceCloseProject(owned, false)
@@ -241,6 +242,12 @@ class DartLspSuperNavigationTest : DartCodeInsightFixtureTestCase() {
         private val initialCaret = sourceEditor.caretModel.offset
         private val initialOpenFiles = editors.openFiles.toSet()
         private val requests = CopyOnWriteArrayList<TextDocumentPositionParams>()
+        private val pendingRequests = CopyOnWriteArrayList<CompletableFuture<Location?>>()
+        private val shutdownEntered = CompletableFuture<Unit>()
+        private val shutdownAcknowledged = CompletableFuture<Unit>()
+        private val pendingAtShutdown = CopyOnWriteArrayList<CompletableFuture<Location?>>()
+        private val cancelledDuringShutdown = CopyOnWriteArrayList<CompletableFuture<Location?>>()
+        private var allCancelledBeforeAcknowledgement = false
         private val legacyHierarchyCalls = CopyOnWriteArrayList<Triple<String, Int, Boolean>>()
         private val das = DartAnalysisServerService.getInstance(owner)
         // Construction starts no process or reader threads. Only the hierarchy facade is exercised.
@@ -320,12 +327,27 @@ class DartLspSuperNavigationTest : DartCodeInsightFixtureTestCase() {
             socket = connected
             val endpoint = object : DartLanguageServer, TextDocumentService, WorkspaceService {
                 override fun getSuper(params: TextDocumentPositionParams): CompletableFuture<Location?> {
+                    val pending = response.get()
+                    pendingRequests.add(pending)
+                    pending.whenComplete { _, _ ->
+                        if (pending.isCancelled && shutdownEntered.isDone && !shutdownAcknowledged.isDone) {
+                            cancelledDuringShutdown.add(pending)
+                        }
+                    }
                     requests.add(params)
-                    return response.get()
+                    return pending
                 }
                 override fun diagnosticServer() = CompletableFuture.completedFuture(DiagnosticServerResult(0))
                 override fun initialize(params: InitializeParams) = CompletableFuture.completedFuture(InitializeResult(ServerCapabilities()))
-                override fun shutdown() = CompletableFuture.completedFuture<Any>(null)
+                override fun shutdown(): CompletableFuture<Any> {
+                    shutdownEntered.complete(Unit)
+                    pendingAtShutdown.addAll(pendingRequests.filter { !it.isDone })
+                    // Match DartBridgeLspServer.shutdown(): stop cancels pending requests before acknowledging.
+                    pendingAtShutdown.forEach { it.cancel(true) }
+                    allCancelledBeforeAcknowledgement = pendingAtShutdown.all { it.isCancelled }
+                    shutdownAcknowledged.complete(Unit)
+                    return CompletableFuture.completedFuture(null)
+                }
                 override fun exit() {}
                 override fun getTextDocumentService(): TextDocumentService = this
                 override fun getWorkspaceService(): WorkspaceService = this
@@ -371,9 +393,35 @@ class DartLspSuperNavigationTest : DartCodeInsightFixtureTestCase() {
         fun assertPending() {
             assertFalse("The server response must still be pending", response.get().isDone)
             assertNotSame("The task must not have finished before the lifecycle event", task.get(), completed.get())
+            assertTrue("The task's process must have started: ${progressContext()}", taskIndicator().isRunning)
         }
 
         fun taskIndicator() = requireNotNull(indicator.get())
+
+        private fun progressContext() =
+            "indicator=${taskIndicator().javaClass.name}, headless=${ApplicationManager.getApplication().isHeadlessEnvironment}"
+
+        fun assertShutdownCancelled(pending: CompletableFuture<Location?>) {
+            val context = progressContext()
+            println("Owned-project disposal: $context")
+            // A deadline below the default 10-second request timeout is only a failure guard.
+            PlatformTestUtil.waitWithEventsDispatching("Bridge shutdown entered: $context", { shutdownEntered.isDone }, 5)
+            PlatformTestUtil.waitWithEventsDispatching("Bridge shutdown acknowledged: $context", { shutdownAcknowledged.isDone }, 5)
+            assertEquals("The owned request must still be pending when shutdown enters: $context",
+                         listOf(pending), pendingAtShutdown.toList())
+            assertEquals("Shutdown must cause the cancellation transition before acknowledgement: $context",
+                         listOf(pending), cancelledDuringShutdown.toList())
+            assertTrue("Every outstanding request must be cancelled before shutdown acknowledgement: $context",
+                       allCancelledBeforeAcknowledgement)
+            assertTrue("The owned request must be cancelled, not completed with a result: $context", pending.isCancelled)
+        }
+
+        fun awaitProcessTermination() {
+            // isRunning=false observes the progress process boundary, not worker-thread return.
+            // Remote cancellation may become a null result; indicator cancellation is not required.
+            PlatformTestUtil.waitWithEventsDispatching("Super process terminated after shutdown: ${progressContext()}",
+                                                       { !taskIndicator().isRunning }, 5)
+        }
 
         fun awaitCompletion() {
             waitFor("Super task UI callbacks completed") { task.get() != null && completed.get() === task.get() }
