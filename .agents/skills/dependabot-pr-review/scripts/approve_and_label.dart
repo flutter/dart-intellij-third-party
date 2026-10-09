@@ -12,17 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Approves pull requests and applies the autosubmit label.
+/// Approves pull requests and applies the autosubmit label, or re-runs their
+/// Kokoro builds.
 ///
 /// This does not merge anything. Applying the label only queues the PR for
 /// the `auto-submit` bot, which merges it once every requirement is met and
 /// strips the label again if any of them fail.
 ///
+/// PRs passed with `--rerun-kokoro` are neither approved nor labeled for
+/// auto-submit. They get the [kokoroRunLabel], plus a [recreateComment] in
+/// [recreateRepos], whose Kokoro job ignores a label added after the PR was
+/// opened. Approve them on a later pass, once the new build passes.
+///
 /// Only run this after the user has explicitly confirmed each PR.
 ///
 /// Usage:
-///   dart run approve_and_label.dart --pr owner/repo#123 [--pr ...]
-///       [--label autosubmit] [--body "text"] [--dry-run]
+///   dart run approve_and_label.dart [--pr owner/repo#123 ...]
+///       [--rerun-kokoro owner/repo#456 ...] [--label autosubmit]
+///       [--body "text"] [--dry-run]
 ///
 /// Exits 0 when every PR succeeded, 1 if any failed, and 2 for invalid
 /// arguments.
@@ -39,11 +46,41 @@ const exitFailure = 1;
 /// Exit code used for invalid command line arguments.
 const exitBadUsage = 2;
 
-/// A pull request to approve, identified by repository and number.
+/// The label that asks Kokoro to build a PR.
+const kokoroRunLabel = 'kokoro:run';
+
+/// Repositories whose Kokoro job only reads [kokoroRunLabel] when a commit is
+/// pushed, not when the label is added.
+///
+/// For these, a re-run also asks Dependabot to recreate the PR, which pushes a
+/// new commit for Kokoro to build. In the other repositories, adding the label
+/// starts a run straight away, and Kokoro removes it again. Recreating there
+/// would push a commit after the label was used up, which Kokoro would then
+/// skip.
+///
+/// Entries must be lowercase, matching [parseRef].
+const recreateRepos = {'flutter/dart-intellij-third-party'};
+
+/// Comment that asks Dependabot to rebuild its branch as a new commit.
+const recreateComment = '@dependabot recreate';
+
+/// The login `gh` reports for PRs opened by Dependabot.
+const dependabotLogin = 'app/dependabot';
+
+/// Whether actions that change GitHub are only printed, not performed.
+///
+/// Set once from the command line in [main]. Read-only lookups still run, so a
+/// dry run reports what a real run would do for each PR's current state.
+late final bool dryRun;
+
+/// A pull request to act on, identified by repository and number.
 typedef PrRef = ({String repo, int number});
 
 /// The outcome of running a subprocess.
 typedef CommandResult = ({bool ok, String output});
+
+/// The parts of a PR's current state that a Kokoro re-run depends on.
+typedef PrInfo = ({String author, Set<String> labels});
 
 /// Runs [executable] with [args], capturing stdout and stderr.
 ///
@@ -79,6 +116,9 @@ void requireGitHubCli() {
 }
 
 /// Parses an `owner/repo#number` reference, exiting on malformed input.
+///
+/// The repository is lowercased, because GitHub names are case-insensitive
+/// and the result is compared against [recreateRepos] and other refs.
 PrRef parseRef(String ref) {
   final match = _prRefPattern.firstMatch(ref.trim());
   if (match == null) {
@@ -87,7 +127,37 @@ PrRef parseRef(String ref) {
     );
     exit(exitBadUsage);
   }
-  return (repo: match.group(1)!, number: int.parse(match.group(2)!));
+  return (
+    repo: match.group(1)!.toLowerCase(),
+    number: int.parse(match.group(2)!),
+  );
+}
+
+/// The `owner/repo#number` form of [pr], used in log lines.
+String describe(PrRef pr) => '${pr.repo}#${pr.number}';
+
+/// Whether re-running Kokoro on [pr] needs a recreated commit.
+bool needsRecreate(PrRef pr) => recreateRepos.contains(pr.repo);
+
+/// Runs a `gh` command that changes [pr], or only prints it under [dryRun].
+///
+/// [action] describes the change for log lines, for example
+/// `add label 'autosubmit'`. Returns whether the change succeeded.
+bool mutate(PrRef pr, String action, List<String> ghArgs) {
+  final ref = describe(pr);
+  if (dryRun) {
+    stdout.writeln('[dry-run] $ref: would $action.');
+    return true;
+  }
+
+  final result = runCommand('gh', ghArgs);
+  if (!result.ok) {
+    stderr.writeln('$ref: FAILED to $action: ${result.output}');
+    return false;
+  }
+
+  stdout.writeln('$ref: did $action.');
+  return true;
 }
 
 /// The authenticated GitHub login, or null when it cannot be determined.
@@ -131,16 +201,54 @@ bool alreadyApprovedBy(PrRef pr, String login) {
   return const LineSplitter().convert(reviews.output).contains(login);
 }
 
+/// The author and labels of [pr], or null with a warning when the lookup
+/// fails.
+PrInfo? fetchPrInfo(PrRef pr) {
+  final result = runCommand('gh', [
+    'pr',
+    'view',
+    '${pr.number}',
+    '--repo',
+    pr.repo,
+    '--json',
+    'author,labels',
+  ]);
+  if (result.ok) {
+    try {
+      if (jsonDecode(result.output) case {
+        'author': {'login': final String author},
+        'labels': final List<dynamic> labels,
+      }) {
+        return (
+          author: author,
+          labels: {
+            for (final label in labels)
+              if (label case {'name': final String name}) name,
+          },
+        );
+      }
+    } on FormatException {
+      // Fall through to the warning below.
+    }
+  }
+
+  stderr.writeln(
+    'Warning: ${describe(pr)}: could not read the author and labels '
+    '(${result.output}).',
+  );
+  return null;
+}
+
 /// Ensures [pr] carries an approving review from the current user.
 ///
 /// Returns true if the PR was already approved or is now approved.
-bool ensureApproved(PrRef pr, String ref, String body, String? login) {
+bool ensureApproved(PrRef pr, String body, String? login) {
   if (login != null && alreadyApprovedBy(pr, login)) {
-    stdout.writeln('$ref: already approved by you, skipping approval.');
+    stdout.writeln('${describe(pr)}: already approved by you, skipping.');
     return true;
   }
 
-  final approve = runCommand('gh', [
+  return mutate(pr, 'approve', [
     'pr',
     'review',
     '${pr.number}',
@@ -149,87 +257,142 @@ bool ensureApproved(PrRef pr, String ref, String body, String? login) {
     '--approve',
     if (body.isNotEmpty) ...['--body', body],
   ]);
-
-  if (!approve.ok) {
-    stderr.writeln('$ref: FAILED to approve: ${approve.output}');
-    return false;
-  }
-
-  stdout.writeln('$ref: approved.');
-  return true;
 }
 
 /// Adds [label] to [pr], returning whether the edit succeeded.
-bool applyLabel(PrRef pr, String ref, String label) {
-  final result = runCommand('gh', [
-    'pr',
-    'edit',
-    '${pr.number}',
-    '--repo',
-    pr.repo,
-    '--add-label',
-    label,
-  ]);
+bool applyLabel(PrRef pr, String label) => mutate(pr, "add label '$label'", [
+  'pr',
+  'edit',
+  '${pr.number}',
+  '--repo',
+  pr.repo,
+  '--add-label',
+  label,
+]);
 
-  if (!result.ok) {
-    stderr.writeln("$ref: FAILED to add label '$label': ${result.output}");
-    return false;
-  }
-
-  stdout.writeln("$ref: added label '$label'.");
-  return true;
-}
+/// Posts [recreateComment] on [pr], returning whether it succeeded.
+bool requestRecreate(PrRef pr) => mutate(pr, "comment '$recreateComment'", [
+  'pr',
+  'comment',
+  '${pr.number}',
+  '--repo',
+  pr.repo,
+  '--body',
+  recreateComment,
+]);
 
 /// Approves [pr] and adds [label]. Returns true when the PR is fully queued.
 ///
 /// Labeling is skipped when approval fails. Labeling an unapproved PR would
 /// leave it in the exact state the auto-submit bot rejects, causing it to
 /// strip the label and comment.
-bool process(
+bool approveAndLabel(
   PrRef pr, {
   required String label,
   required String body,
-  required bool dryRun,
   required String? login,
 }) {
-  final ref = '${pr.repo}#${pr.number}';
-
-  if (dryRun) {
-    stdout.writeln("[dry-run] Would approve $ref and add label '$label'.");
-    return true;
-  }
-
-  if (!ensureApproved(pr, ref, body, login)) {
-    stderr.writeln('$ref: skipping label; an unapproved PR will not merge.');
+  if (!ensureApproved(pr, body, login)) {
+    stderr.writeln(
+      '${describe(pr)}: skipping label; an unapproved PR will not merge.',
+    );
     return false;
   }
 
-  return applyLabel(pr, ref, label);
+  return applyLabel(pr, label);
 }
 
-const usage = '''
-Approves PRs and applies the autosubmit label, queueing them for the
-auto-submit bot. This does not merge anything itself.
+/// Asks Kokoro to build [pr] again.
+///
+/// Adds [kokoroRunLabel] unless it is already present, then, for repositories
+/// in [recreateRepos], asks Dependabot to recreate the PR. The label must be in
+/// place before Dependabot pushes, because that push is when those
+/// repositories' Kokoro job reads it. Only Dependabot acts on the comment, so
+/// any other author is refused there before anything changes.
+///
+/// Elsewhere, a label that is still present means a run is already queued:
+/// Kokoro removes it as soon as it starts. Re-adding it would fire no new
+/// event, so that case is reported and treated as success. When the PR can't
+/// be read, the label is added anyway, since re-adding it is harmless.
+///
+/// Does not approve the PR or add the auto-submit label: while the failed
+/// Kokoro status is still attached, the auto-submit bot would strip that label
+/// straight away.
+bool rerunKokoro(PrRef pr) {
+  final ref = describe(pr);
+  final info = fetchPrInfo(pr);
+  final recreate = needsRecreate(pr);
 
-Usage: dart run approve_and_label.dart --pr owner/repo#123 [options]
+  if (recreate && info?.author != dependabotLogin) {
+    stderr.writeln(
+      '$ref: FAILED: re-running Kokoro here needs a Dependabot PR '
+      "(author: ${info?.author ?? 'unknown'}).",
+    );
+    return false;
+  }
+
+  if (info?.labels.contains(kokoroRunLabel) ?? false) {
+    stdout.writeln("$ref: '$kokoroRunLabel' is already applied.");
+    if (!recreate) {
+      stdout.writeln('$ref: a Kokoro run is already queued.');
+      return true;
+    }
+  } else if (!applyLabel(pr, kokoroRunLabel)) {
+    return false;
+  }
+
+  if (!recreate || requestRecreate(pr)) return true;
+  stderr.writeln(
+    "$ref: '$kokoroRunLabel' is on the PR, so re-running with "
+    '--rerun-kokoro will only post the comment.',
+  );
+  return false;
+}
+
+final usage =
+    '''
+Approves PRs and applies the autosubmit label, queueing them for the
+auto-submit bot, and re-runs Kokoro builds. This does not merge anything
+itself.
+
+Usage: dart run approve_and_label.dart [--pr owner/repo#123]
+           [--rerun-kokoro owner/repo#456] [options]
 
 Options:
-  --pr <owner/repo#n>  PR to approve and label. Repeat for multiple PRs.
-  --label <name>       Label to apply after approval. (default: autosubmit)
-  --body <text>        Optional review comment body.
-  --dry-run            Print the intended actions without calling GitHub.
-  -h, --help           Show this help text.
+  --pr <owner/repo#n>            PR to approve and label. Repeat for multiple
+                                 PRs.
+  --rerun-kokoro <owner/repo#n>  PR whose Kokoro builds should run again.
+                                 Adds '$kokoroRunLabel', and in
+                                 ${recreateRepos.join(', ')}
+                                 also comments '$recreateComment' (Dependabot
+                                 PRs only). The PR is not approved. Repeat for
+                                 multiple PRs.
+  --label <name>                 Label to apply after approval.
+                                 (default: autosubmit)
+  --body <text>                  Optional review comment body.
+  --dry-run                      Print the changes a real run would make
+                                 without making them. Still reads PR state.
+  -h, --help                     Show this help text.
+
+At least one --pr or --rerun-kokoro is required, and a PR may not be passed
+to both.
 
 Values may be given as "--flag value" or "--flag=value".
 
 Exit codes:
-  0  Every PR was approved and labeled.
+  0  Every PR was processed successfully.
   1  The GitHub CLI is unavailable, or at least one PR failed.
   2  Invalid arguments.
 ''';
 
 /// Parsed command line options.
-typedef Options = ({List<String> prs, String label, String body, bool dryRun});
+typedef Options = ({
+  List<String> prs,
+  List<String> reruns,
+  String label,
+  String body,
+  bool dryRun,
+});
 
 /// Splits `--flag=value` into its parts. The value is null for a bare flag.
 (String, String?) splitFlag(String arg) => switch (arg.indexOf('=')) {
@@ -243,12 +406,13 @@ typedef Options = ({List<String> prs, String label, String body, bool dryRun});
 /// Validates parsed values, exiting with usage on any problem.
 Options validateOptions({
   required List<String> prs,
+  required List<String> reruns,
   required String label,
   required String body,
   required bool dryRun,
 }) {
-  if (prs.isEmpty) {
-    stderr.writeln('At least one --pr is required.\n');
+  if (prs.isEmpty && reruns.isEmpty) {
+    stderr.writeln('At least one --pr or --rerun-kokoro is required.\n');
     stderr.write(usage);
     exit(exitBadUsage);
   }
@@ -258,7 +422,7 @@ Options validateOptions({
     exit(exitBadUsage);
   }
 
-  return (prs: prs, label: label, body: body, dryRun: dryRun);
+  return (prs: prs, reruns: reruns, label: label, body: body, dryRun: dryRun);
 }
 
 /// Minimal argument parser; avoids a package:args dependency so the script
@@ -267,6 +431,7 @@ Options validateOptions({
 /// Returns null when help was requested and the caller should exit quietly.
 Options? parseArgs(List<String> args) {
   final prs = <String>[];
+  final reruns = <String>[];
   var label = 'autosubmit';
   var body = '';
   var dryRun = false;
@@ -291,6 +456,8 @@ Options? parseArgs(List<String> args) {
         dryRun = true;
       case '--pr':
         prs.add(nextValue());
+      case '--rerun-kokoro':
+        reruns.add(nextValue());
       case '--label':
         label = nextValue();
       case '--body':
@@ -302,33 +469,61 @@ Options? parseArgs(List<String> args) {
     }
   }
 
-  return validateOptions(prs: prs, label: label, body: body, dryRun: dryRun);
+  return validateOptions(
+    prs: prs,
+    reruns: reruns,
+    label: label,
+    body: body,
+    dryRun: dryRun,
+  );
+}
+
+/// Exits when a PR was passed to both `--pr` and `--rerun-kokoro`.
+///
+/// A PR still showing a failed Kokoro build cannot be queued for auto-submit:
+/// the bot would strip the label at once. Refuse the combination rather than
+/// guess which action was meant.
+void refuseOverlap(Set<PrRef> approvals, Set<PrRef> reruns) {
+  final both = approvals.intersection(reruns);
+  if (both.isEmpty) return;
+
+  stderr.writeln(
+    'These PRs were passed to both --pr and --rerun-kokoro: '
+    '${both.map(describe).join(', ')}. Re-run Kokoro first, then approve '
+    'once the build passes.',
+  );
+  exit(exitBadUsage);
 }
 
 void main(List<String> args) {
   final options = parseArgs(args);
   if (options == null) return;
-
-  requireGitHubCli();
+  dryRun = options.dryRun;
 
   // Parse every ref up front so a malformed one cannot leave a half-applied
   // batch behind.
-  final refs = [for (final ref in options.prs) parseRef(ref)];
+  final approvals = {for (final ref in options.prs) parseRef(ref)};
+  final reruns = {for (final ref in options.reruns) parseRef(ref)};
+  refuseOverlap(approvals, reruns);
 
-  final login = options.dryRun ? null : fetchAuthenticatedLogin();
+  requireGitHubCli();
+  final login = approvals.isEmpty ? null : fetchAuthenticatedLogin();
 
   var failures = 0;
-  for (final ref in refs) {
-    final ok = process(
-      ref,
+  for (final pr in approvals) {
+    final ok = approveAndLabel(
+      pr,
       label: options.label,
       body: options.body,
-      dryRun: options.dryRun,
       login: login,
     );
     if (!ok) failures++;
   }
+  for (final pr in reruns) {
+    if (!rerunKokoro(pr)) failures++;
+  }
 
-  stdout.writeln('\nProcessed ${refs.length} PR(s); $failures failure(s).');
+  final total = approvals.length + reruns.length;
+  stdout.writeln('\nProcessed $total PR(s); $failures failure(s).');
   exit(failures > 0 ? exitFailure : 0);
 }
