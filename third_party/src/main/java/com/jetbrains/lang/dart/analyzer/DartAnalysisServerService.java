@@ -984,6 +984,7 @@ public final class DartAnalysisServerService implements Disposable {
         updateCurrentFile();
 
         if (isLocalAnalyzableFile(file)) {
+          myServerData.onFileOpened(file);
           updateVisibleFiles();
         }
       }
@@ -992,7 +993,13 @@ public final class DartAnalysisServerService implements Disposable {
       public void selectionChanged(@NotNull FileEditorManagerEvent event) {
         updateCurrentFile();
 
-        if (isLocalAnalyzableFile(event.getOldFile()) || isLocalAnalyzableFile(event.getNewFile())) {
+        final VirtualFile newFile = event.getNewFile();
+        final boolean isNewFileAnalyzable = isLocalAnalyzableFile(newFile);
+
+        if (isLocalAnalyzableFile(event.getOldFile()) || isNewFileAnalyzable) {
+          if (isNewFileAnalyzable) {
+            myServerData.onFileOpened(newFile);
+          }
           updateVisibleFiles();
         }
       }
@@ -1019,10 +1026,9 @@ public final class DartAnalysisServerService implements Disposable {
       public void beforeDocumentChange(@NotNull DocumentEvent e) {
         if (myServer == null) return;
 
-        myServerData.onDocumentChanged(e);
-
         final VirtualFile file = FileDocumentManager.getInstance().getFile(e.getDocument());
         if (isLocalAnalyzableFile(file)) {
+          myServerData.onDocumentChanged(e);
           for (VirtualFile fileInEditor : FileEditorManager.getInstance(myProject).getOpenFiles()) {
             if (fileInEditor.equals(file)) {
               synchronized (myLock) {
@@ -1031,10 +1037,9 @@ public final class DartAnalysisServerService implements Disposable {
               break;
             }
           }
+          myUpdateFilesAlarm.cancelAllRequests();
+          myUpdateFilesAlarm.addRequest(DartAnalysisServerService.this::updateFilesContent, UPDATE_FILES_TIMEOUT);
         }
-
-        myUpdateFilesAlarm.cancelAllRequests();
-        myUpdateFilesAlarm.addRequest(DartAnalysisServerService.this::updateFilesContent, UPDATE_FILES_TIMEOUT);
       }
     };
 
@@ -1256,6 +1261,9 @@ public final class DartAnalysisServerService implements Disposable {
         }
         myServerData.onFilesContentUpdated();
       });
+    }
+    else {
+      myServerData.onFilesContentUpdated();
     }
   }
 
