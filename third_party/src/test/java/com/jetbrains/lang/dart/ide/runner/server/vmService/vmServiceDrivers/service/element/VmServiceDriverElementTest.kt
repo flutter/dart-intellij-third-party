@@ -49,6 +49,38 @@ class VmServiceDriverElementTest : TestCase() {
     assertEquals("manual-test-tag", instance.label)
   }
 
+  fun testIsolateReloadEventIncludesIsolateGroupWithoutIsolate() {
+    val json = JsonObject().apply {
+      addProperty("type", "Event")
+      addProperty("kind", "IsolateReload")
+      add("isolateGroup", JsonObject().apply {
+        addProperty("type", "@IsolateGroup")
+        addProperty("id", "isolateGroups/1")
+        addProperty("number", "1")
+        addProperty("name", "main.dart")
+        addProperty("isSystemIsolateGroup", false)
+      })
+    }
+
+    val event = Event(json)
+    val isolateGroup = event.isolateGroup
+    assertEquals(EventKind.IsolateReload, event.kind)
+    assertEquals("isolateGroups/1", isolateGroup?.id)
+    assertEquals("1", isolateGroup?.number)
+    assertEquals("main.dart", isolateGroup?.name)
+    assertFalse(isolateGroup?.isSystemIsolateGroup ?: true)
+    assertNull(event.isolate)
+  }
+
+  fun testEventIsolateGroupIsOptional() {
+    val json = JsonObject().apply {
+      addProperty("type", "Event")
+      addProperty("kind", "VMUpdate")
+    }
+
+    assertNull(Event(json).isolateGroup)
+  }
+
   fun testPerfettoTimeline() {
     val json = JsonObject().apply {
       addProperty("trace", "AA==")
