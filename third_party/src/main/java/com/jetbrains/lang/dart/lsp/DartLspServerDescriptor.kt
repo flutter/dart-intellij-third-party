@@ -253,7 +253,6 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             SemanticTokenTypes.Method -> when {
                 modifiers.contains("constructor") -> DartSyntaxHighlighterColors.CONSTRUCTOR
                 isStatic -> if (isDecl) DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION else DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE
-                isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE
                 else -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE
             }
 
@@ -277,7 +276,6 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             }
 
             SemanticTokenTypes.Parameter -> if (isDecl) DartSyntaxHighlighterColors.PARAMETER_DECLARATION else DartSyntaxHighlighterColors.PARAMETER_REFERENCE
-            "annotation", SemanticTokenTypes.Decorator -> DartSyntaxHighlighterColors.ANNOTATION
             "label" -> DartSyntaxHighlighterColors.LABEL
             SemanticTokenTypes.Namespace -> DartSyntaxHighlighterColors.LIBRARY_NAME
             SemanticTokenTypes.Keyword, "boolean" -> DartSyntaxHighlighterColors.KEYWORD
