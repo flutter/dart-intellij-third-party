@@ -48,7 +48,11 @@ public final class DartInheritorsSearcher extends QueryExecutorBase<PsiElement, 
     }
   }
 
-  // This short-living cache helps not to call Analysis Server twice for the same info on a single 'Go To Implementations' action.
+  /**
+   * DAS-only cache retained for the legacy fallback. LSP Go to Implementation owns a separate cache.
+   * @deprecated Retained during migration to LSP; do not use for LSP location results.
+   */
+  @Deprecated
   private @Nullable WeakReference<HierarchyInfo> myLastResult;
 
   @Override

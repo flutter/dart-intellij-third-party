@@ -271,19 +271,30 @@ class DartLspNavigationTest : DartCodeInsightFixtureTestCase() {
                     assertEquals("Unsupported capability must not send a request", 1, requests.size)
                     assertEmpty(targets)
 
+                    fun invalidate() {
+                        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+                            val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(target.virtualFile)!!
+                            document.insertString(document.textLength, "\n// changed")
+                        }
+                        com.intellij.psi.PsiDocumentManager.getInstance(project).commitAllDocuments()
+                        com.intellij.openapi.application.impl.NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
+                    }
                     capabilities.setImplementationProvider(true)
+                    invalidate()
                     response.set(CompletableFuture.completedFuture(Either.forLeft(emptyList())))
                     search()
                     assertEquals(2, requests.size)
                     assertEmpty(targets)
 
+                    invalidate()
                     response.set(CompletableFuture.failedFuture(ResponseErrorException(ResponseError(-32601, "Method not found", null))))
                     search()
                     assertEquals("Server error must end the search without delivery", 3, requests.size)
                     assertEmpty(targets)
 
                     // Complete the implementation cancellation check before navigation changes the editor context.
-                    response.set(CompletableFuture())
+                    val canceledResponse = CompletableFuture<Either<List<Location>, List<LocationLink>>>()
+                    response.set(canceledResponse)
                     val indicator = EmptyProgressIndicator()
                     val canceledSearch = ApplicationManager.getApplication().executeOnPooledThread(java.util.concurrent.Callable {
                         try {
@@ -301,6 +312,139 @@ class DartLspNavigationTest : DartCodeInsightFixtureTestCase() {
                     PlatformTestUtil.waitWithEventsDispatching("Canceled implementation search", { canceledSearch.isDone }, 10)
                     assertTrue("Request cancellation must propagate", canceledSearch.get())
                     assertEmpty(targets)
+                    canceledResponse.complete(Either.forLeft(listOf(location(targetUri, 0, 6))))
+                    response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(location(targetUri, 0, 6)))))
+                    search()
+                    assertEquals("Canceled completion must not publish a cache entry", 5, requests.size)
+                    assertEquals(listOf("Target"), targets.map { (it as DartClass).name })
+
+                    // Cache only raw results: scope and consumer termination are reapplied on hits.
+                    val other = myFixture.addFileToProject("other.dart", "class Other {}")
+                    val sourceOffset = 16
+                    fun directSearch(file: VirtualFile = source.virtualFile, offset: Int = sourceOffset,
+                                     scope: com.intellij.psi.search.SearchScope = GlobalSearchScope.allScope(project),
+                                     stop: Boolean = false): List<String?> {
+                        val found = CopyOnWriteArrayList<String?>()
+                        val task = ApplicationManager.getApplication().executeOnPooledThread {
+                            DartLspNavigationService.processImplementations(project, file, offset, scope, Processor {
+                                found.add((it as DartClass).name)
+                                !stop
+                            })
+                        }
+                        PlatformTestUtil.waitWithEventsDispatching("Direct implementation search", { task.isDone }, 10)
+                        task.get()
+                        return found
+                    }
+                    response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(
+                        location(targetUri, 0, 6), location(targetUri, 0, 6), location(other.virtualFile.url, 0, 6)
+                    ))))
+                    val beforeReuse = requests.size
+                    assertEquals(listOf("Target"), directSearch(stop = true))
+                    assertEquals(listOf("Other"), directSearch(scope = GlobalSearchScope.fileScope(other)))
+                    assertEquals(listOf("Target", "Other"), directSearch())
+                    assertEquals("Hits must reprocess scope, deduplication and consumers", beforeReuse + 1, requests.size)
+
+                    fun expectMiss(change: () -> Unit) {
+                        val before = requests.size
+                        val cache = project.getService(DartLspImplementationCache::class.java)
+                        val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(source.virtualFile)!!
+                        fun snapshot() = runReadAction {
+                            cache.snapshot(source.virtualFile, document, source.virtualFile.url, Position(1, 6), server)
+                        }
+                        val previousKey = snapshot()
+                        change()
+                        assertFalse("Change must invalidate before any explicit PSI commit", previousKey.matches(snapshot()))
+                        com.intellij.psi.PsiDocumentManager.getInstance(project).commitAllDocuments()
+                        com.intellij.openapi.application.impl.NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
+                        directSearch()
+                        assertEquals("Semantic change must invalidate", before + 1, requests.size)
+                        directSearch()
+                        assertEquals("Unchanged result must then be reused", before + 1, requests.size)
+                    }
+                    expectMiss {
+                        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+                            val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(source.virtualFile)!!
+                            document.insertString(document.textLength, "\n// source change")
+                        }
+                    }
+                    // An uncommitted edit in a different document must invalidate immediately.
+                    expectMiss {
+                        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+                            val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(other.virtualFile)!!
+                            document.insertString(document.textLength, "\n// other change")
+                            assertTrue(com.intellij.psi.PsiDocumentManager.getInstance(project).isUncommited(document))
+                        }
+                    }
+                    val contentFile = myFixture.addFileToProject("content.txt", "before")
+                    expectMiss {
+                        val vfm = VirtualFileManager.getInstance()
+                        val before = vfm.modificationCount
+                        ApplicationManager.getApplication().runWriteAction {
+                            contentFile.virtualFile.setBinaryContent("after!".toByteArray())
+                        }
+                        assertTrue("Content-only changes must advance all-content VFS counter", vfm.modificationCount > before)
+                    }
+                    expectMiss {
+                        val tracker = com.intellij.openapi.roots.ProjectRootModificationTracker.getInstance(project)
+                        val before = tracker.modificationCount
+                        com.intellij.openapi.roots.ModuleRootModificationUtil.updateModel(myFixture.module) { model ->
+                            model.contentEntries.first().addExcludeFolder(source.virtualFile.parent.url + "/excluded-cache-test")
+                        }
+                        assertTrue("Root edits must advance public tracker", tracker.modificationCount > before)
+                    }
+                    val beforePositions = requests.size
+                    directSearch(offset = sourceOffset + 1)
+                    directSearch(file = other.virtualFile, offset = 6)
+                    assertEquals("Distinct positions and source files must miss", beforePositions + 2, requests.size)
+
+                    invalidate()
+                    response.set(CompletableFuture.completedFuture(Either.forLeft(emptyList())))
+                    val beforeEmpty = requests.size
+                    assertEmpty(directSearch())
+                    assertEmpty(directSearch())
+                    assertEquals("Empty successes are reusable", beforeEmpty + 1, requests.size)
+
+                    invalidate()
+                    response.set(CompletableFuture.failedFuture(ResponseErrorException(ResponseError(-32601, "Method not found", null))))
+                    val beforeFailure = requests.size
+                    assertEmpty(directSearch())
+                    response.set(CompletableFuture.completedFuture(null))
+                    assertEmpty(directSearch())
+                    response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(location(targetUri, 0, 6)))))
+                    assertEquals(listOf("Target"), directSearch())
+                    assertEquals("Errors and null responses must not be cached", beforeFailure + 3, requests.size)
+
+                    // A document edit while an RPC is pending prevents delivery and publication.
+                    invalidate()
+                    val pending = CompletableFuture<Either<List<Location>, List<LocationLink>>>()
+                    response.set(pending)
+                    val beforePending = requests.size
+                    val staleTargets = CopyOnWriteArrayList<PsiElement>()
+                    val staleSearch = ApplicationManager.getApplication().executeOnPooledThread {
+                        DartLspNavigationService.processImplementations(project, source.virtualFile, sourceOffset,
+                            GlobalSearchScope.allScope(project), Processor { staleTargets.add(it); true })
+                    }
+                    PlatformTestUtil.waitWithEventsDispatching("Pending stale search", { requests.size == beforePending + 1 }, 10)
+                    invalidate()
+                    pending.complete(Either.forLeft(listOf(location(targetUri, 0, 6))))
+                    PlatformTestUtil.waitWithEventsDispatching("Stale search completed", { staleSearch.isDone }, 10)
+                    staleSearch.get()
+                    assertEmpty("Stale snapshot must not deliver", staleTargets)
+                    response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(location(targetUri, 0, 6)))))
+                    assertEquals(listOf("Target"), directSearch())
+                    assertEquals("Stale response must not publish", beforePending + 2, requests.size)
+
+                    invalidate()
+                    val link = LocationLink().apply {
+                        this.targetUri = target.virtualFile.url
+                        targetRange = Range(Position(0, 0), Position(0, 15))
+                        targetSelectionRange = Range(Position(0, 6), Position(0, 12))
+                    }
+                    response.set(CompletableFuture.completedFuture(Either.forRight(listOf(link))))
+                    val beforeLink = requests.size
+                    assertEquals(listOf("Target"), directSearch())
+                    assertEquals(listOf("Target"), directSearch())
+                    assertEquals("LocationLink selection ranges must be cached", beforeLink + 1, requests.size)
 
                     // The direct action sends the actual caret, not an enclosing declaration's name.
                     val superSource = myFixture.addFileToProject("superSource.dart", "class Source {\n  void method() {}\n}")

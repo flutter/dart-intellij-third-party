@@ -6,6 +6,7 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -83,26 +84,49 @@ object DartLspNavigationService {
     ) {
         ProgressManager.checkCanceled()
         if (project.isDefault || project.isDisposed) return
-        val server = LspServerManager.getInstance(project)
+        fun selectedServer() = LspServerManager.getInstance(project)
             .getServersForProvider(DartLspServerSupportProvider::class.java)
-            .firstOrNull { it.state == LspServerState.Running && it.descriptor.isSupportedFile(file) } ?: return
-        val capability = server.initializeResult?.capabilities?.implementationProvider ?: return
-        if (capability.isLeft && capability.left != true) return
-        val params = runReadAction {
+            .firstOrNull { it.state == LspServerState.Running && it.descriptor.isSupportedFile(file) }
+            ?.takeIf {
+                val capability = it.initializeResult?.capabilities?.implementationProvider
+                capability != null && (!capability.isLeft || capability.left == true)
+            }
+        val server = selectedServer() ?: return
+        val cache = project.service<DartLspImplementationCache>()
+        fun snapshot() = runReadAction {
+            if (project.isDisposed || !file.isValid) return@runReadAction null
             val document = FileDocumentManager.getInstance().getDocument(file) ?: return@runReadAction null
             if (offset !in 0..document.textLength) return@runReadAction null
             val line = document.getLineNumber(offset)
-            ImplementationParams().apply {
-                textDocument = server.getDocumentIdentifier(file)
-                position = Position(line, offset - document.getLineStartOffset(line))
+            cache.snapshot(file, document, server.getDocumentIdentifier(file).uri,
+                           Position(line, offset - document.getLineStartOffset(line)), server)
+        }
+        val key = snapshot() ?: return
+        fun isCurrent(): Boolean {
+            ProgressManager.checkCanceled()
+            return !project.isDisposed && selectedServer() === server && snapshot()?.let(key::matches) == true
+        }
+        val cached = cache.get(key)
+        if (cached != null) {
+            runReadAction {
+                if (isCurrent()) processLocations(project, server.descriptor, cached, scope, consumer)
+                ProgressManager.checkCanceled()
             }
-        } ?: return
+            return
+        }
+        val params = ImplementationParams(org.eclipse.lsp4j.TextDocumentIdentifier(key.uri), Position(key.line, key.character))
         // sendRequestSync handles unavailable/error responses and propagates IDE cancellation.
         val response = server.sendRequestSync { it.textDocumentService.implementation(params) } ?: return
-        val locations = if (response.isLeft) response.left else response.right.map {
+        ProgressManager.checkCanceled()
+        val targets = cache.normalize(if (response.isLeft) response.left else response.right.map {
             Location(it.targetUri, it.targetSelectionRange)
+        })
+        runReadAction {
+            if (!isCurrent()) return@runReadAction
+            processLocations(project, server.descriptor, targets.map { it.location() }, scope, consumer)
+            // A canceled or invalidated invocation must not publish even if its RPC completed.
+            if (isCurrent()) cache.put(key, targets)
         }
-        processLocations(project, server.descriptor, locations, scope, consumer)
     }
 
     internal fun processLocations(
