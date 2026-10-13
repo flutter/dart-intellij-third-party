@@ -64,7 +64,10 @@ class DartLspSymbolDeclarationProvider : PsiSymbolDeclarationProvider {
 
     val lspServers = findReferenceServers(project, file).ifEmpty { return emptyList() }
 
-    val position = getLsp4jPosition(document, nameIdentifier.textRange.startOffset)
+    val offset = nameIdentifier.textRange.startOffset
+    if (offset > document.textLength) return emptyList()
+    val position = getLsp4jPosition(document, offset)
+
     val searchTarget = LspSearchTarget(lspServers, file, position)
 
     val symbol = DartLspSearchTargetSymbol(searchTarget, project, file, position)

@@ -6,7 +6,10 @@
 package com.jetbrains.lang.dart.ide.findUsages
 
 import com.intellij.codeInsight.TargetElementUtil
+import com.intellij.find.usages.impl.searchTargets
+import com.intellij.find.usages.symbol.SearchTargetSymbol
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.model.psi.impl.targetSymbols
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.LspServerManagerListener
@@ -14,10 +17,13 @@ import com.intellij.platform.dartlsp.api.LspServerState
 import com.intellij.platform.dartlsp.impl.documentSync.LspDocumentSyncManager
 import com.intellij.platform.dartlsp.impl.LspServerImpl
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
+import com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget
+import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.lsp.DartLspServerDescriptor
 import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
+import com.jetbrains.lang.dart.psi.DartNamedElement
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.ServerCapabilities
@@ -123,9 +129,9 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
 
         try {
             val caretOffset = myFixture.caretOffset
-            val namedElement = com.intellij.psi.util.PsiTreeUtil.getParentOfType(
+            val namedElement = PsiTreeUtil.getParentOfType(
                 file.findElementAt(caretOffset),
-                com.jetbrains.lang.dart.psi.DartNamedElement::class.java
+                DartNamedElement::class.java
             )
             assertNotNull("Expected DartNamedElement at caret", namedElement)
             if (namedElement == null) return
@@ -138,21 +144,21 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
                 val symbol = declarations.single().symbol
                 assertTrue(
                     "Expected SearchTargetSymbol, got: $symbol",
-                    symbol is com.intellij.find.usages.symbol.SearchTargetSymbol
+                    symbol is SearchTargetSymbol
                 )
-                val searchTarget = (symbol as com.intellij.find.usages.symbol.SearchTargetSymbol).searchTarget
+                val searchTarget = (symbol as SearchTargetSymbol).searchTarget
                 assertTrue(
                     "Expected LspSearchTarget, got: $searchTarget",
-                    searchTarget is com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget
+                    searchTarget is LspSearchTarget
                 )
 
-                val targetSymbols = com.intellij.model.psi.impl.targetSymbols(file, caretOffset)
+                val targetSymbols = targetSymbols(file, caretOffset)
                 assertEquals(1, targetSymbols.size)
                 assertEquals(symbol, targetSymbols.single())
 
-                val targets = com.intellij.find.usages.impl.searchTargets(file, caretOffset)
+                val targets = searchTargets(file, caretOffset)
                 assertEquals(1, targets.size)
-                assertTrue(targets.single() is com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget)
+                assertTrue(targets.single() is LspSearchTarget)
             }
 
             // 2. With LSP references disabled, DartLspSymbolDeclarationProvider returns emptyList so legacy PSI handles it
@@ -177,9 +183,9 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
         val (server, lspServers) = createMockLspServer(file.virtualFile)
 
         try {
-            val namedElement = com.intellij.psi.util.PsiTreeUtil.getParentOfType(
+            val namedElement = PsiTreeUtil.getParentOfType(
                 file.findElementAt(myFixture.caretOffset),
-                com.jetbrains.lang.dart.psi.DartNamedElement::class.java
+                DartNamedElement::class.java
             )
             assertNotNull(namedElement)
             if (namedElement == null) return
@@ -196,8 +202,8 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
                 assertEquals(TextRange.from(relativeStart, nameIdentifier.textLength), declaration.rangeInDeclaringElement)
 
                 // LSP position line must point to line 3 (where annotatedFunc is declared), NOT line 0 (doc comment)
-                val symbol = declaration.symbol as com.intellij.find.usages.symbol.SearchTargetSymbol
-                val searchTarget = symbol.searchTarget as com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget
+                val symbol = declaration.symbol as SearchTargetSymbol
+                val searchTarget = symbol.searchTarget as LspSearchTarget
                 assertEquals(3, searchTarget.position.line)
 
                 // Dereferencing smart pointer when server stops returns null (no memory leaks)
