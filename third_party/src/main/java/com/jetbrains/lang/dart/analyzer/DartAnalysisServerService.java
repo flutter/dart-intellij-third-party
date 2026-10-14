@@ -147,6 +147,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import java.io.File;
 import java.net.URI;
@@ -2674,6 +2675,19 @@ public final class DartAnalysisServerService implements Disposable {
       myDtdUri = uri;
       server.lsp_connectToDtd(uri);
     }
+  }
+
+  /**
+   * Stops the analysis server and waits (bounded) for its process to exit, so that
+   * shutdown-time side effects such as flushing analytics have happened on return.
+   * <p>
+   * Blocks the calling thread for up to {@code SEND_REQUEST_TIMEOUT}, plus the time
+   * {@code StdioServerSocket.stop()} needs to force the process down if it doesn't exit.
+   */
+  @TestOnly
+  public void stopServer_TESTS_ONLY() {
+    assert ApplicationManager.getApplication().isUnitTestMode();
+    stopServer();
   }
 
   public void waitForAnalysisToComplete_TESTS_ONLY(final @NotNull VirtualFile file) {
