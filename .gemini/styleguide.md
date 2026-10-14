@@ -30,6 +30,11 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
   - Classes extending `AnAction` must be completely stateless. Flag any `AnAction` class that defines mutable instance variables (fields), as the platform instantiates a single instance of the action for the lifetime of the IDE.
   - Ensure `update(AnActionEvent e)` methods are fast and do not perform heavy calculations, as they are called frequently by the IDE to determine menu item visibility.
   - Ensure `actionPerformed(AnActionEvent e)` methods are instrumented w/ a call to analytics reporting like `Analytics.report(AnalyticsData.forAction(this, e))`.
+- **LSP migration (LSP-over-legacy):**
+  - A feature that calls an LSP endpoint, or relies on server behavior, added in a recent Dart SDK must be gated on the Dart SDK version: add a `MIN_<FEATURE>_SDK_VERSION` constant next to the others in `DartAnalysisServerService` and compare with `DartSdkUpdateChecker.compareDartSdkVersions`. Flag gates on the analysis-server protocol version instead, and new endpoints used with no SDK gate.
+  - Don't ask for gates on SDK versions more than about two years old. Suggest removing such gates.
+  - `LspMethod.isExperimental` means "users can switch back to the legacy implementation". A feature with a legacy counterpart starts as `isExperimental = true`. A feature with no legacy fallback uses `isExperimental = false`, with a comment saying so. Don't ask to gate it behind the experimental setting.
+  - The changelog entry for an SDK-gated feature says which SDK it requires, e.g. "(requires Dart SDK 3.14.0-139.0.dev or newer)".
 
 ## 3. Idiomatic Language Standards
 ### Dart
