@@ -4,6 +4,7 @@
 - File Structure view implemented with JetBrains LSP (experimental feature) (#673)
 - Code completion with JetBrains LSP (experimental feature) (#399)
 - Support for the Dart "parts with imports" language feature in IDE-side resolution used by Override/Implement Methods, Generate actions, and parameter info: imports in part files and nested parts ([dart-lang/sdk#56209](https://github.com/dart-lang/sdk/issues/56209)) (#721)
+- Error and UI freeze reporting to JetBrains Marketplace (#740)
 
 ### Changed
 
