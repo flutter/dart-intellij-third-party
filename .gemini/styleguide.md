@@ -25,7 +25,7 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - **Backward Compatibility:** Avoid using `@ApiStatus.Internal` or `@ApiStatus.ScheduledForRemoval` APIs unless strictly necessary.
 - **Logging:**
   - Reject any use of `System.out.println` or `System.err.println` for logging.
-  - Enforce the use of the IntelliJ SDK's built-in logger: `com.intellij.openapi.diagnostic.Logger` or our own: `io.flutter.logging.PluginLogger.
+  - Enforce the use of the IntelliJ SDK's built-in logger: `com.intellij.openapi.diagnostic.Logger` or our own: `com.jetbrains.lang.dart.logging.PluginLogger`.
 - **Actions:**
   - Classes extending `AnAction` must be completely stateless. Flag any `AnAction` class that defines mutable instance variables (fields), as the platform instantiates a single instance of the action for the lifetime of the IDE.
   - Ensure `update(AnActionEvent e)` methods are fast and do not perform heavy calculations, as they are called frequently by the IDE to determine menu item visibility.
