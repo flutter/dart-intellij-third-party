@@ -17,6 +17,7 @@ import com.jetbrains.lang.dart.analytics.AnalyticsConfiguration
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.DartTestUtils
+import java.io.IOException
 
 private val LOG = Logger.getInstance(DashEnvPropagationTest::class.java)
 
@@ -128,12 +129,23 @@ class DashEnvPropagationTest : CodeInsightFixtureTestCase<ModuleFixtureBuilder<*
     } catch (e: Throwable) {
       addSuppressedException(e)
     } finally {
+      var tearDownFailure: Throwable? = null
       try {
         // Disposes testRootDisposable, which removes the env overrides. Only after that is it safe
         // to delete the home they point at; a process spawned in between would recreate it.
         super.tearDown()
+      } catch (t: Throwable) {
+        tearDownFailure = t
+        throw t
       } finally {
-        homeToDelete?.delete()
+        try {
+          homeToDelete?.delete()
+        } catch (e: Throwable) {
+          // Don't let a cleanup failure (e.g. files still locked on Windows) mask a tearDown failure.
+          // addSuppressedException won't do here: super.tearDown() has already reported by now.
+          val primary = tearDownFailure
+          if (primary != null) primary.addSuppressed(e) else throw e
+        }
       }
     }
   }
@@ -272,13 +284,21 @@ class DashEnvPropagationTest : CodeInsightFixtureTestCase<ModuleFixtureBuilder<*
     isDone: (List<TelemetryHome.LoggedEvent>) -> Boolean,
   ): List<TelemetryHome.LoggedEvent> {
     val deadline = System.currentTimeMillis() + timeoutMs
-    var events = home.events()
-    while (!isDone(events) && System.currentTimeMillis() < deadline) {
+    while (System.currentTimeMillis() < deadline) {
+      // A read can fail transiently (e.g. a sharing violation on Windows) while the server is still
+      // writing or shutting down; just try again on the next poll.
+      val events = try {
+        home.events()
+      } catch (_: IOException) {
+        null
+      }
+      if (events != null && isDone(events)) return events
       PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
       TimeoutUtil.sleep(100)
-      events = home.events()
     }
-    return events
+    // The final read is deliberately strict: in the suppression tests an unreadable log must fail the
+    // test rather than look like an empty one.
+    return home.events()
   }
 
   private fun describe(session: DasSession): String =
