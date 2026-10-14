@@ -496,6 +496,27 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             with open(structure_view_factory_path, "w", encoding="utf-8") as f:
                 f.write(factory_content)
 
+    # 13. Guard StickyLineInfo construction in LspFileBreadcrumbsCollector against incomplete declarations
+    # where selectionRange.start >= range.end (textOffset >= endOffset).
+    breadcrumbs_collector_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/documentSymbol/LspFileBreadcrumbsCollector.kt"
+    )
+    if os.path.exists(breadcrumbs_collector_path):
+        with open(breadcrumbs_collector_path, "r", encoding="utf-8") as f:
+            breadcrumbs_content = f.read()
+        old_sticky_block = """      val endOffset = getOffsetInDocument(document, symbol.range.end)
+                      ?: return@mapNotNull null
+      StickyLineInfo(textOffset, endOffset, null)"""
+        new_sticky_block = """      val endOffset = getOffsetInDocument(document, symbol.range.end)
+                      ?: return@mapNotNull null
+      if (textOffset >= endOffset) return@mapNotNull null
+      StickyLineInfo(textOffset, endOffset, null)"""
+        if old_sticky_block in breadcrumbs_content:
+            breadcrumbs_content = breadcrumbs_content.replace(old_sticky_block, new_sticky_block)
+            with open(breadcrumbs_collector_path, "w", encoding="utf-8") as f:
+                f.write(breadcrumbs_content)
+
     print("Patch applied successfully!")
 
 if __name__ == "__main__":

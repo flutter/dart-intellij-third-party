@@ -59,6 +59,7 @@ internal class LspFileBreadcrumbsCollector(private val project: Project) : FileB
                        ?: return@mapNotNull null
       val endOffset = getOffsetInDocument(document, symbol.range.end)
                       ?: return@mapNotNull null
+      if (textOffset >= endOffset) return@mapNotNull null
       StickyLineInfo(textOffset, endOffset, null)
     }
   }

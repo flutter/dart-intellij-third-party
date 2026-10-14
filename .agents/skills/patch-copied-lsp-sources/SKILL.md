@@ -66,3 +66,6 @@ Here is the details of the changes made by the patch script:
 10. **LSP Structure View Support**:
    - Copy `platform/lsp-impl/structureView/src` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`, register `LspStructureViewFactory` and `LspStructureViewProjectActivity` in `dart-lsp-impl.xml`, and make `LspStructureViewFactory` public (`class LspStructureViewFactory`) so `DartStructureViewFactory` can delegate to it.
 
+11. **Guard `StickyLineInfo` Range in `LspFileBreadcrumbsCollector`**:
+   - Add `if (textOffset >= endOffset) return@mapNotNull null` before constructing `StickyLineInfo(textOffset, endOffset, null)` in `LspFileBreadcrumbsCollector.computeStickyLineInfos` so incomplete declarations (where `selectionRange.start == range.end`) do not throw `IllegalArgumentException`.
+
