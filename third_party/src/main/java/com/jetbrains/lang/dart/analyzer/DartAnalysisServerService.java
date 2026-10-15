@@ -42,6 +42,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.codeInsight.CodeInsightSettings;
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationInfo;
 import com.intellij.openapi.application.ApplicationManager;
@@ -253,6 +254,7 @@ public final class DartAnalysisServerService implements Disposable {
   private volatile @NotNull String mySdkVersion = "";
   private @Nullable String mySdkHome;
   private volatile @Nullable SemanticTokensLegend mySemanticTokensLegend;
+  private volatile boolean mySemanticTokensAdvertised = false;
   private final AtomicReference<CompletableFuture<SemanticTokensLegend>> mySemanticTokensLegendFuture =
     new AtomicReference<>(new CompletableFuture<>());
 
@@ -784,6 +786,29 @@ public final class DartAnalysisServerService implements Disposable {
     }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspHighlighting(sdk.getVersion());
+  }
+
+  public static boolean isLspHighlightingActive(final @NotNull Project project) {
+    if (!isLspHighlightingEnabled(project)) {
+      return false;
+    }
+    return getInstance(project).isSemanticTokensAdvertised();
+  }
+
+  public boolean isSemanticTokensAdvertised() {
+    return mySemanticTokensAdvertised;
+  }
+
+  public void setSemanticTokensAdvertised(boolean advertised) {
+    if (mySemanticTokensAdvertised != advertised) {
+      mySemanticTokensAdvertised = advertised;
+      analysis_setSubscriptions();
+      ApplicationManager.getApplication().invokeLater(() -> {
+        if (!myProject.isDisposed()) {
+          DaemonCodeAnalyzer.getInstance(myProject).restart();
+        }
+      }, ModalityState.nonModal(), myDisposedCondition);
+    }
   }
 
   public @Nullable SemanticTokensLegend getSemanticTokensLegend() {
@@ -2261,7 +2286,7 @@ public final class DartAnalysisServerService implements Disposable {
       if (myServer == null) return;
 
       final Map<String, List<String>> subscriptions = new HashMap<>();
-      if (!isLspHighlightingEnabled(myProject)) {
+      if (!isLspHighlightingActive(myProject)) {
         subscriptions.put(AnalysisService.HIGHLIGHTS, myVisibleFileUris);
       }
       subscriptions.put(AnalysisService.NAVIGATION, myVisibleFileUris);
@@ -2703,6 +2728,7 @@ public final class DartAnalysisServerService implements Disposable {
       myServerVersion = "";
       mySemanticTokensLegend = null;
       mySemanticTokensLegendFuture.set(new CompletableFuture<>());
+      setSemanticTokensAdvertised(false);
       // The next server starts out knowing nothing about the settings of this client.
       DartLspConfigurationSync configurationSync = myProject.getServiceIfCreated(DartLspConfigurationSync.class);
       if (configurationSync != null) {
@@ -3087,6 +3113,7 @@ public final class DartAnalysisServerService implements Disposable {
     if (server == null) {
       mySemanticTokensLegend = null;
       mySemanticTokensLegendFuture.set(new CompletableFuture<>());
+      setSemanticTokensAdvertised(false);
     }
   }
 

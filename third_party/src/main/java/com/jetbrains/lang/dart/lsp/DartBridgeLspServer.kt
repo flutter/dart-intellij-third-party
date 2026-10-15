@@ -136,6 +136,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     internal val isClientConnected: Boolean
         get() = client != null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
+    @Volatile
+    var isSemanticTokensAdvertised: Boolean = false
+        private set
     private var dasMessageListener: ResponseListener? = null
 
     private val das: DartAnalysisServerService
@@ -372,6 +375,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             initialized = false
             das.updateClientCapabilities(false)
         }
+        isSemanticTokensAdvertised = false
+        das.setSemanticTokensAdvertised(false)
     }
 
     // --- LanguageServer Implementation ---
@@ -384,7 +389,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val legendCompletableFuture = if (legendFuture.isDone) {
             CompletableFuture.completedFuture(das.semanticTokensLegend)
         } else if (das.isServerProcessActive) {
-            legendFuture.completeOnTimeout(null, 1, TimeUnit.SECONDS)
+            legendFuture.copy().completeOnTimeout(null, 1, TimeUnit.SECONDS)
         } else {
             CompletableFuture.completedFuture(null)
         }
@@ -418,6 +423,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 setExecuteCommandProvider(ExecuteCommandOptions())
                 // Add other capabilities as we support them.
             }
+            val advertised = serverLegend != null
+            isSemanticTokensAdvertised = advertised
+            das.setSemanticTokensAdvertised(advertised)
             InitializeResult(capabilities)
         }
     }
