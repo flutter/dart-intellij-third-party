@@ -98,13 +98,20 @@ class DashEnvPropagationTest : CodeInsightFixtureTestCase<ModuleFixtureBuilder<*
 
   override fun setUp() {
     super.setUp()
-    DartTestUtils.configureDartSdk(myModule, myFixture.testRootDisposable, true)
+    // Don't start the server here: it would run with the real HOME and default analytics settings.
+    // Each test starts its single server in runDasSession, after the harness environment is installed.
+    DartTestUtils.configureDartSdk(
+      myModule,
+      myFixture.testRootDisposable,
+      /* realSdk = */ true,
+      /* startServer = */ false,
+    )
     // When server results arrive, DartServerData.forceFileAnnotation restarts the daemon, which the
     // fixture otherwise rejects as a model change during highlighting.
     (myFixture as CodeInsightTestFixtureImpl).canChangeDocumentDuringHighlighting(true)
 
-    // The light project is shared, so a server started by an earlier test (with a different
-    // environment) may still be running. Stop it so each test gets a fresh server.
+    // Each test gets its own project, so no server should be running yet. Stop one anyway as a
+    // cheap guard, so a server with a different environment can never leak into a test.
     das().stopServer_TESTS_ONLY()
 
     savedEnvSuppress = Analytics.suppressAnalytics
