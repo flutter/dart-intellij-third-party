@@ -389,7 +389,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val legendCompletableFuture = if (legendFuture.isDone) {
             CompletableFuture.completedFuture(das.semanticTokensLegend)
         } else if (das.isServerProcessActive) {
-            legendFuture.copy().completeOnTimeout(null, 1, TimeUnit.SECONDS)
+            legendFuture.copy().completeOnTimeout(null, 3, TimeUnit.SECONDS)
         } else {
             CompletableFuture.completedFuture(null)
         }
