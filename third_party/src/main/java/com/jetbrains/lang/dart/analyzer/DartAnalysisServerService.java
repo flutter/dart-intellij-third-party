@@ -2268,6 +2268,12 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
+  public void updateSubscriptions() {
+    synchronized (myLock) {
+      analysis_setSubscriptions();
+    }
+  }
+
   private void analysis_setSubscriptions() {
     synchronized (myLock) {
       if (myServer == null) return;
