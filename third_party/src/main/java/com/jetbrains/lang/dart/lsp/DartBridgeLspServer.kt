@@ -517,7 +517,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun semanticTokensFull(params: SemanticTokensParams): CompletableFuture<SemanticTokens> {
         return forwardRequest("textDocument/semanticTokens/full", params, SemanticTokens::class.java).exceptionally { e ->
-            logger.info("textDocument/semanticTokens/full failed: ${e.message}")
+            logger.debug("textDocument/semanticTokens/full failed: ${e.message}")
             null
         }
     }

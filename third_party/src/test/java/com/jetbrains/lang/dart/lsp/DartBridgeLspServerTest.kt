@@ -2106,17 +2106,25 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
     fun testIsLspHighlightingEnabled() {
         val properties = PropertiesComponent.getInstance(project)
+        val sdk = DartSdk.getDartSdk(project)
+        assertNotNull(sdk)
+        val versionField = DartSdk::class.java.getDeclaredField("myVersion").apply { isAccessible = true }
+        val originalVersion = sdk!!.version
         try {
             properties.setValue("dart.lsp.experimental.enabled", true, true)
-            val sdk = DartSdk.getDartSdk(project)
-            assertNotNull(sdk)
-            val isSufficient = DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting(sdk!!.version)
-            assertEquals(isSufficient, DartAnalysisServerService.isLspHighlightingEnabled(project))
+
+            versionField.set(sdk, "3.15.0")
+            assertTrue("Expected highlighting enabled on SDK 3.15.0", DartAnalysisServerService.isLspHighlightingEnabled(project))
+
+            versionField.set(sdk, "3.13.0")
+            assertFalse("Expected highlighting disabled on SDK 3.13.0", DartAnalysisServerService.isLspHighlightingEnabled(project))
 
             properties.setValue("dart.lsp.experimental.enabled", false, true)
-            assertFalse(DartAnalysisServerService.isLspHighlightingEnabled(project))
+            versionField.set(sdk, "3.15.0")
+            assertFalse("Expected highlighting disabled when experimental setting is false", DartAnalysisServerService.isLspHighlightingEnabled(project))
         } finally {
             properties.unsetValue("dart.lsp.experimental.enabled")
+            versionField.set(sdk, originalVersion)
         }
     }
 
@@ -2197,3 +2205,4 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         override fun logMessage(messageParams: MessageParams?) {}
     }
 }
+
