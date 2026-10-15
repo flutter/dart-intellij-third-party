@@ -146,6 +146,7 @@ import org.dartlang.analysis.server.protocol.SourceChange;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.dartlang.analysis.server.protocol.SourceFileEdit;
 import org.dartlang.analysis.server.protocol.TypeHierarchyItem;
+import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -170,8 +171,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.dartlang.analysis.server.protocol.RequestError;
-import org.eclipse.lsp4j.SemanticTokensLegend;
 
 public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_SDK_VERSION = "2.12";
@@ -776,6 +775,7 @@ public final class DartAnalysisServerService implements Disposable {
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspClosingLabels(sdk.getVersion());
   }
+
   public static boolean isDartSdkVersionSufficientForLspHighlighting(@NotNull String sdkVersion) {
     return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_HIGHLIGHTING_SDK_VERSION) >= 0;
   }
@@ -820,13 +820,15 @@ public final class DartAnalysisServerService implements Disposable {
     mySemanticTokensLegend = legend;
     if (legend != null) {
       mySemanticTokensLegendFuture.get().complete(legend);
+    } else {
+      mySemanticTokensLegendFuture.set(new CompletableFuture<>());
+      setSemanticTokensAdvertised(false);
     }
   }
 
   public @NotNull CompletableFuture<SemanticTokensLegend> getSemanticTokensLegendFuture() {
     return mySemanticTokensLegendFuture.get();
   }
-
 
   public static boolean isDartSdkVersionSufficientForLspCodeActions(@NotNull String sdkVersion) {
     return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_CODE_ACTIONS_SDK_VERSION) >= 0;
@@ -3035,47 +3037,52 @@ public final class DartAnalysisServerService implements Disposable {
       mySemanticTokensLegendFuture.get().complete(null);
       return;
     }
-    if (resultObject.has("lspCapabilities")) {
-      JsonElement lspCapsElem = resultObject.get("lspCapabilities");
-      if (lspCapsElem != null && lspCapsElem.isJsonObject()) {
-        JsonObject lspCaps = lspCapsElem.getAsJsonObject();
-        if (lspCaps.has("semanticTokensProvider")) {
-          JsonElement providerElem = lspCaps.get("semanticTokensProvider");
-          if (providerElem != null && providerElem.isJsonObject()) {
-            JsonObject provider = providerElem.getAsJsonObject();
-            if (provider.has("legend")) {
-              JsonElement legendElem = provider.get("legend");
-              if (legendElem != null && legendElem.isJsonObject()) {
-                JsonObject legendObj = legendElem.getAsJsonObject();
-                List<String> types = new ArrayList<>();
-                if (legendObj.has("tokenTypes")) {
-                  JsonElement typesElem = legendObj.get("tokenTypes");
-                  if (typesElem != null && typesElem.isJsonArray()) {
-                    for (JsonElement e : typesElem.getAsJsonArray()) {
-                      types.add(e.getAsString());
+    try {
+      if (resultObject.has("lspCapabilities")) {
+        JsonElement lspCapsElem = resultObject.get("lspCapabilities");
+        if (lspCapsElem != null && lspCapsElem.isJsonObject()) {
+          JsonObject lspCaps = lspCapsElem.getAsJsonObject();
+          if (lspCaps.has("semanticTokensProvider")) {
+            JsonElement providerElem = lspCaps.get("semanticTokensProvider");
+            if (providerElem != null && providerElem.isJsonObject()) {
+              JsonObject provider = providerElem.getAsJsonObject();
+              if (provider.has("legend")) {
+                JsonElement legendElem = provider.get("legend");
+                if (legendElem != null && legendElem.isJsonObject()) {
+                  JsonObject legendObj = legendElem.getAsJsonObject();
+                  List<String> types = new ArrayList<>();
+                  if (legendObj.has("tokenTypes")) {
+                    JsonElement typesElem = legendObj.get("tokenTypes");
+                    if (typesElem != null && typesElem.isJsonArray()) {
+                      for (JsonElement e : typesElem.getAsJsonArray()) {
+                        types.add(e.getAsString());
+                      }
                     }
                   }
-                }
-                List<String> modifiers = new ArrayList<>();
-                if (legendObj.has("tokenModifiers")) {
-                  JsonElement modsElem = legendObj.get("tokenModifiers");
-                  if (modsElem != null && modsElem.isJsonArray()) {
-                    for (JsonElement e : modsElem.getAsJsonArray()) {
-                      modifiers.add(e.getAsString());
+                  List<String> modifiers = new ArrayList<>();
+                  if (legendObj.has("tokenModifiers")) {
+                    JsonElement modsElem = legendObj.get("tokenModifiers");
+                    if (modsElem != null && modsElem.isJsonArray()) {
+                      for (JsonElement e : modsElem.getAsJsonArray()) {
+                        modifiers.add(e.getAsString());
+                      }
                     }
                   }
-                }
-                if (!types.isEmpty()) {
-                  SemanticTokensLegend legend = new SemanticTokensLegend(types, modifiers);
-                  mySemanticTokensLegend = legend;
-                  mySemanticTokensLegendFuture.get().complete(legend);
-                  return;
+                  if (!types.isEmpty()) {
+                    SemanticTokensLegend legend = new SemanticTokensLegend(types, modifiers);
+                    mySemanticTokensLegend = legend;
+                    mySemanticTokensLegendFuture.get().complete(legend);
+                    return;
+                  }
                 }
               }
             }
           }
         }
       }
+    }
+    catch (Exception ex) {
+      LOG.warn("Failed to parse semantic tokens legend from DAS", ex);
     }
     mySemanticTokensLegendFuture.get().complete(null);
   }
@@ -3180,3 +3187,5 @@ public final class DartAnalysisServerService implements Disposable {
     return uri != null ? uri.toString() : url;
   }
 }
+
+
