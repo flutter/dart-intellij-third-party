@@ -913,6 +913,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val capabilities = result.capabilities
         assertNotNull(capabilities)
         assertNull("Semantic tokens provider should not be advertised if DAS did not provide a legend", capabilities.semanticTokensProvider)
+        assertFalse(bridgeServer.isSemanticTokensAdvertised)
+        assertFalse(DartAnalysisServerService.getInstance(project).isSemanticTokensAdvertised)
     }
 
     fun testInitialize_semanticTokensDynamicLegendFromDas() {
@@ -941,6 +943,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue("Legend should contain Dart custom type 'annotation'", legend.tokenTypes.contains("annotation"))
         assertTrue("Legend should contain modifier 'declaration'", legend.tokenModifiers.contains(SemanticTokenModifiers.Declaration))
         assertTrue("Legend should contain custom modifier 'constructor'", legend.tokenModifiers.contains("constructor"))
+        assertTrue(bridgeServer.isSemanticTokensAdvertised)
+        assertTrue(DartAnalysisServerService.getInstance(project).isSemanticTokensAdvertised)
     }
 
     fun testUpdateClientCapabilities_parsesSemanticTokensLegendFromDas() {
@@ -2114,6 +2118,54 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         } finally {
             properties.unsetValue("dart.lsp.experimental.enabled")
         }
+    }
+
+    fun testIsLspHighlightingActive() {
+        val properties = PropertiesComponent.getInstance(project)
+        val das = DartAnalysisServerService.getInstance(project)
+        try {
+            properties.setValue("dart.lsp.experimental.enabled", true, true)
+            // Initially before bridge initialization or legend advertisement:
+            assertFalse(das.isSemanticTokensAdvertised)
+            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+
+            // Simulate advertisement:
+            das.setSemanticTokensAdvertised(true)
+            val sdk = DartSdk.getDartSdk(project)
+            assertNotNull(sdk)
+            val isSufficient = DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting(sdk!!.version)
+            assertEquals(isSufficient, DartAnalysisServerService.isLspHighlightingActive(project))
+
+            // When experimental LSP is disabled, highlighting is not active even if advertised:
+            properties.setValue("dart.lsp.experimental.enabled", false, true)
+            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+
+            // Reset back:
+            das.setSemanticTokensAdvertised(false)
+            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+        } finally {
+            properties.unsetValue("dart.lsp.experimental.enabled")
+            das.setSemanticTokensAdvertised(false)
+        }
+    }
+
+    fun testSemanticTokensLegendFuture_notMutatedOnTimeout() {
+        val das = DartAnalysisServerService.getInstance(project)
+        val legendFuture = das.semanticTokensLegendFuture
+        assertFalse(legendFuture.isDone)
+
+        // Simulating the timeout pattern used in DartBridgeLspServer.initialize:
+        val timedOutCopy = legendFuture.copy().completeOnTimeout(null, 50, TimeUnit.MILLISECONDS)
+        val copyResult = timedOutCopy.get(1, TimeUnit.SECONDS)
+        assertNull("Copy should have completed with null on timeout", copyResult)
+
+        // The original shared future in DAS must NOT be completed:
+        assertFalse("Original future in DAS must remain uncompleted after copy timeout", legendFuture.isDone)
+
+        // Now verify real DAS response can still complete the original future:
+        val legend = SemanticTokensLegend(listOf("class"), listOf("declaration"))
+        assertTrue("Original future should accept completion", legendFuture.complete(legend))
+        assertEquals(legend, das.semanticTokensLegendFuture.get())
     }
 
     private class MockLanguageClient : LanguageClient {
