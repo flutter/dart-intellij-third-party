@@ -1079,6 +1079,9 @@ public interface AnalysisServer {
 
   default void server_setClientCapabilities(List<String> requests, boolean supportsUris, Object lspCapabilities, Consumer consumer) {
     server_setClientCapabilities(requests, supportsUris, lspCapabilities);
+    if (consumer instanceof JsonConsumer jsonConsumer) {
+      jsonConsumer.onResponse(null, null);
+    }
   }
 
   /**
