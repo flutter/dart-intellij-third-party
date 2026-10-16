@@ -1103,52 +1103,69 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testDartLspSemanticTokensSupport_getTextAttributesKey() {
-        assertEquals(DartSyntaxHighlighterColors.CLASS, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Class, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.CONSTRUCTOR, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Class, listOf("constructor")))
-        assertEquals(DartSyntaxHighlighterColors.ANNOTATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Class, listOf("annotation")))
-        assertEquals(DartSyntaxHighlighterColors.ENUM, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Enum, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.ENUM_CONSTANT, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.EnumMember, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.TYPE_PARAMETER, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.TypeParameter, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.TYPE_ALIAS, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Type, emptyList()))
+        val cases = listOf(
+            // Types & Classes
+            Triple(SemanticTokenTypes.Class, emptyList<String>(), DartSyntaxHighlighterColors.CLASS),
+            Triple(SemanticTokenTypes.Class, listOf("constructor"), DartSyntaxHighlighterColors.CONSTRUCTOR),
+            Triple(SemanticTokenTypes.Class, listOf("annotation"), DartSyntaxHighlighterColors.ANNOTATION),
+            Triple(SemanticTokenTypes.Enum, emptyList(), DartSyntaxHighlighterColors.ENUM),
+            Triple(SemanticTokenTypes.EnumMember, emptyList(), DartSyntaxHighlighterColors.ENUM_CONSTANT),
+            Triple(SemanticTokenTypes.TypeParameter, emptyList(), DartSyntaxHighlighterColors.TYPE_PARAMETER),
+            Triple(SemanticTokenTypes.Type, emptyList(), DartSyntaxHighlighterColors.TYPE_ALIAS),
 
-        assertEquals(DartSyntaxHighlighterColors.CONSTRUCTOR, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf("constructor")))
-        assertEquals(DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static)))
-        assertEquals(DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf("instance", SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Method, listOf("instance")))
+            // Methods & Constructors
+            Triple(SemanticTokenTypes.Method, listOf("constructor"), DartSyntaxHighlighterColors.CONSTRUCTOR),
+            Triple(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION),
+            Triple(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE),
+            Triple(SemanticTokenTypes.Method, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION),
+            Triple(SemanticTokenTypes.Method, listOf("instance"), DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE),
 
-        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static)))
-        assertEquals(DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.LOCAL_FUNCTION_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Function, emptyList()))
+            // Functions
+            Triple(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION),
+            Triple(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION),
+            Triple(SemanticTokenTypes.Function, emptyList(), DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE),
 
-        assertEquals(DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static)))
-        assertEquals(DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf("instance", SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf("instance")))
-        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Property, emptyList()))
+            // Properties (Getters / Setters)
+            Triple(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.STATIC_GETTER_DECLARATION),
+            Triple(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE),
+            Triple(SemanticTokenTypes.Property, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_GETTER_DECLARATION),
+            Triple(SemanticTokenTypes.Property, listOf("instance"), DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE),
+            Triple(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_DECLARATION),
+            Triple(SemanticTokenTypes.Property, emptyList(), DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_REFERENCE),
 
-        assertEquals(DartSyntaxHighlighterColors.IMPORT_PREFIX, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Variable, listOf("importPrefix")))
-        assertEquals(DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Static)))
-        assertEquals(DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Variable, emptyList()))
+            // Variables & Fields
+            Triple(SemanticTokenTypes.Variable, listOf("importPrefix"), DartSyntaxHighlighterColors.IMPORT_PREFIX),
+            Triple(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, listOf("instance"), DartSyntaxHighlighterColors.INSTANCE_FIELD_REFERENCE),
+            Triple(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, emptyList(), DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE),
 
-        assertEquals(DartSyntaxHighlighterColors.PARAMETER_DECLARATION, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Parameter, listOf(SemanticTokenModifiers.Declaration)))
-        assertEquals(DartSyntaxHighlighterColors.PARAMETER_REFERENCE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Parameter, emptyList()))
+            // Parameters, Annotations, Labels, Namespaces, Keywords, Identifiers
+            Triple(SemanticTokenTypes.Parameter, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.PARAMETER_DECLARATION),
+            Triple(SemanticTokenTypes.Parameter, emptyList(), DartSyntaxHighlighterColors.PARAMETER_REFERENCE),
+            Triple("annotation", emptyList(), DartSyntaxHighlighterColors.ANNOTATION),
+            Triple("label", emptyList(), DartSyntaxHighlighterColors.LABEL),
+            Triple(SemanticTokenTypes.Namespace, emptyList(), DartSyntaxHighlighterColors.LIBRARY_NAME),
+            Triple(SemanticTokenTypes.Keyword, emptyList(), DartSyntaxHighlighterColors.KEYWORD),
+            Triple("source", emptyList(), DartSyntaxHighlighterColors.IDENTIFIER),
 
-        assertEquals(DartSyntaxHighlighterColors.ANNOTATION, DartLspSemanticTokensSupport.getTextAttributesKey("annotation", emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.LABEL, DartLspSemanticTokensSupport.getTextAttributesKey("label", emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.LIBRARY_NAME, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Namespace, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.KEYWORD, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Keyword, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.KEYWORD, DartLspSemanticTokensSupport.getTextAttributesKey("boolean", emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.VALID_STRING_ESCAPE, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.String, listOf("escape")))
-        assertEquals(DartSyntaxHighlighterColors.STRING, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.String, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.DOC_COMMENT, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Comment, listOf(SemanticTokenModifiers.Documentation)))
-        assertEquals(DartSyntaxHighlighterColors.LINE_COMMENT, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Comment, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.NUMBER, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Number, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.OPERATION_SIGN, DartLspSemanticTokensSupport.getTextAttributesKey(SemanticTokenTypes.Operator, emptyList()))
-        assertEquals(DartSyntaxHighlighterColors.IDENTIFIER, DartLspSemanticTokensSupport.getTextAttributesKey("source", emptyList()))
+            // Strings & Escapes
+            Triple(SemanticTokenTypes.String, listOf("escape"), DartSyntaxHighlighterColors.VALID_STRING_ESCAPE),
+
+            // Handled by local lexer (must return null)
+            Triple(SemanticTokenTypes.String, emptyList(), null),
+            Triple(SemanticTokenTypes.Comment, emptyList(), null),
+            Triple(SemanticTokenTypes.Comment, listOf(SemanticTokenModifiers.Documentation), null),
+            Triple(SemanticTokenTypes.Number, emptyList(), null),
+            Triple(SemanticTokenTypes.Operator, emptyList(), null),
+            Triple("boolean", emptyList(), null),
+        )
+
+        for ((type, modifiers, expected) in cases) {
+            assertEquals("Failed for type=$type, modifiers=$modifiers", expected, DartLspSemanticTokensSupport.getTextAttributesKey(type, modifiers))
+        }
     }
 
     fun testPublishDiagnosticsNotification() {
@@ -2205,4 +2222,3 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         override fun logMessage(messageParams: MessageParams?) {}
     }
 }
-

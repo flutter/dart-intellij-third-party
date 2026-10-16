@@ -258,14 +258,12 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
         val isStatic = modifiers.contains(SemanticTokenModifiers.Static)
         val isInstance = modifiers.contains("instance")
 
-        if (modifiers.contains("annotation") || tokenType == "annotation" || tokenType == SemanticTokenTypes.Decorator) {
+        if (modifiers.contains("annotation") || tokenType == "annotation") {
             return DartSyntaxHighlighterColors.ANNOTATION
         }
 
         return when (tokenType) {
-            SemanticTokenTypes.Class,
-            SemanticTokenTypes.Interface,
-            SemanticTokenTypes.Struct -> when {
+            SemanticTokenTypes.Class -> when {
                 modifiers.contains("constructor") -> DartSyntaxHighlighterColors.CONSTRUCTOR
                 else -> DartSyntaxHighlighterColors.CLASS
             }
@@ -282,13 +280,15 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             }
 
             SemanticTokenTypes.Function -> when {
-                isStatic -> if (isDecl) DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION else DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE
-                else -> if (isDecl) DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION else DartSyntaxHighlighterColors.LOCAL_FUNCTION_REFERENCE
+                isDecl -> if (isStatic) DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION else DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION
+                // DAS emits function without modifiers for both top-level and local references.
+                // Default to top-level function reference so standalone calls receive standard function highlighting.
+                else -> DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE
             }
 
             SemanticTokenTypes.Property -> when {
-                isStatic -> if (isDecl) DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION else DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE
-                isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE
+                isStatic -> if (isDecl) DartSyntaxHighlighterColors.STATIC_GETTER_DECLARATION else DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE
+                isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_GETTER_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE
                 else -> if (isDecl) DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_DECLARATION else DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_REFERENCE
             }
 
@@ -303,13 +303,11 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             SemanticTokenTypes.Parameter -> if (isDecl) DartSyntaxHighlighterColors.PARAMETER_DECLARATION else DartSyntaxHighlighterColors.PARAMETER_REFERENCE
             "label" -> DartSyntaxHighlighterColors.LABEL
             SemanticTokenTypes.Namespace -> DartSyntaxHighlighterColors.LIBRARY_NAME
-            SemanticTokenTypes.Keyword, "boolean" -> DartSyntaxHighlighterColors.KEYWORD
-            SemanticTokenTypes.String -> if (modifiers.contains("escape")) DartSyntaxHighlighterColors.VALID_STRING_ESCAPE else DartSyntaxHighlighterColors.STRING
-            SemanticTokenTypes.Comment -> if (modifiers.contains(SemanticTokenModifiers.Documentation)) DartSyntaxHighlighterColors.DOC_COMMENT else DartSyntaxHighlighterColors.LINE_COMMENT
-            SemanticTokenTypes.Number -> DartSyntaxHighlighterColors.NUMBER
-            SemanticTokenTypes.Operator -> DartSyntaxHighlighterColors.OPERATION_SIGN
+            SemanticTokenTypes.Keyword -> DartSyntaxHighlighterColors.KEYWORD
+            SemanticTokenTypes.String -> if (modifiers.contains("escape")) DartSyntaxHighlighterColors.VALID_STRING_ESCAPE else null
             "source" -> DartSyntaxHighlighterColors.IDENTIFIER
-            else -> super.getTextAttributesKey(tokenType, modifiers)
+            // Comments, numbers, plain strings, booleans, and operators are left to DartSyntaxHighlighter (lexer), matching legacy behavior.
+            else -> null
         }
     }
 }
