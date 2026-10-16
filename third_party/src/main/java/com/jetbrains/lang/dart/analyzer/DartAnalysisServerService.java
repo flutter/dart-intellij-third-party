@@ -32,14 +32,17 @@ import com.google.dart.server.OrganizeDirectivesConsumer;
 import com.google.dart.server.RequestListener;
 import com.google.dart.server.ResponseListener;
 import com.google.dart.server.SortMembersConsumer;
+import com.google.dart.server.JsonConsumer;
 import com.google.dart.server.generated.AnalysisServer;
 import com.google.dart.server.internal.remote.DebugPrintStream;
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl;
 import com.google.dart.server.internal.remote.StdioServerSocket;
 import com.google.dart.server.utilities.logging.Logging;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.intellij.codeInsight.CodeInsightSettings;
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationInfo;
 import com.intellij.openapi.application.ApplicationManager;
@@ -143,6 +146,7 @@ import org.dartlang.analysis.server.protocol.SourceChange;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.dartlang.analysis.server.protocol.SourceFileEdit;
 import org.dartlang.analysis.server.protocol.TypeHierarchyItem;
+import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -163,8 +167,10 @@ import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_SDK_VERSION = "2.12";
@@ -195,6 +201,9 @@ public final class DartAnalysisServerService implements Disposable {
   // MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION because LSP quick fixes in the JetBrains LSP client
   // depend on publishDiagnostics notifications.
   public static final String MIN_LSP_CODE_ACTIONS_SDK_VERSION = MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION;
+  // The first Dart SDK with dart-lang/sdk@d31d8fa0721 (Analysis Server API 1.43.0), which returns
+  // semanticTokensProvider in server.setClientCapabilities response for LSP-over-Legacy clients.
+  public static final String MIN_LSP_HIGHLIGHTING_SDK_VERSION = "3.14.0-307.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -243,6 +252,10 @@ public final class DartAnalysisServerService implements Disposable {
   // see DartLspConfigurationSync.
   private volatile @NotNull String mySdkVersion = "";
   private @Nullable String mySdkHome;
+  private volatile @Nullable SemanticTokensLegend mySemanticTokensLegend;
+  private volatile boolean mySemanticTokensAdvertised = false;
+  private final AtomicReference<CompletableFuture<SemanticTokensLegend>> mySemanticTokensLegendFuture =
+    new AtomicReference<>(new CompletableFuture<>());
 
   private final DartServerRootsHandler myRootsHandler;
   private final Map<String, Long> myFilePathWithOverlaidContentToTimestamp = Collections.synchronizedMap(new HashMap<>());
@@ -748,6 +761,60 @@ public final class DartAnalysisServerService implements Disposable {
     }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspClosingLabels(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspHighlighting(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_HIGHLIGHTING_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspHighlightingEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspHighlighting(sdk.getVersion());
+  }
+
+  public static boolean isLspHighlightingActive(final @NotNull Project project) {
+    if (!isLspHighlightingEnabled(project)) {
+      return false;
+    }
+    return getInstance(project).isSemanticTokensAdvertised();
+  }
+
+  public boolean isSemanticTokensAdvertised() {
+    return mySemanticTokensAdvertised;
+  }
+
+  public void setSemanticTokensAdvertised(boolean advertised) {
+    if (mySemanticTokensAdvertised != advertised) {
+      mySemanticTokensAdvertised = advertised;
+      analysis_setSubscriptions();
+      ApplicationManager.getApplication().invokeLater(() -> {
+        if (!myProject.isDisposed()) {
+          DaemonCodeAnalyzer.getInstance(myProject).restart();
+        }
+      }, ModalityState.nonModal(), myDisposedCondition);
+    }
+  }
+
+  public @Nullable SemanticTokensLegend getSemanticTokensLegend() {
+    return mySemanticTokensLegend;
+  }
+
+  @VisibleForTesting
+  public void setSemanticTokensLegend(@Nullable SemanticTokensLegend legend) {
+    mySemanticTokensLegend = legend;
+    if (legend != null) {
+      mySemanticTokensLegendFuture.get().complete(legend);
+    } else {
+      mySemanticTokensLegendFuture.set(new CompletableFuture<>());
+      setSemanticTokensAdvertised(false);
+    }
+  }
+
+  public @NotNull CompletableFuture<SemanticTokensLegend> getSemanticTokensLegendFuture() {
+    return mySemanticTokensLegendFuture.get();
   }
 
   public static boolean isDartSdkVersionSufficientForLspCodeActions(@NotNull String sdkVersion) {
@@ -2203,12 +2270,20 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
+  public void updateSubscriptions() {
+    synchronized (myLock) {
+      analysis_setSubscriptions();
+    }
+  }
+
   private void analysis_setSubscriptions() {
     synchronized (myLock) {
       if (myServer == null) return;
 
       final Map<String, List<String>> subscriptions = new HashMap<>();
-      subscriptions.put(AnalysisService.HIGHLIGHTS, myVisibleFileUris);
+      if (!isLspHighlightingActive(myProject)) {
+        subscriptions.put(AnalysisService.HIGHLIGHTS, myVisibleFileUris);
+      }
       subscriptions.put(AnalysisService.NAVIGATION, myVisibleFileUris);
       subscriptions.put(AnalysisService.OVERRIDES, myVisibleFileUris);
       subscriptions.put(AnalysisService.OUTLINE, myVisibleFileUris);
@@ -2646,6 +2721,9 @@ public final class DartAnalysisServerService implements Disposable {
       mySdkHome = null;
       mySdkVersion = "";
       myServerVersion = "";
+      mySemanticTokensLegend = null;
+      mySemanticTokensLegendFuture.set(new CompletableFuture<>());
+      setSemanticTokensAdvertised(false);
       // The next server starts out knowing nothing about the settings of this client.
       DartLspConfigurationSync configurationSync = myProject.getServiceIfCreated(DartLspConfigurationSync.class);
       if (configurationSync != null) {
@@ -2920,10 +2998,74 @@ public final class DartAnalysisServerService implements Disposable {
       boolean supportsLspDiagnostics = isLspPublishDiagnosticsEnabled(myProject);
       boolean supportsLspClosingLabels = isLspClosingLabelsEnabled(myProject);
       boolean supportsLspCodeActions = isLspCodeActionsEnabled(myProject);
-      server.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
-                                          supportsUris,
-                                          buildLspCapabilities(mySdkVersion, supportsLspDiagnostics, supportsLspClosingLabels, supportsLspCodeActions));
+      server.server_setClientCapabilities(
+        List.of("openUrlRequest", "showMessageRequest"),
+        supportsUris,
+        buildLspCapabilities(mySdkVersion, supportsLspDiagnostics, supportsLspClosingLabels, supportsLspCodeActions),
+        new JsonConsumer() {
+          @Override
+          public void onResponse(JsonObject resultObject, RequestError requestError) {
+            handleClientCapabilitiesResponse(resultObject, requestError);
+          }
+        }
+      );
     }
+  }
+
+  @VisibleForTesting
+  public void handleClientCapabilitiesResponse(@Nullable JsonObject resultObject, @Nullable RequestError requestError) {
+    if (requestError != null || resultObject == null) {
+      mySemanticTokensLegendFuture.get().complete(null);
+      return;
+    }
+    try {
+      if (resultObject.has("lspCapabilities")) {
+        JsonElement lspCapsElem = resultObject.get("lspCapabilities");
+        if (lspCapsElem != null && lspCapsElem.isJsonObject()) {
+          JsonObject lspCaps = lspCapsElem.getAsJsonObject();
+          if (lspCaps.has("semanticTokensProvider")) {
+            JsonElement providerElem = lspCaps.get("semanticTokensProvider");
+            if (providerElem != null && providerElem.isJsonObject()) {
+              JsonObject provider = providerElem.getAsJsonObject();
+              if (provider.has("legend")) {
+                JsonElement legendElem = provider.get("legend");
+                if (legendElem != null && legendElem.isJsonObject()) {
+                  JsonObject legendObj = legendElem.getAsJsonObject();
+                  List<String> types = new ArrayList<>();
+                  if (legendObj.has("tokenTypes")) {
+                    JsonElement typesElem = legendObj.get("tokenTypes");
+                    if (typesElem != null && typesElem.isJsonArray()) {
+                      for (JsonElement e : typesElem.getAsJsonArray()) {
+                        types.add(e.getAsString());
+                      }
+                    }
+                  }
+                  List<String> modifiers = new ArrayList<>();
+                  if (legendObj.has("tokenModifiers")) {
+                    JsonElement modsElem = legendObj.get("tokenModifiers");
+                    if (modsElem != null && modsElem.isJsonArray()) {
+                      for (JsonElement e : modsElem.getAsJsonArray()) {
+                        modifiers.add(e.getAsString());
+                      }
+                    }
+                  }
+                  if (!types.isEmpty()) {
+                    SemanticTokensLegend legend = new SemanticTokensLegend(types, modifiers);
+                    mySemanticTokensLegend = legend;
+                    mySemanticTokensLegendFuture.get().complete(legend);
+                    return;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    catch (Exception ex) {
+      LOG.warn("Failed to parse semantic tokens legend from DAS", ex);
+    }
+    mySemanticTokensLegendFuture.get().complete(null);
   }
 
   public void sendResponse(JsonObject response) {
@@ -2960,9 +3102,13 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   @VisibleForTesting
-
   public void setServer(@Nullable RemoteAnalysisServerImpl server) {
     myServer = server;
+    if (server == null) {
+      mySemanticTokensLegend = null;
+      mySemanticTokensLegendFuture.set(new CompletableFuture<>());
+      setSemanticTokensAdvertised(false);
+    }
   }
 
   /**
@@ -3022,3 +3168,5 @@ public final class DartAnalysisServerService implements Disposable {
     return uri != null ? uri.toString() : url;
   }
 }
+
+

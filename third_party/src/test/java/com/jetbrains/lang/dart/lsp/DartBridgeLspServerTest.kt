@@ -9,6 +9,7 @@ import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.Consumer
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
 import com.google.dart.server.DartLspWorkspaceConfigurationConsumer
+import com.google.dart.server.JsonConsumer
 import com.google.dart.server.ResponseListener
 import com.google.dart.server.ShowMessageRequestConsumer
 import com.google.dart.server.internal.remote.ByteLineReaderStream
@@ -16,16 +17,20 @@ import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
 import com.google.dart.server.internal.remote.RequestSink
 import com.google.dart.server.internal.remote.ResponseStream
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import com.intellij.icons.AllIcons
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.jetbrains.lang.dart.sdk.DartSdk
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
+import org.dartlang.analysis.server.protocol.RequestError
 import org.eclipse.lsp4j.ApplyWorkspaceEditParams
 import org.eclipse.lsp4j.ApplyWorkspaceEditResponse
 import org.eclipse.lsp4j.CallHierarchyIncomingCallsParams
@@ -58,6 +63,10 @@ import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ReferenceContext
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
+import org.eclipse.lsp4j.SemanticTokenModifiers
+import org.eclipse.lsp4j.SemanticTokenTypes
+import org.eclipse.lsp4j.SemanticTokensLegend
+import org.eclipse.lsp4j.SemanticTokensParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
 import org.eclipse.lsp4j.SymbolKind
 import org.eclipse.lsp4j.TextDocumentIdentifier
@@ -70,6 +79,7 @@ import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CompletableFuture
@@ -85,6 +95,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     private val capturedRequests = CopyOnWriteArrayList<JsonObject>()
     private val capturedResponses = CopyOnWriteArrayList<JsonObject>()
     private val capturedNotifications = CopyOnWriteArrayList<JsonObject>()
+    private var capturedConsumer: Consumer? = null
 
     override fun setUp() {
         super.setUp()
@@ -119,6 +130,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
             override fun sendRequestToServer(id: String, request: JsonObject, consumer: Consumer) {
                 capturedRequests.add(request)
+                capturedConsumer = consumer
             }
 
             override fun sendResponseToServer(response: JsonObject) {
@@ -171,6 +183,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             
             capturedRequests.clear()
             capturedNotifications.clear()
+            capturedResponses.clear()
+            capturedConsumer = null
         } finally {
             super.tearDown()
         }
@@ -894,6 +908,268 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(completionItem.get("insertReplaceSupport").asBoolean)
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.14.0-226.0.dev"))
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspCompletion("3.15.0"))
+    }
+
+    fun testInitialize_semanticTokensProvider_notAdvertisedWhenLegendNotProvided() {
+        val future = bridgeServer.initialize(InitializeParams())
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        val capabilities = result.capabilities
+        assertNotNull(capabilities)
+        assertNull("Semantic tokens provider should not be advertised if DAS did not provide a legend", capabilities.semanticTokensProvider)
+        assertFalse(bridgeServer.isSemanticTokensAdvertised)
+        assertFalse(DartAnalysisServerService.getInstance(project).isSemanticTokensAdvertised)
+    }
+
+    fun testInitialize_semanticTokensDynamicLegendFromDas() {
+        val dasLegendTypes = listOf(
+            "annotation", "class", "comment", "method", "variable",
+            "parameter", "enum", "enumMember", "type", "source",
+            "property", "keyword", "label", "namespace", "boolean",
+            "number", "string", "function", "typeParameter"
+        )
+        val dasLegendModifiers = listOf(
+            "documentation", "constructor", "declaration", "importPrefix",
+            "instance", "static", "escape", "annotation", "control",
+            "label", "interpolation", "source", "void", "wildcard"
+        )
+        val das = DartAnalysisServerService.getInstance(project)
+        das.semanticTokensLegend = SemanticTokensLegend(dasLegendTypes, dasLegendModifiers)
+
+        val future = bridgeServer.initialize(InitializeParams())
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        val legend = result.capabilities?.semanticTokensProvider?.legend
+        assertNotNull(legend)
+        assertEquals(dasLegendTypes, legend!!.tokenTypes)
+        assertEquals(dasLegendModifiers, legend.tokenModifiers)
+        assertTrue("Legend should contain standard types like 'class'", legend.tokenTypes.contains(SemanticTokenTypes.Class))
+        assertTrue("Legend should contain Dart custom type 'annotation'", legend.tokenTypes.contains("annotation"))
+        assertTrue("Legend should contain modifier 'declaration'", legend.tokenModifiers.contains(SemanticTokenModifiers.Declaration))
+        assertTrue("Legend should contain custom modifier 'constructor'", legend.tokenModifiers.contains("constructor"))
+        assertTrue(bridgeServer.isSemanticTokensAdvertised)
+        assertTrue(DartAnalysisServerService.getInstance(project).isSemanticTokensAdvertised)
+    }
+
+    fun testUpdateClientCapabilities_parsesSemanticTokensLegendFromDas() {
+        val responseJson = """
+            {
+              "lspCapabilities": {
+                "semanticTokensProvider": {
+                  "legend": {
+                    "tokenTypes": ["annotation", "class", "customType"],
+                    "tokenModifiers": ["documentation", "customModifier"]
+                  },
+                  "full": { "delta": false },
+                  "range": true
+                }
+              }
+            }
+        """.trimIndent()
+        val resultObj = JsonParser.parseString(responseJson).asJsonObject
+        val das = DartAnalysisServerService.getInstance(project)
+        das.handleClientCapabilitiesResponse(resultObj, null)
+
+        val legend = das.semanticTokensLegend
+        assertNotNull("Dynamic legend should be parsed from DAS capabilities response", legend)
+        assertEquals(listOf("annotation", "class", "customType"), legend!!.tokenTypes)
+        assertEquals(listOf("documentation", "customModifier"), legend.tokenModifiers)
+    }
+
+    fun testUpdateClientCapabilities_endToEnd() {
+        val das = DartAnalysisServerService.getInstance(project)
+        das.semanticTokensLegend = null
+
+        das.updateClientCapabilities()
+
+        val setCapsReq = capturedRequests.find { it.get("method")?.asString == "server.setClientCapabilities" }
+        assertNotNull("server.setClientCapabilities request should be sent", setCapsReq)
+        assertNotNull("Consumer should be captured", capturedConsumer)
+
+        val responseJson = """
+            {
+              "lspCapabilities": {
+                "semanticTokensProvider": {
+                  "legend": {
+                    "tokenTypes": ["class", "method", "variable"],
+                    "tokenModifiers": ["declaration", "static"]
+                  },
+                  "full": { "delta": false },
+                  "range": true
+                }
+              }
+            }
+        """.trimIndent()
+        val resultObj = JsonParser.parseString(responseJson).asJsonObject
+
+        val jsonConsumer = capturedConsumer as JsonConsumer
+        jsonConsumer.onResponse(resultObj, null)
+
+        val legend = das.semanticTokensLegend
+        assertNotNull("Dynamic legend should be set on DAS", legend)
+        assertEquals(listOf("class", "method", "variable"), legend?.tokenTypes)
+        assertEquals(listOf("declaration", "static"), legend?.tokenModifiers)
+
+        val futureLegend = das.semanticTokensLegendFuture.get(5, TimeUnit.SECONDS)
+        assertEquals(legend, futureLegend)
+    }
+
+    fun testUpdateClientCapabilities_handlesMissingLspCapabilitiesGracefully() {
+        val das = DartAnalysisServerService.getInstance(project)
+        das.updateClientCapabilities()
+
+        val jsonConsumer = capturedConsumer as JsonConsumer
+        jsonConsumer.onResponse(JsonObject(), null)
+
+        assertNull("Legend should be null when lspCapabilities is missing", das.semanticTokensLegend)
+        val futureLegend = das.semanticTokensLegendFuture.get(5, TimeUnit.SECONDS)
+        assertNull("Future should resolve to null when lspCapabilities is missing", futureLegend)
+    }
+
+    fun testUpdateClientCapabilities_handlesRequestErrorGracefully() {
+        val das = DartAnalysisServerService.getInstance(project)
+        das.updateClientCapabilities()
+
+        val jsonConsumer = capturedConsumer as JsonConsumer
+        jsonConsumer.onResponse(null, RequestError("SERVER_ERROR", "Error message", null))
+
+        assertNull("Legend should be null on request error", das.semanticTokensLegend)
+        val futureLegend = das.semanticTokensLegendFuture.get(5, TimeUnit.SECONDS)
+        assertNull("Future should resolve to null on request error", futureLegend)
+    }
+
+    fun testSemanticTokensFull_success() {
+        val params = SemanticTokensParams(TextDocumentIdentifier("file:///test.dart"))
+        val future = bridgeServer.semanticTokensFull(params)
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("textDocument/semanticTokens/full", lspMessage.get("method").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "data": [0, 4, 3, 0, 0, 1, 2, 5, 1, 2]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(listOf(0, 4, 3, 0, 0, 1, 2, 5, 1, 2), result.data)
+    }
+
+    fun testSemanticTokensFull_errorReturnsNull() {
+        val params = SemanticTokensParams(TextDocumentIdentifier("file:///test.dart"))
+        val future = bridgeServer.semanticTokensFull(params)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32601,
+                    "message": "Method not found"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNull("DAS error on semanticTokensFull should gracefully complete with null", result)
+    }
+
+    fun testDartLspSemanticTokensSupport_shouldAskServerForSemanticTokens() {
+        val dartFile = myFixture.configureByText("test.dart", "class Foo {}")
+        assertTrue("Should ask server for .dart files", DartLspSemanticTokensSupport.shouldAskServerForSemanticTokens(dartFile))
+
+        val txtFile = myFixture.configureByText("test.txt", "some text")
+        assertFalse("Should not ask server for .txt files", DartLspSemanticTokensSupport.shouldAskServerForSemanticTokens(txtFile))
+    }
+
+    fun testDartLspSemanticTokensSupport_getTextAttributesKey() {
+        val cases = listOf(
+            // Types & Classes
+            Triple(SemanticTokenTypes.Class, emptyList<String>(), DartSyntaxHighlighterColors.CLASS),
+            Triple(SemanticTokenTypes.Class, listOf("constructor"), DartSyntaxHighlighterColors.CONSTRUCTOR),
+            Triple(SemanticTokenTypes.Class, listOf("annotation"), DartSyntaxHighlighterColors.ANNOTATION),
+            Triple(SemanticTokenTypes.Enum, emptyList(), DartSyntaxHighlighterColors.ENUM),
+            Triple(SemanticTokenTypes.EnumMember, emptyList(), DartSyntaxHighlighterColors.ENUM_CONSTANT),
+            Triple(SemanticTokenTypes.TypeParameter, emptyList(), DartSyntaxHighlighterColors.TYPE_PARAMETER),
+            Triple(SemanticTokenTypes.Type, emptyList(), DartSyntaxHighlighterColors.TYPE_ALIAS),
+
+            // Methods & Constructors
+            Triple(SemanticTokenTypes.Method, listOf("constructor"), DartSyntaxHighlighterColors.CONSTRUCTOR),
+            Triple(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION),
+            Triple(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE),
+            Triple(SemanticTokenTypes.Method, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION),
+            Triple(SemanticTokenTypes.Method, listOf("instance"), DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE),
+
+            // Functions
+            Triple(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION),
+            Triple(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION),
+            Triple(SemanticTokenTypes.Function, emptyList(), DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE),
+
+            // Properties (Getters / Setters)
+            Triple(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.STATIC_GETTER_DECLARATION),
+            Triple(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE),
+            Triple(SemanticTokenTypes.Property, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_GETTER_DECLARATION),
+            Triple(SemanticTokenTypes.Property, listOf("instance"), DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE),
+            Triple(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_DECLARATION),
+            Triple(SemanticTokenTypes.Property, emptyList(), DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_REFERENCE),
+
+            // Variables & Fields
+            Triple(SemanticTokenTypes.Variable, listOf("importPrefix"), DartSyntaxHighlighterColors.IMPORT_PREFIX),
+            Triple(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, listOf("instance"), DartSyntaxHighlighterColors.INSTANCE_FIELD_REFERENCE),
+            Triple(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, emptyList(), DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE),
+
+            // Parameters, Annotations, Labels, Namespaces, Keywords, Identifiers
+            Triple(SemanticTokenTypes.Parameter, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.PARAMETER_DECLARATION),
+            Triple(SemanticTokenTypes.Parameter, emptyList(), DartSyntaxHighlighterColors.PARAMETER_REFERENCE),
+            Triple("annotation", emptyList(), DartSyntaxHighlighterColors.ANNOTATION),
+            Triple("label", emptyList(), DartSyntaxHighlighterColors.LABEL),
+            Triple(SemanticTokenTypes.Namespace, emptyList(), DartSyntaxHighlighterColors.LIBRARY_NAME),
+            Triple(SemanticTokenTypes.Keyword, emptyList(), DartSyntaxHighlighterColors.KEYWORD),
+            Triple("source", emptyList(), DartSyntaxHighlighterColors.IDENTIFIER),
+
+            // Strings & Escapes
+            Triple(SemanticTokenTypes.String, listOf("escape"), DartSyntaxHighlighterColors.VALID_STRING_ESCAPE),
+
+            // Handled by local lexer (must return null)
+            Triple(SemanticTokenTypes.String, emptyList(), null),
+            Triple(SemanticTokenTypes.Comment, emptyList(), null),
+            Triple(SemanticTokenTypes.Comment, listOf(SemanticTokenModifiers.Documentation), null),
+            Triple(SemanticTokenTypes.Number, emptyList(), null),
+            Triple(SemanticTokenTypes.Operator, emptyList(), null),
+            Triple("boolean", emptyList(), null),
+        )
+
+        for ((type, modifiers, expected) in cases) {
+            assertEquals("Failed for type=$type, modifiers=$modifiers", expected, DartLspSemanticTokensSupport.getTextAttributesKey(type, modifiers))
+        }
     }
 
     fun testPublishDiagnosticsNotification() {
@@ -1651,6 +1927,93 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             bgTask.get(5, TimeUnit.SECONDS)
         }
         assertEquals(1, capturedRequests.size)
+    }
+
+    fun testIsDartSdkVersionSufficientForLspHighlighting() {
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-307.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-308.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.15.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("4.0.0"))
+
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-306.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-217.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-65.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.13.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.0.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.19.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.14.0"))
+    }
+
+    fun testIsLspHighlightingEnabled() {
+        val properties = PropertiesComponent.getInstance(project)
+        val sdk = DartSdk.getDartSdk(project)
+        assertNotNull(sdk)
+        val versionField = DartSdk::class.java.getDeclaredField("myVersion").apply { isAccessible = true }
+        val originalVersion = sdk!!.version
+        try {
+            properties.setValue("dart.lsp.experimental.enabled", true, true)
+
+            versionField.set(sdk, "3.15.0")
+            assertTrue("Expected highlighting enabled on SDK 3.15.0", DartAnalysisServerService.isLspHighlightingEnabled(project))
+
+            versionField.set(sdk, "3.13.0")
+            assertFalse("Expected highlighting disabled on SDK 3.13.0", DartAnalysisServerService.isLspHighlightingEnabled(project))
+
+            properties.setValue("dart.lsp.experimental.enabled", false, true)
+            versionField.set(sdk, "3.15.0")
+            assertFalse("Expected highlighting disabled when experimental setting is false", DartAnalysisServerService.isLspHighlightingEnabled(project))
+        } finally {
+            properties.unsetValue("dart.lsp.experimental.enabled")
+            versionField.set(sdk, originalVersion)
+        }
+    }
+
+    fun testIsLspHighlightingActive() {
+        val properties = PropertiesComponent.getInstance(project)
+        val das = DartAnalysisServerService.getInstance(project)
+        try {
+            properties.setValue("dart.lsp.experimental.enabled", true, true)
+            // Initially before bridge initialization or legend advertisement:
+            assertFalse(das.isSemanticTokensAdvertised)
+            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+
+            // Simulate advertisement:
+            das.setSemanticTokensAdvertised(true)
+            val sdk = DartSdk.getDartSdk(project)
+            assertNotNull(sdk)
+            val isSufficient = DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting(sdk!!.version)
+            assertEquals(isSufficient, DartAnalysisServerService.isLspHighlightingActive(project))
+
+            // When experimental LSP is disabled, highlighting is not active even if advertised:
+            properties.setValue("dart.lsp.experimental.enabled", false, true)
+            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+
+            // Reset back:
+            das.setSemanticTokensAdvertised(false)
+            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+        } finally {
+            properties.unsetValue("dart.lsp.experimental.enabled")
+            das.setSemanticTokensAdvertised(false)
+        }
+    }
+
+    fun testSemanticTokensLegendFuture_notMutatedOnTimeout() {
+        val das = DartAnalysisServerService.getInstance(project)
+        val legendFuture = das.semanticTokensLegendFuture
+        assertFalse(legendFuture.isDone)
+
+        // Simulating the timeout pattern used in DartBridgeLspServer.initialize:
+        val timedOutCopy = legendFuture.copy().completeOnTimeout(null, 50, TimeUnit.MILLISECONDS)
+        val copyResult = timedOutCopy.get(1, TimeUnit.SECONDS)
+        assertNull("Copy should have completed with null on timeout", copyResult)
+
+        // The original shared future in DAS must NOT be completed:
+        assertFalse("Original future in DAS must remain uncompleted after copy timeout", legendFuture.isDone)
+
+        // Now verify real DAS response can still complete the original future:
+        val legend = SemanticTokensLegend(listOf("class"), listOf("declaration"))
+        assertTrue("Original future should accept completion", legendFuture.complete(legend))
+        assertEquals(legend, das.semanticTokensLegendFuture.get())
     }
 
     private class MockLanguageClient : LanguageClient {

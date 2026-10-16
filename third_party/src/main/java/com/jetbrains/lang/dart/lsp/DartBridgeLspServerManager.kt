@@ -49,6 +49,9 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
     internal val bridgeServer: DartBridgeLspServer?
         get() = activeConnection?.bridgeServer
 
+    val isSemanticTokensAdvertised: Boolean
+        get() = bridgeServer?.isSemanticTokensAdvertised == true
+
 
     fun startBridgeServer() {
         if (serverSocket != null) {
