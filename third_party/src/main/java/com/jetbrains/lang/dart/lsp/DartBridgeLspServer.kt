@@ -30,6 +30,7 @@ import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.CodeAction
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
+import org.eclipse.lsp4j.ConfigurationParams
 import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
@@ -122,6 +123,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     private var client: LanguageClient? = null
+    internal val isClientConnected: Boolean
+        get() = client != null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
     private var dasMessageListener: ResponseListener? = null
 
@@ -220,6 +223,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 "textDocument/publishDiagnostics" -> handlePublishDiagnostics(client, msgObj)
                 "dart/textDocument/publishClosingLabels" -> handlePublishClosingLabels(msgObj)
                 "workspace/applyEdit" -> handleApplyEdit(client, dasRequestId, msgObj)
+                "workspace/configuration" -> handleWorkspaceConfiguration(client, dasRequestId, msgObj)
                 else -> logger.debug("Ignored notification/request from DAS: $method")
             }
         } catch (e: Exception) {
@@ -276,6 +280,42 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                     das.sendResponse(legacyResponse)
                 } catch (e: Exception) {
                     logger.error("Failed to send applyEdit response to DAS", e)
+                }
+            }
+        }
+    }
+
+    private fun handleWorkspaceConfiguration(client: LanguageClient, dasRequestId: String?, msgObj: JsonObject) {
+        val paramsObj = msgObj.get("params")
+        val params = GSON.fromJson(paramsObj, ConfigurationParams::class.java) ?: ConfigurationParams(emptyList())
+        val lspId = msgObj.get("id")
+        client.configuration(params).whenComplete { response, error ->
+            if (dasRequestId != null) {
+                val lspResponse = JsonObject().apply {
+                    addProperty("jsonrpc", JSONRPC_VERSION)
+                    if (lspId != null) {
+                        add("id", lspId)
+                    }
+                    if (error != null) {
+                        val errorObj = JsonObject().apply {
+                            addProperty("code", -32603)
+                            addProperty("message", error.message ?: "Internal error")
+                        }
+                        add("error", errorObj)
+                    } else {
+                        add("result", GSON.toJsonTree(response))
+                    }
+                }
+                val legacyResponse = JsonObject().apply {
+                    addProperty("id", dasRequestId)
+                    add("result", JsonObject().apply {
+                        add(LSP_RESPONSE_KEY, lspResponse)
+                    })
+                }
+                try {
+                    das.sendResponse(legacyResponse)
+                } catch (e: Exception) {
+                    logger.error("Failed to send workspace/configuration response to DAS", e)
                 }
             }
         }

@@ -6,6 +6,7 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
@@ -13,6 +14,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.LspServerListener
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
@@ -63,9 +65,14 @@ import com.intellij.psi.PsiFile
 import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
+import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
+import org.eclipse.lsp4j.ConfigurationItem
+import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
 import javax.swing.Icon
+
+private const val DART_CONFIGURATION_SECTION = "dart"
 
 /**
  * Configuration descriptor that defines how the JetBrains LSP client communicates with the Dart Bridge server.
@@ -79,6 +86,35 @@ import javax.swing.Icon
 class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(project, "Dart (Bridge)") {
 
     override val lsp4jServerClass: Class<out Lsp4jServer> = DartLanguageServer::class.java
+
+    override val clientCapabilities: ClientCapabilities
+        get() = super.clientCapabilities.apply {
+            workspace.fileOperations = FileOperationsWorkspaceCapabilities().apply {
+                willRename = true
+            }
+            textDocument.publishDiagnostics.apply {
+                relatedInformation = true
+                codeDescriptionSupport = true
+            }
+            experimental = mapOf("closingLabels" to emptyMap<String, Any>())
+        }
+
+    override fun createInitializationOptions(): Any = mapOf("closingLabels" to true)
+
+    override fun getWorkspaceConfiguration(item: ConfigurationItem): Any? {
+        if (item.section == DART_CONFIGURATION_SECTION) {
+            return DartLspInlayHintsConfiguration.buildDartSection().also { dartSection ->
+                DartLspConfigurationSync.getInstance(project).configurationSentToServer(dartSection)
+            }
+        }
+        return super.getWorkspaceConfiguration(item)
+    }
+
+    override val lspServerListener: LspServerListener = object : LspServerListener {
+        override fun serverStopped(shutdownNormally: Boolean) {
+            project.serviceIfCreated<DartLspConfigurationSync>()?.serverStopped()
+        }
+    }
 
     override fun isSupportedFile(file: VirtualFile): Boolean {
         return DartAnalysisServerService.isFileNameRespectedByAnalysisServer(file.name)

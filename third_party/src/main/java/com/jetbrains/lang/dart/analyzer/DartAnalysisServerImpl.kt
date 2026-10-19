@@ -12,12 +12,14 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.logging.PluginLogger
+import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager
 import com.jetbrains.lang.dart.lsp.DartLspConfigurationSync
 import com.jetbrains.lang.dart.lsp.DartLspInlayHintsConfiguration
 import com.jetbrains.lang.dart.sdk.DartConfigurable
@@ -94,6 +96,12 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
    * nor a read action.
    */
   override fun lsp_workspaceConfiguration(sections: List<String?>, consumer: DartLspWorkspaceConfigurationConsumer) {
+    if (project.serviceIfCreated<DartBridgeLspServerManager>()?.bridgeServer?.isClientConnected == true) {
+      // When DartBridgeLspServer is connected to the LSP client, workspace/configuration is handled by
+      // DartBridgeLspServer, which forwards it to the LanguageClient proxy and sends the legacy response to DAS.
+      return
+    }
+
     val dartSection =
       if (sections.contains(DART_CONFIGURATION_SECTION)) DartLspInlayHintsConfiguration.buildDartSection() else null
 

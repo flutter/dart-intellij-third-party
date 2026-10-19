@@ -39,6 +39,8 @@ import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.CompletionParams
+import org.eclipse.lsp4j.ConfigurationItem
+import org.eclipse.lsp4j.ConfigurationParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
@@ -1614,6 +1616,88 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(true, lspResponse.getAsJsonObject("result").get("applied").asBoolean)
     }
 
+    fun testWorkspaceConfigurationRequestForwardedAndResponseSentBack() {
+        val dartConfig = JsonObject().apply {
+            add(DartLspInlayHintsConfiguration.INLAY_HINTS_KEY, JsonObject())
+        }
+        mockClient.configurationResult = listOf(dartConfig, null)
+
+        val serverRequestJson = """
+            {
+              "id": "das_cfg_1",
+              "method": "lsp.handle",
+              "params": {
+                "lspMessage": {
+                  "jsonrpc": "2.0",
+                  "id": 7,
+                  "method": "workspace/configuration",
+                  "params": {
+                    "items": [
+                      { "section": "dart" },
+                      { "section": "flutter" }
+                    ]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(serverRequestJson)
+
+        val receivedParams = requireNotNull(mockClient.lastConfigurationParams) {
+            "Client should have received configuration params"
+        }
+        assertEquals(2, receivedParams.items.size)
+        assertEquals("dart", receivedParams.items[0].section)
+        assertEquals("flutter", receivedParams.items[1].section)
+
+        val responseJsonObject = requireNotNull(capturedResponses.find { it.get("id")?.asString == "das_cfg_1" }) {
+            "A response should be sent back to DAS with id das_cfg_1"
+        }
+        val lspResponse = requireNotNull(responseJsonObject.getAsJsonObject("result")?.getAsJsonObject("lspResponse")) {
+            "response should contain lspResponse"
+        }
+        assertEquals(7, lspResponse.get("id").asInt)
+        val resultArray = requireNotNull(lspResponse.getAsJsonArray("result")) {
+            "lspResponse should contain a result array"
+        }
+        assertEquals(2, resultArray.size())
+        assertEquals(dartConfig, resultArray[0].asJsonObject)
+        assertTrue(resultArray[1].isJsonNull)
+    }
+
+    fun testDescriptorClientCapabilitiesAndInitializationOptions() {
+        val descriptor = DartLspServerDescriptor(project)
+        val capabilities = descriptor.clientCapabilities
+
+        assertEquals(true, capabilities.workspace?.fileOperations?.willRename)
+        assertEquals(true, capabilities.textDocument?.publishDiagnostics?.relatedInformation)
+        assertEquals(true, capabilities.textDocument?.publishDiagnostics?.codeDescriptionSupport)
+
+        val experimental = capabilities.experimental as? Map<*, *>
+        assertNotNull("experimental capabilities should be a Map", experimental)
+        assertTrue("experimental capabilities should include closingLabels", experimental!!.containsKey("closingLabels"))
+
+        val initOptions = descriptor.createInitializationOptions() as? Map<*, *>
+        assertNotNull("initializationOptions should be a Map", initOptions)
+        assertEquals(true, initOptions!!["closingLabels"])
+    }
+
+    fun testDescriptorGetWorkspaceConfiguration() {
+        val descriptor = DartLspServerDescriptor(project)
+
+        val dartItem = ConfigurationItem().apply { section = "dart" }
+        val dartConfig = descriptor.getWorkspaceConfiguration(dartItem) as? JsonObject
+        assertNotNull("dart section should return a JsonObject", dartConfig)
+        assertNotNull(
+            "dart section should contain inlayHints",
+            dartConfig!!.getAsJsonObject(DartLspInlayHintsConfiguration.INLAY_HINTS_KEY)
+        )
+
+        val unknownItem = ConfigurationItem().apply { section = "flutter" }
+        assertNull("unknown section should return null", descriptor.getWorkspaceConfiguration(unknownItem))
+    }
+
     fun testForwardRequestUpdatesFilesContentFromBackgroundThread() {
         val das = DartAnalysisServerService.getInstance(project)
         val changedDocsField = DartAnalysisServerService::class.java.getDeclaredField("myChangedDocuments").apply {
@@ -1657,10 +1741,17 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         var publishedDiagnostics: PublishDiagnosticsParams? = null
         var lastApplyWorkspaceEditParams: ApplyWorkspaceEditParams? = null
         var applyEditResult: ApplyWorkspaceEditResponse = ApplyWorkspaceEditResponse(true)
+        var lastConfigurationParams: ConfigurationParams? = null
+        var configurationResult: List<Any?> = emptyList()
 
         override fun applyEdit(params: ApplyWorkspaceEditParams?): CompletableFuture<ApplyWorkspaceEditResponse> {
             lastApplyWorkspaceEditParams = params
             return CompletableFuture.completedFuture(applyEditResult)
+        }
+
+        override fun configuration(params: ConfigurationParams?): CompletableFuture<List<Any?>> {
+            lastConfigurationParams = params
+            return CompletableFuture.completedFuture(configurationResult)
         }
 
         override fun publishDiagnostics(diagnostics: PublishDiagnosticsParams?) {
