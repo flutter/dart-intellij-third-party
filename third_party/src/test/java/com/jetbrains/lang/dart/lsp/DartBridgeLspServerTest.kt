@@ -8,7 +8,6 @@ package com.jetbrains.lang.dart.lsp
 import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.Consumer
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
-import com.google.dart.server.DartLspWorkspaceConfigurationConsumer
 import com.google.dart.server.ResponseListener
 import com.google.dart.server.ShowMessageRequestConsumer
 import com.google.dart.server.internal.remote.ByteLineReaderStream
@@ -143,11 +142,6 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             override fun lsp_workspaceApplyEdit(
                 params: DartLspApplyWorkspaceEditParams?,
                 consumer: DartLspWorkspaceApplyEditRequestConsumer?
-            ) {}
-
-            override fun lsp_workspaceConfiguration(
-                sections: MutableList<String?>?,
-                consumer: DartLspWorkspaceConfigurationConsumer?
             ) {}
         }
 

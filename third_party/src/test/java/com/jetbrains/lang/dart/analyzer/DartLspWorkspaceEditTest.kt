@@ -7,7 +7,6 @@ package com.jetbrains.lang.dart.analyzer
 
 import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
-import com.google.dart.server.DartLspWorkspaceConfigurationConsumer
 import com.google.dart.server.ShowMessageRequestConsumer
 import com.google.dart.server.internal.remote.ByteLineReaderStream
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
@@ -56,10 +55,6 @@ class DartLspWorkspaceEditTest : DartCodeInsightFixtureTestCase() {
             params: DartLspApplyWorkspaceEditParams?,
             consumer: DartLspWorkspaceApplyEditRequestConsumer?
         ) {}
-        override fun lsp_workspaceConfiguration(
-            sections: MutableList<String?>?,
-            consumer: DartLspWorkspaceConfigurationConsumer?
-        ) {}
 
         override fun sendResponseToServer(response: JsonObject) {
             sentResponses.add(response)
@@ -80,12 +75,7 @@ class DartLspWorkspaceEditTest : DartCodeInsightFixtureTestCase() {
         assertTrue("documentChanges should be true for SDK >= 3.8", workspaceEdit38.get("documentChanges").asBoolean)
 
         val caps37 = DartAnalysisServerService.buildLspCapabilities("3.7.0")
-        // The workspace capabilities themselves are always sent - they also carry `configuration`,
-        // which does not depend on the SDK version - but the apply-edit part of them is not.
-        val workspace37 = caps37.getAsJsonObject("workspace")
-        assertNotNull(workspace37)
-        assertNull("applyEdit should NOT be present for SDK < 3.8", workspace37.get("applyEdit"))
-        assertNull("workspaceEdit should NOT be present for SDK < 3.8", workspace37.getAsJsonObject("workspaceEdit"))
+        assertNull("workspace capability should NOT be present for SDK < 3.8 when configuration is not enabled", caps37.getAsJsonObject("workspace"))
     }
 
     fun testRemoteAnalysisServerParsesDocumentChanges() {

@@ -7,7 +7,9 @@ package com.jetbrains.lang.dart.lsp
 
 import com.google.dart.server.ResponseListener
 import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
@@ -287,24 +289,37 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     private fun handleWorkspaceConfiguration(client: LanguageClient, dasRequestId: String?, msgObj: JsonObject) {
         val paramsObj = msgObj.get("params")
-        val params = GSON.fromJson(paramsObj, ConfigurationParams::class.java) ?: ConfigurationParams(emptyList())
+        val params = if (paramsObj != null && paramsObj.isJsonObject) {
+            GSON.fromJson(paramsObj, ConfigurationParams::class.java) ?: ConfigurationParams(emptyList())
+        } else {
+            ConfigurationParams(emptyList())
+        }
+        val items = params.items ?: emptyList()
+        params.items = items
         val lspId = msgObj.get("id")
-        client.configuration(params).whenComplete { response, error ->
+        val future = try {
+            client.configuration(params)
+        } catch (e: Throwable) {
+            CompletableFuture.failedFuture(e)
+        }
+        future.whenComplete { response, error ->
             if (dasRequestId != null) {
+                if (error != null) {
+                    logger.warn("Error computing workspace/configuration; falling back to null entries", error)
+                }
+                // The server blocks its initialization until it gets an answer, and the LSP protocol
+                // expects one result per requested section in the same order (null for unknown sections).
+                val resultArray = JsonArray()
+                for (i in items.indices) {
+                    val itemConfig = if (error == null && response != null && i < response.size) response[i] else null
+                    resultArray.add(if (itemConfig != null) GSON.toJsonTree(itemConfig) else JsonNull.INSTANCE)
+                }
                 val lspResponse = JsonObject().apply {
                     addProperty("jsonrpc", JSONRPC_VERSION)
                     if (lspId != null) {
                         add("id", lspId)
                     }
-                    if (error != null) {
-                        val errorObj = JsonObject().apply {
-                            addProperty("code", -32603)
-                            addProperty("message", error.message ?: "Internal error")
-                        }
-                        add("error", errorObj)
-                    } else {
-                        add("result", GSON.toJsonTree(response))
-                    }
+                    add("result", resultArray)
                 }
                 val legacyResponse = JsonObject().apply {
                     addProperty("id", dasRequestId)
@@ -333,6 +348,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
+        das.updateClientCapabilities(true)
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
             setDefinitionProvider(true)

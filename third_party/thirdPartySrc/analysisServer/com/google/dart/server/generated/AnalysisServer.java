@@ -15,8 +15,8 @@
  * has drifted from what the generator produces today:
  * - It declares methods that the generator cannot produce, because the spec only knows the generic
  *   lsp.handle request: lsp_connectToDtd sends the dart/connectToDtd LSP request, and
- *   lsp_workspaceApplyEdit and lsp_workspaceConfiguration handle the workspace/applyEdit and
- *   workspace/configuration requests that the server sends to the client.
+ *   lsp_workspaceApplyEdit handles the workspace/applyEdit request that the server sends to the
+ *   client.
  * - It still declares requests that the SDK has removed, such as completion.getSuggestions and
  *   completion.setSubscriptions of the old completion protocol, and it lacks lsp.handle, which the
  *   plugin sends without this interface.
@@ -37,7 +37,6 @@ package com.google.dart.server.generated;
 
 import com.google.dart.server.*;
 import org.dartlang.analysis.server.protocol.*;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -1113,15 +1112,6 @@ public interface AnalysisServer {
   public void server_showMessageRequest(String type, String message, List<MessageAction> actions, ShowMessageRequestConsumer consumer);
 
   public void lsp_workspaceApplyEdit(DartLspApplyWorkspaceEditParams params, DartLspWorkspaceApplyEditRequestConsumer consumer);
-
-  /**
-   * Return the configuration of the given sections, one entry per requested section and in the same
-   * order, using {@code null} for a section that is not known to the client.
-   *
-   * @param sections the names of the requested configuration sections, an entry may be {@code null}
-   *          if the server asked for an unnamed section
-   */
-  public void lsp_workspaceConfiguration(List<@Nullable String> sections, DartLspWorkspaceConfigurationConsumer consumer);
 
   public void lsp_connectToDtd(String uri);
 
