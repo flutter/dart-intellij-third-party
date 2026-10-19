@@ -805,7 +805,7 @@ public final class DartAnalysisServerService implements Disposable {
       analysis_setSubscriptions();
       ApplicationManager.getApplication().invokeLater(() -> {
         if (!myProject.isDisposed()) {
-          DaemonCodeAnalyzer.getInstance(myProject).restart();
+          DaemonCodeAnalyzer.getInstance(myProject).restart("Dart semantic tokens advertisement changed");
         }
       }, ModalityState.nonModal(), myDisposedCondition);
     }
