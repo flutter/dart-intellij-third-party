@@ -124,6 +124,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         private val GSON: Gson = JSON_HANDLER.gson
     }
 
+    @Volatile
     private var client: LanguageClient? = null
     internal val isClientConnected: Boolean
         get() = client != null
