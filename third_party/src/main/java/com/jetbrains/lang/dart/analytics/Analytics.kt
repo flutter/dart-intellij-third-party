@@ -47,7 +47,10 @@ import kotlin.time.Duration.Companion.seconds
 private const val DEBUGGING_LOCALLY = false
 private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 
-private val DEFAULT_RESPONSE_TIMEOUT = 1.seconds
+/// DTD can be slow to respond right after it starts (e.g. on IDE startup while
+/// indexing), so allow a generous amount of time for unified analytics calls.
+/// See https://github.com/flutter/dart-intellij-third-party/issues/704.
+private val DEFAULT_RESPONSE_TIMEOUT = 5.seconds
 
 private object UnifiedAnalytics {
   object Property {
@@ -128,7 +131,7 @@ private object UnifiedAnalytics {
 
       val completed = latch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
       if (!completed) {
-        throw TimeoutException("Call to $SERVICE_NAME.$name timed out after $DEFAULT_RESPONSE_TIMEOUT.")
+        throw TimeoutException("Call to $SERVICE_NAME.$name timed out after $timeout.")
       }
 
     } catch (e: WebSocketException) {
