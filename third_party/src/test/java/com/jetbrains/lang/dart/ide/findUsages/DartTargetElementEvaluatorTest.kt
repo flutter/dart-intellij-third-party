@@ -6,33 +6,46 @@
 package com.jetbrains.lang.dart.ide.findUsages
 
 import com.intellij.codeInsight.TargetElementUtil
-import com.intellij.find.usages.impl.searchTargets
-import com.intellij.find.usages.symbol.SearchTargetSymbol
+import com.intellij.codeInsight.navigation.actions.GotoDeclarationAction
+import com.intellij.codeInsight.navigation.actions.GotoDeclarationOrUsageHandler2
+import com.intellij.codeInsight.navigation.actions.GotoDeclarationOrUsageHandler2.GTDUOutcome
 import com.intellij.ide.util.PropertiesComponent
-import com.intellij.model.psi.impl.targetSymbols
-import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.components.service
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspServerManagerListener
 import com.intellij.platform.dartlsp.api.LspServerState
-import com.intellij.platform.dartlsp.impl.documentSync.LspDocumentSyncManager
+import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.impl.LspServerImpl
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
-import com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget
-import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.platform.dartlsp.impl.connector.Lsp4jServerConnector
+import com.intellij.platform.dartlsp.impl.documentSync.LspDocumentSyncManager
+import com.intellij.platform.dartlsp.impl.features.navigation.CurrentActionHolder
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.lsp.DartLspServerDescriptor
 import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
-import com.jetbrains.lang.dart.psi.DartNamedElement
 import com.jetbrains.lang.dart.sdk.DartConfigurable
+import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.Location
+import org.eclipse.lsp4j.LocationLink
+import org.eclipse.lsp4j.Position
+import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ServerCapabilities
+import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.services.TextDocumentService
+import java.io.InputStream
+import java.io.OutputStream
+import java.lang.reflect.Proxy
+import java.util.concurrent.CompletableFuture
 
 class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
 
     override fun tearDown() {
         try {
             PropertiesComponent.getInstance(project).unsetValue("dart.lsp.experimental.enabled")
+            service<CurrentActionHolder>().currentActionClass = null
         } catch (e: Throwable) {
             addSuppressedException(e)
         } finally {
@@ -40,8 +53,22 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
         }
     }
 
-    private fun createMockLspServer(vFile: VirtualFile): Pair<LspServerImpl, MutableCollection<LspServerImpl>> {
-        val descriptor = DartLspServerDescriptor(project)
+    private fun createMockLspServer(
+        vFile: VirtualFile,
+        definitionResponder: (DefinitionParams) -> Either<List<Location>, List<LocationLink>> = {
+            Either.forRight(emptyList())
+        },
+    ): Pair<LspServerImpl, MutableCollection<LspServerImpl>> {
+        val dartDescriptor = DartLspServerDescriptor(project)
+        val descriptor = object : ProjectWideLspServerDescriptor(project, "Dart (Bridge)") {
+            override fun isSupportedFile(file: VirtualFile): Boolean = dartDescriptor.isSupportedFile(file)
+            override fun getFileUri(file: VirtualFile): String = dartDescriptor.getFileUri(file)
+            override fun findFileByUri(fileUri: String): VirtualFile? {
+                if (fileUri == getFileUri(vFile)) return vFile
+                return dartDescriptor.findFileByUri(fileUri)
+            }
+            override val lspCustomization = dartDescriptor.lspCustomization
+        }
         val server = LspServerImpl(
             DartLspServerSupportProvider::class.java,
             descriptor,
@@ -55,6 +82,42 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
             }
         )
 
+        val textDocumentService = Proxy.newProxyInstance(
+            TextDocumentService::class.java.classLoader,
+            arrayOf(TextDocumentService::class.java)
+        ) { _, method, args ->
+            if (method.name == "definition") {
+                CompletableFuture.completedFuture(definitionResponder(args[0] as DefinitionParams))
+            } else {
+                CompletableFuture.completedFuture(null)
+            }
+        } as TextDocumentService
+
+        val lsp4jServer = Proxy.newProxyInstance(
+            Lsp4jServer::class.java.classLoader,
+            arrayOf(Lsp4jServer::class.java)
+        ) { _, method, _ ->
+            if (method.name == "getTextDocumentService") {
+                textDocumentService
+            } else {
+                CompletableFuture.completedFuture(null)
+            }
+        } as Lsp4jServer
+
+        val connector = object : Lsp4jServerConnector(server) {
+            override val ideToServerStream: OutputStream get() = OutputStream.nullOutputStream()
+            override val serverToIdeStream: InputStream get() = InputStream.nullInputStream()
+            override fun prepareConnect() {}
+            override fun isConnectionAlive(): Boolean = true
+            override fun disconnect() {}
+        }.apply {
+            this.lsp4jServer = lsp4jServer
+        }
+
+        LspServerImpl::class.java.getDeclaredField("lsp4jServerConnector").apply {
+            isAccessible = true
+            set(server, connector)
+        }
         LspServerImpl::class.java.getDeclaredField("initializeResult").apply {
             isAccessible = true
             set(server, initResult)
@@ -115,7 +178,7 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
         assertNull(evaluator.getTargetCandidates(reference))
     }
 
-    fun testDeclarationResolvesToLspSearchTargetViaDeclarationProvider() {
+    fun testLocationLinkSelfDefinitionLeadsToShowUsages() {
         val file = myFixture.configureByText(
             "test.dart",
             """
@@ -125,94 +188,161 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
             }
             """.trimIndent()
         )
-        val (server, lspServers) = createMockLspServer(file.virtualFile)
+        val selfRange = Range(Position(0, 5), Position(0, 11))
+        val (server, lspServers) = createMockLspServer(file.virtualFile) {
+            val fileUri = DartLspServerDescriptor(project).getFileUri(file.virtualFile)
+            Either.forRight(listOf(LocationLink(fileUri, selfRange, selfRange, selfRange)))
+        }
 
         try {
-            val caretOffset = myFixture.caretOffset
-            val namedElement = PsiTreeUtil.getParentOfType(
-                file.findElementAt(caretOffset),
-                DartNamedElement::class.java
-            )
-            assertNotNull("Expected DartNamedElement at caret", namedElement)
-            if (namedElement == null) return
-
-            // 1. With LSP references enabled, DartLspSymbolDeclarationProvider yields a SearchTargetSymbol backed by LspSearchTarget
             PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
-            if (DartAnalysisServerService.isLspReferencesEnabled(project)) {
-                val declarations = DartLspSymbolDeclarationProvider().getDeclarations(namedElement, -1)
-                assertEquals(1, declarations.size)
-                val symbol = declarations.single().symbol
-                assertTrue(
-                    "Expected SearchTargetSymbol, got: $symbol",
-                    symbol is SearchTargetSymbol
+            if (DartAnalysisServerService.isLspReferencesEnabled(project) &&
+                DartAnalysisServerService.isLspNavigationEnabled(project)
+            ) {
+                service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+                val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                    myFixture.editor,
+                    file,
+                    myFixture.caretOffset
                 )
-                val searchTarget = (symbol as SearchTargetSymbol).searchTarget
-                assertTrue(
-                    "Expected LspSearchTarget, got: $searchTarget",
-                    searchTarget is LspSearchTarget
-                )
-
-                val targetSymbols = targetSymbols(file, caretOffset)
-                assertEquals(1, targetSymbols.size)
-                assertEquals(symbol, targetSymbols.single())
-
-                val targets = searchTargets(file, caretOffset)
-                assertEquals(1, targets.size)
-                assertTrue(targets.single() is LspSearchTarget)
+                assertEquals(GTDUOutcome.SU, outcome)
             }
-
-            // 2. With LSP references disabled, DartLspSymbolDeclarationProvider returns emptyList so legacy PSI handles it
-            PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", false, true)
-            val disabledDeclarations = DartLspSymbolDeclarationProvider().getDeclarations(namedElement, -1)
-            assertTrue("Expected empty declarations when LSP references are disabled", disabledDeclarations.isEmpty())
         } finally {
+            server.requestExecutor.shutdownNow()
             lspServers.remove(server)
         }
     }
 
-    fun testDeclarationRangeRestrictedToNameIdentifierAndPositionPointsToName() {
+    fun testLocationSelfDefinitionLeadsToShowUsages() {
         val file = myFixture.configureByText(
-            "annotated.dart",
+            "test.dart",
             """
-            /// Doc comment describing function
-            @override
-            @deprecated
-            void annotated<caret>Func() {}
+            void help<caret>er() {}
             """.trimIndent()
         )
-        val (server, lspServers) = createMockLspServer(file.virtualFile)
+        val selfRange = Range(Position(0, 5), Position(0, 11))
+        val (server, lspServers) = createMockLspServer(file.virtualFile) {
+            val fileUri = DartLspServerDescriptor(project).getFileUri(file.virtualFile)
+            Either.forLeft(listOf(Location(fileUri, selfRange)))
+        }
 
         try {
-            val namedElement = PsiTreeUtil.getParentOfType(
-                file.findElementAt(myFixture.caretOffset),
-                DartNamedElement::class.java
-            )
-            assertNotNull(namedElement)
-            if (namedElement == null) return
-
             PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
-            if (DartAnalysisServerService.isLspReferencesEnabled(project)) {
-                val declarations = DartLspSymbolDeclarationProvider().getDeclarations(namedElement, -1)
-                assertEquals(1, declarations.size)
-                val declaration = declarations.single()
-
-                // Range should be restricted to the name identifier "annotatedFunc" (length 13), NOT the multi-line function body
-                val nameIdentifier = requireNotNull(namedElement.nameIdentifier)
-                val relativeStart = nameIdentifier.textRange.startOffset - namedElement.textRange.startOffset
-                assertEquals(TextRange.from(relativeStart, nameIdentifier.textLength), declaration.rangeInDeclaringElement)
-
-                // LSP position line must point to line 3 (where annotatedFunc is declared), NOT line 0 (doc comment)
-                val symbol = declaration.symbol as SearchTargetSymbol
-                val searchTarget = symbol.searchTarget as LspSearchTarget
-                assertEquals(3, searchTarget.position.line)
-
-                // Dereferencing smart pointer when server stops returns null (no memory leaks)
-                val pointer = symbol.createPointer()
-                assertNotNull(pointer.dereference())
-                lspServers.remove(server)
-                assertNull("Smart pointer dereference must return null when LSP server stops", pointer.dereference())
+            if (DartAnalysisServerService.isLspReferencesEnabled(project) &&
+                DartAnalysisServerService.isLspNavigationEnabled(project)
+            ) {
+                service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+                val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                    myFixture.editor,
+                    file,
+                    myFixture.caretOffset
+                )
+                assertEquals(GTDUOutcome.SU, outcome)
             }
         } finally {
+            server.requestExecutor.shutdownNow()
+            lspServers.remove(server)
+        }
+    }
+
+    fun testDefinitionAtAnotherPositionLeadsToNavigation() {
+        val file = myFixture.configureByText(
+            "test.dart",
+            """
+            void helper() {}
+            void main() {
+              help<caret>er();
+            }
+            """.trimIndent()
+        )
+        val targetRange = Range(Position(0, 5), Position(0, 11))
+        val originRange = Range(Position(2, 2), Position(2, 8))
+        val (server, lspServers) = createMockLspServer(file.virtualFile) {
+            val fileUri = DartLspServerDescriptor(project).getFileUri(file.virtualFile)
+            Either.forRight(listOf(LocationLink(fileUri, targetRange, targetRange, originRange)))
+        }
+
+        try {
+            PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
+            if (DartAnalysisServerService.isLspReferencesEnabled(project) &&
+                DartAnalysisServerService.isLspNavigationEnabled(project)
+            ) {
+                service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+                val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                    myFixture.editor,
+                    file,
+                    myFixture.caretOffset
+                )
+                assertEquals(GTDUOutcome.GTD, outcome)
+            }
+        } finally {
+            server.requestExecutor.shutdownNow()
+            lspServers.remove(server)
+        }
+    }
+
+    fun testMultiLineLocationAroundCaretLeadsToNavigation() {
+        val file = myFixture.configureByText(
+            "test.dart",
+            """
+            void foo() {
+              <caret>foo();
+            }
+            """.trimIndent()
+        )
+        // A multi-line range is the full declaration body, not the name range. The caret is on a usage inside the body.
+        val bodyRange = Range(Position(0, 0), Position(2, 1))
+        val (server, lspServers) = createMockLspServer(file.virtualFile) {
+            val fileUri = DartLspServerDescriptor(project).getFileUri(file.virtualFile)
+            Either.forLeft(listOf(Location(fileUri, bodyRange)))
+        }
+
+        try {
+            PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
+            if (DartAnalysisServerService.isLspReferencesEnabled(project) &&
+                DartAnalysisServerService.isLspNavigationEnabled(project)
+            ) {
+                service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+                val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                    myFixture.editor,
+                    file,
+                    myFixture.caretOffset
+                )
+                assertEquals(GTDUOutcome.GTD, outcome)
+            }
+        } finally {
+            server.requestExecutor.shutdownNow()
+            lspServers.remove(server)
+        }
+    }
+
+    fun testSelfDefinitionWhenLspDisabledFallsBackToLegacyShowUsages() {
+        val file = myFixture.configureByText(
+            "test.dart",
+            """
+            void help<caret>er() {}
+            void main() {
+              helper();
+            }
+            """.trimIndent()
+        )
+        val selfRange = Range(Position(0, 5), Position(0, 11))
+        val (server, lspServers) = createMockLspServer(file.virtualFile) {
+            val fileUri = DartLspServerDescriptor(project).getFileUri(file.virtualFile)
+            Either.forRight(listOf(LocationLink(fileUri, selfRange, selfRange, selfRange)))
+        }
+
+        try {
+            PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", false, true)
+            service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+            val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                myFixture.editor,
+                file,
+                myFixture.caretOffset
+            )
+            assertEquals(GTDUOutcome.SU, outcome)
+        } finally {
+            server.requestExecutor.shutdownNow()
             lspServers.remove(server)
         }
     }
