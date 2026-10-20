@@ -409,9 +409,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
       dasService.updateClientCapabilities();
       dasService.updateSubscriptions();
       DaemonCodeAnalyzer.getInstance(myProject).restart("Dart settings changed");
-      if (currentExperimentalEnabled) {
-        bridgeManager.startBridgeServer();
-      }
+      bridgeManager.startBridgeServer();
     }
 
     reset(); // because we rely on remembering initial state
