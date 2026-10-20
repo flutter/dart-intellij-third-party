@@ -381,13 +381,16 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     // --- LanguageServer Implementation ---
 
+    // Overridable in tests.
+    internal var isLspHighlightingEnabled: () -> Boolean = { DartAnalysisServerService.isLspHighlightingEnabled(project) }
+
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
         initialized = true
         das.updateClientCapabilities(true)
         val legendFuture = das.semanticTokensLegendFuture
         val legendCompletableFuture = when {
-            !DartAnalysisServerService.isLspHighlightingEnabled(project) -> CompletableFuture.completedFuture(null)
+            !isLspHighlightingEnabled() -> CompletableFuture.completedFuture(null)
             legendFuture.isDone -> CompletableFuture.completedFuture(das.semanticTokensLegend)
             das.isServerProcessActive -> legendFuture.copy().completeOnTimeout(null, 3, TimeUnit.SECONDS)
             else -> CompletableFuture.completedFuture(null)

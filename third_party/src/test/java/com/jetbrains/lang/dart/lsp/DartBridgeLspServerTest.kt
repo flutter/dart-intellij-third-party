@@ -931,6 +931,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         )
         val das = DartAnalysisServerService.getInstance(project)
         das.semanticTokensLegend = SemanticTokensLegend(dasLegendTypes, dasLegendModifiers)
+        bridgeServer.isLspHighlightingEnabled = { true }
 
         val future = bridgeServer.initialize(InitializeParams())
         val result = future.get(5, TimeUnit.SECONDS)
