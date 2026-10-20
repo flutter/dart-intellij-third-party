@@ -304,12 +304,11 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
         val legendFuture = das.semanticTokensLegendFuture
-        val legendCompletableFuture = if (legendFuture.isDone) {
-            CompletableFuture.completedFuture(das.semanticTokensLegend)
-        } else if (das.isServerProcessActive) {
-            legendFuture.copy().completeOnTimeout(null, 3, TimeUnit.SECONDS)
-        } else {
-            CompletableFuture.completedFuture(null)
+        val legendCompletableFuture = when {
+            !DartAnalysisServerService.isLspHighlightingEnabled(project) -> CompletableFuture.completedFuture(null)
+            legendFuture.isDone -> CompletableFuture.completedFuture(das.semanticTokensLegend)
+            das.isServerProcessActive -> legendFuture.copy().completeOnTimeout(null, 3, TimeUnit.SECONDS)
+            else -> CompletableFuture.completedFuture(null)
         }
 
         return legendCompletableFuture.thenApply { serverLegend ->
