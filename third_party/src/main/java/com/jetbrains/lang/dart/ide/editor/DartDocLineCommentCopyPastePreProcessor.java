@@ -12,7 +12,6 @@ import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.text.CharArrayUtil;
 import com.jetbrains.lang.dart.DartLanguage;
-import com.jetbrains.lang.dart.ide.DartCommenter;
 import com.jetbrains.lang.dart.ide.documentation.DartDocUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -20,12 +19,12 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Keeps the {@code ///} prefix when multi-line text is pasted into a single-line Dart doc comment.
  * <p>
- * The platform's {@code LineCommentCopyPastePreProcessor} uses {@link DartCommenter#getLineCommentPrefix()} ({@code //}) and so turns
- * every newline of the pasted text into {@code "\n// "}, even if the caret is inside a {@code ///} comment. This processor is registered
+ * The platform's {@code LineCommentCopyPastePreProcessor} uses {@code DartCommenter.getLineCommentPrefix()} ({@code //}) and so turns
+ * * every newline of the pasted text into {@code "\n// "}, even if the caret is inside a {@code ///} comment. This processor is registered
  * to run after the platform one and rewrites that replacement to use {@code ///}.
  */
 public final class DartDocLineCommentCopyPastePreProcessor implements CopyPastePreProcessor {
-    private static final String LINE_COMMENT_PREFIX = new DartCommenter().getLineCommentPrefix();
+    private static final String LINE_COMMENT_PREFIX = "//";
 
     @Override
     public @Nullable String preprocessOnCopy(PsiFile file, int[] startOffsets, int[] endOffsets, String text) {
