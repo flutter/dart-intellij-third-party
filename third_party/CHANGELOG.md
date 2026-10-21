@@ -14,6 +14,7 @@
 - Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
 - Restore semantic syntax highlighting after external file modification (#656)
 - Avoid UI freeze during project startup by updating excluded folders directly via `WorkspaceModel` (#728)
+- Preserve the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#676)
 
 ## 510.0.0
 
