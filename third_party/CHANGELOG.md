@@ -11,6 +11,7 @@
 - Avoid read-access error when invoking Type Hierarchy, Method Hierarchy, Go to Super Method, or Go to Implementation(s) in IntelliJ 2026.1+ (#780)
 - Avoid a trailing newline in the Dart SDK version, which leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
 - Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
+- Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
 
 ## 511.0.0
 
