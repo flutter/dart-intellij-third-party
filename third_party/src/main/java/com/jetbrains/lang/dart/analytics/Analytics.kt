@@ -197,8 +197,22 @@ private object AnalyticsConfigurationManager {
         return data
       }
 
+      // Older SDKs don't ship `dart tooling-daemon`; starting it would fail and every
+      // analytics call would time out. Keep the default (suppressed) configuration.
+      // See https://github.com/flutter/dart-intellij-third-party/issues/704.
+      if (!DartToolingDaemonService.isDartSdkVersionSufficient(sdk)) {
+        logger.debug("Dart SDK ${sdk.version} does not support DTD; analytics are suppressed.")
+        initLatch.countDown()
+        return data
+      }
+
       val dtdProcess = DTDProcess()
       dtdProcess.listener = object : DTDProcessListener {
+        override fun onProcessFailedToStart() {
+          logger.debug("DTD process failed to start; analytics are suppressed.")
+          initLatch.countDown()
+        }
+
         override fun onProcessStarted(uri: String?) {
           logger.debug("DartAnalysisServerService.onProcessStarted")
 

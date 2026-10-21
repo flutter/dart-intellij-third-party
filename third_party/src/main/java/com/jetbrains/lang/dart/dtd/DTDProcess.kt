@@ -187,8 +187,7 @@ class DTDProcess {
   @Throws(WebSocketException::class)
   fun sendRequest(method: String, params: JsonObject, includeSecret: Boolean, consumer: DartToolingDaemonConsumer) {
     if (!webSocketReady) {
-      logger.warn("sendRequest(\"$method\") called when the socket is not ready")
-      return
+      throw WebSocketException("sendRequest(\"$method\") called when the socket is not ready")
     }
 
     val request = JsonObject()
@@ -210,10 +209,14 @@ class DTDProcess {
   private inner class OSProcessListener : ProcessListener {
 
     override fun processTerminated(event: ProcessEvent) {
+      val startedSuccessfully = processRunning
       processRunning = false
       webSocketReady = false
       uri = null
       logger.info("DTD process terminated, exit code: ${event.exitCode}")
+      if (!startedSuccessfully) {
+        listener?.onProcessFailedToStart()
+      }
     }
 
     override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
@@ -233,10 +236,12 @@ class DTDProcess {
         uri = details["uri"].asString
         secret = details["trusted_client_secret"].asString
       } catch (e: Exception) {
+        // Not the init message (e.g. `Could not find a command named "tooling-daemon"` on older SDKs).
+        // Keep waiting; if the process exits instead, processTerminated reports the failure.
         logger.warn("Failed to parse DTD init message. Error: ${e.message}. DTD message: $text")
-      } finally {
-        onProcessStarted(uri, secret)
+        return
       }
+      onProcessStarted(uri, secret)
     }
   }
 }
@@ -246,4 +251,7 @@ interface DTDProcessListener {
   fun onWebSocketClose() {}
   fun onWebSocketOpen() {}
   fun onProcessStarted(uri: String?) {}
+
+  /** Called when the process exits before reporting its connection details (e.g. unsupported SDK). */
+  fun onProcessFailedToStart() {}
 }
