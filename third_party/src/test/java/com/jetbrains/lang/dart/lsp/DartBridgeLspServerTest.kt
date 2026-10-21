@@ -1660,6 +1660,105 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue(resultArray[1].isJsonNull)
     }
 
+    fun testWorkspaceConfigurationAnsweredWithNullsWhenNoClientConnected() {
+        bridgeServer.stop()
+        val unconnectedBridge = DartBridgeLspServer(project)
+        try {
+            val serverRequestJson = """
+                {
+                  "id": "das_cfg_no_client",
+                  "method": "lsp.handle",
+                  "params": {
+                    "lspMessage": {
+                      "jsonrpc": "2.0",
+                      "id": 8,
+                      "method": "workspace/configuration",
+                      "params": {
+                        "items": [
+                          { "section": "dart" },
+                          { "section": "flutter" }
+                        ]
+                      }
+                    }
+                  }
+                }
+            """.trimIndent()
+
+            capturedListener.onResponse(serverRequestJson)
+
+            val responseJsonObject = requireNotNull(capturedResponses.find { it.get("id")?.asString == "das_cfg_no_client" }) {
+                "A response should be sent back to DAS even when no client is connected"
+            }
+            val lspResponse = requireNotNull(responseJsonObject.getAsJsonObject("result")?.getAsJsonObject("lspResponse"))
+            assertEquals(8, lspResponse.get("id").asInt)
+            val resultArray = requireNotNull(lspResponse.getAsJsonArray("result"))
+            assertEquals(2, resultArray.size())
+            assertTrue(resultArray[0].isJsonNull)
+            assertTrue(resultArray[1].isJsonNull)
+        } finally {
+            unconnectedBridge.stop()
+        }
+    }
+
+    fun testWorkspaceConfigurationAnsweredWithNullsWhenParamsMalformed() {
+        val serverRequestJson = """
+            {
+              "id": "das_cfg_malformed",
+              "method": "lsp.handle",
+              "params": {
+                "lspMessage": {
+                  "jsonrpc": "2.0",
+                  "id": 9,
+                  "method": "workspace/configuration",
+                  "params": {
+                    "items": [
+                      "not_an_object",
+                      123
+                    ]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(serverRequestJson)
+
+        val responseJsonObject = requireNotNull(capturedResponses.find { it.get("id")?.asString == "das_cfg_malformed" }) {
+            "A response should be sent back to DAS even when params fail to parse"
+        }
+        val lspResponse = requireNotNull(responseJsonObject.getAsJsonObject("result")?.getAsJsonObject("lspResponse"))
+        assertEquals(9, lspResponse.get("id").asInt)
+        val resultArray = requireNotNull(lspResponse.getAsJsonArray("result"))
+        assertEquals(2, resultArray.size())
+        assertTrue(resultArray[0].isJsonNull)
+        assertTrue(resultArray[1].isJsonNull)
+    }
+
+    fun testStopWithdrawsWorkspaceConfigurationCapability() {
+        capturedRequests.clear()
+        bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+
+        val initCapReq = requireNotNull(capturedRequests.lastOrNull { it.get("method")?.asString == "server.setClientCapabilities" }) {
+            "initialize() should send server.setClientCapabilities"
+        }
+        val initWorkspaceCap = initCapReq.getAsJsonObject("params")
+            .getAsJsonObject("lspCapabilities")
+            .getAsJsonObject("workspace")
+        assertTrue(initWorkspaceCap.get("configuration").asBoolean)
+
+        capturedRequests.clear()
+        bridgeServer.stop()
+        assertFalse("isClientConnected should be false after stop()", bridgeServer.isClientConnected)
+
+        val stopCapReq = requireNotNull(capturedRequests.lastOrNull { it.get("method")?.asString == "server.setClientCapabilities" }) {
+            "stop() should withdraw workspace.configuration via server.setClientCapabilities"
+        }
+        val stopWorkspaceCap = stopCapReq.getAsJsonObject("params")
+            .getAsJsonObject("lspCapabilities")
+            .getAsJsonObject("workspace")
+        assertFalse(stopWorkspaceCap?.has("configuration") == true)
+    }
+
     fun testDescriptorClientCapabilitiesAndInitializationOptions() {
         val descriptor = DartLspServerDescriptor(project)
         val capabilities = descriptor.clientCapabilities

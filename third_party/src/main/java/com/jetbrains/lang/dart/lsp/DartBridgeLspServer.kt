@@ -126,6 +126,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     @Volatile
     private var client: LanguageClient? = null
+    @Volatile
+    private var initialized: Boolean = false
     internal val isClientConnected: Boolean
         get() = client != null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
@@ -219,14 +221,17 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     private fun forwardServerMessageToClient(dasRequestId: String?, method: String, msgObj: JsonObject) {
-        val client = this.client ?: return
         try {
+            if (method == "workspace/configuration") {
+                handleWorkspaceConfiguration(this.client, dasRequestId, msgObj)
+                return
+            }
+            val client = this.client ?: return
             // Parse and forward notifications/requests to the LSP client proxy using lsp4j.
             when (method) {
                 "textDocument/publishDiagnostics" -> handlePublishDiagnostics(client, msgObj)
                 "dart/textDocument/publishClosingLabels" -> handlePublishClosingLabels(msgObj)
                 "workspace/applyEdit" -> handleApplyEdit(client, dasRequestId, msgObj)
-                "workspace/configuration" -> handleWorkspaceConfiguration(client, dasRequestId, msgObj)
                 else -> logger.debug("Ignored notification/request from DAS: $method")
             }
         } catch (e: Exception) {
@@ -288,20 +293,31 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
-    private fun handleWorkspaceConfiguration(client: LanguageClient, dasRequestId: String?, msgObj: JsonObject) {
-        val paramsObj = msgObj.get("params")
-        val params = if (paramsObj != null && paramsObj.isJsonObject) {
-            GSON.fromJson(paramsObj, ConfigurationParams::class.java) ?: ConfigurationParams(emptyList())
+    private fun handleWorkspaceConfiguration(client: LanguageClient?, dasRequestId: String?, msgObj: JsonObject) {
+        val paramsObj = msgObj.get("params")?.takeIf { it.isJsonObject }?.asJsonObject
+        val rawItemsCount = paramsObj?.get("items")?.takeIf { it.isJsonArray }?.asJsonArray?.size() ?: 0
+        val parsedParams = if (paramsObj != null) {
+            try {
+                GSON.fromJson(paramsObj, ConfigurationParams::class.java)
+            } catch (e: Exception) {
+                logger.warn("Failed to parse workspace/configuration params; falling back to null entries", e)
+                null
+            }
         } else {
-            ConfigurationParams(emptyList())
+            null
         }
-        val items = params.items ?: emptyList()
-        params.items = items
+        val items = parsedParams?.items
+        val itemCount = items?.size ?: rawItemsCount
         val lspId = msgObj.get("id")
-        val future = try {
-            client.configuration(params)
-        } catch (e: Throwable) {
-            CompletableFuture.failedFuture(e)
+        val future = if (client != null && parsedParams != null) {
+            parsedParams.items = items ?: emptyList()
+            try {
+                client.configuration(parsedParams)
+            } catch (e: Throwable) {
+                CompletableFuture.failedFuture(e)
+            }
+        } else {
+            CompletableFuture.completedFuture(null)
         }
         future.whenComplete { response, error ->
             if (dasRequestId != null) {
@@ -311,7 +327,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 // The server blocks its initialization until it gets an answer, and the LSP protocol
                 // expects one result per requested section in the same order (null for unknown sections).
                 val resultArray = JsonArray()
-                for (i in items.indices) {
+                for (i in 0 until itemCount) {
                     val itemConfig = if (error == null && response != null && i < response.size) response[i] else null
                     resultArray.add(if (itemConfig != null) GSON.toJsonTree(itemConfig) else JsonNull.INSTANCE)
                 }
@@ -338,17 +354,26 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     fun stop() {
-        dasMessageListener?.let { das.removeResponseListener(it) }
+        client = null
+        dasMessageListener?.let {
+            das.removeResponseListener(it)
+            dasMessageListener = null
+        }
         pendingRequests.forEach { (_, pending) ->
             pending.future.cancel(true)
         }
         pendingRequests.clear()
+        if (initialized) {
+            initialized = false
+            das.updateClientCapabilities(false)
+        }
     }
 
     // --- LanguageServer Implementation ---
 
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
+        initialized = true
         das.updateClientCapabilities(true)
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
