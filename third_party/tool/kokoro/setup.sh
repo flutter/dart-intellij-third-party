@@ -88,10 +88,8 @@ setup() {
 
   java --version
 
-  # Let the OS pick the address family rather than forcing IPv6. Some external
-  # hosts (e.g. github.com) are IPv4-only. Command-line -D flags take precedence
-  # over the image-level JAVA_TOOL_OPTIONS, which also sets preferIPv6Addresses.
-  export JAVA_OPTS=" -Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=system"
+  # Enable verbose output for Gradle
+  export JAVA_OPTS=" -Djava.net.preferIPv4Stack=false -Djava.net.preferIPv6Addresses=true"
 
   run_gradle_with_retry --version
 }
