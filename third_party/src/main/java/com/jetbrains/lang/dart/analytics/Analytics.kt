@@ -28,7 +28,6 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
@@ -209,9 +208,6 @@ internal class ConfigRetryPolicy(private val backoffMs: LongArray = longArrayOf(
 private object AnalyticsConfigurationManager {
   private const val INITIALIZATION_TIMEOUT_IN_MS: Long = 700
 
-  /** The minimum SDK version with a DTD-hosted `UnifiedAnalytics` service (matches the project DTD's minimum). */
-  private const val MIN_SDK_VERSION_FOR_RETRY = "3.4"
-
   @Volatile
   lateinit var data: AnalyticsConfiguration
 
@@ -272,12 +268,21 @@ private object AnalyticsConfigurationManager {
           val delay = retryPolicy.onFailure(nowMs())
           // SDKs older than the minimum have no analytics service to retry against. A later natural call (e.g. after
           // an SDK update) can still claim the retry.
-          if (delay != null && StringUtil.compareVersionNumbers(sdk.version, MIN_SDK_VERSION_FOR_RETRY) >= 0) {
+          if (delay != null && DartToolingDaemonService.isDartSdkVersionSufficient(sdk)) {
             logger.info("Analytics configuration failed; retrying in $delay ms")
             scheduleRetry(WeakReference(project), logger, delay)
           }
         }
         currentLatch.countDown()
+      }
+
+      // Older SDKs don't ship `dart tooling-daemon`; starting it would fail and every
+      // analytics call would time out. Keep the default (suppressed) configuration.
+      // See https://github.com/flutter/dart-intellij-third-party/issues/704.
+      if (!DartToolingDaemonService.isDartSdkVersionSufficient(sdk)) {
+        logger.debug("Dart SDK ${sdk.version} does not support DTD; analytics are suppressed.")
+        settle(false)
+        return currentData
       }
 
       val dtdProcess = DTDProcess()
