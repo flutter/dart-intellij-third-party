@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
  * Keeps the {@code ///} prefix when multi-line text is pasted into a single-line Dart doc comment.
  * <p>
  * The platform's {@code LineCommentCopyPastePreProcessor} uses {@code DartCommenter.getLineCommentPrefix()} ({@code //}) and so turns
- * * every newline of the pasted text into {@code "\n// "}, even if the caret is inside a {@code ///} comment. This processor is registered
+ * every newline of the pasted text into {@code "\n// "}, even if the caret is inside a {@code ///} comment. This processor is registered
  * to run after the platform one and rewrites that replacement to use {@code ///}.
  */
 public final class DartDocLineCommentCopyPastePreProcessor implements CopyPastePreProcessor {
