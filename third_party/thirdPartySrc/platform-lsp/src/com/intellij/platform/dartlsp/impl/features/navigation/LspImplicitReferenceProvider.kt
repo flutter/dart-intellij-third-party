@@ -15,14 +15,17 @@ import com.intellij.openapi.actionSystem.ex.AnActionListener
 import com.intellij.openapi.actionSystem.impl.ActionManagerImpl
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionSupport
 import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionDisabled
 import com.intellij.platform.dartlsp.impl.LspServerImpl
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
+import com.intellij.platform.dartlsp.impl.features.usages.LspSearchTarget
+import com.intellij.platform.dartlsp.impl.features.usages.isFindReferencesEnabledFor
+import com.intellij.platform.dartlsp.util.getLsp4jPosition
 import com.intellij.platform.dartlsp.util.getOffsetInDocument
 import com.intellij.platform.dartlsp.util.getRangeInDocument
 import com.intellij.psi.PsiElement
@@ -34,7 +37,10 @@ import org.eclipse.lsp4j.LocationLink
  * backed by the information from an LSP server
  * ([textDocument/definition](https://microsoft.github.io/language-server-protocol/specification/#textDocument_definition) and
  * [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specification/#textDocument_typeDefinition)
- * requests)
+ * requests).
+ *
+ * When the caret is on a declaration, the 'Go To Declaration or Usages' action shows the usages instead.
+ * See [createResolvedReference].
  */
 internal class LspImplicitReferenceProvider : ImplicitReferenceProvider {
 
@@ -57,9 +63,9 @@ internal class LspImplicitReferenceProvider : ImplicitReferenceProvider {
     val actionClass = service<CurrentActionHolder>().currentActionClass ?: return null
     return when {
       actionClass.isAssignableFrom(GotoDeclarationAction::class.java) ->
-        createResolvedReference(psiFile, offsetInElement, ::requestElementDefinitions)
+        createResolvedReference(psiFile, offsetInElement, ::requestElementDefinitions, fallbackToShowUsagesOnSelfDefinition = true)
       actionClass.isAssignableFrom(GotoTypeDeclarationAction::class.java) ->
-        createResolvedReference(psiFile, offsetInElement, ::requestTypeDefinitions)
+        createResolvedReference(psiFile, offsetInElement, ::requestTypeDefinitions, fallbackToShowUsagesOnSelfDefinition = false)
       else -> null
     }
   }
@@ -68,14 +74,7 @@ internal class LspImplicitReferenceProvider : ImplicitReferenceProvider {
     if (!lspServer.supportsGotoDefinition()) return emptyList()
     val goToDefCustomizer = lspServer.descriptor.lspCustomization.goToDefinitionCustomizer
     if (goToDefCustomizer !is LspGoToDefinitionSupport) return emptyList()
-    val definitions = lspServer.requestExecutor.getElementDefinitions(file, offset)
-
-    if (definitions.size == 1
-        && definitions[0].targetSelectionRange == definitions[0].originSelectionRange
-        && definitions[0].targetUri == lspServer.descriptor.getFileUri(file))
-      return emptyList()
-
-    return definitions
+    return lspServer.requestExecutor.getElementDefinitions(file, offset)
   }
 
   private fun requestTypeDefinitions(lspServer: LspServerImpl, file: VirtualFile, offset: Int): List<LocationLink> {
@@ -85,23 +84,96 @@ internal class LspImplicitReferenceProvider : ImplicitReferenceProvider {
   }
 
   /**
-   * Sends the request to the LSP server and returns [LspResolvedSymbolReference] based on the received response
+   * Sends the request to the LSP server and returns [LspResolvedSymbolReference] based on the received response.
+   *
+   * When [fallbackToShowUsagesOnSelfDefinition] is `true` and every response is a [self-definition][isSelfDefinition],
+   * the caret is on a declaration.
+   * In this case the reference resolves to a [LspSearchTarget], which has no navigation targets.
+   * The 'Go To Declaration or Usages' action then shows the usages
+   * (the [textDocument/references](https://microsoft.github.io/language-server-protocol/specification/#textDocument_references)
+   * request), like it does for a declaration in a regular language.
    */
   private fun createResolvedReference(
     psiFile: PsiFile,
     offset: Int,
     sendRequest: (lspServer: LspServerImpl, file: VirtualFile, offset: Int) -> List<LocationLink>,
+    fallbackToShowUsagesOnSelfDefinition: Boolean,
   ): LspResolvedSymbolReference? {
     val file = psiFile.virtualFile ?: return null
     val document = FileDocumentManager.getInstance().getCachedDocument(file) ?: return null
 
-    val serversAndLocationLinks = LspServerManagerImpl.getInstanceImpl(psiFile.project).getServersWithThisFileOpen(file)
-      .mapNotNull {
-        val locationLinks = sendRequest(it, file, offset)
-        if (locationLinks.isNotEmpty()) LspServerAndLocationLinks(it, locationLinks) else null
-      }
+    val lspServers = LspServerManagerImpl.getInstanceImpl(psiFile.project).getServersWithThisFileOpen(file)
+    val responses = lspServers.mapNotNull { lspServer ->
+      val locationLinks = sendRequest(lspServer, file, offset)
+      if (locationLinks.isNotEmpty()) LspServerAndLocationLinks(lspServer, locationLinks) else null
+    }
+    val (selfDefinitions, navigations) = responses.partition {
+      fallbackToShowUsagesOnSelfDefinition && isSelfDefinition(it.lspServer, it.locationLinks, file, document, offset)
+    }
+
+    if (navigations.isNotEmpty()) return buildNavigationReference(psiFile, document, offset, navigations)
+    if (selfDefinitions.isEmpty()) return null
+    return createShowUsagesReference(psiFile, file, document, offset, lspServers, selfDefinitions.flatMap { it.locationLinks })
+  }
+
+  /**
+   * A self-definition means that the server resolved the definition to the request position itself,
+   * so the caret is on the declaration.
+   * A server that returns a plain `Location` gives no origin selection range
+   * (see [toLocationLink][com.intellij.platform.dartlsp.impl.util.toLocationLink]).
+   * For such a response, a definition whose single-line name range covers the caret is a self-definition.
+   * A multi-line range is likely the full declaration body, and a usage inside the body must still navigate.
+   */
+  private fun isSelfDefinition(
+    lspServer: LspServerImpl,
+    locationLinks: List<LocationLink>,
+    file: VirtualFile,
+    document: Document,
+    offset: Int,
+  ): Boolean {
+    val locationLink = locationLinks.singleOrNull() ?: return false
+    if (locationLink.targetUri != lspServer.descriptor.getFileUri(file)) return false
+    val targetSelectionRange = locationLink.targetSelectionRange ?: return false
+    val originSelectionRange = locationLink.originSelectionRange
+    if (originSelectionRange != null) return targetSelectionRange == originSelectionRange
+    if (targetSelectionRange.start.line != targetSelectionRange.end.line) return false
+    val targetRangeInDocument = getRangeInDocument(document, targetSelectionRange) ?: return false
+    return targetRangeInDocument.containsOffset(offset)
+  }
+
+  /**
+   * The reference-supporting servers come from the same [lspServers] list that answered the definition requests.
+   * This list can be wider than the one the 'Find Usages' action uses
+   * (see [LspSearchTargetsRule][com.intellij.platform.dartlsp.impl.features.usages.LspSearchTargetsRule]):
+   * it also covers a library file that never got the `didOpen` notification.
+   */
+  private fun createShowUsagesReference(
+    psiFile: PsiFile,
+    file: VirtualFile,
+    document: Document,
+    offset: Int,
+    lspServers: Collection<LspServerImpl>,
+    selfDefinitionLinks: List<LocationLink>,
+  ): LspResolvedSymbolReference? {
+    val referenceServers = lspServers
+      .filter { it.isFindReferencesEnabledFor(file) }
       .ifEmpty { return null }
 
+    // The range must contain the request offset: `DeclarationOrReference.Reference.rangeWithOffset` fails otherwise.
+    val rangeInFile = selfDefinitionLinks
+      .mapNotNull { getRangeInDocument(document, it.targetSelectionRange) }
+      .fold(TextRange(offset, offset), TextRange::union)
+
+    val searchTarget = LspSearchTarget(referenceServers, file, getLsp4jPosition(document, offset))
+    return LspResolvedSymbolReference(psiFile, rangeInFile, listOf(searchTarget))
+  }
+
+  private fun buildNavigationReference(
+    psiFile: PsiFile,
+    document: Document,
+    offset: Int,
+    serversAndLocationLinks: List<LspServerAndLocationLinks>,
+  ): LspResolvedSymbolReference? {
     // In the case of `foo<caret>++`, a server may return references both for `foo` and for `++`.
     // IntelliJ's standard behavior is to respect only the right reference.
     val hasRangeToTheRight: Boolean = serversAndLocationLinks.flatMap { it.locationLinks }.any { locationLink ->
@@ -139,17 +211,17 @@ internal class LspImplicitReferenceProvider : ImplicitReferenceProvider {
 }
 
 
-private data class LspServerAndLocationLinks(val lspServer: LspServer, val locationLinks: List<LocationLink>)
+private data class LspServerAndLocationLinks(val lspServer: LspServerImpl, val locationLinks: List<LocationLink>)
 
 
 private class LspResolvedSymbolReference(
   private val psiFile: PsiFile,
   private val rangeInFile: TextRange,
-  private val resolveResults: List<LspNavigatableSymbol>,
+  private val resolveResults: List<Symbol>,
 ) : PsiSymbolReference {
   override fun getElement(): PsiElement = psiFile
   override fun getRangeInElement(): TextRange = rangeInFile
-  override fun resolveReference(): List<LspNavigatableSymbol> = resolveResults
+  override fun resolveReference(): List<Symbol> = resolveResults
   override fun resolvesTo(target: Symbol) = false
 }
 
@@ -170,6 +242,6 @@ private class CurrentActionListener : AnActionListener {
 
 
 @Service(Service.Level.APP)
-private class CurrentActionHolder {
-  var currentActionClass: Class<AnAction>? = null
+internal class CurrentActionHolder {
+  var currentActionClass: Class<out AnAction>? = null
 }
