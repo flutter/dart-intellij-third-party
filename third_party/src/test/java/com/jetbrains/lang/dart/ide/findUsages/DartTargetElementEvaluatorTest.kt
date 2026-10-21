@@ -162,15 +162,14 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
 
         // Enable experimental LSP features
         PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
+        assertTrue(DartAnalysisServerService.isLspReferencesEnabled(project))
 
-        if (DartAnalysisServerService.isLspReferencesEnabled(project)) {
-            val candidates = evaluator.getTargetCandidates(reference)
-            assertNotNull(candidates)
-            assertTrue(candidates?.isEmpty() == true)
+        val candidates = evaluator.getTargetCandidates(reference)
+        assertNotNull(candidates)
+        assertTrue(candidates?.isEmpty() == true)
 
-            val utilCandidates = TargetElementUtil.getInstance().getTargetCandidates(reference)
-            assertTrue(utilCandidates.isEmpty())
-        }
+        val utilCandidates = TargetElementUtil.getInstance().getTargetCandidates(reference)
+        assertTrue(utilCandidates.isEmpty())
 
         // Disable experimental LSP features
         PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", false, true)
@@ -196,17 +195,17 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
 
         try {
             PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
-            if (DartAnalysisServerService.isLspReferencesEnabled(project) &&
-                DartAnalysisServerService.isLspNavigationEnabled(project)
-            ) {
-                service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
-                val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
-                    myFixture.editor,
-                    file,
-                    myFixture.caretOffset
-                )
-                assertEquals(GTDUOutcome.SU, outcome)
-            }
+            assertTrue(
+                DartAnalysisServerService.isLspReferencesEnabled(project) &&
+                    DartAnalysisServerService.isLspNavigationEnabled(project)
+            )
+            service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+            val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                myFixture.editor,
+                file,
+                myFixture.caretOffset
+            )
+            assertEquals(GTDUOutcome.SU, outcome)
         } finally {
             server.requestExecutor.shutdownNow()
             lspServers.remove(server)
@@ -228,17 +227,17 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
 
         try {
             PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
-            if (DartAnalysisServerService.isLspReferencesEnabled(project) &&
-                DartAnalysisServerService.isLspNavigationEnabled(project)
-            ) {
-                service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
-                val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
-                    myFixture.editor,
-                    file,
-                    myFixture.caretOffset
-                )
-                assertEquals(GTDUOutcome.SU, outcome)
-            }
+            assertTrue(
+                DartAnalysisServerService.isLspReferencesEnabled(project) &&
+                    DartAnalysisServerService.isLspNavigationEnabled(project)
+            )
+            service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+            val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                myFixture.editor,
+                file,
+                myFixture.caretOffset
+            )
+            assertEquals(GTDUOutcome.SU, outcome)
         } finally {
             server.requestExecutor.shutdownNow()
             lspServers.remove(server)
@@ -264,17 +263,17 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
 
         try {
             PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
-            if (DartAnalysisServerService.isLspReferencesEnabled(project) &&
-                DartAnalysisServerService.isLspNavigationEnabled(project)
-            ) {
-                service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
-                val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
-                    myFixture.editor,
-                    file,
-                    myFixture.caretOffset
-                )
-                assertEquals(GTDUOutcome.GTD, outcome)
-            }
+            assertTrue(
+                DartAnalysisServerService.isLspReferencesEnabled(project) &&
+                    DartAnalysisServerService.isLspNavigationEnabled(project)
+            )
+            service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+            val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                myFixture.editor,
+                file,
+                myFixture.caretOffset
+            )
+            assertEquals(GTDUOutcome.GTD, outcome)
         } finally {
             server.requestExecutor.shutdownNow()
             lspServers.remove(server)
@@ -299,17 +298,17 @@ class DartTargetElementEvaluatorTest : DartCodeInsightFixtureTestCase() {
 
         try {
             PropertiesComponent.getInstance(project).setValue("dart.lsp.experimental.enabled", true, true)
-            if (DartAnalysisServerService.isLspReferencesEnabled(project) &&
-                DartAnalysisServerService.isLspNavigationEnabled(project)
-            ) {
-                service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
-                val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
-                    myFixture.editor,
-                    file,
-                    myFixture.caretOffset
-                )
-                assertEquals(GTDUOutcome.GTD, outcome)
-            }
+            assertTrue(
+                DartAnalysisServerService.isLspReferencesEnabled(project) &&
+                    DartAnalysisServerService.isLspNavigationEnabled(project)
+            )
+            service<CurrentActionHolder>().currentActionClass = GotoDeclarationAction::class.java
+            val outcome = GotoDeclarationOrUsageHandler2.testGTDUOutcomeInNonBlockingReadAction(
+                myFixture.editor,
+                file,
+                myFixture.caretOffset
+            )
+            assertEquals(GTDUOutcome.GTD, outcome)
         } finally {
             server.requestExecutor.shutdownNow()
             lspServers.remove(server)
