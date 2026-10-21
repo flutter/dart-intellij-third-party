@@ -50,7 +50,7 @@ private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 /// DTD can be slow to respond right after it starts (e.g. on IDE startup while
 /// indexing), so allow a generous amount of time for unified analytics calls.
 /// See https://github.com/flutter/dart-intellij-third-party/issues/704.
-private val DEFAULT_RESPONSE_TIMEOUT = 5.seconds
+private val DEFAULT_RESPONSE_TIMEOUT = 3.seconds
 
 private object UnifiedAnalytics {
   object Property {
