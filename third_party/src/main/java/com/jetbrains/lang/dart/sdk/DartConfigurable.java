@@ -364,7 +364,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
           DartSdkUtil.updateKnownSdkPaths(myProject, sdkHomePath);
 
           DartSdkLibUtil.ensureDartSdkConfigured(myProject, sdkHomePath);
-          DaemonCodeAnalyzer.getInstance(myProject).restart();
+          DaemonCodeAnalyzer.getInstance(myProject).restart("Dart settings changed");
 
           final Module[] modules = myShowModulesPanel
                                    ? myModulesCheckboxTreeTable.getCheckedNodes(Module.class)
@@ -393,7 +393,10 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
     ApplicationManager.getApplication().runWriteAction(runnable);
 
     if (myEnableDartSupportCheckBox.isSelected() && initialExperimentalEnabled != currentExperimentalEnabled) {
-      DartAnalysisServerService.getInstance(myProject).updateClientCapabilities();
+      DartAnalysisServerService dasService = DartAnalysisServerService.getInstance(myProject);
+      dasService.updateClientCapabilities();
+      dasService.updateSubscriptions();
+      DaemonCodeAnalyzer.getInstance(myProject).restart("Dart settings changed");
       DartBridgeLspServerManager bridgeManager = myProject.getService(DartBridgeLspServerManager.class);
       bridgeManager.stopBridgeServer();
       bridgeManager.startBridgeServer();
