@@ -53,11 +53,13 @@ import org.eclipse.lsp4j.InsertTextFormat
 import org.eclipse.lsp4j.MessageActionItem
 import org.eclipse.lsp4j.MessageParams
 import org.eclipse.lsp4j.Position
+import org.eclipse.lsp4j.PrepareRenameParams
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ReferenceContext
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
+import org.eclipse.lsp4j.RenameParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
 import org.eclipse.lsp4j.SymbolKind
 import org.eclipse.lsp4j.TextDocumentIdentifier
@@ -68,12 +70,14 @@ import org.eclipse.lsp4j.TypeHierarchySubtypesParams
 import org.eclipse.lsp4j.TypeHierarchySupertypesParams
 import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
 class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
@@ -1554,6 +1558,104 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val fileOperations = workspace.getAsJsonObject("fileOperations")
         assertNotNull("fileOperations capability should not be null", fileOperations)
         assertTrue("willRename should be true", fileOperations.get("willRename").asBoolean)
+    }
+
+    fun testIsDartSdkVersionSufficientForLspRename() {
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspRename("3.14.0-251.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspRename("3.14.0-252.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspRename("3.14.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspRename("3.13.5"))
+    }
+
+    fun testBuildLspCapabilitiesIncludesRenamePrepareSupport() {
+        val sufficient = DartAnalysisServerService.buildLspCapabilities("3.14.0-252.0.dev").getAsJsonObject("textDocument")
+        val rename = requireNotNull(sufficient.getAsJsonObject("rename")) { "rename capability should be advertised" }
+        assertTrue(rename.get("prepareSupport").asBoolean)
+
+        val older = DartAnalysisServerService.buildLspCapabilities("3.14.0-251.0.dev").getAsJsonObject("textDocument")
+        assertFalse("rename capability should not be advertised for older SDKs", older.has("rename"))
+    }
+
+    fun testInitializeCapabilitiesIncludeRenameProvider() {
+        val initResult = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+        val renameProvider = requireNotNull(initResult.capabilities.renameProvider) { "renameProvider should be set" }
+        assertTrue("renameProvider should carry RenameOptions", renameProvider.isRight)
+        assertEquals(true, renameProvider.right.prepareProvider)
+    }
+
+    fun testPrepareRenameRequest() {
+        val params = PrepareRenameParams(TextDocumentIdentifier("file:///project/lib/a.dart"), Position(6, 9))
+
+        val future = bridgeServer.prepareRename(params)
+
+        val lspMessage = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("textDocument/prepareRename", lspMessage.get("method").asString)
+        assertEquals(9, lspMessage.getAsJsonObject("params").getAsJsonObject("position").get("character").asInt)
+
+        capturedListener.onResponse(
+            """
+            {"id": "123", "result": {"lspResponse": {"jsonrpc": "2.0", "id": "123", "result": {
+              "range": {"start": {"line": 6, "character": 9}, "end": {"line": 6, "character": 14}},
+              "placeholder": "greet"
+            }}}}
+            """.trimIndent()
+        )
+
+        val result = requireNotNull(future.get(5, TimeUnit.SECONDS)) { "prepareRename result should not be null" }
+        assertTrue("The result should be a PrepareRenameResult", result.isSecond)
+        assertEquals("greet", result.second.placeholder)
+        assertEquals(Range(Position(6, 9), Position(6, 14)), result.second.range)
+    }
+
+    fun testRenameRequest() {
+        val params = RenameParams(TextDocumentIdentifier("file:///project/lib/a.dart"), Position(6, 9), "welcome")
+
+        val future = bridgeServer.rename(params)
+
+        val lspMessage = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("textDocument/rename", lspMessage.get("method").asString)
+        assertEquals("welcome", lspMessage.getAsJsonObject("params").get("newName").asString)
+
+        capturedListener.onResponse(
+            """
+            {"id": "123", "result": {"lspResponse": {"jsonrpc": "2.0", "id": "123", "result": {"documentChanges": [
+              {"textDocument": {"uri": "file:///project/lib/a.dart", "version": null},
+               "edits": [{"range": {"start": {"line": 6, "character": 9}, "end": {"line": 6, "character": 14}},
+                          "newText": "welcome"}]}
+            ]}}}}
+            """.trimIndent()
+        )
+
+        val edit = requireNotNull(future.get(5, TimeUnit.SECONDS)) { "rename result should not be null" }
+        assertEquals(1, requireNotNull(edit.documentChanges).size)
+    }
+
+    fun testRenameErrorResponse() {
+        val params = RenameParams(TextDocumentIdentifier("file:///project/lib/a.dart"), Position(0, 0), "x")
+
+        val future = bridgeServer.rename(params)
+
+        capturedListener.onResponse(
+            """
+            {"id": "123", "result": {"lspResponse": {"jsonrpc": "2.0", "id": "123", "error": {
+              "code": -32010, "message": "The function 'print' is defined in the SDK, so cannot be renamed."
+            }}}}
+            """.trimIndent()
+        )
+
+        try {
+            future.get(5, TimeUnit.SECONDS)
+            fail("The rename future should complete exceptionally")
+        }
+        catch (e: ExecutionException) {
+            val cause = e.cause as? ResponseErrorException
+            assertNotNull("The cause should be a ResponseErrorException", cause)
+            assertEquals("The function 'print' is defined in the SDK, so cannot be renamed.", cause?.responseError?.message)
+        }
     }
 
     fun testLauncherCreationSucceedsWithoutDuplicateRpcMethodException() {
