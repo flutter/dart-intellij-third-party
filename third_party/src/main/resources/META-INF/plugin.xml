@@ -92,6 +92,7 @@
 
     <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartServerRenameHandler"/>
     <renamePsiElementProcessor implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspRenamePsiElementProcessor" order="first"/>
+    <renamePsiElementProcessor implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspSymbolRenameProcessor" order="first"/>
     <inlineActionHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartInlineHandler"/>
 
     <codeInsight.lineMarkerProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.marker.DartMethodLineMarkerProvider"/>

@@ -5,7 +5,11 @@
  */
 package com.jetbrains.lang.dart.ide.refactoring
 
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.ThrowableComputable
+import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import org.jetbrains.annotations.TestOnly
 
@@ -24,3 +28,16 @@ object DartLspRename {
     fun isEnabled(project: Project): Boolean =
         enabledInTests ?: DartAnalysisServerService.isLspRenameEnabled(project)
 }
+
+/**
+ * Runs a rename [request] under a cancellable modal progress, so it doesn't block the EDT and holds no read lock while the
+ * server may wait for the user's answer to a question; `null` if the user cancelled it.
+ */
+internal fun <T> runRenameRequestUnderProgress(project: Project, request: () -> T): T? =
+    try {
+        ProgressManager.getInstance().runProcessWithProgressSynchronously(
+            ThrowableComputable<T, RuntimeException> { request() }, DartBundle.message("progress.title.rename"), true, project)
+    }
+    catch (_: ProcessCanceledException) {
+        null
+    }
