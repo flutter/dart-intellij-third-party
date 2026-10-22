@@ -412,7 +412,7 @@ class DartLspNavigationTest : DartCodeInsightFixtureTestCase() {
                     assertEmpty(directSearch())
                     response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(location(targetUri, 0, 6)))))
                     assertEquals(listOf("Target"), directSearch())
-                    assertEquals("Errors and null responses must not be cached", beforeFailure + 3, requests.size)
+                    assertEquals("Errors and direct client null responses must not be cached", beforeFailure + 3, requests.size)
 
                     // A document edit while an RPC is pending prevents delivery and publication.
                     invalidate()
