@@ -15,4 +15,4 @@ The `dart-intellij-third-party` repository provides the official Dart plugin for
 
 
 ## System Verification
-- Test: `./tool/validate_agent_configs.sh`
+- Test: `./tool/check_agent_skills.sh`

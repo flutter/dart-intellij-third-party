@@ -257,7 +257,7 @@ This repository includes custom configuration and automation skills for AI codin
 
 If you add or update any agent skills, run the documentation checker to verify that all skills remain documented in `README.md`:
 ```shell
-./tool/validate_agent_configs.sh
+./tool/check_agent_skills.sh
 ```
 
 ## Pull Request Checklist
@@ -268,5 +268,5 @@ Before submitting a Pull Request, please ensure:
 2. [ ] Your code compiles cleanly with JDK 21.
 3. [ ] All unit tests pass: `./gradlew test`.
 4. [ ] Plugin verification passes: `./gradlew verifyPlugin`.
-5. [ ] If adding/modifying AI agent skills, `./tool/validate_agent_configs.sh` passes.
+5. [ ] If adding/modifying AI agent skills, `./tool/check_agent_skills.sh` passes.
 6. [ ] Opening this pull request will not exceed the limit of 2 concurrent open non-draft pull requests.

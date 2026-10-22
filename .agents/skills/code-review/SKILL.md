@@ -56,7 +56,7 @@ Perform a multi-pass analysis of the diff:
     > Instruct the subagent that if it encounters permission errors or stalls while running any other commands, it should use the **`send_message`** tool to notify you immediately.
 2. Retrieve the current changes (using `git diff`).
 3. Read `.gemini/styleguide.md` if present.
-4. Run `bash ./tool/validate_agent_configs.sh` (if the file exists) to verify skill documentation integrity. Record any failures as `[MUST-FIX]` items.
+4. Run `bash ./tool/check_agent_skills.sh` (if the file exists) to verify skill documentation integrity. Record any failures as `[MUST-FIX]` items.
 
    *(Note for subagents: If context was not provided by your parent and you are executing steps 2-4 yourself, the system may pause to ask the user for permission. If you get stuck waiting, use the **`send_message`** tool to notify your parent agent.)*
 5. Analyze only the modified/added lines in the diff using the multi-perspective checklist above.
