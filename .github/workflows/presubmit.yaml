@@ -71,6 +71,19 @@ jobs:
           distribution: 'temurin' # Recommended distribution
           java-version: '21' # Match version in build.gradle.kts
 
+      # On Windows runners the C: drive (user home, %TEMP%) has much slower I/O
+      # than the drive hosting the workspace (D:). Move the Gradle user home and
+      # temp dirs next to the workspace. See actions/runner-images#8755.
+      - name: Use faster workspace drive on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $base = "${{ runner.temp }}"
+          New-Item -ItemType Directory -Force -Path "$base\gradle-home", "$base\tmp" | Out-Null
+          "GRADLE_USER_HOME=$base\gradle-home" >> $env:GITHUB_ENV
+          "TEMP=$base\tmp" >> $env:GITHUB_ENV
+          "TMP=$base\tmp" >> $env:GITHUB_ENV
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
