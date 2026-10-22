@@ -66,3 +66,8 @@ Here is the details of the changes made by the patch script:
 10. **LSP Structure View Support**:
    - Copy `platform/lsp-impl/structureView/src` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`, register `LspStructureViewFactory` and `LspStructureViewProjectActivity` in `dart-lsp-impl.xml`, and make `LspStructureViewFactory` public (`class LspStructureViewFactory`) so `DartStructureViewFactory` can delegate to it.
 
+11. **LSP Go to Declaration or Usages Backport (`IJPL-156979` / `0634427a`)**:
+   - Backport upstream commit `0634427a` (`IJPL-156979`) to `LspImplicitReferenceProvider.kt` and `LspSearchTargetsRule.kt` (adapted for `LspServer` / `LspServerImpl` naming) so that invoking *Go to Declaration or Usages* (`GotoDeclarationAction`) on a declaration falls back to *Show Usages* via `LspSearchTarget`. (This backport can be dropped once the `intellij-community` sync source includes `0634427a`.)
+   - Keep `CurrentActionHolder` in `LspImplicitReferenceProvider.kt` `internal` (instead of `private`) so `DartTargetElementEvaluatorTest` can set `currentActionClass` in tests.
+
+

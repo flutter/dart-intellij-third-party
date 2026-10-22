@@ -88,6 +88,20 @@ const failingConclusions = <String>{
 
 const passingConclusions = <String>{'SUCCESS', 'NEUTRAL', 'SKIPPED'};
 
+/// Label that asks Kokoro to (re)run its presubmit builds on a PR.
+///
+/// Dependabot applies it when opening a PR, and the `kokoro-team` account
+/// removes it as soon as Kokoro picks the job up. Applying it again is how a
+/// failed Kokoro build is re-run, for example to pick up an upstream fix or to
+/// get past an intermittent failure.
+const kokoroRunLabel = 'kokoro:run';
+
+/// Whether the check named [name] is reported by Kokoro.
+///
+/// Kokoro posts legacy commit statuses named after the platform, such as
+/// `kokoro-mac`. The match ignores case.
+bool isKokoroCheck(String name) => name.toLowerCase().startsWith('kokoro');
+
 /// Stand-in name for a PR whose title cannot be parsed or is missing.
 ///
 /// Never render an empty dependency name: the name identifies the PR in the
@@ -146,8 +160,16 @@ final class ChecksSummary {
     return BuildStatus.noChecks;
   }
 
+  /// Whether Kokoro builds are the only failing checks.
+  ///
+  /// Such a PR can be retried by applying [kokoroRunLabel], rather than
+  /// needing a code change. Other checks may still be pending.
+  bool get onlyKokoroFailing =>
+      failing.isNotEmpty && failing.every((check) => isKokoroCheck(check.name));
+
   Map<String, Object?> toJson() => {
     'status': status.name,
+    'onlyKokoroFailing': onlyKokoroFailing,
     'passingCount': passing.length,
     'failingCount': failing.length,
     'pendingCount': pending.length,
@@ -340,6 +362,15 @@ final class PullRequest {
   /// were an ordinary library bump.
   PrSource get source => PrSource.forAuthor(author);
 
+  /// Whether [kokoroRunLabel] is on the PR.
+  ///
+  /// Where Kokoro acts on the label as soon as it is added, as in
+  /// `flutter/flutter-intellij`, it removes the label when it starts, so a
+  /// label that is still present means a run is queued. In
+  /// `flutter/dart-intellij-third-party`, Kokoro only reads the label when a
+  /// commit is pushed, so a present label may just be left over.
+  bool get hasKokoroRunLabel => labels.contains(kokoroRunLabel);
+
   /// The `owner/repo#number` reference accepted by `approve_and_label.dart`.
   String get ref => '$repo#$number';
 
@@ -359,6 +390,7 @@ final class PullRequest {
     'reviewDecision': reviewDecision,
     'labels': labels,
     'hasLabel': hasLabel,
+    'hasKokoroRunLabel': hasKokoroRunLabel,
     'checks': checks.toJson(),
   };
 }
@@ -574,7 +606,14 @@ void printFootnotes(List<PullRequest> prs, String label) {
 
   for (final pr in prs.where((pr) => pr.checks.failing.isNotEmpty)) {
     final names = pr.checks.failing.map((c) => c.name).join(', ');
-    stdout.writeln('- ${pr.ref} (${pr.dependency.name}) failing: $names');
+    final rerunNote = !pr.checks.onlyKokoroFailing
+        ? ''
+        : pr.hasKokoroRunLabel
+        ? " (only Kokoro failed; '$kokoroRunLabel' already applied)"
+        : " (only Kokoro failed; can re-run)";
+    stdout.writeln(
+      '- ${pr.ref} (${pr.dependency.name}) failing: $names$rerunNote',
+    );
   }
 
   final alreadyLabeled = prs.where((pr) => pr.hasLabel).toList();

@@ -3,6 +3,8 @@
 ### Added
 - File Structure view implemented with JetBrains LSP (experimental feature) (#673)
 - Code completion with JetBrains LSP (experimental feature) (#399)
+- Support for the Dart "parts with imports" language feature in IDE-side resolution used by Override/Implement Methods, Generate actions, and parameter info: imports in part files and nested parts ([dart-lang/sdk#56209](https://github.com/dart-lang/sdk/issues/56209)) (#721)
+- Error and UI freeze reporting to JetBrains Marketplace (#740)
 - Optimizing imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
 
 ### Changed
@@ -10,6 +12,10 @@
 ### Removed
 
 ### Fixed
+- Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
+- Restore semantic syntax highlighting after external file modification (#656)
+- Avoid UI freeze during project startup by updating excluded folders directly via `WorkspaceModel` (#728)
+- Support Go to Declaration or Usages and Find Usages on declaration sites when experimental LSP is enabled (#699)
 
 ## 510.0.0
 

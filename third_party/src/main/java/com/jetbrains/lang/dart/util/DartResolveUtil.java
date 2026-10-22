@@ -1,6 +1,8 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.util;
 
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Condition;
@@ -178,15 +180,106 @@ public final class DartResolveUtil {
     if (filesOfInterest != null && filesOfInterest.isEmpty()) return true;
 
     final boolean privateOnly = componentNameHint != null && componentNameHint.startsWith("_");
-    return processTopLevelDeclarationsImpl(context, processor, rootVirtualFile, filesOfInterest, new HashSet<>(), privateOnly);
+    final LibraryChain contextChain = getLibraryChain(context.getContainingFile());
+    if (rootVirtualFile != null && contextChain.contains(rootVirtualFile)) {
+      return processContextLibrary(context, processor, rootVirtualFile, filesOfInterest, privateOnly, contextChain);
+    }
+    return processLibrary(context, processor, rootVirtualFile, filesOfInterest, new HashSet<>(), privateOnly);
   }
 
-  private static boolean processTopLevelDeclarationsImpl(final @NotNull PsiElement context,
-                                                         final @NotNull DartPsiScopeProcessor processor,
-                                                         final @Nullable VirtualFile virtualFile,
-                                                         final @Nullable Set<? extends VirtualFile> filesOfInterest,
-                                                         final @NotNull Set<? super VirtualFile> alreadyProcessed,
-                                                         final boolean privateOnly) {
+  /**
+   * Processes {@code rootVirtualFile}, a file of the library containing the resolution context, in the lookup order defined by the
+   * parts-with-imports feature:
+   * <ol>
+   *   <li>Declarations of {@code rootVirtualFile} and all its (nested) parts. Library declarations shadow all imports.</li>
+   *   <li>Only if {@code rootVirtualFile} is the library itself, so that all of the library's declarations have been seen: the unprefixed
+   *   imports of each file in {@code contextChain}, innermost first, so a part's imports shadow those of its ancestors. A part doesn't see
+   *   the imports of its sibling or child parts. Finally, the implicit {@code dart:core} import of the library, unless the library
+   *   imports {@code dart:core} explicitly.</li>
+   * </ol>
+   * Exports of files in the context library are not processed.
+   */
+  private static boolean processContextLibrary(final @NotNull PsiElement context,
+                                               final @NotNull DartPsiScopeProcessor processor,
+                                               final @NotNull VirtualFile rootVirtualFile,
+                                               final @Nullable Set<? extends VirtualFile> filesOfInterest,
+                                               final boolean privateOnly,
+                                               final @NotNull LibraryChain contextChain) {
+    final Set<VirtualFile> libraryFiles = new HashSet<>();
+    if (!processDeclarationsOfFileAndParts(context, processor, rootVirtualFile, filesOfInterest, libraryFiles)) return false;
+
+    // Private names can't be imported.
+    if (privateOnly) return true;
+
+    // When starting from a part, only the declarations of that part and its sub-parts have been seen so far. Imports must not be
+    // processed until the declarations of the whole library have been, which happens when the library itself is processed.
+    if (!contextChain.libraryRoots().contains(rootVirtualFile)) return true;
+
+    final Set<VirtualFile> alreadyProcessed = new HashSet<>(libraryFiles);
+    // Only an explicit import in the library itself replaces the implicit one; a part's 'import dart:core' doesn't.
+    boolean libraryImportsDartCore = false;
+    for (VirtualFile chainFile : contextChain.files()) {
+      if (!libraryFiles.contains(chainFile)) continue; // not part of this library, e.g. another root of a legacy 'part of name;'
+
+      for (DartImportOrExportInfo importInfo : DartImportAndExportIndex.getImportAndExportInfos(context.getProject(), chainFile)) {
+        ProgressManager.checkCanceled();
+        if (importInfo.getKind() != Kind.Import) continue;
+        if (chainFile.equals(rootVirtualFile) && DART_CORE_URI.equals(importInfo.getUri())) libraryImportsDartCore = true;
+        if (!processImportOrExport(context, processor, chainFile, importInfo, filesOfInterest, alreadyProcessed)) return false;
+      }
+    }
+
+    if (!libraryImportsDartCore) {
+      final VirtualFile dartCoreLib = DartLibraryIndex.getSdkLibByUri(context.getProject(), DART_CORE_URI);
+      if (dartCoreLib != null) {
+        final DartImportOrExportInfo implicitImportInfo =
+          new DartImportOrExportInfo(Kind.Import, DART_CORE_URI, null, Collections.emptySet(), Collections.emptySet());
+        processor.importedFileProcessingStarted(dartCoreLib, implicitImportInfo);
+        final boolean continueProcessing =
+          processLibrary(context, processor, dartCoreLib, filesOfInterest, alreadyProcessed, false);
+        processor.importedFileProcessingFinished(dartCoreLib);
+        return continueProcessing;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Processes the declarations of {@code virtualFile} and, recursively, of its parts, adding each visited file to {@code visited}.
+   * Parts are visited even if they don't declare the name we're looking for: with the parts-with-imports feature they may have
+   * sub-parts that do.
+   */
+  private static boolean processDeclarationsOfFileAndParts(final @NotNull PsiElement context,
+                                                           final @NotNull DartPsiScopeProcessor processor,
+                                                           final @NotNull VirtualFile virtualFile,
+                                                           final @Nullable Set<? extends VirtualFile> filesOfInterest,
+                                                           final @NotNull Set<? super VirtualFile> visited) {
+    ProgressManager.checkCanceled();
+    if (!visited.add(virtualFile)) return true;
+
+    if (!processDeclarationsIfOfInterest(context, processor, virtualFile, filesOfInterest)) return false;
+
+    for (String partUrl : DartPartUriIndex.getPartUris(context.getProject(), virtualFile)) {
+      final VirtualFile partFile = getImportedFile(context.getProject(), virtualFile, partUrl);
+      if (partFile != null && !processDeclarationsOfFileAndParts(context, processor, partFile, filesOfInterest, visited)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Processes a library other than the one containing the resolution context: the declarations of {@code virtualFile}, its (nested)
+   * parts, and what they export. Imports of such a library are not visible to the resolution context and are skipped.
+   */
+  private static boolean processLibrary(final @NotNull PsiElement context,
+                                        final @NotNull DartPsiScopeProcessor processor,
+                                        final @Nullable VirtualFile virtualFile,
+                                        final @Nullable Set<? extends VirtualFile> filesOfInterest,
+                                        final @NotNull Set<? super VirtualFile> alreadyProcessed,
+                                        final boolean privateOnly) {
+    ProgressManager.checkCanceled();
     if (virtualFile == null) return true;
 
     if (alreadyProcessed.contains(virtualFile)) {
@@ -196,27 +289,18 @@ public final class DartResolveUtil {
 
     alreadyProcessed.add(virtualFile);
 
-    boolean contains = filesOfInterest == null || filesOfInterest.contains(virtualFile);
-    if (contains) {
-      final PsiFile psiFile = context.getManager().findFile(virtualFile);
-      if (psiFile instanceof DartFile) {
-        if (!DartPsiCompositeElementImpl.processDeclarationsImpl(psiFile, processor, ResolveState.initial(), null)) {
-          return false;
-        }
-      }
-    }
+    if (!processDeclarationsIfOfInterest(context, processor, virtualFile, filesOfInterest)) return false;
 
     for (String partUrl : DartPartUriIndex.getPartUris(context.getProject(), virtualFile)) {
       final VirtualFile partFile = getImportedFile(context.getProject(), virtualFile, partUrl);
-      if (partFile == null || alreadyProcessed.contains(partFile) || (filesOfInterest != null && !filesOfInterest.contains(partFile))) {
+      if (partFile == null || alreadyProcessed.contains(partFile)) {
         continue;
       }
 
-      final PsiFile partPsiFile = context.getManager().findFile(partFile);
-      if (partPsiFile != null) {
-        if (!processTopLevelDeclarationsImpl(partPsiFile, processor, partFile, filesOfInterest, alreadyProcessed, privateOnly)) {
-          return false;
-        }
+      // Parts are visited even if they don't declare the name we're looking for: with the parts-with-imports feature they may have
+      // sub-parts that do, or exports.
+      if (!processLibrary(context, processor, partFile, filesOfInterest, alreadyProcessed, privateOnly)) {
+        return false;
       }
     }
 
@@ -224,49 +308,44 @@ public final class DartResolveUtil {
       return true;
     }
 
-    final List<VirtualFile> libraryFiles = findLibrary(context.getContainingFile());
-    final boolean processingLibraryWhereContextElementLocated = libraryFiles.contains(virtualFile);
-
-    boolean coreImportedExplicitly = false;
-
-    for (DartImportOrExportInfo importOrExportInfo : DartImportAndExportIndex.getImportAndExportInfos(context.getProject(), virtualFile)) {
-      if (processingLibraryWhereContextElementLocated && importOrExportInfo.getKind() == Kind.Export) continue;
-      if (!processingLibraryWhereContextElementLocated && importOrExportInfo.getKind() == Kind.Import) continue;
-
-      if (importOrExportInfo.getKind() == Kind.Import && DART_CORE_URI.equals(importOrExportInfo.getUri())) {
-        coreImportedExplicitly = true;
-      }
-
-      // if statement has prefix all components are prefix.Name
-      if (importOrExportInfo.getKind() == Kind.Import && importOrExportInfo.getImportPrefix() != null) continue;
-
-      final VirtualFile importedFile = getImportedFile(context.getProject(), virtualFile, importOrExportInfo.getUri());
-      if (importedFile != null) {
-        processor.importedFileProcessingStarted(importedFile, importOrExportInfo);
-        final boolean continueProcessing =
-          processTopLevelDeclarationsImpl(context, processor, importedFile, filesOfInterest, alreadyProcessed, false);
-        processor.importedFileProcessingFinished(importedFile);
-        if (!continueProcessing) {
-          return false;
-        }
-      }
-    }
-
-    if (!coreImportedExplicitly && processingLibraryWhereContextElementLocated) {
-      final VirtualFile dartCoreLib = DartLibraryIndex.getSdkLibByUri(context.getProject(), DART_CORE_URI);
-      if (dartCoreLib != null) {
-        final DartImportOrExportInfo implicitImportInfo =
-          new DartImportOrExportInfo(Kind.Import, DART_CORE_URI, null, Collections.emptySet(), Collections.emptySet());
-        processor.importedFileProcessingStarted(dartCoreLib, implicitImportInfo);
-        final boolean continueProcessing =
-          processTopLevelDeclarationsImpl(context, processor, dartCoreLib, filesOfInterest, alreadyProcessed, false);
-        processor.importedFileProcessingFinished(dartCoreLib);
-
-          return continueProcessing;
-      }
+    for (DartImportOrExportInfo exportInfo : DartImportAndExportIndex.getImportAndExportInfos(context.getProject(), virtualFile)) {
+      if (exportInfo.getKind() != Kind.Export) continue;
+      if (!processImportOrExport(context, processor, virtualFile, exportInfo, filesOfInterest, alreadyProcessed)) return false;
     }
 
     return true;
+  }
+
+  private static boolean processDeclarationsIfOfInterest(final @NotNull PsiElement context,
+                                                         final @NotNull DartPsiScopeProcessor processor,
+                                                         final @NotNull VirtualFile virtualFile,
+                                                         final @Nullable Set<? extends VirtualFile> filesOfInterest) {
+    if (filesOfInterest != null && !filesOfInterest.contains(virtualFile)) return true;
+
+    final PsiFile psiFile = context.getManager().findFile(virtualFile);
+    return !(psiFile instanceof DartFile) ||
+           DartPsiCompositeElementImpl.processDeclarationsImpl(psiFile, processor, ResolveState.initial(), null);
+  }
+
+  /**
+   * Processes the library referenced by an import or export directive of {@code directiveFile}. Prefixed imports are skipped: their
+   * names are only reachable as {@code prefix.Name}.
+   */
+  private static boolean processImportOrExport(final @NotNull PsiElement context,
+                                               final @NotNull DartPsiScopeProcessor processor,
+                                               final @NotNull VirtualFile directiveFile,
+                                               final @NotNull DartImportOrExportInfo info,
+                                               final @Nullable Set<? extends VirtualFile> filesOfInterest,
+                                               final @NotNull Set<? super VirtualFile> alreadyProcessed) {
+    if (info.getKind() == Kind.Import && info.getImportPrefix() != null) return true;
+
+    final VirtualFile importedFile = getImportedFile(context.getProject(), directiveFile, info.getUri());
+    if (importedFile == null) return true;
+
+    processor.importedFileProcessingStarted(importedFile, info);
+    final boolean continueProcessing = processLibrary(context, processor, importedFile, filesOfInterest, alreadyProcessed, false);
+    processor.importedFileProcessingFinished(importedFile);
+    return continueProcessing;
   }
 
   public static @Nullable VirtualFile getImportedFile(final @NotNull Project project,
@@ -295,22 +374,109 @@ public final class DartResolveUtil {
     return ContainerUtil.find(librariesForContext2, librariesSetForContext1::contains) != null;
   }
 
+  /**
+   * Returns the library file(s) that {@code context} belongs to.
+   * <p>
+   * If {@code context} has no {@code part of} directive (or the directive can't be resolved), the file itself is the library. Otherwise,
+   * the {@code part of} chain is followed until a library is reached; with the parts-with-imports feature, a part file can itself be the
+   * parent of other part files. If the chain contains a cycle, {@code context} itself is treated as the library.
+   * <p>
+   * More than one file may be returned for legacy {@code part of dotted.name;} directives that match several libraries. Such directives
+   * are only resolved one level deep: a library name only matches libraries that directly contain a {@code part} directive for the file.
+   * A nested part that uses a library name rather than a URI therefore doesn't find its library, and is treated as a library itself.
+   * The parts-with-imports feature requires the URI form for nested parts.
+   */
   public static @NotNull List<VirtualFile> findLibrary(final @NotNull PsiFile context) {
+    return getLibraryChain(context).libraryRoots();
+  }
+
+  /**
+   * The result of walking the {@code part of} chain from a file up to its library.
+   *
+   * @param libraryRoots the library file(s) at the top of the chain
+   * @param files        the starting file, every intermediate part file, and the library roots, ordered innermost (the starting file)
+   *                     first. Import lookup relies on this order: a part's imports shadow those of its ancestors.
+   */
+  private record LibraryChain(@NotNull List<VirtualFile> libraryRoots, @NotNull List<VirtualFile> files) {
+    private static final LibraryChain EMPTY = new LibraryChain(Collections.emptyList(), Collections.emptyList());
+
+    boolean contains(@NotNull VirtualFile file) {
+      return files.contains(file); // chains are short, typically one to three files
+    }
+  }
+
+  private static @NotNull LibraryChain getLibraryChain(final @Nullable PsiFile context) {
+    if (context == null) return LibraryChain.EMPTY;
     final VirtualFile contextVirtualFile = getRealVirtualFile(context);
-    if (contextVirtualFile == null) return Collections.emptyList();
+    if (contextVirtualFile == null) return LibraryChain.EMPTY;
 
     return CachedValuesManager.getCachedValue(context, () -> {
-      final DartPartOfStatement partOfStatement = PsiTreeUtil.getChildOfType(context, DartPartOfStatement.class);
-      if (partOfStatement != null) {
-        List<VirtualFile> files = partOfStatement.getLibraryFiles();
-        if (!files.isEmpty()) {
-          return new CachedValueProvider.Result<>(files, PsiModificationTracker.MODIFICATION_COUNT);
-        }
+      final Project project = context.getProject();
+      final List<VirtualFile> partOfTargets = getPartOfTargets(context);
+      final LibraryChain result;
+      if (partOfTargets.isEmpty()) {
+        // no resolvable 'part of' directive -> this file itself is a library
+        result = new LibraryChain(List.of(contextVirtualFile), List.of(contextVirtualFile));
       }
-
-      // no 'part of' statement in file -> this file itself is a library
-      return new CachedValueProvider.Result<>(Collections.singletonList(contextVirtualFile), PsiModificationTracker.MODIFICATION_COUNT);
+      else {
+        // insertion order is innermost first, see LibraryChain.files
+        final Set<VirtualFile> chain = new LinkedHashSet<>();
+        chain.add(contextVirtualFile);
+        final List<VirtualFile> roots = new SmartList<>();
+        result = collectLibraryRoots(context, partOfTargets, chain, roots)
+                 ? new LibraryChain(List.copyOf(roots), List.copyOf(chain))
+                 // a cycle -> this file itself is a library
+                 : new LibraryChain(List.of(contextVirtualFile), List.of(contextVirtualFile));
+      }
+      // Results computed in dumb mode are dropped when indexing finishes, see isPartFile.
+      return new CachedValueProvider.Result<>(result, PsiModificationTracker.MODIFICATION_COUNT,
+                                              DumbService.getInstance(project).getModificationTracker());
     });
+  }
+
+  /**
+   * Follows the {@code part of} chain upwards from {@code file}, whose {@code part of} directive resolves to the non-empty
+   * {@code partOfTargets}. Adds every visited file to {@code chain}, and every file at the top of the chain (a file without a resolvable
+   * {@code part of} directive) to {@code roots}.
+   *
+   * @return {@code false} if the chain contains a cycle, in which case {@code chain} and {@code roots} are incomplete
+   */
+  private static boolean collectLibraryRoots(final @NotNull PsiFile file,
+                                             final @NotNull List<VirtualFile> partOfTargets,
+                                             final @NotNull Set<VirtualFile> chain,
+                                             final @NotNull List<VirtualFile> roots) {
+    for (VirtualFile parentFile : partOfTargets) {
+      ProgressManager.checkCanceled();
+      if (!chain.add(parentFile)) return false;
+
+      // Only parse the parent if it is a part file itself; usually it's the library.
+      final PsiFile parentPsiFile = isPartFile(file.getProject(), parentFile) ? file.getManager().findFile(parentFile) : null;
+      final List<VirtualFile> parentPartOfTargets = parentPsiFile == null ? Collections.emptyList() : getPartOfTargets(parentPsiFile);
+      if (parentPartOfTargets.isEmpty()) {
+        // parentFile is a library, or a part file whose own parent can't be resolved; either way it's the top of this chain
+        roots.add(parentFile);
+      }
+      else if (!collectLibraryRoots(parentPsiFile, parentPartOfTargets, chain, roots)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Returns the files that the {@code part of} directive of {@code file} refers to, or an empty list if there is no such directive or it
+   * can't be resolved.
+   */
+  private static @NotNull List<VirtualFile> getPartOfTargets(final @NotNull PsiFile file) {
+    final DartPartOfStatement partOfStatement = PsiTreeUtil.getChildOfType(file, DartPartOfStatement.class);
+    return partOfStatement == null ? Collections.emptyList() : partOfStatement.getLibraryFiles();
+  }
+
+  /**
+   * Returns whether {@code file} may have a {@code part of} directive, without parsing it when indexes are available.
+   */
+  private static boolean isPartFile(final @NotNull Project project, final @NotNull VirtualFile file) {
+    return DumbService.isDumb(project) || DartPartOfIndex.isPart(project, file);
   }
 
   public static @NotNull List<VirtualFile> findLibraryByName(final @NotNull PsiElement context, final @NotNull String libraryName) {

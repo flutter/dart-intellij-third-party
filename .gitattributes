@@ -1,5 +1,5 @@
 * text=auto
-*.bat text eol=crlf
+*.bat -text
 *.sh text eol=lf
 gradlew text eol=lf
 *.jar binary
