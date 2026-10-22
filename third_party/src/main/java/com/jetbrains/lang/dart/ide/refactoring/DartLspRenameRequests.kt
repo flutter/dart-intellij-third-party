@@ -188,6 +188,18 @@ internal fun toFileTextEdits(
     return DartLspRenameResult.Success(result)
 }
 
+/** Applies the [edits] of a rename to the documents of their files. Call it inside a write command. */
+internal fun applyFileTextEdits(edits: List<DartLspFileTextEdit>) {
+    val fileDocumentManager = FileDocumentManager.getInstance()
+    for ((file, fileEdits) in edits.groupBy { it.file }) {
+        val document = fileDocumentManager.getDocument(file) ?: continue
+        // From the end, so that earlier offsets stay valid.
+        for (edit in fileEdits.sortedByDescending { it.range.startOffset }) {
+            document.replaceString(edit.range.startOffset, edit.range.endOffset, edit.newText)
+        }
+    }
+}
+
 private fun toTextRange(document: Document, range: org.eclipse.lsp4j.Range): TextRange? {
     val start = getOffsetInDocument(document, range.start) ?: return null
     val end = getOffsetInDocument(document, range.end) ?: return null
