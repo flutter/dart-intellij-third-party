@@ -117,8 +117,10 @@ class DartLspRenameRequestsImpl(private val project: Project) : DartLspRenameReq
         return runReadAction { toFileTextEdits(edit) { uri -> getDartFileInfo(project, uri).findFile() } }
     }
 
-    private fun findServer(): LspServer? =
+    /** The running Dart LSP server, if any. Replaced in tests. */
+    internal var findServer: () -> LspServer? = {
         LspServerManager.getInstance(project).getServersForProvider(DartLspServerSupportProvider::class.java).firstOrNull()
+    }
 
     private fun findDocument(file: VirtualFile): Document? = runReadAction { FileDocumentManager.getInstance().getDocument(file) }
 
@@ -129,8 +131,14 @@ class DartLspRenameRequestsImpl(private val project: Project) : DartLspRenameReq
         request: (Lsp4jServer) -> CompletableFuture<T>,
     ): DartLspRenameResult<T?> {
         val response = server.sendRequestSync(timeoutMs) { lsp4jServer ->
-            request(lsp4jServer).handle { value, error ->
-                if (error == null) DartLspRenameResult.Success(value) else DartLspRenameResult.Failure(messageOf(error))
+            // The client runs this on its own executor: if it threw, the request would get no answer before the timeout.
+            try {
+                request(lsp4jServer).handle { value, error ->
+                    if (error == null) DartLspRenameResult.Success(value) else DartLspRenameResult.Failure(messageOf(error))
+                }
+            }
+            catch (e: Exception) {
+                CompletableFuture.completedFuture(DartLspRenameResult.Failure(messageOf(e)))
             }
         }
         return when {

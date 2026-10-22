@@ -9,7 +9,11 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.platform.dartlsp.api.Lsp4jServer
+import com.intellij.platform.dartlsp.api.LspServer
+import com.intellij.platform.dartlsp.api.LspServerState
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
+import com.jetbrains.lang.dart.lsp.DartLspServerDescriptor
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.RenameFile
@@ -19,6 +23,9 @@ import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.VersionedTextDocumentIdentifier
 import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.services.TextDocumentService
+import java.lang.reflect.Proxy
+import java.util.concurrent.CompletableFuture
 
 class DartLspRenameRequestsTest : DartCodeInsightFixtureTestCase() {
 
@@ -128,6 +135,44 @@ class DartLspRenameRequestsTest : DartCodeInsightFixtureTestCase() {
         assertEquals(DartLspRenameResult.NoServer, result)
         assertEquals(1, synced)
     }
+
+    fun testRequestThatThrowsAtOnceBecomesFailure() {
+        // The JetBrains LSP client runs the request on its own executor: an exception there would leave the request
+        // without an answer until the timeout, so it has to become a Failure.
+        val a = myFixture.addFileToProject("lib/a.dart", "var greet = 1;\n").virtualFile
+        val textDocumentService = proxy<TextDocumentService> { name, _ ->
+            if (name == "rename") throw IllegalStateException("Stream closed") else null
+        }
+        val lsp4jServer = proxy<Lsp4jServer> { name, _ -> if (name == "getTextDocumentService") textDocumentService else null }
+        val descriptor = DartLspServerDescriptor(project)
+        val server = proxy<LspServer> { name, args ->
+            when (name) {
+                "getDescriptor" -> descriptor
+                "getState" -> LspServerState.Running
+                "sendRequestSync" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val sender = requireNotNull(args)[1] as (Lsp4jServer) -> CompletableFuture<*>
+                    sender(lsp4jServer).get()
+                }
+                else -> null
+            }
+        }
+        val requests = DartLspRenameRequestsImpl(project).apply {
+            syncFileContents = {}
+            findServer = { server }
+        }
+
+        val result = ApplicationManager.getApplication().executeOnPooledThread<DartLspRenameResult<*>> {
+            requests.rename(a, 4, "hello")
+        }.get()
+
+        assertEquals(DartLspRenameResult.Failure("Stream closed"), result)
+    }
+
+    private inline fun <reified T> proxy(crossinline answer: (String, Array<out Any?>?) -> Any?): T =
+        Proxy.newProxyInstance(T::class.java.classLoader, arrayOf(T::class.java)) { _, method, args ->
+            answer(method.name, args)
+        } as T
 
     fun testUtf16Positions() {
         // LSP positions count UTF-16 code units: '😀' is two of them, like in a Java String.
