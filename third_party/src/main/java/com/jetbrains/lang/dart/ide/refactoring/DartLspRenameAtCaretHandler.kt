@@ -15,6 +15,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiManager
 import com.intellij.refactoring.rename.RenameHandler
 import com.intellij.refactoring.util.CommonRefactoringUtil
 import com.jetbrains.lang.dart.DartBundle
@@ -68,9 +69,12 @@ class DartLspRenameAtCaretHandler : RenameHandler, TitledHandler {
         }
         if (edits.isEmpty()) return
 
+        // With the files, the command first makes sure they are writable (read-only status, VCS checkout).
+        val psiManager = PsiManager.getInstance(project)
+        val files = edits.map { it.file }.distinct().mapNotNull { psiManager.findFile(it) }
         WriteCommandAction.runWriteCommandAction(project, DartBundle.message("progress.title.rename"), null, {
             applyFileTextEdits(edits)
-        })
+        }, *files.toTypedArray())
     }
 
     override fun invoke(project: Project, elements: Array<out PsiElement>, dataContext: DataContext) {

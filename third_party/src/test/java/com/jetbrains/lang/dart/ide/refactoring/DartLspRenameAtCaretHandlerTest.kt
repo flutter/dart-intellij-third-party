@@ -9,6 +9,7 @@ import com.intellij.codeInsight.TargetElementUtil
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.ui.TestDialogManager
 import com.intellij.openapi.ui.TestInputDialog
 import com.intellij.openapi.util.TextRange
@@ -16,6 +17,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.refactoring.util.CommonRefactoringUtil
 import com.intellij.testFramework.replaceService
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
+import java.io.IOException
 
 class DartLspRenameAtCaretHandlerTest : DartCodeInsightFixtureTestCase() {
 
@@ -89,6 +91,26 @@ class DartLspRenameAtCaretHandlerTest : DartCodeInsightFixtureTestCase() {
         DartLspRenameAtCaretHandler().invoke(project, myFixture.editor, myFixture.file, dataContext())
 
         myFixture.checkResult("import 'dart:math' as math;\n\nvoid main() => print(math.max(1, 2));\n")
+    }
+
+    fun testReadOnlyFileIsNotChanged() {
+        val text = "imp<caret>ort 'dart:math';\n"
+        myFixture.configureByText("main.dart", text)
+        val plain = text.replace("<caret>", "")
+        TestDialogManager.setTestInputDialog { "math" }
+        renameResult = { file, newName ->
+            DartLspRenameResult.Success(listOf(DartLspFileTextEdit(file, TextRange.from(plain.indexOf(";"), 0), " as $newName")))
+        }
+        val file = myFixture.file.virtualFile
+        WriteAction.runAndWait<IOException> { file.isWritable = false }
+        try {
+            DartLspRenameAtCaretHandler().invoke(project, myFixture.editor, myFixture.file, dataContext())
+        }
+        finally {
+            WriteAction.runAndWait<IOException> { file.isWritable = true }
+        }
+
+        myFixture.checkResult(plain)
     }
 
     fun testCancelledInputChangesNothing() {
