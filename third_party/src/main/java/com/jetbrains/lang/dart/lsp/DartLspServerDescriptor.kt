@@ -6,7 +6,6 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
@@ -14,7 +13,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
-import com.intellij.platform.dartlsp.api.LspServerListener
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
@@ -112,12 +110,6 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             }
         }
         return super.getWorkspaceConfiguration(item)
-    }
-
-    override val lspServerListener: LspServerListener = object : LspServerListener {
-        override fun serverStopped(shutdownNormally: Boolean) {
-            project.serviceIfCreated<DartLspConfigurationSync>()?.serverStopped()
-        }
     }
 
     override fun isSupportedFile(file: VirtualFile): Boolean {
