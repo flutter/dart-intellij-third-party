@@ -199,10 +199,12 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
 
         DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
         assertTrue(handler.canInlineElementInEditor(element, myFixture.editor))
+        assertTrue(handler.canInlineElementInEditor(null, myFixture.editor))
 
         DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
         // Without legacy navigation regions populated in DAS, legacy findContext returns null
         assertFalse(handler.canInlineElementInEditor(element, myFixture.editor))
+        assertFalse(handler.canInlineElementInEditor(null, myFixture.editor))
     }
 
     fun testHandlersShowCannotRefactorErrorHintWhenLspServerNotRunning() {

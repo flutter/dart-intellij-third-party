@@ -43,7 +43,11 @@ public final class DartInlineHandler extends InlineActionHandler {
     if (editor == null) return false;
     final Project project = element != null ? element.getProject() : editor.getProject();
     if (project != null && DartConfigurable.isLspCodeActionsEnabled(project)) {
-      return element != null && element.getLanguage() == DartLanguage.INSTANCE;
+      if (element != null) {
+        return element.getLanguage() == DartLanguage.INSTANCE;
+      }
+      final PsiFile file = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
+      return file != null && file.getLanguage() == DartLanguage.INSTANCE;
     }
     final InlineRefactoringContext context = findContext(editor);
     if (context == null) return false;
