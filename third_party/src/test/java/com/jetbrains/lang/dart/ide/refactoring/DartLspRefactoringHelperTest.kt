@@ -5,7 +5,6 @@
  */
 package com.jetbrains.lang.dart.ide.refactoring
 
-import com.google.gson.JsonPrimitive
 import com.intellij.CommonBundle
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.actionSystem.DataContext
@@ -28,7 +27,6 @@ import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.util.DartTestUtils
-import org.dartlang.analysis.server.protocol.RefactoringKind
 import org.eclipse.lsp4j.CodeAction
 import org.eclipse.lsp4j.CodeActionDisabled
 import org.eclipse.lsp4j.CodeActionKind
@@ -86,100 +84,6 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
         } finally {
             super.tearDown()
         }
-    }
-
-    fun testMatchesRefactoringForExtractMethod() {
-        val targetTitles = setOf(DartLspRefactoringHelper.EXTRACT_METHOD_TITLE)
-        val targetKinds = setOf(RefactoringKind.EXTRACT_METHOD)
-
-        val byTitle = CodeAction("Extract Method")
-        assertTrue(DartLspRefactoringHelper.matchesRefactoring(byTitle, targetTitles, targetKinds))
-
-        val byCommandString = CodeAction("Custom Title").apply {
-            command = Command("Custom Title", "refactor.perform", listOf("EXTRACT_METHOD"))
-        }
-        assertTrue(DartLspRefactoringHelper.matchesRefactoring(byCommandString, targetTitles, targetKinds))
-
-        val byCommandJsonPrimitive = CodeAction("Custom Title").apply {
-            command = Command("Custom Title", "refactor.perform", listOf(JsonPrimitive("EXTRACT_METHOD")))
-        }
-        assertTrue(DartLspRefactoringHelper.matchesRefactoring(byCommandJsonPrimitive, targetTitles, targetKinds))
-
-        val extractLocal = CodeAction("Extract Local Variable").apply {
-            command = Command("Extract Local Variable", "refactor.perform", listOf("EXTRACT_LOCAL_VARIABLE"))
-        }
-        assertFalse(DartLspRefactoringHelper.matchesRefactoring(extractLocal, targetTitles, targetKinds))
-
-        val extractWidget = CodeAction("Extract Widget").apply {
-            command = Command("Extract Widget", "refactor.perform", listOf("EXTRACT_WIDGET"))
-        }
-        assertFalse(DartLspRefactoringHelper.matchesRefactoring(extractWidget, targetTitles, targetKinds))
-    }
-
-    fun testMatchesRefactoringForExtractLocalVariable() {
-        val targetTitles = setOf(DartLspRefactoringHelper.EXTRACT_LOCAL_VARIABLE_TITLE)
-        val targetKinds = setOf(RefactoringKind.EXTRACT_LOCAL_VARIABLE)
-
-        val byTitle = CodeAction("Extract Local Variable")
-        assertTrue(DartLspRefactoringHelper.matchesRefactoring(byTitle, targetTitles, targetKinds))
-
-        val byCommand = CodeAction("Other Title").apply {
-            command = Command("Other Title", "refactor.perform", listOf("EXTRACT_LOCAL_VARIABLE"))
-        }
-        assertTrue(DartLspRefactoringHelper.matchesRefactoring(byCommand, targetTitles, targetKinds))
-
-        val extractMethod = CodeAction("Extract Method").apply {
-            command = Command("Extract Method", "refactor.perform", listOf("EXTRACT_METHOD"))
-        }
-        assertFalse(DartLspRefactoringHelper.matchesRefactoring(extractMethod, targetTitles, targetKinds))
-    }
-
-    fun testMatchesRefactoringForInline() {
-        val targetTitles = setOf(
-            DartLspRefactoringHelper.INLINE_LOCAL_VARIABLE_TITLE,
-            DartLspRefactoringHelper.INLINE_METHOD_TITLE,
-        )
-        val targetKinds = setOf(
-            RefactoringKind.INLINE_LOCAL_VARIABLE,
-            RefactoringKind.INLINE_METHOD,
-        )
-
-        val inlineLocal = CodeAction("Inline Local Variable")
-        assertTrue(DartLspRefactoringHelper.matchesRefactoring(inlineLocal, targetTitles, targetKinds))
-
-        val inlineMethod = CodeAction("Inline Method")
-        assertTrue(DartLspRefactoringHelper.matchesRefactoring(inlineMethod, targetTitles, targetKinds))
-
-        val inlineByCommand = CodeAction("Inline...").apply {
-            command = Command("Inline...", "refactor.perform", listOf("INLINE_METHOD"))
-        }
-        assertTrue(DartLspRefactoringHelper.matchesRefactoring(inlineByCommand, targetTitles, targetKinds))
-
-        val extractMethod = CodeAction("Extract Method")
-        assertFalse(DartLspRefactoringHelper.matchesRefactoring(extractMethod, targetTitles, targetKinds))
-    }
-
-    fun testFindMatchingCodeActionSkipsDisabledActionsAndUnwrapsCommands() {
-        val targetTitles = setOf(DartLspRefactoringHelper.EXTRACT_METHOD_TITLE)
-        val targetKinds = setOf(RefactoringKind.EXTRACT_METHOD)
-
-        val disabledAction = CodeAction("Extract Method").apply {
-            disabled = CodeActionDisabled("Selection is not valid")
-        }
-        val validCommand = Command("Extract Method", "refactor.perform", listOf("EXTRACT_METHOD"))
-
-        val matched = DartLspRefactoringHelper.findMatchingCodeAction(
-            listOf(
-                Either.forRight(disabledAction),
-                Either.forLeft(validCommand),
-            ),
-            targetTitles,
-            targetKinds,
-        )
-        assertNotNull(matched)
-        assertEquals("Extract Method", matched?.title)
-        assertEquals("refactor.perform", matched?.command?.command)
-        assertNotNull("Unwrapped Command should have non-null edit to avoid resolveCodeAction", matched?.edit)
     }
 
     fun testDartInlineHandlerCanInlineElementInEditorGatedByLspCodeActions() {
@@ -260,7 +164,11 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
         val fakeServer = createFakeLspServer(
             onCodeAction = { params ->
                 capturedCodeActionParams = params
-                val action = CodeAction("Extract Method").apply {
+                val disabledAction = CodeAction("Extract Method").apply {
+                    kind = CodeActionKind.RefactorExtract
+                    disabled = CodeActionDisabled("Not valid")
+                }
+                val validAction = CodeAction("Extract Method").apply {
                     kind = CodeActionKind.RefactorExtract
                     command = Command(
                         "Extract Method",
@@ -268,7 +176,7 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
                         listOf("EXTRACT_METHOD", file.virtualFile.path, 1, 16, 15),
                     )
                 }
-                listOf(Either.forRight(action))
+                listOf(Either.forRight(disabledAction), Either.forRight(validAction))
             },
             onExecuteCommand = { params ->
                 capturedExecuteCommandParams = params
@@ -287,7 +195,6 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
             length = length,
             codeActionKind = CodeActionKind.RefactorExtract,
             targetTitles = setOf(DartLspRefactoringHelper.EXTRACT_METHOD_TITLE),
-            targetRefactoringKinds = setOf(RefactoringKind.EXTRACT_METHOD),
             progressTitle = DartBundle.message("progress.title.extract.method"),
             errorTitle = DartBundle.message("dart.refactoring.extract.method.error"),
             lspServer = fakeServer,
@@ -342,7 +249,6 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
                 length = length,
                 codeActionKind = CodeActionKind.RefactorExtract,
                 targetTitles = setOf(DartLspRefactoringHelper.EXTRACT_LOCAL_VARIABLE_TITLE),
-                targetRefactoringKinds = setOf(RefactoringKind.EXTRACT_LOCAL_VARIABLE),
                 progressTitle = DartBundle.message("progress.title.extract.local.variable"),
                 errorTitle = CommonBundle.getErrorTitle(),
                 lspServer = fakeServer,
