@@ -1,3 +1,8 @@
+---
+trigger: always_on
+description: "Keep agent context small: orient via ABOUT.md, scope searches, read large files by range, and run targeted builds and tests."
+---
+
 # Agent Efficiency Rule
 
 Everything an agent reads (file contents, command output, search results) stays in the conversation history and is re-sent on every later turn. Keep context small and relevant, but don't trade a single read for many tiny ones: extra turns re-send the history too.
