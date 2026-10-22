@@ -494,6 +494,9 @@ object AnalyticsConstants {
   val DURATION_MS = IntValue("duration_ms")
 
   @JvmField
+  val OUTCOME = StringValue("outcome")
+
+  @JvmField
   val EXTRACT_ALL = BooleanValue("extract_all")
 
   @JvmField
