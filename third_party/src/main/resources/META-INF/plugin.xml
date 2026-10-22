@@ -91,6 +91,7 @@
     <lang.importOptimizer language="Dart" implementationClass="com.jetbrains.lang.dart.ide.imports.DartImportOptimizer"/>
 
     <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartServerRenameHandler"/>
+    <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspInplaceRenameHandler"/>
     <renamePsiElementProcessor implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspRenamePsiElementProcessor" order="first"/>
     <renamePsiElementProcessor implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspSymbolRenameProcessor" order="first"/>
     <inlineActionHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartInlineHandler"/>
