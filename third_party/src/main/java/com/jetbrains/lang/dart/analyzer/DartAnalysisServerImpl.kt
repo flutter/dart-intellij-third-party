@@ -11,9 +11,12 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.util.concurrency.annotations.RequiresWriteLock
 import com.jetbrains.lang.dart.DartBundle
@@ -39,27 +42,8 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
     messageActions: List<MessageAction>,
     consumer: ShowMessageRequestConsumer,
   ) {
-    val notificationType: NotificationType = when (messageType) {
-      MessageType.ERROR -> NotificationType.ERROR
-      MessageType.WARNING -> NotificationType.WARNING
-      else -> NotificationType.INFORMATION
-    }
-
-    NotificationGroupManager.getInstance()
-      .getNotificationGroup("Dart Analysis Server")
-      .createNotification(message, notificationType)
-      .also { notification ->
-        for (messageAction in messageActions) {
-          val actionLabel: @NlsSafe String = messageAction.label
-          notification.addAction(object : AnAction(actionLabel) {
-            override fun actionPerformed(e: AnActionEvent) {
-              notification.expire()
-              consumer.computedMessageActions(actionLabel)
-            }
-          })
-        }
-      }
-      .notify(project)
+    val actionLabels: List<@NlsSafe String> = messageActions.map { it.label }
+    showServerMessageRequest(project, messageType, message, actionLabels, answer = consumer::computedMessageActions)
   }
 
   override fun lsp_workspaceApplyEdit(params: DartLspApplyWorkspaceEditParams, consumer: DartLspWorkspaceApplyEditRequestConsumer) {
@@ -131,4 +115,56 @@ internal class DartAnalysisServerImpl(private val project: Project, socket: Anal
     }
     return true
   }
+}
+
+/**
+ * Shows a question of the server (`server.showMessageRequest`) and passes the chosen action label to [answer], or `null`
+ * if the user closed it without choosing.
+ *
+ * While a modal dialog or progress is open, e.g. the progress of a rename that waits for the server's *Rename Anyway* /
+ * *Cancel* question, the question is a modal dialog: a notification couldn't be clicked then. Otherwise it is a
+ * notification with the actions as links.
+ */
+internal fun showServerMessageRequest(
+  project: Project,
+  messageType: String,
+  message: @NlsSafe String,
+  actionLabels: List<@NlsSafe String>,
+  isModalContext: () -> Boolean = { ModalityState.current() != ModalityState.nonModal() },
+  answer: (String?) -> Unit,
+) {
+  ApplicationManager.getApplication().invokeLater({
+    if (isModalContext()) {
+      val icon = when (messageType) {
+        MessageType.ERROR -> Messages.getErrorIcon()
+        MessageType.WARNING -> Messages.getWarningIcon()
+        else -> Messages.getInformationIcon()
+      }
+      val choice = Messages.showDialog(project, message, DartBundle.message("dart.analysis.server.message.title"),
+                                       actionLabels.toTypedArray(), 0, icon)
+      answer(actionLabels.getOrNull(choice))
+      return@invokeLater
+    }
+
+    val notificationType: NotificationType = when (messageType) {
+      MessageType.ERROR -> NotificationType.ERROR
+      MessageType.WARNING -> NotificationType.WARNING
+      else -> NotificationType.INFORMATION
+    }
+
+    NotificationGroupManager.getInstance()
+      .getNotificationGroup("Dart Analysis Server")
+      .createNotification(message, notificationType)
+      .also { notification ->
+        for (actionLabel in actionLabels) {
+          notification.addAction(object : AnAction(actionLabel) {
+            override fun actionPerformed(e: AnActionEvent) {
+              notification.expire()
+              answer(actionLabel)
+            }
+          })
+        }
+      }
+      .notify(project)
+  }, ModalityState.any(), project.disposed)
 }
