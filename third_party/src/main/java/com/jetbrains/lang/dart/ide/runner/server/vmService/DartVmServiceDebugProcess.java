@@ -125,11 +125,8 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
     if (DebugType.REMOTE == debugType) {
       LOG.assertTrue(myExecutionResult == null, myExecutionResult);
     }
-    else if (DebugType.CLI == debugType) {
-      LOG.assertTrue(myExecutionResult != null);
-    }
-    else if (DebugType.WEBDEV == debugType) {
-      LOG.assertTrue(myExecutionResult != null);
+    else {
+      LOG.assertTrue(myExecutionResult != null, "ExecutionResult must not be null for " + debugType);
     }
   }
 
