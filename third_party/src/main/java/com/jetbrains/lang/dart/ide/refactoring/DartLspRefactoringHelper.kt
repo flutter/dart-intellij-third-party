@@ -6,7 +6,7 @@
 package com.jetbrains.lang.dart.ide.refactoring
 
 import com.intellij.CommonBundle
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
@@ -133,8 +133,10 @@ object DartLspRefactoringHelper {
                     .firstOrNull { it.disabled == null && it.title in targetTitles }
                     ?: return@runProcessWithProgressSynchronously
                 val intention = LspIntentionAction(lspServer, matchingAction)
-                if (ReadAction.compute<Boolean, Throwable> { intention.isAvailable() }) {
-                    matchingIntention = intention
+                ApplicationManager.getApplication().runReadAction {
+                    if (intention.isAvailable()) {
+                        matchingIntention = intention
+                    }
                 }
             },
             progressTitle,
