@@ -6,7 +6,6 @@ import com.google.common.collect.EvictingQueue;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.google.dart.server.AnalysisServerListener;
 import com.google.dart.server.AnalysisServerListenerAdapter;
-import com.google.dart.server.CreateContextConsumer;
 import com.google.dart.server.DartLspTextDocumentContentConsumer;
 import com.google.dart.server.ExtendedRequestErrorCode;
 import com.google.dart.server.FindElementReferencesConsumer;
@@ -27,7 +26,6 @@ import com.google.dart.server.GetSuggestionsConsumer2;
 import com.google.dart.server.GetTypeHierarchyConsumer;
 import com.google.dart.server.ImportElementsConsumer;
 import com.google.dart.server.ListPostfixCompletionTemplatesConsumer;
-import com.google.dart.server.MapUriConsumer;
 import com.google.dart.server.OrganizeDirectivesConsumer;
 import com.google.dart.server.RequestListener;
 import com.google.dart.server.ResponseListener;
@@ -217,8 +215,6 @@ public final class DartAnalysisServerService implements Disposable {
   private static final long GET_SUGGESTION_DETAILS2_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long FIND_ELEMENT_REFERENCES_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_TYPE_HIERARCHY_TIMEOUT = TimeUnit.SECONDS.toMillis(10);
-  private static final long EXECUTION_CREATE_CONTEXT_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
-  private static final long EXECUTION_MAP_URI_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long ANALYSIS_IN_TESTS_TIMEOUT = TimeUnit.SECONDS.toMillis(10);
   private static final long LSP_MESSAGE_TEXT_DOCUMENT_CONTENT_TIMEOUT = TimeUnit.SECONDS.toMillis(50);
   private static final long TESTS_TIMEOUT_COEFF = 10;
@@ -2237,47 +2233,6 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
-  public @Nullable String execution_createContext(@NotNull String filePath) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      String message = "Dart Analysis Server is not available.";
-      LOG.warn(message);
-      return null;
-    }
-
-    final String fileUri = getLocalFileUri(filePath);
-    final Ref<String> resultRef = new Ref<>();
-    final CountDownLatch latch = new CountDownLatch(1);
-    server.execution_createContext(fileUri, new CreateContextConsumer() {
-      @Override
-      public void computedExecutionContext(final String contextId) {
-        resultRef.set(contextId);
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(final RequestError error) {
-        logError("execution_createContext()", fileUri, error);
-        String message = getShortErrorMessage("execution_createContext()", fileUri, error);
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, EXECUTION_CREATE_CONTEXT_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("execution_createContext", EXECUTION_CREATE_CONTEXT_TIMEOUT, fileUri);
-    }
-    return resultRef.get();
-  }
-
-  public void execution_deleteContext(final @NotNull String contextId) {
-    final AnalysisServer server = myServer;
-    if (server != null) {
-      server.execution_deleteContext(contextId);
-    }
-  }
-
   public @Nullable Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>> execution_getSuggestions(@NotNull String code,
                                                                                                                 int offset,
                                                                                                                 @NotNull VirtualFile contextFile,
@@ -2318,71 +2273,6 @@ public final class DartAnalysisServerService implements Disposable {
       logTookTooLongMessage("execution_getSuggestions", GET_SUGGESTIONS_TIMEOUT, contextFileUri);
     }
     return refResult.get();
-  }
-
-  public @Nullable String execution_mapUri(@NotNull String _id, @NotNull VirtualFile _file) {
-    return execution_mapUri(_id, getFileUri(_file), null);
-  }
-
-  public @Nullable String execution_mapUri(@NotNull String _id, @NotNull String _executionContextUri) {
-    return execution_mapUri(_id, null, _executionContextUri);
-  }
-
-  /**
-   * @deprecated use {@link #execution_mapUri(String, VirtualFile)} or {@link #execution_mapUri(String, String)}
-   */
-  @Deprecated
-  public @Nullable String execution_mapUri(@NotNull String _id, @Nullable String _filePathOrUri, @Nullable String _executionContextUri) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return null;
-    }
-
-    // From the Dart Analysis Server Spec:
-    // Exactly one of the file and uri fields must be provided. If both fields are provided, then an error of type INVALID_PARAMETER will
-    // be generated. Similarly, if neither field is provided, then an error of type INVALID_PARAMETER will be generated.
-    if ((_filePathOrUri == null && _executionContextUri == null) || (_filePathOrUri != null && _executionContextUri != null)) {
-      LOG.error("execution_mapUri - one of _filePathOrUri and _executionContextUri must be non-null.");
-      return null;
-    }
-
-    if (_filePathOrUri != null && !_filePathOrUri.contains("://")) {
-      _filePathOrUri = FileUtil.toSystemDependentName(_filePathOrUri);
-    }
-
-    final Ref<String> resultRef = new Ref<>();
-
-    final CountDownLatch latch = new CountDownLatch(1);
-    server.execution_mapUri(_id, _filePathOrUri, _executionContextUri, new MapUriConsumer() {
-      @Override
-      public void computedFileOrUri(final String file, final String uri) {
-        if (uri != null) {
-          resultRef.set(uri);
-        }
-        else {
-          resultRef.set(file);
-        }
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(final RequestError error) {
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, EXECUTION_MAP_URI_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("execution_mapUri", EXECUTION_MAP_URI_TIMEOUT, _filePathOrUri != null ? _filePathOrUri : _executionContextUri);
-      return null;
-    }
-
-    if (_executionContextUri != null && !resultRef.isNull()) {
-      return FileUtil.toSystemIndependentName(resultRef.get());
-    }
-
-    return resultRef.get();
   }
 
   // LSP over Legacy Dart Analysis Server protocols

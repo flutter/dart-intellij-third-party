@@ -9,6 +9,7 @@
 ### Changed
 
 ### Removed
+- Legacy Dart Analysis Server execution context and URI mapping during debugging (#686)
 
 ### Fixed
 - Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
