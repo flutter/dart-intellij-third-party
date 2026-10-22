@@ -3,8 +3,10 @@ package com.jetbrains.lang.dart.ide.findUsages;
 
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.usages.Usage;
 import com.intellij.usages.UsageGroup;
+import com.intellij.usages.UsageInfo2UsageAdapter;
 import com.intellij.usages.UsageTarget;
 import com.intellij.usages.rules.PsiElementUsage;
 import com.intellij.usages.rules.SingleParentUsageGroupingRule;
@@ -19,6 +21,9 @@ public class DartUnitMemberUsageGroupingRule extends SingleParentUsageGroupingRu
   protected @Nullable UsageGroup getParentGroupFor(@NotNull Usage usage, UsageTarget @NotNull [] targets) {
     PsiElement psiElement = usage instanceof PsiElementUsage ? ((PsiElementUsage)usage).getElement() : null;
     if (psiElement == null || psiElement.getLanguage() != DartLanguage.INSTANCE) return null;
+    if (psiElement instanceof PsiFile && usage instanceof UsageInfo2UsageAdapter adapter) {
+      psiElement = psiElement.findElementAt(adapter.getUsageInfo().getNavigationOffset());
+    }
 
     // todo Docs are not parsed perfectly and doc comment may be not a child of the corresponding function. Related to comment for DartDocUtil.getDocumentationText
 

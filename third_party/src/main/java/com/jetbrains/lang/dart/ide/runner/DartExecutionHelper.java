@@ -41,7 +41,7 @@ public final class DartExecutionHelper {
 
     // Show a notification on the dart analysis tool window.
     final DartProblemsView problemsView = DartProblemsView.getInstance(project);
-    problemsView.showErrorNotification("", message, icon);
+    problemsView.showErrorNotification("", message, icon, true);
   }
 
   public static void clearIssueNotifications(final @NotNull Project project) {

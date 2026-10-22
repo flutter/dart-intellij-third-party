@@ -15,6 +15,7 @@ import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -23,6 +24,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.util.Disposer
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
@@ -30,9 +32,11 @@ import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.PrintingLogger
 import com.jetbrains.lang.dart.websocket.WebSocketException
+import org.jetbrains.annotations.TestOnly
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.function.Consumer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -284,8 +288,60 @@ object Analytics {
   fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
     AnalyticsConfigurationManager.getConfiguration(sdk, project, logger)
 
+  private val testObserver = ThreadLocal<Consumer<AnalyticsData>>()
+
+  /** Observes attempted reports on this thread without changing consent or delivery. */
+  @TestOnly
   @JvmStatic
-  fun report(data: AnalyticsData) = data.reportTo(reporter)
+  fun withReportObserver(observer: Consumer<AnalyticsData>, action: Runnable) {
+    check(ApplicationManager.getApplication().isUnitTestMode)
+    val previous = testObserver.get()
+    testObserver.set(observer)
+    try {
+      action.run()
+    } finally {
+      if (previous == null) testObserver.remove() else testObserver.set(previous)
+    }
+  }
+
+  /**
+   * Test-only env vars merged last into every environment built by [updateEnvironment]
+   * (the analysis server, DTD, pub, run configurations, ...).
+   */
+  @Volatile
+  private var testEnvironmentOverrides: Map<String, String>? = null
+
+  /**
+   * Adds or overrides environment variables for every process configured via
+   * [updateEnvironment] until [parentDisposable] is disposed.
+   *
+   * Overrides are applied *after* the regular `DASH__*` values, so they can replace them.
+   * A later call replaces (does not merge with) earlier overrides; disposing it restores
+   * whatever was installed before.
+   *
+   * This is global rather than thread-local (unlike [withReportObserver]) because
+   * sub-tools such as the analysis server are spawned from whichever thread first
+   * needs them, which is often not the test thread.
+   */
+  @TestOnly
+  @JvmStatic
+  fun setEnvironmentOverridesForTests(overrides: Map<String, String>, parentDisposable: Disposable) {
+    check(ApplicationManager.getApplication().isUnitTestMode)
+    val previous = testEnvironmentOverrides
+    val installed = overrides.toMap()
+    testEnvironmentOverrides = installed
+    Disposer.register(parentDisposable) {
+      // Only restore if nobody replaced these overrides in the meantime; otherwise disposing a stale
+      // scope would silently drop a newer caller's overrides (e.g. its isolated HOME).
+      if (testEnvironmentOverrides === installed) testEnvironmentOverrides = previous
+    }
+  }
+
+  @JvmStatic
+  fun report(data: AnalyticsData) {
+    testObserver.get()?.accept(data)
+    data.reportTo(reporter)
+  }
 
   @JvmStatic
   fun recordRunOrDebugSession(mechanism: String, executor: Executor, project: Project?) {
@@ -314,6 +370,8 @@ object Analytics {
           environment[UnifiedAnalytics.Env.PLUGIN_NAME] = plugin.name
           environment[UnifiedAnalytics.Env.PLUGIN_VERSION] = plugin.version
       }
+
+      testEnvironmentOverrides?.let { environment.putAll(it) }
   }
 }
 
@@ -332,8 +390,8 @@ class AssistData(id: String?, project: Project?) :
 class FixData(id: String?, project: Project?) :
   AnalyticsData(AnalyticsConstants.FIX_TYPE, id, project)
 
-class LegacyHoverData(id: String?, project: Project?) :
-  AnalyticsData(AnalyticsConstants.LEGACY_HOVER_TYPE, id, project)
+class LegacyRefactoringData(kind: String?, project: Project?) :
+  AnalyticsData(AnalyticsConstants.LEGACY_REFACTORING_TYPE, kind, project)
 
 class SettingsData(project: Project?) :
   AnalyticsData(AnalyticsConstants.SETTINGS_TYPE, "settings", project)
@@ -377,7 +435,8 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
     fun forFix(id: String?, project: Project?): FixData = FixData(id, project)
 
     @JvmStatic
-    fun forLegacyHover(id: String?, project: Project?): LegacyHoverData = LegacyHoverData(id, project)
+    fun forLegacyRefactoring(kind: String?, project: Project?): LegacyRefactoringData =
+      LegacyRefactoringData(kind, project)
 
     @JvmStatic
     fun forAction(action: AnAction, event: AnActionEvent): ActionData = forAction(
@@ -425,10 +484,22 @@ object AnalyticsConstants {
   @JvmField
   val DURATION_MS = IntValue("duration_ms")
 
+  @JvmField
+  val EXTRACT_ALL = BooleanValue("extract_all")
+
+  @JvmField
+  val CREATE_GETTER = BooleanValue("create_getter")
+
+  @JvmField
+  val INLINE_ALL = BooleanValue("inline_all")
+
+  @JvmField
+  val CUSTOM_NAME = BooleanValue("custom_name")
+
   internal const val ACTION_TYPE = "action"
   internal const val ASSIST_TYPE = "assist"
   internal const val FIX_TYPE = "fix"
-  internal const val LEGACY_HOVER_TYPE = "legacy_hover"
+  internal const val LEGACY_REFACTORING_TYPE = "legacy_refactoring"
   internal const val SETTINGS_TYPE = "settings"
   internal const val DEBUG_SESSION_TYPE = "debug_session"
   internal const val RUN_SESSION_TYPE = "run_session"
@@ -494,7 +565,7 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     }
   }
 
-  private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
+  internal fun createEventParams(dataMap: Map<String, Any>): JsonObject {
     val params = JsonObject()
     params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
@@ -516,6 +587,11 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
 
     // Note: encoded as a string.
     params.addProperty(UnifiedAnalytics.Property.EVENT, event.toString())
+    return params
+  }
+
+  private fun sendAnalyticsEvent(project: Project, dataMap: Map<String, Any>) {
+    val params = createEventParams(dataMap)
 
     // TODO (pq): temporary
     // print(params.toString())

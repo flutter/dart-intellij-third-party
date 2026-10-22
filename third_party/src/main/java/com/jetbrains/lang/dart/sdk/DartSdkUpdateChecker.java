@@ -6,6 +6,8 @@ import com.google.gson.JsonParser;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationAction;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.project.Project;
@@ -136,18 +138,19 @@ public final class DartSdkUpdateChecker {
     final String title = DartBundle.message("dart.sdk.update.title");
     final String message = DartBundle.message("new.dart.sdk.available.for.download..notification", availableSdkVersion, currentSdkVersion);
 
-    UpdateChecker.getNotificationGroup().createNotification(title, message, NotificationType.INFORMATION)
-      .setDisplayId("dart.sdk.update.available")
-      .setListener((notification, event) -> {
-      notification.expire();
-      if ("download".equals(event.getDescription())) {
-        BrowserUtil.browse(downloadUrl);
-      }
+    final Notification notification = UpdateChecker.getNotificationGroup().createNotification(title, message, NotificationType.INFORMATION)
+      .setDisplayId("dart.sdk.update.available");
 
-      if ("settings".equals(event.getDescription())) {
-        DartConfigurable.openDartSettings(project);
-      }
-    }).notify(project);
+    notification.addAction(NotificationAction.createSimple(DartBundle.message("download.dart.sdk"),()-> {
+      notification.expire();
+      BrowserUtil.browse(downloadUrl);
+    }));
+
+    notification.addAction(NotificationAction.createSimple(DartBundle.message("open.dart.settings"), ()-> {
+      notification.expire();
+      DartConfigurable.openDartSettings(project);
+    }));
+    notification.notify(project);
   }
 
   private static @Nullable SdkUpdateInfo getSdkUpdateInfo(final @NotNull String updateCheckUrl, final @NotNull String sdkDownloadUrl) {

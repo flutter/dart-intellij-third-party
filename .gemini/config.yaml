@@ -19,4 +19,16 @@ code_review:
     code_review: true
     # (DEFAULT) -- Note that this is disabled for flutter
     include_drafts: true
-ignore_patterns: []
+ignore_patterns:
+  - "third_party/build/**"
+  - "third_party/bin/**"
+  - "dart-sdk/**"
+  - ".idea/**"
+  - "third_party/.idea/**"
+  - "third_party/.settings/**"
+  - "third_party/.gradle/**"
+  - "third_party/.intellijPlatform/**"
+  - "third_party/.kotlin/**"
+  - "third_party/gradle/wrapper/gradle-wrapper.jar"
+  - "third_party/tool/baseline/**"
+  - "tool/.dart_tool/**"

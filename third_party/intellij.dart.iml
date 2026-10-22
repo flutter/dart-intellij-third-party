@@ -7,7 +7,6 @@
       <sourceFolder url="file://$MODULE_DIR$/resources" type="java-resource" />
       <sourceFolder url="file://$MODULE_DIR$/testSrc" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/gen" isTestSource="false" generated="true" />
-      <sourceFolder url="file://$MODULE_DIR$/thirdPartySrc/vmServiceDrivers" isTestSource="false" generated="true" />
       <sourceFolder url="file://$MODULE_DIR$/thirdPartySrc/analysisServer" isTestSource="false" generated="true" />
       <excludeFolder url="file://$MODULE_DIR$/out" />
       <excludeFolder url="file://$MODULE_DIR$/testData/highlighting/PathPackageReferenceInspection/other_project_2/.dart_tool" />
@@ -64,15 +63,6 @@
     <orderEntry type="module" module-name="intellij.xml.parser" />
     <orderEntry type="library" name="netty-codec-http" level="project" />
     <orderEntry type="library" name="commons-lang3" level="project" />
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/weberknecht-0.1.5.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
     <orderEntry type="module-library">
       <library>
         <CLASSES>

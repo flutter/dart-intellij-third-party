@@ -90,7 +90,7 @@ public class DartServerQuickFixTest extends CodeInsightFixtureTestCase {
   }
 
   public void testUseEqEqNull() {
-    doQuickFixTest("Use == null instead of 'is Null'");
+    doQuickFixTest("Use '== null' instead of 'is Null'");
   }
 
   private void doCrLfAwareTest(@NotNull final String content, @NotNull final String intentionStartText, @NotNull final String after) {

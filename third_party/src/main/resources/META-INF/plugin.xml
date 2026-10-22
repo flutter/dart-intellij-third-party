@@ -32,6 +32,7 @@
   </extensionPoints>
 
   <extensions defaultExtensionNs="com.intellij">
+    <errorHandler implementation="com.intellij.diagnostic.JetBrainsMarketplaceErrorReportSubmitter"/>
     <moveFileHandler implementation="com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler"/>
     <fileType name="Dart" extensions="dart" language="Dart" implementationClass="com.jetbrains.lang.dart.DartFileType" fieldName="INSTANCE"/>
     <lang.syntaxHighlighter language="Dart" implementationClass="com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter"/>
@@ -73,7 +74,6 @@
     <psi.referenceContributor language="Dart" implementation="com.jetbrains.lang.dart.psi.DartReferenceContributor"/>
     <psi.referenceContributor language="XML" implementation="com.jetbrains.lang.dart.psi.DartReferenceContributor"/>
     <xml.xmlTypedHandlersAdditionalSupport implementation="com.jetbrains.lang.dart.xml.DartXmlTypedHandlersAdditionalSupport" />
-    <include.provider implementation="com.jetbrains.lang.dart.psi.DartPackageAwareFileIncludeProvider" order="first"/>
     <typeHierarchyProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.hierarchy.type.DartTypeHierarchyProvider"/>
     <callHierarchyProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.hierarchy.call.DartCallHierarchyProvider"/>
     <methodHierarchyProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.hierarchy.method.DartMethodHierarchyProvider"/>
@@ -91,6 +91,7 @@
     <lang.importOptimizer language="Dart" implementationClass="com.jetbrains.lang.dart.ide.imports.DartImportOptimizer"/>
 
     <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartServerRenameHandler"/>
+    <renamePsiElementProcessor implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspRenamePsiElementProcessor" order="first"/>
     <inlineActionHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartInlineHandler"/>
 
     <codeInsight.lineMarkerProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.marker.DartMethodLineMarkerProvider"/>
@@ -113,6 +114,7 @@
 
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartImportAndExportIndex"/>
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartPartUriIndex"/>
+    <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartPartOfIndex"/>
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartClassIndex"/>
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartLibraryIndex"/>
     <fileBasedIndex implementation="com.jetbrains.lang.dart.ide.index.DartComponentIndex"/>
@@ -154,13 +156,63 @@
        implementationClass="com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider"/>
 
     <codeInsight.declarativeInlayProvider language="Dart"
-                                          implementationClass="com.jetbrains.lang.dart.hints.DartInlayHintsProvider"
+                                          implementationClass="com.jetbrains.lang.dart.hints.DartClosingLabelsInlayHintsProvider"
                                           isEnabledByDefault="true"
                                           group="OTHER_GROUP"
                                           providerId="dart.closing.labels"
                                           bundle="messages.DartBundle"
                                           nameKey="dart.inlay.hints.closing.labels.name"
                                           descriptionKey="dart.inlay.hints.closing.labels.description">
+    </codeInsight.declarativeInlayProvider>
+
+    <codeInsight.declarativeInlayProvider language="Dart"
+                                          implementationClass="com.jetbrains.lang.dart.hints.DartParameterNamesInlayHintsProvider"
+                                          isEnabledByDefault="false"
+                                          group="PARAMETERS_GROUP"
+                                          providerId="dart.parameter.names"
+                                          bundle="messages.DartBundle"
+                                          nameKey="dart.inlay.hints.parameter.names.name"
+                                          descriptionKey="dart.inlay.hints.parameter.names.description">
+      <option optionId="dart.parameter.names.only.literal"
+              enabledByDefault="false"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.parameter.names.only.literal.name"
+              descriptionKey="dart.inlay.hints.parameter.names.only.literal.description"/>
+    </codeInsight.declarativeInlayProvider>
+
+    <codeInsight.declarativeInlayProvider language="Dart"
+                                          implementationClass="com.jetbrains.lang.dart.hints.DartTypesInlayHintsProvider"
+                                          isEnabledByDefault="false"
+                                          group="TYPES_GROUP"
+                                          providerId="dart.types"
+                                          bundle="messages.DartBundle"
+                                          nameKey="dart.inlay.hints.types.name"
+                                          descriptionKey="dart.inlay.hints.types.description">
+      <option optionId="dart.types.variable"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.variable.name"
+              descriptionKey="dart.inlay.hints.types.variable.description"/>
+      <option optionId="dart.types.return"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.return.name"
+              descriptionKey="dart.inlay.hints.types.return.description"/>
+      <option optionId="dart.types.parameter"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.parameter.name"
+              descriptionKey="dart.inlay.hints.types.parameter.description"/>
+      <option optionId="dart.types.type.arguments"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.type.arguments.name"
+              descriptionKey="dart.inlay.hints.types.type.arguments.description"/>
+      <option optionId="dart.types.dot.shorthand"
+              enabledByDefault="true"
+              bundle="messages.DartBundle"
+              nameKey="dart.inlay.hints.types.dot.shorthand.name"
+              descriptionKey="dart.inlay.hints.types.dot.shorthand.description"/>
     </codeInsight.declarativeInlayProvider>
 
     <lang.surroundDescriptor language="Dart"
@@ -183,6 +235,8 @@
     <lang.findUsagesProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.findUsages.DartFindUsagesProvider"/>
     <usageTypeProvider implementation="com.jetbrains.lang.dart.ide.findUsages.DartUsageTypeProvider"/>
     <findUsagesHandlerFactory implementation="com.jetbrains.lang.dart.ide.findUsages.DartServerFindUsagesHandlerFactory"/>
+    <!-- Transitional LSP migration hook: suppresses legacy PSI search target candidates when LSP references are active -->
+    <targetElementEvaluator language="Dart" implementationClass="com.jetbrains.lang.dart.ide.findUsages.DartTargetElementEvaluator"/>
     <fileStructureGroupRuleProvider implementation="com.jetbrains.lang.dart.ide.findUsages.DartUnitMemberGroupRuleProvider"/>
     <fileStructureGroupRuleProvider implementation="com.jetbrains.lang.dart.ide.findUsages.DartClassMemberGroupRuleProvider"/>
     <elementDescriptionProvider implementation="com.jetbrains.lang.dart.psi.DartElementDescriptionProvider"/>
@@ -270,6 +324,11 @@
     <webServerPathHandler implementation="com.jetbrains.lang.dart.pubServer.PubServerPathHandler"/>
   </extensions>
 
+
+  <applicationListeners>
+    <listener class="com.jetbrains.lang.dart.analytics.DartNavigationActionListener"
+              topic="com.intellij.openapi.actionSystem.ex.AnActionListener"/>
+  </applicationListeners>
 
   <projectListeners>
     <listener class="com.jetbrains.lang.dart.DartWorkspaceModelChangeListener" topic="com.intellij.platform.backend.workspace.WorkspaceModelChangeListener"/>

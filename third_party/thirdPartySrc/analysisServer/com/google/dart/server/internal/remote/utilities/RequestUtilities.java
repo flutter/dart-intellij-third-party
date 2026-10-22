@@ -153,6 +153,9 @@ public class RequestUtilities {
     else if (object instanceof String) {
       return new JsonPrimitive((String)object);
     }
+    else if (object instanceof JsonElement) {
+      return (JsonElement)object;
+    }
     else if (object instanceof List<?>) {
       List<?> list = (List<?>)object;
       JsonArray jsonArray = new JsonArray();
@@ -1051,27 +1054,15 @@ public class RequestUtilities {
   public static JsonObject generateClientCapabilities(String idValue,
                                                       List<String> requests,
                                                       boolean supportsUris,
-                                                      boolean supportsWorkspaceApplyEdits) {
+                                                      Object lspCapabilities) {
     JsonObject params = new JsonObject();
     params.add(REQUESTS, buildJsonElement(requests));
     if (supportsUris) {
       params.addProperty("supportsUris", supportsUris);
     }
-
-    if (supportsWorkspaceApplyEdits) {
-      JsonObject workspace = new JsonObject();
-      workspace.addProperty("applyEdit", true);
-
-      JsonObject workspaceEdit = new JsonObject();
-      workspaceEdit.addProperty("documentChanges", false);
-      workspace.add("workspaceEdit", workspaceEdit);
-
-      JsonObject lspCapabilities = new JsonObject();
-      lspCapabilities.add("workspace", workspace);
-
-      params.add("lspCapabilities", lspCapabilities);
+    if (lspCapabilities != null) {
+      params.add("lspCapabilities", buildJsonElement(lspCapabilities));
     }
-
     return buildJsonObjectRequest(idValue, METHOD_SERVER_SET_CAPABILITIES, params);
   }
 
@@ -1239,6 +1230,8 @@ public class RequestUtilities {
 
   public static final String LSP_MESSAGE = "lspMessage";
 
+  public static final String LSP_RESPONSE = "lspResponse";
+
   /**
    * Generate and return a LSP over Legacy DAS request.
    *
@@ -1264,6 +1257,35 @@ public class RequestUtilities {
     JsonObject lspParams = new JsonObject();
     lspParams.addProperty("uri", uri);
     return generateLSPMessage(idValue, LSP_DART_TEXT_DOCUMENT_CONTENT, lspParams);
+  }
+
+  /**
+   * Generate and return a response to a LSP over Legacy DAS request that the server sent via
+   * "lsp.handle". The server matches the response by the id of the legacy request, the LSP response
+   * itself is wrapped into the result.
+   *
+   * Example:
+   * {"id":"2","result":
+   *   {"lspResponse":
+   *     {"id":0,"jsonrpc":"2.0","result":[{"inlayHints":{}}]}}}
+   *
+   * @param idValue the id of the legacy request
+   * @param lspIdValue the id of the LSP request, passed back unchanged to keep its JSON type
+   * @param lspResult the result of the LSP request
+   */
+  public static JsonObject generateLSPResponse(String idValue, JsonElement lspIdValue, JsonElement lspResult) {
+    JsonObject lspResponse = new JsonObject();
+    lspResponse.add(ID, lspIdValue);
+    lspResponse.addProperty(LSP_JSONRPC, LSP_JSONROC_VERSION);
+    lspResponse.add(RESULT, lspResult);
+
+    JsonObject resultJsonObject = new JsonObject();
+    resultJsonObject.add(LSP_RESPONSE, lspResponse);
+
+    JsonObject jsonObject = new JsonObject();
+    jsonObject.addProperty(ID, idValue);
+    jsonObject.add(RESULT, resultJsonObject);
+    return jsonObject;
   }
 
   private RequestUtilities() {

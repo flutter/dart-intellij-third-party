@@ -5,7 +5,7 @@ import com.intellij.codeInsight.hints.declarative.DeclarativeInlayHintsSettings;
 import com.intellij.codeInsight.hints.declarative.impl.DeclarativeInlayHintsPassFactory;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.EditorFactory;
-import com.jetbrains.lang.dart.hints.DartInlayHintsProvider;
+import com.jetbrains.lang.dart.hints.DartClosingLabelsInlayHintsProvider;
 
 import java.util.Arrays;
 
@@ -16,7 +16,7 @@ public class DartClosingLabelManager {
 
   public void setShowClosingLabels(boolean value) {
     if (value != getShowClosingLabels()) {
-      DeclarativeInlayHintsSettings.Companion.getInstance().setProviderEnabled(DartInlayHintsProvider.PROVIDER_ID, value);
+      DeclarativeInlayHintsSettings.Companion.getInstance().setProviderEnabled(DartClosingLabelsInlayHintsProvider.PROVIDER_ID, value);
 
       Arrays.stream(EditorFactory.getInstance().getAllEditors())
         .filter(editor -> editor.getProject() != null && DartAnalysisServerService.isLocalAnalyzableFile(editor.getVirtualFile()))
@@ -25,6 +25,6 @@ public class DartClosingLabelManager {
   }
 
   public boolean getShowClosingLabels() {
-    return Boolean.TRUE.equals(DeclarativeInlayHintsSettings.Companion.getInstance().isProviderEnabled(DartInlayHintsProvider.PROVIDER_ID));
+    return Boolean.TRUE.equals(DeclarativeInlayHintsSettings.Companion.getInstance().isProviderEnabled(DartClosingLabelsInlayHintsProvider.PROVIDER_ID));
   }
 }

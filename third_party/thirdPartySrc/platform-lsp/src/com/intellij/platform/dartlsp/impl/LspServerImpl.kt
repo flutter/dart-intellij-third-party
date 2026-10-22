@@ -10,6 +10,7 @@ import com.intellij.openapi.editor.ex.DocumentEx
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.dartlsp.util.getDocumentFilterPattern
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel.StdIO
@@ -476,7 +477,13 @@ class LspServerImpl internal constructor(
         if (filter.scheme != null && filter.scheme != "file") continue
 
         val language = filter.language
-        val pattern = filter.pattern
+        val filterPattern = getDocumentFilterPattern(filter)
+        if (filterPattern != null && filterPattern.isRight) {
+          // A RelativePattern needs its baseUri resolved against the workspace folders. The IDE does not support it yet.
+          logWarn("Ignoring the document filter, its pattern is relative: ${filterPattern.right}")
+          continue
+        }
+        val pattern = filterPattern?.left
         if (language == null && pattern == null) continue
         if (language != null && language != descriptor.getLanguageId(file)) continue
 

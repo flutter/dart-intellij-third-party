@@ -1090,7 +1090,7 @@ public class DartParser implements PsiParser, LightPsiParser {
   /* ********************************************************** */
   // !(<<nonStrictID>> | 'this' | 'operator' | '(' | '@' | 'abstract' | 'base' | 'class' | 'const' | 'covariant' |
   //                                  'enum' | 'export' | 'extension' | 'external' | 'factory' | 'final' | 'get' | 'import' | 'interface' |
-  //                                  'late' | 'library' | 'mixin' | 'part' | 'sealed' | 'set' | 'static' | 'typedef' | 'var' | 'void' | '}')
+  //                                  'late' | 'library' | 'mixin' | 'new' | 'part' | 'sealed' | 'set' | 'static' | 'typedef' | 'var' | 'void' | '}')
   static boolean class_member_recover(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "class_member_recover")) return false;
     boolean r;
@@ -1202,7 +1202,7 @@ public class DartParser implements PsiParser, LightPsiParser {
   public static boolean componentName(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "componentName")) return false;
     boolean r;
-    Marker m = enter_section_(b, l, _NONE_, COMPONENT_NAME, "<component name>");
+    Marker m = enter_section_(b, l, _COLLAPSE_, COMPONENT_NAME, "<component name>");
     r = nonStrictID(b, l + 1);
     exit_section_(b, l, m, r, false, null);
     return r;
@@ -5792,7 +5792,7 @@ public class DartParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // metadata* 'augment'? ('external' | 'const')* componentName '.' (componentName | 'new') formalParameterList initializers? (';' | functionBodyOrNative | redirection)?
+  // metadata* 'augment'? ('external' | 'const')* componentName '.' (componentName | newAsComponentName) formalParameterList initializers? (';' | functionBodyOrNative | redirection)?
   public static boolean namedConstructorDeclaration(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "namedConstructorDeclaration")) return false;
     boolean r, p;
@@ -5849,12 +5849,12 @@ public class DartParser implements PsiParser, LightPsiParser {
     return r;
   }
 
-  // componentName | 'new'
+  // componentName | newAsComponentName
   private static boolean namedConstructorDeclaration_5(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "namedConstructorDeclaration_5")) return false;
     boolean r;
     r = componentName(b, l + 1);
-    if (!r) r = consumeToken(b, NEW);
+    if (!r) r = newAsComponentName(b, l + 1);
     return r;
   }
 
@@ -6003,7 +6003,19 @@ public class DartParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // metadata* 'augment'? ('external' | 'const')* 'new' componentName? formalParameterList initializers? (';' | functionBodyOrNative | redirection)?
+  // 'new'
+  public static boolean newAsComponentName(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "newAsComponentName")) return false;
+    if (!nextTokenIs(b, NEW)) return false;
+    boolean r;
+    Marker m = enter_section_(b);
+    r = consumeToken(b, NEW);
+    exit_section_(b, m, COMPONENT_NAME, r);
+    return r;
+  }
+
+  /* ********************************************************** */
+  // metadata* 'augment'? ('external' | 'const')* newAsComponentName componentName? formalParameterList initializers? (';' | functionBodyOrNative | redirection)?
   public static boolean newConstructorDeclaration(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "newConstructorDeclaration")) return false;
     if (!nextTokenIs(b, "<new constructor declaration>", AT, AUGMENT,
@@ -6013,7 +6025,7 @@ public class DartParser implements PsiParser, LightPsiParser {
     r = newConstructorDeclaration_0(b, l + 1);
     r = r && newConstructorDeclaration_1(b, l + 1);
     r = r && newConstructorDeclaration_2(b, l + 1);
-    r = r && consumeToken(b, NEW);
+    r = r && newAsComponentName(b, l + 1);
     p = r; // pin = 4
     r = r && report_error_(b, newConstructorDeclaration_4(b, l + 1));
     r = p && report_error_(b, formalParameterList(b, l + 1)) && r;
@@ -7103,7 +7115,7 @@ public class DartParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  public static boolean record(PsiBuilder b, int l) {
+  public static boolean record_$(PsiBuilder b, int l) {
     Marker m = enter_section_(b);
     exit_section_(b, m, RECORD, true);
     return true;
@@ -8028,14 +8040,14 @@ public class DartParser implements PsiParser, LightPsiParser {
 
   /* ********************************************************** */
   // '.' 'new' | 'const' '.' ('new' | referenceExpression)
-  static boolean shorthandNewExpressionPrefix(PsiBuilder b, int l) {
+  public static boolean shorthandNewExpressionPrefix(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "shorthandNewExpressionPrefix")) return false;
-    if (!nextTokenIs(b, "", CONST, DOT)) return false;
+    if (!nextTokenIs(b, "<shorthand new expression prefix>", CONST, DOT)) return false;
     boolean r;
-    Marker m = enter_section_(b);
+    Marker m = enter_section_(b, l, _NONE_, SHORTHAND_NEW_EXPRESSION_PREFIX, "<shorthand new expression prefix>");
     r = parseTokens(b, 0, DOT, NEW);
     if (!r) r = shorthandNewExpressionPrefix_1(b, l + 1);
-    exit_section_(b, m, null, r);
+    exit_section_(b, l, m, r, false, null);
     return r;
   }
 
@@ -8604,7 +8616,7 @@ public class DartParser implements PsiParser, LightPsiParser {
   // !(<<nonStrictID>> | 'sync' | 'async' | '=>' | '{' | 'operator' |
   //                                                     '(' | ',' | ':' | ';' | '@' | 'abstract' | 'base' | 'class' | 'const' | 'covariant' |
   //                                                     'enum' | 'export' | 'extension' | 'external' | 'factory' | 'final' | 'get' | 'import' |
-  //                                                     'interface' | 'late' | 'library' | 'mixin' | 'native' | 'part' | 'sealed' | 'set' |
+  //                                                     'interface' | 'late' | 'library' | 'mixin' | 'native' | 'new' | 'part' | 'sealed' | 'set' |
   //                                                     'static' | 'typedef' | 'var' | 'void' | '}' )
   static boolean super_call_or_field_initializer_recover(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "super_call_or_field_initializer_recover")) return false;

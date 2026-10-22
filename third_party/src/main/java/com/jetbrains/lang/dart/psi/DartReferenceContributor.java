@@ -51,6 +51,8 @@ final class DartReferenceContributor extends PsiReferenceContributor {
       }
 
       final Project project = element.getProject();
+      if (DartAnalysisServerService.isLspNavigationEnabled(project)) return PsiReference.EMPTY_ARRAY;
+
       final VirtualFile file = DartResolveUtil.getRealVirtualFile(InjectedLanguageManager.getInstance(project).getTopLevelFile(element));
       if (!DartAnalysisServerService.isLocalAnalyzableFile(file)) return PsiReference.EMPTY_ARRAY;
 

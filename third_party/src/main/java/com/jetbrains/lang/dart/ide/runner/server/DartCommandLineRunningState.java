@@ -20,14 +20,13 @@ import com.intellij.openapi.actionSystem.Separator;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.io.FileUtil;
-import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.Consumer;
 import com.intellij.util.net.NetUtils;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService;
-import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
+
 import com.jetbrains.lang.dart.ide.runner.DartConsoleFilter;
 import com.jetbrains.lang.dart.ide.runner.DartExecutionHelper;
 import com.jetbrains.lang.dart.ide.runner.DartRelativePathsConsoleFilter;
@@ -139,7 +138,7 @@ public class DartCommandLineRunningState extends CommandLineState {
       final DartRunConfiguration dartRunConfiguration = (DartRunConfiguration)getEnvironment().getRunProfile();
       final VirtualFile launchFile = dartRunConfiguration.getRunnerParameters().getDartFileOrDirectory();
       final String message = DartBundle.message("analysis.issues.may.affect.the.execution",
-                                                DartProblemsView.OPEN_DART_ANALYSIS_LINK, dartRunConfiguration.getName());
+                                                dartRunConfiguration.getName());
       DartExecutionHelper.displayIssues(project, launchFile, message, dartRunConfiguration.getIcon());
     }
     catch (RuntimeConfigurationError error) {

@@ -15,12 +15,12 @@ import com.intellij.openapi.util.WriteExternalException;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.PathUtil;
-import com.intellij.util.xmlb.SkipDefaultValuesSerializationFilters;
 import com.intellij.util.xmlb.XmlSerializer;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
 import com.jetbrains.lang.dart.ide.runner.server.ui.DartWebdevConfigurationEditorForm;
+import org.jdom.Attribute;
 import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -62,7 +62,7 @@ public class DartWebdevConfiguration extends LocatableConfigurationBase<DartWebd
 
   @Override
   public @Nullable String suggestedName() {
-    // Attempt to compute the relative path to the html file, i.e. some "web/index.html"
+    // Attempt to compute the relative path to the HTML file, i.e. some "web/index.html"
     // If not successful, return at least the file name, i.e. some "index.html"
     final String htmlFilePath = myParameters.getHtmlFilePath();
     String htmlFilePathRelativeFromWorkingDir = null;
@@ -84,7 +84,13 @@ public class DartWebdevConfiguration extends LocatableConfigurationBase<DartWebd
   @Override
   public void writeExternal(@NotNull Element element) throws WriteExternalException {
     super.writeExternal(element);
-    XmlSerializer.serializeInto(myParameters, element, new SkipDefaultValuesSerializationFilters());
+    Element serializedState = XmlSerializer.serialize(myParameters);
+    if (serializedState != null) {
+      for (Attribute attribute : serializedState.getAttributes()) {
+        element.setAttribute(attribute.getName(), attribute.getValue());
+      }
+      element.addContent(serializedState.cloneContent());
+    }
   }
 
   @Override

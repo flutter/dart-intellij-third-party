@@ -35,12 +35,6 @@ public class DartNewConstructorDeclarationImpl extends AbstractDartComponentImpl
 
   @Override
   @Nullable
-  public DartComponentName getComponentName() {
-    return DartPsiImplUtil.getComponentName(this);
-  }
-
-  @Override
-  @Nullable
   public DartFormalParameterList getFormalParameterList() {
     return findChildByClass(DartFormalParameterList.class);
   }
@@ -73,6 +67,11 @@ public class DartNewConstructorDeclarationImpl extends AbstractDartComponentImpl
   @Nullable
   public DartStringLiteralExpression getStringLiteralExpression() {
     return findChildByClass(DartStringLiteralExpression.class);
+  }
+
+  @Override
+  public @Nullable DartComponentName getComponentName() {
+    return DartPsiImplUtil.getComponentName(this);
   }
 
 }

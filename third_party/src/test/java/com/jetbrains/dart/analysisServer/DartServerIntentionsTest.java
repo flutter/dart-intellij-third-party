@@ -37,7 +37,7 @@ public class DartServerIntentionsTest extends CodeInsightFixtureTestCase {
   }
 
   public void testIntroduceVariableNoSelection() {
-    doTest("Assign value to new local variable");
+    doTest("Assign value to local variable");
   }
 
   public void testSurroundWithTryCatch() {
@@ -95,7 +95,7 @@ public class DartServerIntentionsTest extends CodeInsightFixtureTestCase {
       main ( )  {
        Foo<caret>
          }""");
-    IntentionAction action = myFixture.findSingleIntention("Assign value to new local variable");
+    IntentionAction action = myFixture.findSingleIntention("Assign value to local variable");
     assertEquals("""
                    main ( )  {
                     var foo = Foo

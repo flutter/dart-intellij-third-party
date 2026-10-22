@@ -58,3 +58,16 @@ Here is the details of the changes made by the patch script:
 
 8. **Support External Library Files**:
    - Remove `if (!ProjectFileIndex.getInstance(project).isInContent(file)) return false` from `LspServerImpl.isSupportedFile(file)` so that the Dart LSP bridge can serve external library files (such as pub-cache packages and Dart SDK libraries like `dart:io`).
+
+9. **Cross-Version lsp4j 0.x / 1.0.0 Compatibility**:
+   - Add reflective compatibility helpers in `Lsp4jUtil.kt` (`Diagnostic.messageIfStringOrEmpty` and `getDocumentFilterPattern`) so bytecode does not directly invoke `Diagnostic.getMessage()` or `DocumentFilter.getPattern()`, whose return types changed from `String` in lsp4j 0.x (IntelliJ 253–262) to `Either` in lsp4j 1.0.0 (IntelliJ 263+).
+   - Update `applyTextEdits` in `Lsp4jUtil.kt` to unwrap `Either<TextEdit, SnippetTextEdit>` elements when running on lsp4j 1.0.0.
+   - Update `LspDiagnosticsCustomizer.kt`, `LspDiagnosticAndLazyQuickFixes.kt`, and `LspServerImpl.kt` to use these helpers.
+10. **LSP Structure View Support**:
+   - Copy `platform/lsp-impl/structureView/src` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`, register `LspStructureViewFactory` and `LspStructureViewProjectActivity` in `dart-lsp-impl.xml`, and make `LspStructureViewFactory` public (`class LspStructureViewFactory`) so `DartStructureViewFactory` can delegate to it.
+
+11. **LSP Go to Declaration or Usages Backport (`IJPL-156979` / `0634427a`)**:
+   - Backport upstream commit `0634427a` (`IJPL-156979`) to `LspImplicitReferenceProvider.kt` and `LspSearchTargetsRule.kt` (adapted for `LspServer` / `LspServerImpl` naming) so that invoking *Go to Declaration or Usages* (`GotoDeclarationAction`) on a declaration falls back to *Show Usages* via `LspSearchTarget`. (This backport can be dropped once the `intellij-community` sync source includes `0634427a`.)
+   - Keep `CurrentActionHolder` in `LspImplicitReferenceProvider.kt` `internal` (instead of `private`) so `DartTargetElementEvaluatorTest` can set `currentActionClass` in tests.
+
+

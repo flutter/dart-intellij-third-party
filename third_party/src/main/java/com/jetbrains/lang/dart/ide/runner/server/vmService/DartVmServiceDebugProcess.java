@@ -12,6 +12,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.ui.InputValidator;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Disposer;
@@ -21,7 +22,6 @@ import com.intellij.openapi.util.registry.Registry;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
@@ -46,15 +46,14 @@ import com.jetbrains.lang.dart.ide.runner.server.OpenDartObservatoryUrlAction;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceEvaluator;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceStackFrame;
 import com.jetbrains.lang.dart.ide.runner.server.vmService.frame.DartVmServiceSuspendContext;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.*;
 import com.jetbrains.lang.dart.ide.runner.server.webdev.DartDaemonParserUtil;
 import com.jetbrains.lang.dart.util.DartBazelFileUtil;
-import com.jetbrains.lang.dart.util.DartResolveUtil;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import org.dartlang.vm.service.VmService;
-import org.dartlang.vm.service.element.*;
-import org.dartlang.vm.service.logging.Logging;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.VmService;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.logging.Logging;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -276,7 +275,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
   }
 
   private void setLogger() {
-    Logging.setLogger(new org.dartlang.vm.service.logging.Logger() {
+    Logging.setLogger(new com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.logging.Logger() {
       @Override
       public void logError(final String message) {
         if (message.contains("\"code\":102,")) { // Cannot add breakpoint, already logged in logInformation()
@@ -403,16 +402,16 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
       if (remoteUri.startsWith(DartUrlResolver.DART_PREFIX)) continue;
       if (remoteUri.startsWith(DartUrlResolver.PACKAGE_PREFIX)) continue;
 
-      final PsiFile[] localFilesWithSameName = ReadAction.compute(() -> {
+      final Collection<VirtualFile> localFilesWithSameName = ReadAction.compute(() -> {
         final String remoteFileName = PathUtil.getFileName(remoteUri);
         final GlobalSearchScope scope = GlobalSearchScopesCore.directoryScope(getSession().getProject(), projectRoot, true);
-        return FilenameIndex.getFilesByName(getSession().getProject(), remoteFileName, scope);
+        return FilenameIndex.getVirtualFilesByName(remoteFileName, scope);
       });
 
       int howManyFilesMatch = 0;
 
-      for (PsiFile psiFile : localFilesWithSameName) {
-        final VirtualFile file = DartResolveUtil.getRealVirtualFile(psiFile);
+      for (VirtualFile file : localFilesWithSameName) {
+        ProgressManager.checkCanceled();
         if (file == null) continue;
 
         LOG.assertTrue(file.getPath().startsWith(projectRoot.getPath() + "/"), file.getPath() + "," + projectRoot.getPath());

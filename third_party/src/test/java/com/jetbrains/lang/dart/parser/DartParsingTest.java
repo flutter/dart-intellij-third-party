@@ -193,4 +193,8 @@ public class DartParsingTest extends ParsingTestCase {
   public void testPrimaryConstructors() {
     doTest();
   }
+
+  public void testPartsWithImports() {
+    doTest();
+  }
 }

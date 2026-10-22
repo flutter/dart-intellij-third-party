@@ -52,7 +52,6 @@ import org.jetbrains.io.Responses;
 import org.jetbrains.io.SimpleChannelInboundHandlerAdapter;
 
 import javax.swing.*;
-import javax.swing.event.HyperlinkEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -389,15 +388,13 @@ final class PubServerService extends NetService {
       final String message = DartBundle.message(myNotificationAboutErrors ? "dart.webdev.server.output.contains.errors"
                                                                           : "dart.webdev.server.output.contains.warnings");
 
-      myNotification = NOTIFICATION_GROUP.createNotification(message, NotificationType.WARNING).setListener(new NotificationListener.Adapter() {
-        @Override
-        protected void hyperlinkActivated(final @NotNull Notification notification, final @NotNull HyperlinkEvent e) {
-          notification.expire();
-          ToolWindowManager.getInstance(myProject).getToolWindow(DART_WEBDEV).activate(null);
-        }
-      });
-
-      myNotification.notify(myProject);
+      final Notification notification = NOTIFICATION_GROUP.createNotification(message, NotificationType.WARNING);
+      notification.addAction(NotificationAction.createSimple(DartBundle.message("open.dart.webdev.server.action.text"), () -> {
+                notification.expire();
+                ToolWindowManager.getInstance(myProject).getToolWindow(DART_WEBDEV).activate(null);
+              }));
+      myNotification = notification;
+      notification.notify(myProject);
     }
   }
 }

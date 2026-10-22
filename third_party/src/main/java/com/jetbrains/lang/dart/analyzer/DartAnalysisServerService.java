@@ -13,7 +13,6 @@ import com.google.dart.server.FindElementReferencesConsumer;
 import com.google.dart.server.FormatConsumer;
 import com.google.dart.server.GetAssistsConsumer;
 import com.google.dart.server.GetFixesConsumer;
-import com.google.dart.server.GetHoverConsumer;
 import com.google.dart.server.GetImportedElementsConsumer;
 import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
@@ -38,6 +37,7 @@ import com.google.dart.server.internal.remote.DebugPrintStream;
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl;
 import com.google.dart.server.internal.remote.StdioServerSocket;
 import com.google.dart.server.utilities.logging.Logging;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.intellij.codeInsight.CodeInsightSettings;
 import com.intellij.openapi.Disposable;
@@ -98,6 +98,8 @@ import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
+import com.jetbrains.lang.dart.lsp.DartLspConfigurationSync;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
 import com.jetbrains.lang.dart.sdk.DartSdkUtil;
@@ -110,7 +112,6 @@ import org.dartlang.analysis.server.protocol.AnalysisError;
 import org.dartlang.analysis.server.protocol.AnalysisErrorFixes;
 import org.dartlang.analysis.server.protocol.AnalysisErrorSeverity;
 import org.dartlang.analysis.server.protocol.AnalysisErrorType;
-import org.dartlang.analysis.server.protocol.AnalysisOptions;
 import org.dartlang.analysis.server.protocol.AnalysisService;
 import org.dartlang.analysis.server.protocol.AnalysisStatus;
 import org.dartlang.analysis.server.protocol.AvailableSuggestionSet;
@@ -120,7 +121,6 @@ import org.dartlang.analysis.server.protocol.CompletionService;
 import org.dartlang.analysis.server.protocol.CompletionSuggestion;
 import org.dartlang.analysis.server.protocol.Element;
 import org.dartlang.analysis.server.protocol.HighlightRegion;
-import org.dartlang.analysis.server.protocol.HoverInformation;
 import org.dartlang.analysis.server.protocol.ImplementedClass;
 import org.dartlang.analysis.server.protocol.ImplementedMember;
 import org.dartlang.analysis.server.protocol.ImportedElements;
@@ -147,6 +147,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import java.io.File;
 import java.net.URI;
@@ -180,6 +181,20 @@ public final class DartAnalysisServerService implements Disposable {
   // https://htmlpreview.github.io/?https://github.com/dart-lang/sdk/blob/main/pkg/analysis_server/doc/api.html#request_server.setClientCapabilities
   public static final String MIN_FILE_URI_SDK_VERSION = "3.4.0";
   private static final String MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION = "3.8";
+  public static final String MIN_LSP_NAVIGATION_SDK_VERSION = "3.14.0-65.0.dev";
+  public static final String MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION = "3.14.0-137.0.dev";
+  public static final String MIN_LSP_REFERENCES_SDK_VERSION = "3.14.0-65.0.dev";
+  public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
+  public static final String MIN_LSP_CLOSING_LABELS_SDK_VERSION = "3.14.0-219.0.dev";
+  public static final String MIN_LSP_COMPLETION_SDK_VERSION = "3.14.0-226.0.dev";
+  // The first Dart SDK with dart-lang/sdk@6700ccc4316 (Analysis Server API 1.41.0), which accepts
+  // `workspace/didChangeConfiguration` from the client as an `lsp.notification`. An older server
+  // logs that notification as an error, so it must not be sent at all.
+  public static final String MIN_LSP_INLAY_HINTS_CONFIGURATION_SDK_VERSION = "3.14.0-258.0.dev";
+  // Although textDocument/codeAction was added in 3.9.0-122.0.dev, we match
+  // MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION because LSP quick fixes in the JetBrains LSP client
+  // depend on publishDiagnostics notifications.
+  public static final String MIN_LSP_CODE_ACTIONS_SDK_VERSION = MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION;
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 
@@ -188,7 +203,6 @@ public final class DartAnalysisServerService implements Disposable {
   private static final long EDIT_FORMAT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
   private static final long EDIT_ORGANIZE_DIRECTIVES_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(300);
   private static final long EDIT_SORT_MEMBERS_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
-  private static final long GET_HOVER_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_NAVIGATION_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_ASSISTS_TIMEOUT_EDT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long GET_ASSISTS_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(1000);
@@ -225,7 +239,9 @@ public final class DartAnalysisServerService implements Disposable {
   private @Nullable StdioServerSocket myServerSocket;
 
   private @NotNull String myServerVersion = "";
-  private @NotNull String mySdkVersion = "";
+  // Written when the server starts or stops, read from the thread that computes the inlay hints,
+  // see DartLspConfigurationSync.
+  private volatile @NotNull String mySdkVersion = "";
   private @Nullable String mySdkHome;
 
   private final DartServerRootsHandler myRootsHandler;
@@ -289,49 +305,7 @@ public final class DartAnalysisServerService implements Disposable {
 
     @Override
     public void computedErrors(@NotNull String filePathOrUri, @NotNull List<AnalysisError> errors) {
-      DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathOrUri);
-
-      final ProgressIndicator indicator = myProgressIndicator;
-      if (indicator != null && fileInfo instanceof DartLocalFileInfo localFileInfo) {
-        String fileName = PathUtil.getFileName(localFileInfo.getFilePath());
-        indicator.setText(DartBundle.message("dart.analysis.progress.with.file", fileName));
-      }
-
-      final List<AnalysisError> errorsWithoutTodo = errors.isEmpty() ? Collections.emptyList() : new ArrayList<>(errors.size());
-      boolean hasSevereProblems = false;
-
-      for (AnalysisError error : errors) {
-        if (AnalysisErrorSeverity.ERROR.equals(error.getSeverity())) {
-          hasSevereProblems = true;
-        }
-        if (!AnalysisErrorType.TODO.equals(error.getType())) {
-          errorsWithoutTodo.add(error);
-        }
-      }
-
-      int newHash = errorsWithoutTodo.isEmpty() ? 0 : ensureNotZero(errorsWithoutTodo.hashCode());
-
-      if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-        int oldHash;
-        synchronized (myFilePathsWithErrors) {
-          // TObjectIntHashMap returns 0 if there's no such entry, it's equivalent to empty error set for this file
-          oldHash = myFilePathToErrorsHash.getInt(localFileInfo.getFilePath());
-        }
-
-        // do nothing if errors are the same as were already handled previously
-        if (oldHash == newHash && myServerData.isErrorInfoUpToDate(localFileInfo)) return;
-      }
-
-      boolean restartHighlighting =
-        fileInfo instanceof DartLocalFileInfo localFileInfo && myVisibleFileUris.contains(getLocalFileUri(localFileInfo.getFilePath()))
-        ||
-        fileInfo instanceof DartNotLocalFileInfo notLocalFileInfo && myVisibleFileUris.contains(notLocalFileInfo.getFileUri());
-
-      if (myServerData.computedErrors(fileInfo, errorsWithoutTodo, restartHighlighting)) {
-        if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-          onErrorsUpdated(localFileInfo, errorsWithoutTodo, hasSevereProblems, newHash);
-        }
-      }
+      processComputedErrors(filePathOrUri, errors, true);
     }
 
     @Override
@@ -578,6 +552,229 @@ public final class DartAnalysisServerService implements Disposable {
     return StringUtil.compareVersionNumbers(sdkVersion, MIN_WORKSPACE_APPLY_EDITS_SDK_VERSION) >= 0;
   }
 
+  public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion) {
+    return buildLspCapabilities(sdkVersion, false, false);
+  }
+
+  public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion, boolean supportsLspDiagnostics) {
+    return buildLspCapabilities(sdkVersion, supportsLspDiagnostics, false, false);
+  }
+
+  public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion,
+                                                         boolean supportsLspDiagnostics,
+                                                         boolean supportsLspClosingLabels) {
+    return buildLspCapabilities(sdkVersion, supportsLspDiagnostics, supportsLspClosingLabels, false);
+  }
+
+  public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion,
+                                                         boolean supportsLspDiagnostics,
+                                                         boolean supportsLspClosingLabels,
+                                                         boolean supportsLspCodeActions) {
+    return buildLspCapabilities(sdkVersion, supportsLspDiagnostics, supportsLspClosingLabels, supportsLspCodeActions, false);
+  }
+
+  public static @NotNull JsonObject buildLspCapabilities(@NotNull String sdkVersion,
+                                                         boolean supportsLspDiagnostics,
+                                                         boolean supportsLspClosingLabels,
+                                                         boolean supportsLspCodeActions,
+                                                         boolean supportsLspConfiguration) {
+    JsonObject lspCapabilities = new JsonObject();
+
+    JsonObject workspace = new JsonObject();
+
+    if (supportsLspConfiguration) {
+      // Without this the server never asks for the `dart` configuration section, so the settings of
+      // Settings | Editor | Inlay Hints would never reach it. It is only advertised once the
+      // DartBridgeLspServer is connected to the LSP client, so workspace/configuration is handled
+      // through DartBridgeLspServer -> DartLspServerDescriptor.getWorkspaceConfiguration.
+      workspace.addProperty("configuration", true);
+    }
+
+    if (isDartSdkVersionSufficientForWorkspaceApplyEdits(sdkVersion)) {
+      workspace.addProperty("applyEdit", true);
+
+      JsonObject workspaceEdit = new JsonObject();
+      workspaceEdit.addProperty("documentChanges", true);
+      workspace.add("workspaceEdit", workspaceEdit);
+
+      JsonObject fileOperations = new JsonObject();
+      fileOperations.addProperty("willRename", true);
+      workspace.add("fileOperations", fileOperations);
+    }
+
+    if (workspace.size() > 0) {
+      lspCapabilities.add("workspace", workspace);
+    }
+
+    JsonObject textDocument = new JsonObject();
+
+    JsonObject documentSymbol = new JsonObject();
+    documentSymbol.addProperty("hierarchicalDocumentSymbolSupport", true);
+    textDocument.add("documentSymbol", documentSymbol);
+
+    JsonObject definition = new JsonObject();
+    definition.addProperty("linkSupport", true);
+    textDocument.add("definition", definition);
+
+    JsonObject typeDefinition = new JsonObject();
+    typeDefinition.addProperty("linkSupport", true);
+    textDocument.add("typeDefinition", typeDefinition);
+
+    if (supportsLspDiagnostics) {
+      JsonObject publishDiagnostics = new JsonObject();
+      publishDiagnostics.addProperty("relatedInformation", true);
+      publishDiagnostics.addProperty("codeDescriptionSupport", true);
+
+      JsonObject tagSupport = new JsonObject();
+      JsonArray valueSet = new JsonArray();
+      valueSet.add(1); // Unnecessary
+      valueSet.add(2); // Deprecated
+      tagSupport.add("valueSet", valueSet);
+      publishDiagnostics.add("tagSupport", tagSupport);
+
+      textDocument.add("publishDiagnostics", publishDiagnostics);
+    }
+
+    if (isDartSdkVersionSufficientForLspCompletion(sdkVersion)) {
+      JsonObject completion = new JsonObject();
+      JsonObject completionItem = new JsonObject();
+      completionItem.addProperty("snippetSupport", true);
+      completionItem.addProperty("labelDetailsSupport", true);
+      completionItem.addProperty("deprecatedSupport", true);
+      completionItem.addProperty("insertReplaceSupport", true);
+      completion.add("completionItem", completionItem);
+      textDocument.add("completion", completion);
+    }
+
+    if (supportsLspClosingLabels) {
+      JsonObject experimental = lspCapabilities.has("experimental")
+                                ? lspCapabilities.getAsJsonObject("experimental")
+                                : new JsonObject();
+      experimental.add("closingLabels", new JsonObject());
+      lspCapabilities.add("experimental", experimental);
+    }
+
+    if (supportsLspCodeActions) {
+      JsonObject codeAction = new JsonObject();
+      JsonObject codeActionLiteralSupport = new JsonObject();
+      JsonObject codeActionKind = new JsonObject();
+      JsonArray valueSet = new JsonArray();
+      valueSet.add("");
+      valueSet.add("quickfix");
+      valueSet.add("refactor");
+      valueSet.add("refactor.extract");
+      valueSet.add("refactor.inline");
+      valueSet.add("refactor.rewrite");
+      valueSet.add("source");
+      valueSet.add("source.organizeImports");
+      codeActionKind.add("valueSet", valueSet);
+      codeActionLiteralSupport.add("codeActionKind", codeActionKind);
+      codeAction.add("codeActionLiteralSupport", codeActionLiteralSupport);
+
+      codeAction.addProperty("dataSupport", true);
+
+      textDocument.add("codeAction", codeAction);
+    }
+
+    lspCapabilities.add("textDocument", textDocument);
+
+    return lspCapabilities;
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspNavigation(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_NAVIGATION_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspNavigationEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspNavigation(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspCompletion(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_COMPLETION_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspCompletionEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspCompletion(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspPublishDiagnostics(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspReferences(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_REFERENCES_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspClosingLabels(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_CLOSING_LABELS_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspPublishDiagnosticsEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspPublishDiagnostics(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspInlayHints(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_INLAY_HINTS_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspInlayHintsConfiguration(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_INLAY_HINTS_CONFIGURATION_SDK_VERSION) >= 0;
+  }
+
+  /**
+   * Whether the running server can be told that the configuration has changed, see
+   * {@link com.jetbrains.lang.dart.lsp.DartLspConfigurationSync}. Checks the SDK that the running
+   * server was started from, because that is the server the notification goes to.
+   */
+  public boolean isLspConfigurationNotificationSupported() {
+    return isDartSdkVersionSufficientForLspInlayHintsConfiguration(mySdkVersion);
+  }
+
+  public static boolean isLspInlayHintsEnabled(final @NotNull Project project) {
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspInlayHints(sdk.getVersion());
+  }
+
+  public static boolean isLspReferencesEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspReferences(sdk.getVersion());
+  }
+
+  public static boolean isLspClosingLabelsEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspClosingLabels(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspCodeActions(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_CODE_ACTIONS_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspCodeActionsEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspCodeActions(sdk.getVersion());
+  }
+
   public boolean shouldUseCompletion2() {
     return StringUtil.compareVersionNumbers(getServerVersion(), COMPLETION_2_SERVER_VERSION) >= 0;
   }
@@ -801,6 +998,7 @@ public final class DartAnalysisServerService implements Disposable {
         updateCurrentFile();
 
         if (isLocalAnalyzableFile(file)) {
+          myServerData.onFileOpened(file);
           updateVisibleFiles();
         }
       }
@@ -809,7 +1007,13 @@ public final class DartAnalysisServerService implements Disposable {
       public void selectionChanged(@NotNull FileEditorManagerEvent event) {
         updateCurrentFile();
 
-        if (isLocalAnalyzableFile(event.getOldFile()) || isLocalAnalyzableFile(event.getNewFile())) {
+        final VirtualFile newFile = event.getNewFile();
+        final boolean isNewFileAnalyzable = isLocalAnalyzableFile(newFile);
+
+        if (isLocalAnalyzableFile(event.getOldFile()) || isNewFileAnalyzable) {
+          if (isNewFileAnalyzable) {
+            myServerData.onFileOpened(newFile);
+          }
           updateVisibleFiles();
         }
       }
@@ -836,10 +1040,9 @@ public final class DartAnalysisServerService implements Disposable {
       public void beforeDocumentChange(@NotNull DocumentEvent e) {
         if (myServer == null) return;
 
-        myServerData.onDocumentChanged(e);
-
         final VirtualFile file = FileDocumentManager.getInstance().getFile(e.getDocument());
         if (isLocalAnalyzableFile(file)) {
+          myServerData.onDocumentChanged(e);
           for (VirtualFile fileInEditor : FileEditorManager.getInstance(myProject).getOpenFiles()) {
             if (fileInEditor.equals(file)) {
               synchronized (myLock) {
@@ -848,10 +1051,9 @@ public final class DartAnalysisServerService implements Disposable {
               break;
             }
           }
+          myUpdateFilesAlarm.cancelAllRequests();
+          myUpdateFilesAlarm.addRequest(DartAnalysisServerService.this::updateFilesContent, UPDATE_FILES_TIMEOUT);
         }
-
-        myUpdateFilesAlarm.cancelAllRequests();
-        myUpdateFilesAlarm.addRequest(DartAnalysisServerService.this::updateFilesContent, UPDATE_FILES_TIMEOUT);
       }
     };
 
@@ -954,24 +1156,24 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public void updateVisibleFiles() {
-    ApplicationManager.getApplication().assertReadAccessAllowed();
+    ApplicationManager.getApplication().runReadAction(() -> {
+      synchronized (myLock) {
+        final List<String> newVisibleFileUris = new ArrayList<>();
 
-    synchronized (myLock) {
-      final List<String> newVisibleFileUris = new ArrayList<>();
+        for (VirtualFile file : FileEditorManager.getInstance(myProject).getSelectedFiles()) {
+          if (isLocalAnalyzableFile(file)) {
+            newVisibleFileUris.add(getFileUri(file));
+          }
+        }
 
-      for (VirtualFile file : FileEditorManager.getInstance(myProject).getSelectedFiles()) {
-        if (isLocalAnalyzableFile(file)) {
-          newVisibleFileUris.add(getFileUri(file));
+        if (!Comparing.haveEqualElements(myVisibleFileUris, newVisibleFileUris)) {
+          myVisibleFileUris.clear();
+          myVisibleFileUris.addAll(newVisibleFileUris);
+          analysis_setPriorityFiles();
+          analysis_setSubscriptions();
         }
       }
-
-      if (!Comparing.haveEqualElements(myVisibleFileUris, newVisibleFileUris)) {
-        myVisibleFileUris.clear();
-        myVisibleFileUris.addAll(newVisibleFileUris);
-        analysis_setPriorityFiles();
-        analysis_setSubscriptions();
-      }
-    }
+    });
   }
 
   /**
@@ -1074,6 +1276,9 @@ public final class DartAnalysisServerService implements Disposable {
         myServerData.onFilesContentUpdated();
       });
     }
+    else {
+      myServerData.onFilesContentUpdated();
+    }
   }
 
   public void ensureAnalysisRootsUpToDate() {
@@ -1095,6 +1300,63 @@ public final class DartAnalysisServerService implements Disposable {
     List<String> excludedRootUris = ContainerUtil.map(excludedRootPaths, this::getLocalFileUri);
     server.analysis_setAnalysisRoots(includedRootUris, excludedRootUris, null);
     return true;
+  }
+
+  public void onLspDiagnosticsUpdated(@NotNull String filePathOrUri, @NotNull List<AnalysisError> errors) {
+    // Delegates to shared processComputedErrors logic so that LSP publishDiagnostics notifications
+    // behave 100% identically to legacy DAS computedErrors notifications (TODO filtering, error state deduplication,
+    // active editor highlighting updates, Project View decorators, and Dart Analysis tool window population).
+    processComputedErrors(filePathOrUri, errors, false);
+  }
+
+  private void processComputedErrors(@NotNull String filePathOrUri,
+                                     @NotNull List<AnalysisError> errors,
+                                     boolean updateProgressIndicator) {
+    DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathOrUri);
+
+    if (updateProgressIndicator) {
+      final ProgressIndicator indicator = myProgressIndicator;
+      if (indicator != null && fileInfo instanceof DartLocalFileInfo localFileInfo) {
+        String fileName = PathUtil.getFileName(localFileInfo.getFilePath());
+        indicator.setText(DartBundle.message("dart.analysis.progress.with.file", fileName));
+      }
+    }
+
+    final List<AnalysisError> errorsWithoutTodo = errors.isEmpty() ? Collections.emptyList() : new ArrayList<>(errors.size());
+    boolean hasSevereProblems = false;
+
+    for (AnalysisError error : errors) {
+      if (AnalysisErrorSeverity.ERROR.equals(error.getSeverity())) {
+        hasSevereProblems = true;
+      }
+      if (!AnalysisErrorType.TODO.equals(error.getType())) {
+        errorsWithoutTodo.add(error);
+      }
+    }
+
+    int newHash = errorsWithoutTodo.isEmpty() ? 0 : ensureNotZero(errorsWithoutTodo.hashCode());
+
+    if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
+      int oldHash;
+      synchronized (myFilePathsWithErrors) {
+        // TObjectIntHashMap returns 0 if there's no such entry, it's equivalent to empty error set for this file
+        oldHash = myFilePathToErrorsHash.getInt(localFileInfo.getFilePath());
+      }
+
+      // do nothing if errors are the same as were already handled previously
+      if (oldHash == newHash && myServerData.isErrorInfoUpToDate(localFileInfo)) return;
+    }
+
+    boolean restartHighlighting =
+      fileInfo instanceof DartLocalFileInfo localFileInfo && myVisibleFileUris.contains(getLocalFileUri(localFileInfo.getFilePath()))
+      ||
+      fileInfo instanceof DartNotLocalFileInfo notLocalFileInfo && myVisibleFileUris.contains(notLocalFileInfo.getFileUri());
+
+    if (myServerData.computedErrors(fileInfo, errorsWithoutTodo, restartHighlighting)) {
+      if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
+        onErrorsUpdated(localFileInfo, errorsWithoutTodo, hasSevereProblems, newHash);
+      }
+    }
   }
 
   private void onErrorsUpdated(@NotNull DartLocalFileInfo localFileInfo,
@@ -1151,39 +1413,6 @@ public final class DartAnalysisServerService implements Disposable {
     if (myInitializationOnServerStartupDone) {
       DartProblemsView.getInstance(myProject).clearAll();
     }
-  }
-
-  public @NotNull List<HoverInformation> analysis_getHover(final @NotNull VirtualFile file, final int _offset) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return HoverInformation.EMPTY_LIST;
-    }
-
-    final String fileUri = getFileUri(file);
-    final List<HoverInformation> result = new ArrayList<>();
-
-    final CountDownLatch latch = new CountDownLatch(1);
-    final int offset = getOriginalOffset(file, _offset);
-    server.analysis_getHover(fileUri, offset, new GetHoverConsumer() {
-      @Override
-      public void computedHovers(HoverInformation[] hovers) {
-        Collections.addAll(result, hovers);
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(RequestError error) {
-        logError("analysis_getHover()", fileUri, error);
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_HOVER_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("analysis_getHover", GET_HOVER_TIMEOUT, fileUri);
-    }
-    return result;
   }
 
   public @Nullable List<DartServerData.DartNavigationRegion> analysis_getNavigation(final @NotNull VirtualFile file,
@@ -1999,6 +2228,7 @@ public final class DartAnalysisServerService implements Disposable {
       subscriptions.put(AnalysisService.IMPLEMENTED, myVisibleFileUris);
       subscriptions.put(AnalysisService.CLOSING_LABELS, myVisibleFileUris);
 
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("analysis_setSubscriptions, subscriptions:\n" + subscriptions);
       }
@@ -2312,14 +2542,8 @@ public final class DartAnalysisServerService implements Disposable {
 
         mySdkVersion = sdk.getVersion();
 
-        startedServer.analysis_updateOptions(new AnalysisOptions(true, true, true, true, false, true, false));
-        boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
-        boolean supportsWorkspaceApplyEdits = isDartSdkVersionSufficientForWorkspaceApplyEdits(mySdkVersion);
-        startedServer.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
-                                                   supportsUris,
-                                                   supportsWorkspaceApplyEdits);
-
         myServer = startedServer;
+        updateClientCapabilities();
 
         // Clear any dart view notifications.
         ApplicationManager.getApplication().invokeLater(
@@ -2435,6 +2659,11 @@ public final class DartAnalysisServerService implements Disposable {
       mySdkHome = null;
       mySdkVersion = "";
       myServerVersion = "";
+      // The next server starts out knowing nothing about the settings of this client.
+      DartLspConfigurationSync configurationSync = myProject.getServiceIfCreated(DartLspConfigurationSync.class);
+      if (configurationSync != null) {
+        configurationSync.serverStopped();
+      }
       myFilePathWithOverlaidContentToTimestamp.clear();
       myVisibleFileUris.clear();
       myChangedDocuments.clear();
@@ -2459,6 +2688,19 @@ public final class DartAnalysisServerService implements Disposable {
       myDtdUri = uri;
       server.lsp_connectToDtd(uri);
     }
+  }
+
+  /**
+   * Stops the analysis server and waits (bounded) for its process to exit, so that
+   * shutdown-time side effects such as flushing analytics have happened on return.
+   * <p>
+   * Blocks the calling thread for up to {@code SEND_REQUEST_TIMEOUT}, plus the time
+   * {@code StdioServerSocket.stop()} needs to force the process down if it doesn't exit.
+   */
+  @TestOnly
+  public void stopServer_TESTS_ONLY() {
+    assert ApplicationManager.getApplication().isUnitTestMode();
+    stopServer();
   }
 
   public void waitForAnalysisToComplete_TESTS_ONLY(final @NotNull VirtualFile file) {
@@ -2682,6 +2924,50 @@ public final class DartAnalysisServerService implements Disposable {
     if (server != null) {
       server.sendRequestToServer(id, request);
     }
+  }
+
+  public void updateClientCapabilities() {
+    DartBridgeLspServerManager bridgeManager = myProject.getServiceIfCreated(DartBridgeLspServerManager.class);
+    updateClientCapabilities(bridgeManager != null && bridgeManager.isClientConnected());
+  }
+
+  public void updateClientCapabilities(boolean supportsLspConfiguration) {
+    final RemoteAnalysisServerImpl server = myServer;
+    if (server != null) {
+      boolean supportsUris = isDartSdkVersionSufficientForFileUri(mySdkVersion);
+      boolean supportsLspDiagnostics = isLspPublishDiagnosticsEnabled(myProject);
+      boolean supportsLspClosingLabels = isLspClosingLabelsEnabled(myProject);
+      boolean supportsLspCodeActions = isLspCodeActionsEnabled(myProject);
+      server.server_setClientCapabilities(List.of("openUrlRequest", "showMessageRequest"),
+                                          supportsUris,
+                                          buildLspCapabilities(mySdkVersion,
+                                                               supportsLspDiagnostics,
+                                                               supportsLspClosingLabels,
+                                                               supportsLspCodeActions,
+                                                               supportsLspConfiguration));
+    }
+  }
+
+  public void sendResponse(JsonObject response) {
+    final RemoteAnalysisServerImpl server = myServer;
+    if (server != null) {
+      server.sendResponseToServer(response);
+    }
+  }
+
+  /**
+   * Send a notification, i.e. a message that the server never answers.
+   *
+   * @return whether there was a running server to send it to; a notification has no response, so a
+   * caller that tracks what the server knows has no other way of noticing that it never went out
+   */
+  public boolean sendNotification(JsonObject notification) {
+    final RemoteAnalysisServerImpl server = myServer;
+    if (server == null) {
+      return false;
+    }
+    server.sendNotificationToServer(notification);
+    return true;
   }
 
   /**

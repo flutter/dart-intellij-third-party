@@ -1,8 +1,3 @@
 - name: lib/dart.jar
   modules:
   - name: intellij.dart
-- name: lib/weberknecht-0.1.5.jar.jar
-  library: weberknecht-0.1.5.jar
-  module: intellij.dart
-  files:
-  - name: $PROJECT_DIR$/contrib/Dart/lib/weberknecht-0.jar

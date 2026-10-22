@@ -5,7 +5,6 @@ import com.intellij.CommonBundle;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.WriteAction;
-import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
@@ -124,6 +123,7 @@ public abstract class ServerRefactoringDialog<T extends ServerRefactoring> exten
     });
 
     if (error == null) {
+      myRefactoring.reportAnalytics();
       close(DialogWrapper.OK_EXIT_CODE);
     }
     else {

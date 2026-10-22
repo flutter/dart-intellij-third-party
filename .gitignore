@@ -1,9 +1,8 @@
 # Mac Finder settings
 .DS_Store
 
-
 # IntelliJ and IDEs
-.idea/
+/.idea/
 **/.idea/
 *.iml
 third_party/.settings/
@@ -15,6 +14,7 @@ third_party/.settings/
 out/
 
 # Dart / Flutter
+/dart-sdk/
 .dart_tool/
 .packages
 pubspec.lock

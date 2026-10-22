@@ -29,9 +29,15 @@ public class DartNewExpressionImpl extends DartReferenceImpl implements DartNewE
   }
 
   @Override
-  @NotNull
-  public List<DartReferenceExpression> getReferenceExpressionList() {
-    return PsiTreeUtil.getChildrenOfTypeAsList(this, DartReferenceExpression.class);
+  @Nullable
+  public DartReferenceExpression getReferenceExpression() {
+    return findChildByClass(DartReferenceExpression.class);
+  }
+
+  @Override
+  @Nullable
+  public DartShorthandNewExpressionPrefix getShorthandNewExpressionPrefix() {
+    return findChildByClass(DartShorthandNewExpressionPrefix.class);
   }
 
   @Override

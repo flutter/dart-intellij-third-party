@@ -397,7 +397,7 @@ public class DartVisitor extends PsiElementVisitor {
   }
 
   public void visitNewConstructorDeclaration(@NotNull DartNewConstructorDeclaration o) {
-    visitPsiCompositeElement(o);
+    visitComponent(o);
   }
 
   public void visitNewExpression(@NotNull DartNewExpression o) {
@@ -573,6 +573,10 @@ public class DartVisitor extends PsiElementVisitor {
 
   public void visitShorthandExpression(@NotNull DartShorthandExpression o) {
     visitExpression(o);
+  }
+
+  public void visitShorthandNewExpressionPrefix(@NotNull DartShorthandNewExpressionPrefix o) {
+    visitReference(o);
   }
 
   public void visitShowCombinator(@NotNull DartShowCombinator o) {

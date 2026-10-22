@@ -15,13 +15,13 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleType;
 import com.intellij.openapi.module.WebModuleBuilder;
 import com.intellij.openapi.module.WebModuleTypeBase;
+import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ContentEntry;
 import com.intellij.openapi.roots.ModifiableModelsProvider;
 import com.intellij.openapi.roots.ModifiableRootModel;
 import com.intellij.openapi.roots.libraries.LibraryTable;
 import com.intellij.openapi.roots.libraries.LibraryTablesRegistrar;
-import com.intellij.openapi.startup.StartupManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -178,20 +178,21 @@ public final class DartModuleBuilder extends ModuleBuilder {
   }
 
   static void runWhenNonModalIfModuleNotDisposed(final @NotNull Runnable runnable, final @NotNull Module module) {
-    // runnable must not be executed immediately because the new project model might be not yet committed, so Dart SDK won't be found
-    // In WebStorm we get already initialized project at this point, but in IntelliJ IDEA - not yet initialized.
+    // runnable must not be executed immediately because the new project model might be not yet committed, so Dart SDK won't be found.
+    // DumbService.runWhenSmart waits for the project to be fully initialized, loaded, and indexed.
+    // This perfectly handles both WebStorm (already initialized) and IntelliJ IDEA (needs to wait).
 
-    if (module.getProject().isInitialized()) {
-      ApplicationManager.getApplication().invokeLater(runnable, ModalityState.nonModal(), module.getDisposed());
-      return;
-    }
-
-    StartupManager.getInstance(module.getProject()).runWhenProjectIsInitialized(() -> {
+    DumbService.getInstance(module.getProject()).runWhenSmart(() -> {
+      if (module.isDisposed()) return;
       if (ModalityState.current() == ModalityState.nonModal()) {
         runnable.run();
       }
       else {
-        ApplicationManager.getApplication().invokeLater(runnable, ModalityState.nonModal(), o -> module.isDisposed());
+        ApplicationManager.getApplication().invokeLater(
+                runnable,
+                ModalityState.nonModal(),
+                o -> module.isDisposed()
+        );
       }
     });
   }

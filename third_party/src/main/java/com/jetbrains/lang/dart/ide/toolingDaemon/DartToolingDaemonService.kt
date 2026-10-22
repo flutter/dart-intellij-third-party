@@ -5,7 +5,6 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.intellij.execution.ExecutionException
-import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.KillableProcessHandler
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessListener
@@ -19,7 +18,6 @@ import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.*
 import com.intellij.util.EventDispatcher
@@ -29,22 +27,27 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
-import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
-import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.websocket.WebSocket
 import com.jetbrains.lang.dart.websocket.WebSocketEventHandler
 import com.jetbrains.lang.dart.websocket.WebSocketException
 import com.jetbrains.lang.dart.websocket.WebSocketMessage
 import kotlinx.coroutines.CoroutineScope
 import java.net.URI
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
+
+private data class PendingRequest(
+  val method: String,
+  val params: JsonObject,
+  val includeSecret: Boolean,
+  val consumer: DartToolingDaemonConsumer
+)
 
 @Service(Service.Level.PROJECT)
 class DartToolingDaemonService private constructor(val project: Project, cs: CoroutineScope) : Disposable {
@@ -56,6 +59,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   var webSocketListener: DartToolingDaemonWebSocketListener? = null
 
   private lateinit var webSocket: WebSocket
+  @Volatile
   var webSocketReady: Boolean = false
     private set
 
@@ -64,6 +68,8 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   private var secret: String? = null
 
   private var lastSentRootUris: List<String> = emptyList()
+
+  private val pendingRequests = ConcurrentLinkedQueue<PendingRequest>()
 
   private val nextRequestId = AtomicInteger()
   private val consumerMap: MutableMap<Int, DartToolingDaemonConsumer> = mutableMapOf()
@@ -88,12 +94,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
 
     activeLocationChangeEventSupported = DartAnalysisServerService.isDartSdkVersionSufficientForWorkspaceApplyEdits(sdk.version)
 
-    val commandLine = GeneralCommandLine().withWorkDirectory(sdk.homePath)
-    commandLine.exePath = FileUtil.toSystemDependentName(DartSdkUtil.getDartExePath(sdk))
-    commandLine.charset = StandardCharsets.UTF_8
-    commandLine.addParameter("tooling-daemon")
-    commandLine.addParameter("--machine")
-    Analytics.updateEnvironment(commandLine)
+    val commandLine = createDtdCommandLine(sdk)
 
     logger.info("Starting Dart Tooling Daemon, sdk ${sdk.version}")
     dtdProcessHandler = object : KillableProcessHandler(commandLine) {
@@ -151,6 +152,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     uri = null
     secret = null
     lastSentRootUris = emptyList()
+    pendingRequests.clear()
     consumerMap.clear()
     servicesMap.clear()
   }
@@ -180,11 +182,31 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
 
   @Throws(WebSocketException::class)
   fun sendRequest(method: String, params: JsonObject, includeSecret: Boolean, consumer: DartToolingDaemonConsumer) {
-    if (!webSocketReady) {
-      logger.warn("sendRequest(\"$method\") called when the socket is not ready")
+    if (!webSocketReady || !pendingRequests.isEmpty()) {
+      logger.debug("sendRequest(\"$method\") queued because the socket is not ready or there are pending requests")
+      pendingRequests.add(PendingRequest(method, params, includeSecret, consumer))
+      if (webSocketReady) {
+        drainPendingRequests()
+      }
       return
     }
 
+    doSendRequest(method, params, includeSecret, consumer)
+  }
+
+  private fun drainPendingRequests() {
+    while (webSocketReady) {
+      val pending = pendingRequests.poll() ?: break
+      try {
+        doSendRequest(pending.method, pending.params, pending.includeSecret, pending.consumer)
+      }
+      catch (e: Exception) {
+        logger.warn("Failed to send queued DTD request for ${pending.method}", e)
+      }
+    }
+  }
+
+  private fun doSendRequest(method: String, params: JsonObject, includeSecret: Boolean, consumer: DartToolingDaemonConsumer) {
     val request = JsonObject()
     request.addProperty("jsonrpc", "2.0")
     request.addProperty("method", method)
@@ -300,7 +322,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
       if (serviceRunning) return
 
       // The first line of text is the command issued, which can be ignored.
-      val text = event.text.trim().takeUnless { it.endsWith(" tooling-daemon --machine") }
+      val text = event.text.trim().takeUnless { isDtdCommandLine(it) }
                  ?: return
 
       var uri: String? = null
@@ -323,6 +345,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
       serviceRunning = false
       webSocketReady = false
       uri = null
+      pendingRequests.clear()
       logger.info("DTD terminated, exit code: ${event.exitCode}")
     }
   }
@@ -332,6 +355,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
       logger.info("Connected to DTD successfully")
       webSocketReady = true
       ensureRootsUpToDate()
+      drainPendingRequests()
 
       // Fake request to make sure the tooling daemon works
       //val params = JsonObject()
@@ -416,6 +440,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
       webSocketReady = false
       secret = null
       lastSentRootUris = emptyList()
+      pendingRequests.clear()
     }
   }
 

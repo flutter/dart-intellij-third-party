@@ -22,6 +22,11 @@ You are a Senior Staff Engineer performing a rigorous code review on the develop
 
 Perform a multi-pass analysis of the diff:
 
+### Pass 0: Repository & Structure Restrictions
+- **Third-Party Sources:** Check for direct modifications under `third_party/thirdPartySrc/platform-lsp/` or `third_party/thirdPartySrc/analysisServer/org/dartlang/analysis/server/protocol/`.
+  - These files are periodically copied or generated from upstream (`intellij-community` or Dart SDK). Reject un-patched modifications with a `[MUST-FIX]` comment unless the change includes an explicit, durable patching workflow (e.g., `.agents/skills/patch-copied-lsp-sources/scripts/patch.py`).
+  - *Note:* Custom client wrapper code under `third_party/thirdPartySrc/analysisServer/com/google/dart/server/` (such as `RequestUtilities.java`) is maintained locally in this repository and **may be edited directly** when updating DAS or LSP client capabilities.
+
 ### Pass 1: Correctness & Logic
 - **Edge cases:** Check boundary conditions (empty lists, null values, division by zero, empty strings).
 - **Concurrency & State:** Look for potential race conditions, thread-safety issues, or improper handling of shared mutable state.
@@ -41,7 +46,18 @@ Perform a multi-pass analysis of the diff:
 - **API Design:** Are new functions/methods single-responsibility? Do the parameters make sense? Are visibility modifiers (public, private, protected) used correctly?
 
 ## Step-by-Step Execution
-1. Retrieve the current changes (using `git diff`).
-2. Read `.gemini/styleguide.md` if present.
-3. Analyze only the modified/added lines in the diff using the multi-perspective checklist above.
-4. Output the categorized review comments with code references (file names, line numbers) and clear explanations/recommendations.
+1. **Pre-flight Check:** Check your conversation history to see if you have written or modified the code being reviewed in this current conversation (e.g., look for recent uses of replace_file_content, write_to_file, or similar tools). If so, and you are in an interactive session, pause and ask the user:
+   > "I noticed we wrote this code in our current conversation. Should I spin up a sub-agent for an unbiased review?"
+   - If they agree: **Before** invoking the subagent, you (the parent agent) must gather the required context (by executing steps 2, 3, and 4 yourself). This avoids the subagent stalling on permission prompts. Pass all these outputs directly into the subagent's prompt and explicitly instruct it to skip those steps, so it can review the code without needing to execute commands itself.
+   - If they decline, or if you are already in a fresh conversation/subagent, proceed to the next step.
+   If you are in a non-interactive environment, gather the context as described above and automatically invoke a subagent, passing the context and instructing it to skip steps 2, 3, and 4.
+
+    > [!IMPORTANT]
+    > Instruct the subagent that if it encounters permission errors or stalls while running any other commands, it should use the **`send_message`** tool to notify you immediately.
+2. Retrieve the current changes (using `git diff`).
+3. Read `.gemini/styleguide.md` if present.
+4. Run `bash ./tool/validate_agent_configs.sh` (if the file exists) to verify skill documentation integrity. Record any failures as `[MUST-FIX]` items.
+
+   *(Note for subagents: If context was not provided by your parent and you are executing steps 2-4 yourself, the system may pause to ask the user for permission. If you get stuck waiting, use the **`send_message`** tool to notify your parent agent.)*
+5. Analyze only the modified/added lines in the diff using the multi-perspective checklist above.
+6. Output the categorized review comments with code references (file names, line numbers) and clear explanations/recommendations, including the results of the script checks.

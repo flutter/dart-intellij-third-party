@@ -1,0 +1,106 @@
+/*
+ * Copyright (c) 2015, the Dart project authors.
+ *
+ * Licensed under the Eclipse Public License v1.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.eclipse.org/legal/epl-v10.html
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
+ */
+package com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
+/**
+ * The {@link Stack} class represents the various components of a Dart stack trace for a given
+ * isolate.
+ */
+@SuppressWarnings({"WeakerAccess", "unused"})
+public class Stack extends Response {
+
+  public Stack(JsonObject json) {
+    super(json);
+  }
+
+  /**
+   * A list of frames which contains both synchronous part and the asynchronous continuation e.g.
+   * `async` functions awaiting completion of the currently running `async` function. Asynchronous
+   * frames are separated from each other and synchronous prefix via frames of kind
+   * {@link FrameKind#AsyncSuspensionMarker}.
+   *
+   * The name is historic and misleading: despite what <i>causal</i> implies, this stack does not
+   * reflect the stack at the moment when the asynchronous operation was started (i.e. the stack
+   * that <i>caused</i> it), but instead reflects the chain of listeners which will run when the
+   * asynchronous operation is completed (i.e. its <i>awaiters</i>).
+   *
+   * This field is absent if currently running code does not have an asynchronous continuation.
+   *
+   * Can return <code>null</code>.
+   */
+  public ElementList<Frame> getAsyncCausalFrames() {
+    if (json.get("asyncCausalFrames") == null) return null;
+    
+    return new ElementList<Frame>(json.get("asyncCausalFrames").getAsJsonArray()) {
+      @Override
+      protected Frame basicGet(JsonArray array, int index) {
+        return new Frame(array.get(index).getAsJsonObject());
+      }
+    };
+  }
+
+  /**
+   * Deprecated since version 4.7 of the protocol. Will be always absent in the response.
+   *
+   * Used to contain information about asynchronous continuation, similar to the one in
+   * asyncCausalFrame but with a slightly different encoding.
+   *
+   * Can return <code>null</code>.
+   */
+  public ElementList<Frame> getAwaiterFrames() {
+    if (json.get("awaiterFrames") == null) return null;
+    
+    return new ElementList<Frame>(json.get("awaiterFrames").getAsJsonArray()) {
+      @Override
+      protected Frame basicGet(JsonArray array, int index) {
+        return new Frame(array.get(index).getAsJsonObject());
+      }
+    };
+  }
+
+  /**
+   * A list of frames that make up the synchronous stack, rooted at the message loop (i.e., the
+   * frames since the last asynchronous gap or the isolate's entrypoint).
+   */
+  public ElementList<Frame> getFrames() {
+    return new ElementList<Frame>(json.get("frames").getAsJsonArray()) {
+      @Override
+      protected Frame basicGet(JsonArray array, int index) {
+        return new Frame(array.get(index).getAsJsonObject());
+      }
+    };
+  }
+
+  /**
+   * A list of messages in the isolate's message queue.
+   */
+  public ElementList<Message> getMessages() {
+    return new ElementList<Message>(json.get("messages").getAsJsonArray()) {
+      @Override
+      protected Message basicGet(JsonArray array, int index) {
+        return new Message(array.get(index).getAsJsonObject());
+      }
+    };
+  }
+
+  /**
+   * Specifies whether or not this stack is complete or has been artificially truncated.
+   */
+  public boolean getTruncated() {
+    return getAsBoolean("truncated");
+  }
+}

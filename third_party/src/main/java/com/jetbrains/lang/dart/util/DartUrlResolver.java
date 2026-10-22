@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.util;
 
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -32,7 +33,7 @@ public abstract class DartUrlResolver {
    * @param contextFile may be pubspec.yaml file, its parent folder or any file/folder within this parent folder; in case of import statements resolve this must be an analyzed file
    */
   public static @NotNull DartUrlResolver getInstance(final @NotNull Project project, final @NotNull VirtualFile contextFile) {
-    return new DartUrlResolverImpl(project, contextFile);
+    return ReadAction.compute(() -> new DartUrlResolverImpl(project, contextFile));
   }
 
   public abstract @Nullable VirtualFile getPubspecYamlFile();

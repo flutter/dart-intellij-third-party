@@ -13,6 +13,8 @@ import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.models.ProductRelease
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 class VerboseTestListener : TestListener, Serializable {
     override fun beforeSuite(suite: TestDescriptor) {}
@@ -24,10 +26,24 @@ class VerboseTestListener : TestListener, Serializable {
     }
 }
 
-// Specify UTF-8 for all compilations so we avoid Windows-1252.
+// Read javaVersion from gradle.properties
+val javaVersionStr = providers.gradleProperty("javaVersion").get()
+val javaVersionInt = javaVersionStr.toInt()
+val kotlinJvmTarget = JvmTarget.fromTarget(javaVersionStr)
+val javaVer = JavaVersion.toVersion(javaVersionStr)
+
 allprojects {
     tasks.withType<JavaCompile> {
+        // Specify UTF-8 for all compilations so we avoid Windows-1252.
         options.encoding = "UTF-8"
+        // Enforce the target bytecode version and standard library API level across all Java compilation tasks.
+        options.release.set(javaVersionInt)
+    }
+    tasks.withType<KotlinCompile> {
+        compilerOptions {
+            // Same as above, but for kotlin.
+            jvmTarget.set(kotlinJvmTarget)
+        }
     }
     tasks.withType<Test> {
         systemProperty("file.encoding", "UTF-8")
@@ -83,11 +99,10 @@ intellijPlatform {
 
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
-            untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
 
         println("plugin version: ${version.get()}")
-        println("ideaVersion: ${ideaVersion.sinceBuild.get()} to ${ideaVersion.untilBuild.orNull}")
+        println("ideaVersion: ${this.ideaVersion.sinceBuild.get()} and above")
 
         changeNotes = provider {
             project.changelog.renderItem(project.changelog.getLatest(), Changelog.OutputType.HTML)
@@ -98,7 +113,10 @@ intellijPlatform {
             VerifyPluginTask.FailureLevel.COMPATIBILITY_WARNINGS,
             VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
             //            VerifyPluginTask.FailureLevel.DEPRECATED_API_USAGES,
-            VerifyPluginTask.FailureLevel.SCHEDULED_FOR_REMOVAL_API_USAGES,
+            // TODO: Re-enable once copied platform-lsp sources (LspCodeVisionProvider.computeForEditor)
+            // are removed (when minimum supported version is 2026.2+) and SimpleListCellRenderer.create
+            // usages are updated. New usages in non-vendored code are still caught by check_verifier_baselines.sh.
+            //            VerifyPluginTask.FailureLevel.SCHEDULED_FOR_REMOVAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.EXPERIMENTAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
             //            VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES,
@@ -121,7 +139,6 @@ sourceSets {
         java {
             srcDir("gen")
             srcDir("thirdPartySrc/analysisServer")
-            srcDir("thirdPartySrc/vmServiceDrivers")
             srcDir("thirdPartySrc/platform-lsp/src")
         }
         resources {
@@ -132,16 +149,18 @@ sourceSets {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        jvmTarget.set(kotlinJvmTarget)
     }
 }
 
 java {
     toolchain {
+        // Dynamically use the running JVM version for the toolchain so Gradle does not search for or download a
+        // specific JDK on CI or locally. (if we set this to a specific version, it's likely to break dev build.)
         languageVersion.set(JavaLanguageVersion.of(JavaVersion.current().majorVersion))
     }
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = javaVer
+    targetCompatibility = javaVer
 }
 
 dependencies {
@@ -296,7 +315,6 @@ tasks {
     printProductsReleases {
         channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
         types = listOf(IntelliJPlatformType.IntellijIdeaCommunity, IntelliJPlatformType.IntellijIdeaUltimate, IntelliJPlatformType.AndroidStudio)
-        untilBuild = provider { null }
         doLast {
             println()
             println("Mapping printProductsReleases output to ideV:")

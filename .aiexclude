@@ -1,0 +1,17 @@
+# Build & Compiler Outputs
+third_party/build/
+third_party/bin/
+
+# Caches & Platform SDKs
+/dart-sdk/
+/.idea/
+third_party/.idea/
+third_party/.settings/
+third_party/.gradle/
+third_party/.intellijPlatform/
+third_party/.kotlin/
+tool/.dart_tool/
+
+# Binary Archives & Baselines
+third_party/gradle/wrapper/gradle-wrapper.jar
+third_party/tool/baseline/

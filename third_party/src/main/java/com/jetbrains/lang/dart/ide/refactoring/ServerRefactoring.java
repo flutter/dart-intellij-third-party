@@ -11,6 +11,10 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
+import com.jetbrains.lang.dart.analytics.LegacyRefactoringData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatusEntry;
@@ -61,6 +65,55 @@ public abstract class ServerRefactoring {
     this.file = file;
     this.offset = offset;
     this.length = length;
+  }
+
+  public @NotNull String getKind() {
+    return kind;
+  }
+
+  public @NotNull LegacyRefactoringData collectAnalyticsData() {
+    LegacyRefactoringData refactoringData = AnalyticsData.forLegacyRefactoring(kind, myProject);
+
+    RefactoringOptions options = getOptions();
+    if (options instanceof ExtractMethodOptions extractMethodOptions) {
+      boolean extractAll = extractMethodOptions.extractAll();
+      boolean createGetter = extractMethodOptions.createGetter();
+      refactoringData.add(AnalyticsConstants.EXTRACT_ALL, extractAll);
+      refactoringData.add(AnalyticsConstants.CREATE_GETTER, createGetter);
+
+      if (this instanceof ServerExtractMethodRefactoring extractMethodRefactoring) {
+        String[] suggestedNames = extractMethodRefactoring.getNames();
+        String currentName = extractMethodOptions.getName();
+        boolean isCustomName = suggestedNames.length > 0 && !suggestedNames[0].equals(currentName);
+        refactoringData.add(AnalyticsConstants.CUSTOM_NAME, isCustomName);
+      }
+    }
+    else if (options instanceof ExtractLocalVariableOptions extractLocalVariableOptions) {
+      boolean extractAll = extractLocalVariableOptions.extractAll();
+      refactoringData.add(AnalyticsConstants.EXTRACT_ALL, extractAll);
+
+      if (this instanceof ServerExtractLocalVariableRefactoring extractLocalRefactoring) {
+        String[] suggestedNames = extractLocalRefactoring.getNames();
+        String currentName = extractLocalVariableOptions.getName();
+        boolean isCustomName = suggestedNames.length > 0 && !suggestedNames[0].equals(currentName);
+        refactoringData.add(AnalyticsConstants.CUSTOM_NAME, isCustomName);
+      }
+    }
+    else if (options instanceof InlineMethodOptions inlineMethodOptions) {
+      boolean inlineAll = inlineMethodOptions.inlineAll();
+      refactoringData.add(AnalyticsConstants.INLINE_ALL, inlineAll);
+    }
+
+    return refactoringData;
+  }
+
+  public void reportAnalytics() {
+    try {
+      Analytics.report(collectAnalyticsData());
+    }
+    catch (Throwable t) {
+      // Analytics reporting must never prevent refactorings from executing
+    }
   }
 
   protected @NotNull Project getProject() {

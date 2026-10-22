@@ -1,15 +1,92 @@
 ## Unreleased
 
 ### Added
+- File Structure view implemented with JetBrains LSP (experimental feature) (#673)
+- Code completion with JetBrains LSP (experimental feature) (#399)
+- Support for the Dart "parts with imports" language feature in IDE-side resolution used by Override/Implement Methods, Generate actions, and parameter info: imports in part files and nested parts ([dart-lang/sdk#56209](https://github.com/dart-lang/sdk/issues/56209)) (#721)
+- Error and UI freeze reporting to JetBrains Marketplace (#740)
+
+### Changed
+
+### Removed
+
+### Fixed
+- Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
+- Restore semantic syntax highlighting after external file modification (#656)
+- Avoid UI freeze during project startup by updating excluded folders directly via `WorkspaceModel` (#728)
+- Support Go to Declaration or Usages and Find Usages on declaration sites when experimental LSP is enabled (#699)
+
+## 510.0.0
+
+### Added
+- Inlay hints for types and parameter names, configurable in Settings | Editor | Inlay Hints (JetBrains LSP; requires Dart SDK 3.14.0-139.0.dev or newer) (#617)
+- Per-category options for the Dart inlay hints in Settings | Editor | Inlay Hints (JetBrains LSP; requires Dart SDK 3.14.0-258.0.dev or newer) (#679)
+- Updating Dart imports when renaming or moving files and directories via LSP `workspace/willRenameFiles` (experimental feature) (#638)
+- Closing labels populated using Language Server Protocol (LSP) publishClosingLabels notifications (experimental feature; requires Dart SDK 3.14.0-219.0.dev or newer) (#400)
+- Quick fixes, assists, source actions, and refactorings via LSP code actions (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#526)
+
+### Changed
+- Highlighting read vs write variable occurrences via LSP is now enabled for all users (#693)
+
+### Fixed
+- Support lsp4j 1.0.0 in IntelliJ 2026.3 (#671)
+- Avoid ambiguous "Find Usages Of" popup when invoking Find Usages with LSP references enabled (#643)
+- Class and method grouping for LSP Find Usages (#650)
+
+## 509.0.0
+
+### Added
+- Populating Dart Analysis tool window errors and warnings using Language Server Protocol (LSP) publishDiagnostics notifications (#520)
+- Go to Type Declaration implemented with JetBrains LSP (#615)
+- Type and Call Hierarchy navigation implemented with JetBrains LSP (#403)
+- Find Usages / references with JetBrains LSP (experimental feature) (#396)
+
+### Changed
+- Diagnostics server port retrieval via LSP has passed the experimental phase and is now enabled for all users with an appropriate SDK (#625)
+- Hover via LSP is now enabled for all users (#626)
+
+### Fixed
+- Quick Documentation from code completion popup window (#632)
+
+## 508.1.0
+
+### Added
+- Highlighting read vs write variable occurrences (JetBrains LSP, experimental feature) (#552)
+
+### Fixed
+- Code completion and parameter info tooltips for constructor shorthand '.new' argument lists (#573)
+- Avoid passing unsupported '--ping-interval' flag to DTD on Dart SDKs older than 3.8.0-16.0.dev (#599)
+
+## 508.0.0
+
+### Added
+- Retrieving diagnostics server with JetBrains LSP (#493)
+- Documenting the process for installing dev builds (#544)
+
+### Changed
+- Go to Definition implemented with JetBrains LSP (#539)
+
+### Removed
+- untilBuild restriction (#553)
+
+### Fixed
+- Duplicate analysis errors on Windows due to drive letter casing in LSP file URIs (#537)
+- DTD connection timeouts by enabling a 15-second ping interval (#525)
+
+## 507.0.0
+
+### Added
 - Support for IDEA platform 2026.2 (#499)
 
 ### Changed
+- Hover implemented with JetBrains LSP as an experimental feature (#443)
 
 ### Removed
 - Support for platform versions 251 and 252 (#473)
 
 ### Fixed
 - Prevent memory leak by closing DTD WebSocket connections and clearing listeners when disposing projects (#449)
+- Split screen `RunContentDescriptor` error during app run/debug (#506)
 
 ## 506.1.0
 

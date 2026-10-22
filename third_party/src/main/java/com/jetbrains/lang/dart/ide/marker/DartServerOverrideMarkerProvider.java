@@ -12,6 +12,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.analytics.DartNavigationAnalytics;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.analyzer.DartServerData;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
@@ -107,6 +108,8 @@ public final class DartServerOverrideMarkerProvider implements LineMarkerProvide
         PsiElement anchor = PsiTreeUtil.getDeepestFirst(componentName);
 
         return new LineMarkerInfo<>(anchor, anchor.getTextRange(), icon, __ -> accessibleName, (e, __) -> {
+            (overrides ? DartNavigationAnalytics.OVERRIDE_METHOD : DartNavigationAnalytics.IMPLEMENT_METHOD)
+                    .report(componentName.getProject());
             List<DartComponent> superComponents = new ArrayList<>();
             if (superclassComponent != null) {
                 superComponents.add(superclassComponent);
