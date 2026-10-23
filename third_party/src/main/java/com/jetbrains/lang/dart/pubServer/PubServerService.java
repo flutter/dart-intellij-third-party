@@ -14,6 +14,7 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.logging.PluginLogger;
@@ -150,9 +151,14 @@ final class PubServerService extends NetService {
 
   @Override
   protected void configureConsole(final @NotNull TextConsoleBuilder consoleBuilder) {
-    consoleBuilder.addFilter(new DartConsoleFilter(getProject(), firstServedDir));
-    consoleBuilder.addFilter(new DartRelativePathsConsoleFilter(getProject(), firstServedDir.getParent().getPath()));
-    consoleBuilder.addFilter(new UrlFilter());
+    ReadAction.run(() -> {
+      final VirtualFile servedDir = firstServedDir;
+      consoleBuilder.addFilter(new DartConsoleFilter(getProject(), servedDir));
+      if (servedDir != null && servedDir.getParent() != null) {
+        consoleBuilder.addFilter(new DartRelativePathsConsoleFilter(getProject(), servedDir.getParent().getPath()));
+      }
+      consoleBuilder.addFilter(new UrlFilter());
+    });
   }
 
   public boolean isPubServerProcessAlive() {
@@ -190,12 +196,14 @@ final class PubServerService extends NetService {
         .invokeAndWait(() -> DartWebdev.INSTANCE.ensureWebdevActivated(getProject()), ModalityState.any());
     }
 
-    final GeneralCommandLine commandLine = new GeneralCommandLine().withWorkDirectory(firstServedDir.getParent().getPath());
+    final String workDir = ReadAction.compute(() -> firstServedDir != null && firstServedDir.getParent() != null ? firstServedDir.getParent().getPath() : null);
+    final String dirName = ReadAction.compute(() -> firstServedDir != null ? firstServedDir.getName() : "");
+    final GeneralCommandLine commandLine = new GeneralCommandLine().withWorkDirectory(workDir);
     DartPubActionBase.setupPubExePath(commandLine, dartSdk);
     commandLine.withEnvironment(DartPubActionBase.PUB_ENV_VAR_NAME, DartPubActionBase.getPubEnvValue());
 
     commandLine.addParameters("global", "run", "webdev", "serve");
-    commandLine.addParameter(firstServedDir.getName() + ":" + port);
+    commandLine.addParameter(dirName + ":" + port);
     commandLine.withEnvironment(DartPubActionBase.PUB_ENV_VAR_NAME, DartPubActionBase.getPubEnvValue() + ".webdev");
 
     Analytics.updateEnvironment(commandLine);
