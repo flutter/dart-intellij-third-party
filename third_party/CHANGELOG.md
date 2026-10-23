@@ -7,6 +7,7 @@
 - Error and UI freeze reporting to JetBrains Marketplace (#740)
 
 ### Changed
+- Extract Method, Extract Local Variable, and Inline refactorings routed to LSP code actions when experimental LSP features are enabled (#684)
 
 ### Removed
 

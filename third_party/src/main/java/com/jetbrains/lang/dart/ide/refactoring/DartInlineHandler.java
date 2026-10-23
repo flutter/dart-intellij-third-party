@@ -24,6 +24,7 @@ import com.jetbrains.lang.dart.analyzer.DartServerData.DartNavigationTarget;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.assists.DartSourceEditException;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.dartlang.analysis.server.protocol.ElementKind;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.jetbrains.annotations.NotNull;
@@ -40,6 +41,14 @@ public final class DartInlineHandler extends InlineActionHandler {
   @Override
   public boolean canInlineElementInEditor(PsiElement element, Editor editor) {
     if (editor == null) return false;
+    final Project project = element != null ? element.getProject() : editor.getProject();
+    if (project != null && DartConfigurable.isLspCodeActionsEnabled(project)) {
+      if (element != null) {
+        return element.getLanguage() == DartLanguage.INSTANCE;
+      }
+      final PsiFile file = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
+      return file != null && file.getLanguage() == DartLanguage.INSTANCE;
+    }
     final InlineRefactoringContext context = findContext(editor);
     if (context == null) return false;
     final String kind = context.kind;
@@ -53,6 +62,13 @@ public final class DartInlineHandler extends InlineActionHandler {
   @Override
   public void inlineElement(final @NotNull Project project, final @Nullable Editor editor, PsiElement element) {
     if (editor == null) return;
+    if (DartConfigurable.isLspCodeActionsEnabled(project)) {
+      final PsiFile file = element != null
+                           ? element.getContainingFile()
+                           : PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
+      DartLspRefactoringHelper.performInline(project, editor, file);
+      return;
+    }
 
     final InlineRefactoringContext context = findContext(editor);
     if (context == null) return;

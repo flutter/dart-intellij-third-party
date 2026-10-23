@@ -15,9 +15,11 @@ import com.intellij.ui.DocumentAdapter;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ui.JBUI;
 import com.jetbrains.lang.dart.DartBundle;
+import com.jetbrains.lang.dart.ide.refactoring.DartLspRefactoringHelper;
 import com.jetbrains.lang.dart.ide.refactoring.ServerExtractMethodRefactoring;
 import com.jetbrains.lang.dart.ide.refactoring.ServerRefactoringDialog;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,6 +34,11 @@ public class DartServerExtractMethodHandler implements RefactoringActionHandler 
 
   @Override
   public void invoke(@NotNull Project project, Editor editor, PsiFile file, DataContext dataContext) {
+    if (DartConfigurable.isLspCodeActionsEnabled(project)) {
+      DartLspRefactoringHelper.performExtractMethod(project, editor, file);
+      return;
+    }
+
     final SelectionModel selectionModel = editor.getSelectionModel();
 
     final int offset = selectionModel.getSelectionStart();
