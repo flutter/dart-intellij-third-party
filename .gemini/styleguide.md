@@ -73,7 +73,7 @@ enforce standard modern Java/Kotlin coding conventions, but strictly police the 
 - **Portability:** Flag any references to local directories (e.g., `/Users/username/...`), hardcoded LDAP/usernames, or environment-specific paths that could make tools, scripts, or agent skills less portable.
 - **Cross-Platform Scripts:** Repository tooling (`tool/`, `third_party/tool/`, and agent skill scripts) must work on macOS, Linux, and Windows (shell scripts run under Git for Windows' bash). Flag:
   - Scripts that parse text files but assume LF line endings. On Windows, checked-out text files usually have CRLF, so strip a trailing `\r` before comparing lines (e.g., `sub(/\r$/, "")` in awk, `${line%$'\r'}` in bash).
-  - GNU-only or BSD-only flags (e.g., `sed -i` without a backup suffix, `grep -P`, `readlink -f`) unless the script guards for them.
+  - GNU-only or BSD-only flags (e.g., `sed -i` with no suffix is GNU-only and `sed -i ''` is BSD-only; use `sed -i.bak … && rm ….bak` or a temp file; `grep -P` is missing on macOS) unless the script guards for them.
   - Path handling that assumes `/` separators in Dart, Java, or Kotlin tooling instead of using platform path APIs.
-  - Changes to `.gitattributes` line-ending rules: explicit `text`/`eol=` rules make any CRLF-committed file under them show as modified in every clone (see #727). Prefer making scripts tolerate CRLF.
+  - New explicit `text`/`eol=` rules in `.gitattributes` that cover files already committed with CRLF: those files then show as modified in every clone (see #727). Such a change must run `git add --renormalize .` in the same commit; otherwise, prefer making scripts tolerate CRLF.
 - **Agent Skills Documentation:** Enforce that any newly created or added agent skills (i.e., new `SKILL.md` files) are documented in the repository's `README.md`.

@@ -15,8 +15,9 @@ jobs:
   # Job 0: Check AI Configuration and Agent Skills
   check-ai-config:
     strategy:
+      fail-fast: false
       matrix:
-        # Windows catches scripts that assume LF line endings or GNU-only tools.
+        # Windows catches scripts that assume LF line endings or POSIX paths.
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     defaults:
@@ -25,7 +26,7 @@ jobs:
     steps:
       - name: Use Windows-style line endings (on windows only)
         if: ${{ runner.os == 'Windows' }}
-        # Mirror a typical Windows checkout, where text files get CRLF line endings.
+        # Pin a CRLF checkout for text files, as in a typical Windows clone.
         run: git config --global core.autocrlf true
 
       - name: Checkout code
