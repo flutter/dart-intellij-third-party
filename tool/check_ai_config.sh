@@ -121,7 +121,8 @@ RULES_DIR=".agents/rules"
 if [[ -d "$RULES_DIR" ]]; then
   for rule in "$RULES_DIR"/*.md; do
     [[ -f "$rule" ]] || continue
-    if ! awk 'NR == 1 { if ($0 != "---") exit; in_fm = 1; next }
+    if ! awk '{ sub(/\r$/, "") }
+              NR == 1 { if ($0 != "---") exit; in_fm = 1; next }
               in_fm && $0 == "---" { closed = 1; exit }
               in_fm && /^trigger:[[:space:]]*[^[:space:]]/ { found = 1 }
               END { exit !(closed && found) }' "$rule"; then
