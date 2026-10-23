@@ -59,9 +59,15 @@ import org.eclipse.lsp4j.InlayHint
 import org.eclipse.lsp4j.InlayHintParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
+import org.eclipse.lsp4j.PrepareRenameDefaultBehavior
+import org.eclipse.lsp4j.PrepareRenameParams
+import org.eclipse.lsp4j.PrepareRenameResult
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
+import org.eclipse.lsp4j.RenameOptions
+import org.eclipse.lsp4j.RenameParams
 import org.eclipse.lsp4j.ServerCapabilities
 import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.TypeDefinitionParams
@@ -74,6 +80,7 @@ import org.eclipse.lsp4j.WorkspaceServerCapabilities
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.jsonrpc.messages.Either3
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
@@ -393,6 +400,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 fileOperations = fileOperationsCaps
             }
             setCodeActionProvider(true)
+            setRenameProvider(RenameOptions(true))
             setExecuteCommandProvider(ExecuteCommandOptions())
             // Add other capabilities as we support them.
         }
@@ -525,6 +533,29 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     // --- WorkspaceService Implementation ---
+
+    override fun prepareRename(
+        params: PrepareRenameParams
+    ): CompletableFuture<Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior>> {
+        // The result is one of three shapes; Gson can't pick the right one for an Either3, so it is converted by hand.
+        return forwardRequest<JsonElement?>("textDocument/prepareRename", params, JsonElement::class.java)
+            .thenApply { toPrepareRenameResult(it) }
+    }
+
+    override fun rename(params: RenameParams): CompletableFuture<WorkspaceEdit> {
+        return forwardRequest("textDocument/rename", params, WorkspaceEdit::class.java)
+    }
+
+    private fun toPrepareRenameResult(
+        json: JsonElement?
+    ): Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior>? {
+        val obj = json?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        return when {
+            obj.has("placeholder") -> Either3.forSecond(GSON.fromJson(obj, PrepareRenameResult::class.java))
+            obj.has("defaultBehavior") -> Either3.forThird(GSON.fromJson(obj, PrepareRenameDefaultBehavior::class.java))
+            else -> Either3.forFirst(GSON.fromJson(obj, Range::class.java))
+        }
+    }
 
     override fun willRenameFiles(params: RenameFilesParams): CompletableFuture<WorkspaceEdit> {
         return forwardRequest("workspace/willRenameFiles", params, WorkspaceEdit::class.java)

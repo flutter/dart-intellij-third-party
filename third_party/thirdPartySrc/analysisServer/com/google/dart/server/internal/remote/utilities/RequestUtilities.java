@@ -19,6 +19,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import org.dartlang.analysis.server.protocol.*;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -1189,9 +1190,12 @@ public class RequestUtilities {
    * }
    * </pre>
    */
-  public static JsonObject generateShowMessageRequestResponse(String idValue, String action) {
+  public static JsonObject generateShowMessageRequestResponse(String idValue, @Nullable String action) {
     JsonObject resultJsonObject = new JsonObject();
-    resultJsonObject.add(ACTION, buildJsonElement(action));
+    // No action: the user closed the message without choosing one.
+    if (action != null) {
+      resultJsonObject.add(ACTION, buildJsonElement(action));
+    }
 
     JsonObject jsonObject = new JsonObject();
     jsonObject.addProperty(ID, idValue);
