@@ -5,6 +5,7 @@ import com.intellij.execution.filters.Filter;
 import com.intellij.execution.filters.HyperlinkInfo;
 import com.intellij.execution.filters.OpenFileHyperlinkInfo;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.text.StringUtil;
@@ -74,6 +75,7 @@ public class DartConsoleFilter implements Filter {
 
           VirtualFile inPackage = null;
           for (VirtualFile yamlFile : myAllPubspecYamlFiles) {
+            ProgressManager.checkCanceled();
             if (yamlFile.isValid()) {
               inPackage = DartUrlResolver.getInstance(myProject, yamlFile).findFileByDartUrl(PACKAGE_PREFIX + info.path);
               if (inPackage != null) {

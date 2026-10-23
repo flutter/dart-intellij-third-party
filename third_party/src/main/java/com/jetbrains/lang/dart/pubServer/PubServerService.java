@@ -151,14 +151,19 @@ final class PubServerService extends NetService {
 
   @Override
   protected void configureConsole(final @NotNull TextConsoleBuilder consoleBuilder) {
-    ReadAction.run(() -> {
-      final VirtualFile servedDir = firstServedDir;
-      consoleBuilder.addFilter(new DartConsoleFilter(getProject(), servedDir));
-      if (servedDir != null && servedDir.getParent() != null) {
-        consoleBuilder.addFilter(new DartRelativePathsConsoleFilter(getProject(), servedDir.getParent().getPath()));
-      }
-      consoleBuilder.addFilter(new UrlFilter());
+    final VirtualFile servedDir = firstServedDir;
+    // DartConsoleFilter's constructor resolves a DartUrlResolver for servedDir, which requires read access.
+    final DartConsoleFilter dartConsoleFilter = ReadAction.compute(() -> new DartConsoleFilter(getProject(), servedDir));
+    final String parentPath = servedDir == null ? null : ReadAction.compute(() -> {
+      final VirtualFile parent = servedDir.getParent();
+      return parent != null ? parent.getPath() : null;
     });
+
+    consoleBuilder.addFilter(dartConsoleFilter);
+    if (parentPath != null) {
+      consoleBuilder.addFilter(new DartRelativePathsConsoleFilter(getProject(), parentPath));
+    }
+    consoleBuilder.addFilter(new UrlFilter());
   }
 
   public boolean isPubServerProcessAlive() {
@@ -196,8 +201,16 @@ final class PubServerService extends NetService {
         .invokeAndWait(() -> DartWebdev.INSTANCE.ensureWebdevActivated(getProject()), ModalityState.any());
     }
 
-    final String workDir = ReadAction.compute(() -> firstServedDir != null && firstServedDir.getParent() != null ? firstServedDir.getParent().getPath() : null);
-    final String dirName = ReadAction.compute(() -> firstServedDir != null ? firstServedDir.getName() : "");
+    final VirtualFile servedDir = firstServedDir;
+    final String[] workDirAndDirName = ReadAction.compute(() -> {
+      if (servedDir == null) {
+        return new String[]{null, ""};
+      }
+      final VirtualFile parent = servedDir.getParent();
+      return new String[]{parent != null ? parent.getPath() : null, servedDir.getName()};
+    });
+    final String workDir = workDirAndDirName[0];
+    final String dirName = workDirAndDirName[1];
     final GeneralCommandLine commandLine = new GeneralCommandLine().withWorkDirectory(workDir);
     DartPubActionBase.setupPubExePath(commandLine, dartSdk);
     commandLine.withEnvironment(DartPubActionBase.PUB_ENV_VAR_NAME, DartPubActionBase.getPubEnvValue());
