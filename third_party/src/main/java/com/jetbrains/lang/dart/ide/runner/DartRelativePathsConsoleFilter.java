@@ -3,6 +3,7 @@ package com.jetbrains.lang.dart.ide.runner;
 
 import com.intellij.execution.filters.Filter;
 import com.intellij.execution.filters.OpenFileHyperlinkInfo;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Couple;
 import com.intellij.openapi.util.Trinity;
@@ -32,13 +33,15 @@ public class DartRelativePathsConsoleFilter implements Filter {
     final int line = fileRelPathLineAndColumn.second;
     final int column = fileRelPathLineAndColumn.third;
 
-    final VirtualFile file =
-      LocalFileSystem.getInstance().findFileByPath(myBaseDirPath + "/" + trimmedText.substring(0, fileRelPath.length()));
-    if (file == null || file.isDirectory()) return null;
+    return ReadAction.compute(() -> {
+      final VirtualFile file =
+        LocalFileSystem.getInstance().findFileByPath(myBaseDirPath + "/" + trimmedText.substring(0, fileRelPath.length()));
+      if (file == null || file.isDirectory()) return null;
 
-    return new Result(entireLength - trimmedText.length(),
-                      entireLength - trimmedText.length() + fileRelPath.length(),
-                      new OpenFileHyperlinkInfo(myProject, file, line, column));
+      return new Result(entireLength - trimmedText.length(),
+                        entireLength - trimmedText.length() + fileRelPath.length(),
+                        new OpenFileHyperlinkInfo(myProject, file, line, column));
+    });
   }
 
   public static @Nullable Trinity<String, Integer, Integer> getFileRelPathLineAndColumn(final @NotNull String text) {
