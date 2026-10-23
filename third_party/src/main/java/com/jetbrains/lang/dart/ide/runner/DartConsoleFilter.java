@@ -74,9 +74,11 @@ public class DartConsoleFilter implements Filter {
 
           VirtualFile inPackage = null;
           for (VirtualFile yamlFile : myAllPubspecYamlFiles) {
-            inPackage = DartUrlResolver.getInstance(myProject, yamlFile).findFileByDartUrl(PACKAGE_PREFIX + info.path);
-            if (inPackage != null) {
-              break;
+            if (yamlFile.isValid()) {
+              inPackage = DartUrlResolver.getInstance(myProject, yamlFile).findFileByDartUrl(PACKAGE_PREFIX + info.path);
+              if (inPackage != null) {
+                break;
+              }
             }
           }
           yield inPackage;

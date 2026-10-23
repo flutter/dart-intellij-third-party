@@ -69,4 +69,23 @@ class DartConsoleFilterThreadingTest : BasePlatformTestCase() {
       FileUtil.delete(tempDir)
     }
   }
+
+  fun testDartConsoleFilterWithDeletedPubspec() {
+    val pubspec = myFixture.addFileToProject("pubspec.yaml", "name: my_project\n")
+    myFixture.addFileToProject("lib/foo.dart", "void foo() {}\n")
+
+    val filter = DartConsoleFilter(project)
+    val line = "package:my_project/foo.dart:1:1"
+
+    val result1 = filter.applyFilter(line, line.length)
+    assertNotNull("Initial package resolution should succeed", result1)
+
+    ApplicationManager.getApplication().runWriteAction {
+      pubspec.virtualFile.delete(this)
+    }
+
+    val result2 = filter.applyFilter(line, line.length)
+    assertNull("Filter should safely handle invalidated pubspec without throwing", result2)
+  }
 }
+
