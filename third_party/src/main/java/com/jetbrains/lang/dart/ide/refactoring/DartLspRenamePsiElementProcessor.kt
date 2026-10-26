@@ -11,6 +11,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
@@ -142,19 +143,17 @@ class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
         if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
             return false
         }
-        val sdk = DartSdk.getDartSdk(project) ?: return false
-
-        return when (element) {
-            is DartFile -> {
-                val vFile = element.virtualFile ?: return false
-                DartAnalysisServerService.getInstance(project).isInIncludedRoots(vFile)
-            }
-            is PsiDirectory -> {
-                val vFile = element.virtualFile
-                DartAnalysisServerService.getInstance(project).isInIncludedRoots(vFile)
-            }
-            else -> false
+        if (DartSdk.getDartSdk(project) == null) {
+            return false
         }
+
+        val vFile = when (element) {
+            is DartFile -> element.virtualFile
+            is PsiDirectory -> element.virtualFile
+            else -> null
+        } ?: return false
+
+        return ProjectFileIndex.getInstance(project).isInContent(vFile)
     }
 
     override fun findReferences(

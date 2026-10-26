@@ -46,7 +46,7 @@ experimental LSP features are enabled, file renames and moves use LSP
 
 - The LSP rename/move path runs only when
   `DartConfigurable.isExperimentalLspFeaturesEnabled` is true and the file is
-  in the analysis roots.
+  in the project content.
 - The LSP extract/inline path runs only when
   `DartConfigurable.isLspCodeActionsEnabled(project)` is true and a Dart SDK
   is configured.

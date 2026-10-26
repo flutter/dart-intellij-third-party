@@ -6,6 +6,7 @@
 package com.jetbrains.lang.dart.ide.refactoring
 
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.testFramework.LightVirtualFile
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.psi.DartFile
 import com.jetbrains.lang.dart.sdk.DartConfigurable
@@ -36,6 +37,31 @@ class DartLspRenamePsiElementProcessorTest : DartCodeInsightFixtureTestCase() {
         try {
             assertTrue(processor.canProcessElement(file))
             assertTrue(processor.canProcessElement(dir))
+        } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+        }
+    }
+
+    fun testCanProcessElementNonDartFileReturnsFalse() {
+        val processor = DartLspRenamePsiElementProcessor()
+        val textFile = myFixture.addFileToProject("lib/readme.txt", "hello")
+
+        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+        try {
+            assertFalse(processor.canProcessElement(textFile))
+        } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+        }
+    }
+
+    fun testCanProcessElementOutsideContentReturnsFalse() {
+        val processor = DartLspRenamePsiElementProcessor()
+        val lightFile = LightVirtualFile("outside.dart", "class Outside {}")
+        val psiLightFile = checkNotNull(psiManager.findFile(lightFile))
+
+        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+        try {
+            assertFalse(processor.canProcessElement(psiLightFile))
         } finally {
             DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
         }
