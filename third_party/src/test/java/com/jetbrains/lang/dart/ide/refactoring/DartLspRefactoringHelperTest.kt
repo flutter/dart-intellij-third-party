@@ -5,7 +5,6 @@
  */
 package com.jetbrains.lang.dart.ide.refactoring
 
-import com.intellij.CommonBundle
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.editor.Document
@@ -122,7 +121,9 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
         )
         DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
 
-        val expectedMessage = RefactoringBundle.getCannotRefactorMessage(null)
+        val expectedMessage = RefactoringBundle.getCannotRefactorMessage(
+            DartBundle.message("analysis.server.not.running"),
+        )
 
         try {
             DartServerExtractMethodHandler().invoke(project, myFixture.editor, file, DataContext.EMPTY_CONTEXT)
@@ -250,7 +251,7 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
                 codeActionKind = CodeActionKind.RefactorExtract,
                 targetTitles = setOf(DartLspRefactoringHelper.EXTRACT_LOCAL_VARIABLE_TITLE),
                 progressTitle = DartBundle.message("progress.title.extract.local.variable"),
-                errorTitle = CommonBundle.getErrorTitle(),
+                errorTitle = DartBundle.message("dart.refactoring.extract.local.variable.error"),
                 lspServer = fakeServer,
             )
             fail("Expected RefactoringErrorHintException when no matching CodeAction is returned")
@@ -259,8 +260,50 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
         }
     }
 
+    fun testPerformRefactoringShowsNoResponseErrorHintWhenServerReturnsNull() {
+        val file = myFixture.configureByText(
+            "test.dart",
+            """
+            void main() {
+              <selection>print('hello');</selection>
+            }
+            """.trimIndent(),
+        )
+        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+
+        val fakeServer = createFakeLspServer(
+            onCodeAction = { null },
+            onExecuteCommand = {},
+        )
+
+        val selectionModel = myFixture.editor.selectionModel
+        val offset = selectionModel.selectionStart
+        val length = selectionModel.selectionEnd - offset
+
+        try {
+            DartLspRefactoringHelper.performRefactoring(
+                project = project,
+                editor = myFixture.editor,
+                file = file,
+                offset = offset,
+                length = length,
+                codeActionKind = CodeActionKind.RefactorExtract,
+                targetTitles = setOf(DartLspRefactoringHelper.EXTRACT_METHOD_TITLE),
+                progressTitle = DartBundle.message("progress.title.extract.method"),
+                errorTitle = DartBundle.message("dart.refactoring.extract.method.error"),
+                lspServer = fakeServer,
+            )
+            fail("Expected RefactoringErrorHintException when server returns null")
+        } catch (e: CommonRefactoringUtil.RefactoringErrorHintException) {
+            val expectedMessage = RefactoringBundle.getCannotRefactorMessage(
+                DartBundle.message("dart.refactoring.lsp.no.response"),
+            )
+            assertEquals(expectedMessage, e.message)
+        }
+    }
+
     private fun createFakeLspServer(
-        onCodeAction: (CodeActionParams) -> List<Either<Command, CodeAction>>,
+        onCodeAction: (CodeActionParams) -> List<Either<Command, CodeAction>>?,
         onExecuteCommand: (ExecuteCommandParams) -> Unit,
     ): LspServer {
         val textDocumentService = Proxy.newProxyInstance(

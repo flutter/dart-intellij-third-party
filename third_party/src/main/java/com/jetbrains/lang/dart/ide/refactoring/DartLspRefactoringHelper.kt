@@ -5,7 +5,6 @@
  */
 package com.jetbrains.lang.dart.ide.refactoring
 
-import com.intellij.CommonBundle
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.progress.ProgressManager
@@ -67,7 +66,7 @@ object DartLspRefactoringHelper {
             codeActionKind = CodeActionKind.RefactorExtract,
             targetTitles = setOf(EXTRACT_LOCAL_VARIABLE_TITLE),
             progressTitle = DartBundle.message("progress.title.extract.local.variable"),
-            errorTitle = CommonBundle.getErrorTitle(),
+            errorTitle = DartBundle.message("dart.refactoring.extract.local.variable.error"),
         )
     }
 
@@ -83,7 +82,7 @@ object DartLspRefactoringHelper {
             codeActionKind = CodeActionKind.RefactorInline,
             targetTitles = setOf(INLINE_LOCAL_VARIABLE_TITLE, INLINE_METHOD_TITLE),
             progressTitle = RefactoringBundle.message("inline.command"),
-            errorTitle = CommonBundle.getErrorTitle(),
+            errorTitle = DartBundle.message("dart.refactoring.inline.error"),
         )
     }
 
@@ -110,7 +109,12 @@ object DartLspRefactoringHelper {
         PsiDocumentManager.getInstance(project).commitAllDocuments()
 
         if (lspServer == null) {
-            showCannotRefactorErrorHint(project, editor, errorTitle)
+            showCannotRefactorErrorHint(
+                project,
+                editor,
+                errorTitle,
+                DartBundle.message("analysis.server.not.running"),
+            )
             return
         }
 
@@ -124,10 +128,13 @@ object DartLspRefactoringHelper {
         }
         val params = CodeActionParams(lspServer.getDocumentIdentifier(virtualFile), range, context)
 
+        var serverResponded = false
         var matchingIntention: LspIntentionAction? = null
         val completed = ProgressManager.getInstance().runProcessWithProgressSynchronously(
             {
-                val results = lspServer.sendRequestSync { it.textDocumentService.codeAction(params) }.orEmpty()
+                val results = lspServer.sendRequestSync { it.textDocumentService.codeAction(params) }
+                    ?: return@runProcessWithProgressSynchronously
+                serverResponded = true
                 val matchingAction = results.asSequence()
                     .mapNotNull { it.right }
                     .firstOrNull { it.disabled == null && it.title in targetTitles }
@@ -146,6 +153,16 @@ object DartLspRefactoringHelper {
 
         if (!completed) return
 
+        if (!serverResponded) {
+            showCannotRefactorErrorHint(
+                project,
+                editor,
+                errorTitle,
+                DartBundle.message("dart.refactoring.lsp.no.response"),
+            )
+            return
+        }
+
         val intentionToInvoke = matchingIntention
         if (intentionToInvoke == null) {
             showCannotRefactorErrorHint(project, editor, errorTitle)
@@ -159,8 +176,9 @@ object DartLspRefactoringHelper {
         project: Project,
         editor: Editor,
         @NlsContexts.DialogTitle errorTitle: String,
+        @NlsContexts.DialogMessage reason: String? = null,
     ) {
-        val message = RefactoringBundle.getCannotRefactorMessage(null)
+        val message = RefactoringBundle.getCannotRefactorMessage(reason)
         CommonRefactoringUtil.showErrorHint(project, editor, message, errorTitle, null)
     }
 }
