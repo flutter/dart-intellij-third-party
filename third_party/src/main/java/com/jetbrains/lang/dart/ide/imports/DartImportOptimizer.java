@@ -10,6 +10,7 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.psi.DartFile;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import org.dartlang.analysis.server.protocol.SourceFileEdit;
 import org.jetbrains.annotations.NotNull;
@@ -52,6 +53,7 @@ public final class DartImportOptimizer implements ImportOptimizer {
 
   @Override
   public boolean supports(@NotNull PsiFile file) {
-    return file instanceof DartFile;
+    // With LSP code actions enabled, DartLspImportOptimizer organizes the imports instead.
+    return file instanceof DartFile && !DartConfigurable.isLspCodeActionsEnabled(file.getProject());
   }
 }
