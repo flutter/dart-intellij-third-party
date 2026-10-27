@@ -8,7 +8,8 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.ex.AnActionListener
-import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.jetbrains.lang.dart.DartLanguage
@@ -16,7 +17,7 @@ import com.jetbrains.lang.dart.DartLanguage
 class DartNavigationActionListener : AnActionListener {
   override fun beforeActionPerformed(action: AnAction, event: AnActionEvent) {
     val id = event.actionManager.getId(action)
-    if (id !in actionIds || !runReadActionBlocking { hasDartContext(event) }) return
+    if (id !in actionIds || !ApplicationManager.getApplication().runReadAction(Computable { hasDartContext(event) })) return
     // Capture the source context before navigation changes the selected editor.
     Analytics.report(AnalyticsData.forAction(id, event))
   }
