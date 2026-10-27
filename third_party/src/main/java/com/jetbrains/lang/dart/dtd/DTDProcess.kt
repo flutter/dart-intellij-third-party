@@ -28,6 +28,7 @@ import com.jetbrains.lang.dart.websocket.WebSocketException
 import com.jetbrains.lang.dart.websocket.WebSocketMessage
 import com.jetbrains.lang.dart.websocket.WebSocket
 import java.net.URI
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 class DTDProcess {
@@ -37,7 +38,7 @@ class DTDProcess {
 
   private lateinit var osProcessHandler: KillableProcessHandler
 
-  private val consumerMap: MutableMap<String, DartToolingDaemonConsumer> = mutableMapOf()
+  private val consumerMap: MutableMap<String, DartToolingDaemonConsumer> = ConcurrentHashMap()
 
   private var processRunning = false
 
@@ -83,7 +84,7 @@ class DTDProcess {
       }
       webSocket.connect()
     } catch (e: Exception) {
-      logger.error("Failed to connect to Dart Tooling Daemon, uri: $uri", e)
+      logger.warn("Failed to connect to Dart Tooling Daemon, uri: $uri", e)
     }
   }
 
@@ -161,7 +162,11 @@ class DTDProcess {
       connectToWebSocket(it)
     }
 
-    listener?.onProcessStarted(uri)
+    // Notify off the process output reader thread: listeners may block waiting for DTD responses,
+    // which must not stall reading the process stdout/stderr.
+    ApplicationManager.getApplication().executeOnPooledThread {
+      listener?.onProcessStarted(uri)
+    }
   }
 
   private fun sendResponse(id: String, result: JsonObject?, error: JsonObject? = null) {
@@ -185,7 +190,7 @@ class DTDProcess {
   }
 
   @Throws(WebSocketException::class)
-  fun sendRequest(method: String, params: JsonObject, includeSecret: Boolean, consumer: DartToolingDaemonConsumer) {
+  fun sendRequest(method: String, params: JsonObject, includeSecret: Boolean, consumer: DartToolingDaemonConsumer): String {
     if (!webSocketReady) {
       throw WebSocketException("sendRequest(\"$method\") called when the socket is not ready")
     }
@@ -203,7 +208,18 @@ class DTDProcess {
 
     val requestString = request.toString()
     logger.debug("--> $requestString")
-    webSocket.send(requestString)
+    try {
+      webSocket.send(requestString)
+    } catch (e: WebSocketException) {
+      consumerMap.remove(id)
+      throw e
+    }
+    return id
+  }
+
+  /** Drops the pending consumer for [id], if any (e.g. after the caller timed out); a late response is ignored. */
+  fun cancelRequest(id: String) {
+    consumerMap.remove(id)
   }
 
   private inner class OSProcessListener : ProcessListener {
