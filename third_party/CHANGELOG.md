@@ -8,6 +8,7 @@
 
 ### Changed
 - Extract Method, Extract Local Variable, and Inline refactorings now route to LSP code actions when experimental LSP features are enabled, applying refactorings directly without the legacy options dialogs (such as custom naming or choosing between single and all occurrences) (#684)
+- Type Hierarchy navigation via LSP is now enabled for all users
 
 ### Removed
 
