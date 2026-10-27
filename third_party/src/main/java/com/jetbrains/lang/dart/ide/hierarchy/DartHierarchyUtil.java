@@ -71,7 +71,7 @@ public final class DartHierarchyUtil {
     final Set<TypeHierarchyItem> seenItems = new HashSet<>();
     final List<DartClass> superClasses = new ArrayList<>();
     Integer superIndex = items.getFirst().getSuperclass();
-    while (superIndex != null) {
+    while (superIndex != null && superIndex >= 0 && superIndex < items.size()) {
       TypeHierarchyItem superItem = items.get(superIndex);
       if (!seenItems.add(superItem)) {
         break;
