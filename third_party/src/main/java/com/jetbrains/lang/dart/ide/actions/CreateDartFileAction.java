@@ -4,6 +4,7 @@ package com.jetbrains.lang.dart.ide.actions;
 import com.intellij.ide.actions.CreateFileFromTemplateAction;
 import com.intellij.ide.actions.CreateFileFromTemplateDialog;
 import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.project.Project;
@@ -16,6 +17,11 @@ import icons.DartIcons;
 import org.jetbrains.annotations.NotNull;
 
 public class CreateDartFileAction extends CreateFileFromTemplateAction {
+
+  @Override
+  public @NotNull ActionUpdateThread getActionUpdateThread() {
+    return ActionUpdateThread.BGT;
+  }
 
   @Override
   protected boolean isAvailable(@NotNull DataContext dataContext) {

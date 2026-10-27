@@ -6,6 +6,7 @@ import com.intellij.execution.configurations.RunConfigurationBase;
 import com.intellij.execution.configurations.RunProfileState;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.testframework.actions.AbstractRerunFailedTestsAction;
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.ui.ComponentContainer;
 import com.jetbrains.lang.dart.ide.runner.base.DartRunConfiguration;
@@ -16,6 +17,11 @@ class DartTestRerunnerAction extends AbstractRerunFailedTestsAction {
 
   DartTestRerunnerAction(@NotNull ComponentContainer componentContainer) {
     super(componentContainer);
+  }
+
+  @Override
+  public @NotNull ActionUpdateThread getActionUpdateThread() {
+    return ActionUpdateThread.BGT;
   }
 
   @Override

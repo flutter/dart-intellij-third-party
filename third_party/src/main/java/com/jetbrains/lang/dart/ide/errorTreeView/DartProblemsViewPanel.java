@@ -167,6 +167,11 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
       @NlsSafe String fixMessage = sourceChangeFix.getMessage();
       group.add(new AnAction(fixMessage, null, AllIcons.Actions.QuickfixBulb) {
         @Override
+        public @NotNull ActionUpdateThread getActionUpdateThread() {
+          return ActionUpdateThread.BGT;
+        }
+
+        @Override
         public void actionPerformed(@NotNull AnActionEvent event) {
           OpenSourceUtil.navigate(PsiNavigationSupport.getInstance().createNavigatable(myProject, selectedVFile, problem.getOffset()));
           try {
@@ -200,6 +205,11 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
       if (StringUtil.isNotEmpty(message) && vFile != null) {
         group.add(new DumbAwareAction(message, null, jumpToSourceIcon) {
           @Override
+          public @NotNull ActionUpdateThread getActionUpdateThread() {
+            return ActionUpdateThread.BGT;
+          }
+
+          @Override
           public void actionPerformed(@NotNull AnActionEvent e) {
             int offset = DartAnalysisServerService.getInstance(myProject).getConvertedOffset(vFile, location.getOffset());
             OpenSourceUtil.navigate(PsiNavigationSupport.getInstance().createNavigatable(myProject, vFile, offset));
@@ -218,6 +228,11 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
     group.add(new DumbAwareAction(DartBundle.messagePointer("action.DartProblemsViewPanel.open.documentation.text"),
                                   DartBundle.messagePointer("action.DartProblemsViewPanel.open.documentation.description"),
                                   AllIcons.Ide.External_link_arrow) {
+      @Override
+      public @NotNull ActionUpdateThread getActionUpdateThread() {
+        return ActionUpdateThread.BGT;
+      }
+
       @Override
       public void actionPerformed(@NotNull AnActionEvent e) {
         BrowserUtil.browse(url);
