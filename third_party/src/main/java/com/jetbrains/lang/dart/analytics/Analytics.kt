@@ -15,6 +15,7 @@ import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -23,6 +24,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.util.Disposer
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
@@ -302,6 +304,39 @@ object Analytics {
     }
   }
 
+  /**
+   * Test-only env vars merged last into every environment built by [updateEnvironment]
+   * (the analysis server, DTD, pub, run configurations, ...).
+   */
+  @Volatile
+  private var testEnvironmentOverrides: Map<String, String>? = null
+
+  /**
+   * Adds or overrides environment variables for every process configured via
+   * [updateEnvironment] until [parentDisposable] is disposed.
+   *
+   * Overrides are applied *after* the regular `DASH__*` values, so they can replace them.
+   * A later call replaces (does not merge with) earlier overrides; disposing it restores
+   * whatever was installed before.
+   *
+   * This is global rather than thread-local (unlike [withReportObserver]) because
+   * sub-tools such as the analysis server are spawned from whichever thread first
+   * needs them, which is often not the test thread.
+   */
+  @TestOnly
+  @JvmStatic
+  fun setEnvironmentOverridesForTests(overrides: Map<String, String>, parentDisposable: Disposable) {
+    check(ApplicationManager.getApplication().isUnitTestMode)
+    val previous = testEnvironmentOverrides
+    val installed = overrides.toMap()
+    testEnvironmentOverrides = installed
+    Disposer.register(parentDisposable) {
+      // Only restore if nobody replaced these overrides in the meantime; otherwise disposing a stale
+      // scope would silently drop a newer caller's overrides (e.g. its isolated HOME).
+      if (testEnvironmentOverrides === installed) testEnvironmentOverrides = previous
+    }
+  }
+
   @JvmStatic
   fun report(data: AnalyticsData) {
     testObserver.get()?.accept(data)
@@ -335,6 +370,8 @@ object Analytics {
           environment[UnifiedAnalytics.Env.PLUGIN_NAME] = plugin.name
           environment[UnifiedAnalytics.Env.PLUGIN_VERSION] = plugin.version
       }
+
+      testEnvironmentOverrides?.let { environment.putAll(it) }
   }
 }
 

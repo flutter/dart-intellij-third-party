@@ -70,6 +70,21 @@ public final class DartTestUtils {
 
   @TestOnly
   public static void configureDartSdk(@NotNull final Module module, @NotNull final Disposable disposable, final boolean realSdk) {
+    configureDartSdk(module, disposable, realSdk, realSdk);
+  }
+
+  /**
+   * Configures the Dart SDK for {@code module}.
+   *
+   * @param startServer whether to start the analysis server once the SDK is configured. Pass {@code false}
+   *                    for tests that must set up the server's environment before it first starts; the
+   *                    server then starts on the first request (e.g. highlighting).
+   */
+  @TestOnly
+  public static void configureDartSdk(@NotNull final Module module,
+                                      @NotNull final Disposable disposable,
+                                      final boolean realSdk,
+                                      final boolean startServer) {
     final String sdkHome;
     String tempSdk;
 
@@ -114,7 +129,7 @@ public final class DartTestUtils {
       Disposer.register(disposable, DartSdkLibUtil.enableDartSdkAndReturnUndoingDisposable(module));
     });
     IndexingTestUtil.waitUntilIndexesAreReady(module.getProject());
-    if (realSdk) {
+    if (startServer) {
       ApplicationManager.getApplication().runReadAction(() -> {
         DartAnalysisServerService.getInstance(module.getProject()).serverReadyForRequest();
       });

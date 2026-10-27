@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-08-04' } *-->
+<!--* freshness: { reviewed: '2026-10-25' } *-->
 # internal
 
 ## Overview
@@ -6,7 +6,7 @@ Internal multiplexer and broadcasting listener wrapper (BroadcastAnalysisServerL
 
 ## Interface
 - com.google.dart.server.internal.BroadcastAnalysisServerListener
-- ./remote/ABOUT.md
+- [./remote/ABOUT.md](./remote/ABOUT.md)
 
 ## Invariants
 - Fan-out notification broadcast to multiple AnalysisServerListener instances.

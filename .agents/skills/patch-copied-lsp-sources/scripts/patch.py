@@ -495,8 +495,19 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             )
             with open(structure_view_factory_path, "w", encoding="utf-8") as f:
                 f.write(factory_content)
-
-    # 13. Guard StickyLineInfo construction in LspFileBreadcrumbsCollector against incomplete declarations
+    # 13. Make CurrentActionHolder internal in LspImplicitReferenceProvider.kt for tests
+    implicit_ref_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/navigation/LspImplicitReferenceProvider.kt")
+    if os.path.exists(implicit_ref_path):
+        with open(implicit_ref_path, "r", encoding="utf-8") as f:
+            implicit_ref_content = f.read()
+        if "private class CurrentActionHolder" in implicit_ref_content:
+            implicit_ref_content = implicit_ref_content.replace(
+                "private class CurrentActionHolder",
+                "internal class CurrentActionHolder"
+            )
+            with open(implicit_ref_path, "w", encoding="utf-8") as f:
+                f.write(implicit_ref_content)
+    # 14. Guard StickyLineInfo construction in LspFileBreadcrumbsCollector against incomplete declarations
     # where selectionRange.start >= range.end (textOffset >= endOffset).
     breadcrumbs_collector_path = os.path.join(
         base_dir,

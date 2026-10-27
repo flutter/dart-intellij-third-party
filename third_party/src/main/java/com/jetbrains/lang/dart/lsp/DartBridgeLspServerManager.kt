@@ -49,6 +49,8 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
     internal val bridgeServer: DartBridgeLspServer?
         get() = activeConnection?.bridgeServer
 
+    fun isClientConnected(): Boolean = bridgeServer?.isClientConnected == true
+
 
     fun startBridgeServer() {
         if (serverSocket != null) {

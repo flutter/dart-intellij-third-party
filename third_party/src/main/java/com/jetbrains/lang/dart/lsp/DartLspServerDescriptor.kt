@@ -63,9 +63,17 @@ import com.intellij.psi.PsiFile
 import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
+import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
+import org.eclipse.lsp4j.ConfigurationItem
+import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
+import org.eclipse.lsp4j.PublishDiagnosticsCapabilities
+import org.eclipse.lsp4j.TextDocumentClientCapabilities
+import org.eclipse.lsp4j.WorkspaceClientCapabilities
 import javax.swing.Icon
+
+private const val DART_CONFIGURATION_SECTION = "dart"
 
 /**
  * Configuration descriptor that defines how the JetBrains LSP client communicates with the Dart Bridge server.
@@ -79,6 +87,30 @@ import javax.swing.Icon
 class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(project, "Dart (Bridge)") {
 
     override val lsp4jServerClass: Class<out Lsp4jServer> = DartLanguageServer::class.java
+
+    override val clientCapabilities: ClientCapabilities
+        get() = super.clientCapabilities.apply {
+            val ws = workspace ?: WorkspaceClientCapabilities().also { workspace = it }
+            ws.fileOperations = FileOperationsWorkspaceCapabilities().apply {
+                willRename = true
+            }
+            val td = textDocument ?: TextDocumentClientCapabilities().also { textDocument = it }
+            val pd = td.publishDiagnostics ?: PublishDiagnosticsCapabilities().also { td.publishDiagnostics = it }
+            pd.relatedInformation = true
+            pd.codeDescriptionSupport = true
+            experimental = mapOf("closingLabels" to emptyMap<String, Any>())
+        }
+
+    override fun createInitializationOptions(): Any = mapOf("closingLabels" to true)
+
+    override fun getWorkspaceConfiguration(item: ConfigurationItem): Any? {
+        if (item.section == DART_CONFIGURATION_SECTION) {
+            return DartLspInlayHintsConfiguration.buildDartSection().also { dartSection ->
+                DartLspConfigurationSync.getInstance(project).configurationSentToServer(dartSection)
+            }
+        }
+        return super.getWorkspaceConfiguration(item)
+    }
 
     override fun isSupportedFile(file: VirtualFile): Boolean {
         return DartAnalysisServerService.isFileNameRespectedByAnalysisServer(file.name)

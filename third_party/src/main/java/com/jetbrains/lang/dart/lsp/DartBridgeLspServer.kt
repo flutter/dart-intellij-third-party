@@ -7,7 +7,9 @@ package com.jetbrains.lang.dart.lsp
 
 import com.google.dart.server.ResponseListener
 import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
@@ -30,6 +32,7 @@ import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.CodeAction
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
+import org.eclipse.lsp4j.ConfigurationParams
 import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
@@ -121,7 +124,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         private val GSON: Gson = JSON_HANDLER.gson
     }
 
+    @Volatile
     private var client: LanguageClient? = null
+    @Volatile
+    private var initialized: Boolean = false
+    internal val isClientConnected: Boolean
+        get() = client != null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
     private var dasMessageListener: ResponseListener? = null
 
@@ -213,8 +221,12 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     private fun forwardServerMessageToClient(dasRequestId: String?, method: String, msgObj: JsonObject) {
-        val client = this.client ?: return
         try {
+            if (method == "workspace/configuration") {
+                handleWorkspaceConfiguration(this.client, dasRequestId, msgObj)
+                return
+            }
+            val client = this.client ?: return
             // Parse and forward notifications/requests to the LSP client proxy using lsp4j.
             when (method) {
                 "textDocument/publishDiagnostics" -> handlePublishDiagnostics(client, msgObj)
@@ -281,18 +293,88 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
+    private fun handleWorkspaceConfiguration(client: LanguageClient?, dasRequestId: String?, msgObj: JsonObject) {
+        val paramsObj = msgObj.get("params")?.takeIf { it.isJsonObject }?.asJsonObject
+        val rawItemsCount = paramsObj?.get("items")?.takeIf { it.isJsonArray }?.asJsonArray?.size() ?: 0
+        val parsedParams = if (paramsObj != null) {
+            try {
+                GSON.fromJson(paramsObj, ConfigurationParams::class.java)
+            } catch (e: Exception) {
+                logger.warn("Failed to parse workspace/configuration params; falling back to null entries", e)
+                null
+            }
+        } else {
+            null
+        }
+        val items = parsedParams?.items
+        val itemCount = items?.size ?: rawItemsCount
+        val lspId = msgObj.get("id")
+        val future = if (client != null && parsedParams != null) {
+            parsedParams.items = items ?: emptyList()
+            try {
+                client.configuration(parsedParams)
+            } catch (e: Throwable) {
+                CompletableFuture.failedFuture(e)
+            }
+        } else {
+            CompletableFuture.completedFuture(null)
+        }
+        future.whenComplete { response, error ->
+            if (dasRequestId != null) {
+                if (error != null) {
+                    logger.warn("Error computing workspace/configuration; falling back to null entries", error)
+                }
+                // The server blocks its initialization until it gets an answer, and the LSP protocol
+                // expects one result per requested section in the same order (null for unknown sections).
+                val resultArray = JsonArray()
+                for (i in 0 until itemCount) {
+                    val itemConfig = if (error == null && response != null && i < response.size) response[i] else null
+                    resultArray.add(if (itemConfig != null) GSON.toJsonTree(itemConfig) else JsonNull.INSTANCE)
+                }
+                val lspResponse = JsonObject().apply {
+                    addProperty("jsonrpc", JSONRPC_VERSION)
+                    if (lspId != null) {
+                        add("id", lspId)
+                    }
+                    add("result", resultArray)
+                }
+                val legacyResponse = JsonObject().apply {
+                    addProperty("id", dasRequestId)
+                    add("result", JsonObject().apply {
+                        add(LSP_RESPONSE_KEY, lspResponse)
+                    })
+                }
+                try {
+                    das.sendResponse(legacyResponse)
+                } catch (e: Exception) {
+                    logger.error("Failed to send workspace/configuration response to DAS", e)
+                }
+            }
+        }
+    }
+
     fun stop() {
-        dasMessageListener?.let { das.removeResponseListener(it) }
+        client = null
+        dasMessageListener?.let {
+            das.removeResponseListener(it)
+            dasMessageListener = null
+        }
         pendingRequests.forEach { (_, pending) ->
             pending.future.cancel(true)
         }
         pendingRequests.clear()
+        if (initialized) {
+            initialized = false
+            das.updateClientCapabilities(false)
+        }
     }
 
     // --- LanguageServer Implementation ---
 
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
+        initialized = true
+        das.updateClientCapabilities(true)
         val capabilities = ServerCapabilities().apply {
             setHoverProvider(true)
             setDefinitionProvider(true)

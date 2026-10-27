@@ -7,7 +7,6 @@ package com.jetbrains.lang.dart.lsp
 
 import com.google.dart.server.AnalysisServerSocket
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer
-import com.google.dart.server.DartLspWorkspaceConfigurationConsumer
 import com.google.dart.server.ShowMessageRequestConsumer
 import com.google.dart.server.internal.remote.ByteLineReaderStream
 import com.google.dart.server.internal.remote.RemoteAnalysisServerImpl
@@ -75,11 +74,6 @@ class DartLspConfigurationSyncTest : DartCodeInsightFixtureTestCase() {
             override fun lsp_workspaceApplyEdit(
                 params: DartLspApplyWorkspaceEditParams?,
                 consumer: DartLspWorkspaceApplyEditRequestConsumer?,
-            ) {}
-
-            override fun lsp_workspaceConfiguration(
-                sections: MutableList<String?>?,
-                consumer: DartLspWorkspaceConfigurationConsumer?,
             ) {}
         }
         DartAnalysisServerService.getInstance(project).setServer(stubServer)
