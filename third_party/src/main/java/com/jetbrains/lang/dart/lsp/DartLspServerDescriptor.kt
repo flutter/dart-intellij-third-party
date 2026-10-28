@@ -285,6 +285,7 @@ open class DartLsp4jClient(
 ) : Lsp4jClient(handler) {
 
     override fun publishDiagnostics(params: PublishDiagnosticsParams) {
+        if (project.isDisposed) return
         super.publishDiagnostics(params)
         val diagnostics = params.diagnostics ?: emptyList()
         val errors = DartLspDiagnosticConverter.convertDiagnostics(project, params.uri, diagnostics)
