@@ -188,4 +188,33 @@ class DartLsp4jClientTest : DartCodeInsightFixtureTestCase() {
             problemsView.currentFilePathToErrors.containsKey(filePath)
         )
     }
+
+    fun testPublishDiagnosticsIgnoredWhenProjectDisposed() {
+        val testFile = myFixture.addFileToProject(
+            "lib/disposed_test.dart",
+            "void main() {}"
+        )
+        val fileUri = "file://${testFile.virtualFile.path}"
+        var handlerCalled = false
+        val handler = createMockHandler { handlerCalled = true }
+
+        val disposedProject = Proxy.newProxyInstance(
+            com.intellij.openapi.project.Project::class.java.classLoader,
+            arrayOf(com.intellij.openapi.project.Project::class.java)
+        ) { _, method, _ ->
+            if (method.name == "isDisposed") true else null
+        } as com.intellij.openapi.project.Project
+
+        val client = DartLsp4jClient(disposedProject, handler)
+        val diagnostic = Diagnostic(
+            Range(Position(0, 0), Position(0, 1)),
+            "Error",
+            DiagnosticSeverity.Error,
+            "dart",
+            "error_code"
+        )
+        client.publishDiagnostics(PublishDiagnosticsParams(fileUri, listOf(diagnostic)))
+
+        assertFalse("super.publishDiagnostics should not be called if project is disposed", handlerCalled)
+    }
 }
