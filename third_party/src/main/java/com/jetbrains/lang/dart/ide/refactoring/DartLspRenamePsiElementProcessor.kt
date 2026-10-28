@@ -31,6 +31,7 @@ import com.jetbrains.lang.dart.lsp.DartLspService
 import com.jetbrains.lang.dart.psi.DartFile
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdk
+import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.TextEdit
@@ -147,13 +148,19 @@ class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
             return false
         }
 
-        val vFile = when (element) {
-            is DartFile -> element.virtualFile
-            is PsiDirectory -> element.virtualFile
-            else -> null
-        } ?: return false
-
-        return ProjectFileIndex.getInstance(project).isInContent(vFile)
+        val fileIndex = ProjectFileIndex.getInstance(project)
+        return when (element) {
+            is DartFile -> {
+                val vFile = element.virtualFile ?: return false
+                fileIndex.isInContent(vFile)
+            }
+            is PsiDirectory -> {
+                val vFile = element.virtualFile
+                val module = fileIndex.getModuleForFile(vFile) ?: return false
+                DartSdkLibUtil.isDartSdkEnabled(module)
+            }
+            else -> false
+        }
     }
 
     override fun findReferences(

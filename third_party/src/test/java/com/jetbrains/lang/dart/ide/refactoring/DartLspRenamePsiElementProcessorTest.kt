@@ -5,11 +5,14 @@
  */
 package com.jetbrains.lang.dart.ide.refactoring
 
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.testFramework.LightVirtualFile
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.psi.DartFile
 import com.jetbrains.lang.dart.sdk.DartConfigurable
+import com.jetbrains.lang.dart.sdk.DartSdk
+import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.TextDocumentEdit
@@ -63,6 +66,34 @@ class DartLspRenamePsiElementProcessorTest : DartCodeInsightFixtureTestCase() {
         try {
             assertFalse(processor.canProcessElement(psiLightFile))
         } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+        }
+    }
+
+    fun testCanProcessElementDirectoryInNonDartModuleReturnsFalse() {
+        val processor = DartLspRenamePsiElementProcessor()
+        val file = myFixture.addFileToProject("lib/c.dart", "class C {}")
+        val dir = file.containingDirectory
+
+        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+        try {
+            assertTrue(processor.canProcessElement(dir))
+            assertTrue(processor.canProcessElement(file))
+
+            WriteAction.run<Throwable> {
+                DartSdkLibUtil.disableDartSdk(listOf(module))
+            }
+            assertFalse(DartSdkLibUtil.isDartSdkEnabled(module))
+            assertNotNull(DartSdk.getDartSdk(project))
+
+            // Directory in a non-Dart module should return false to prevent hijacking directory renames
+            assertFalse(processor.canProcessElement(dir))
+            // Dart files within project content are still handled
+            assertTrue(processor.canProcessElement(file))
+        } finally {
+            WriteAction.run<Throwable> {
+                DartSdkLibUtil.enableDartSdk(module)
+            }
             DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
         }
     }
