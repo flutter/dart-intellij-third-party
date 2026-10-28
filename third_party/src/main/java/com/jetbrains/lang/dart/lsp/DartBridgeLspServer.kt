@@ -254,10 +254,6 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val paramsObj = msgObj.get("params")
         val params = GSON.fromJson(paramsObj, PublishDiagnosticsParams::class.java)
         client.publishDiagnostics(params)
-        val errors = params.diagnostics?.map {
-            DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, params.uri, it)
-        } ?: emptyList()
-        das.onLspDiagnosticsUpdated(params.uri, errors)
     }
 
     private fun handlePublishClosingLabels(client: LanguageClient, msgObj: JsonObject) {

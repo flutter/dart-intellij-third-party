@@ -39,7 +39,6 @@ class DartLspDiagnosticConverterTest : DartCodeInsightFixtureTestCase() {
 
         val error = DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(
             project,
-            das,
             fileUri,
             diagnostic
         )
@@ -50,6 +49,35 @@ class DartLspDiagnosticConverterTest : DartCodeInsightFixtureTestCase() {
         assertEquals("A value of type 'String' can't be assigned to a variable of type 'int'.", error.message)
         assertEquals(2, error.location.startLine) // 1-indexed line number in table
         assertEquals(2, error.location.endLine)
+
+        // Verify deprecated overload with das maintains backwards compatibility
+        @Suppress("DEPRECATION")
+        val errorWithDas = DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(
+            project,
+            das,
+            fileUri,
+            diagnostic
+        )
+        assertEquals(error.code, errorWithDas.code)
+        assertEquals(error.message, errorWithDas.message)
+    }
+
+    fun testConvertDiagnosticsListWithoutDas() {
+        val testFile = myFixture.addFileToProject(
+            "lib/test_list.dart",
+            "void main() { int x = 'str'; }"
+        )
+        val fileUri = "file://${testFile.virtualFile.path}"
+        val diagnostic = Diagnostic(
+            Range(Position(0, 14), Position(0, 21)),
+            "Type error",
+            DiagnosticSeverity.Error,
+            "dart",
+            "type_error"
+        )
+        val errors = DartLspDiagnosticConverter.convertDiagnostics(project, fileUri, listOf(diagnostic))
+        assertEquals(1, errors.size)
+        assertEquals("type_error", errors[0].code)
     }
 
     fun testConvertTodoDiagnostic() {
