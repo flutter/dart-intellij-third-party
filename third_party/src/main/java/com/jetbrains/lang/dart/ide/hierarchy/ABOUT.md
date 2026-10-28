@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-27' } *-->
+<!--* freshness: { reviewed: '2026-10-28' } *-->
 # hierarchy
 
 ## Overview
@@ -17,4 +17,4 @@ Method and call hierarchy views for Dart, backed by the Analysis Server (type hi
 - Sends type-hierarchy, reference-search, and navigation requests to the Analysis Server; read-only otherwise.
 
 ## Verification
-- No dedicated tests in this repo; verify via Navigate > Type / Method / Call Hierarchy in a Dart file.
+- `DartHierarchyUtilTest` covers `DartHierarchyUtil.filterSuperClasses`; verify UI flows via Navigate > Type / Method / Call Hierarchy in a Dart file.
