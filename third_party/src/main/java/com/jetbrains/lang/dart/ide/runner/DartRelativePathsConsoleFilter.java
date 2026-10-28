@@ -3,8 +3,9 @@ package com.jetbrains.lang.dart.ide.runner;
 
 import com.intellij.execution.filters.Filter;
 import com.intellij.execution.filters.OpenFileHyperlinkInfo;
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Couple;
 import com.intellij.openapi.util.Trinity;
 import com.intellij.openapi.util.text.StringUtil;
@@ -33,7 +34,7 @@ public class DartRelativePathsConsoleFilter implements Filter {
     final int line = fileRelPathLineAndColumn.second;
     final int column = fileRelPathLineAndColumn.third;
 
-    return ReadAction.compute(() -> {
+    return ApplicationManager.getApplication().runReadAction((Computable<Result>)() -> {
       final VirtualFile file =
         LocalFileSystem.getInstance().findFileByPath(myBaseDirPath + "/" + trimmedText.substring(0, fileRelPath.length()));
       if (file == null || file.isDirectory()) return null;
