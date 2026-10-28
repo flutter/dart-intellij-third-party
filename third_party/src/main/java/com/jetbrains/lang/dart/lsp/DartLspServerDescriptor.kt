@@ -11,9 +11,14 @@ import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.platform.dartlsp.api.Lsp4jClient
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
+import com.jetbrains.lang.dart.analyzer.DartLocalFileInfo
+import com.jetbrains.lang.dart.analyzer.getDartFileInfo
+import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchySupport
@@ -69,6 +74,7 @@ import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
 import org.eclipse.lsp4j.PublishDiagnosticsCapabilities
+import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.TextDocumentClientCapabilities
 import org.eclipse.lsp4j.WorkspaceClientCapabilities
 import javax.swing.Icon
@@ -232,6 +238,31 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val selectionRangeCustomizer = LspSelectionRangeDisabled
         override val codeLensCustomizer = LspCodeLensDisabled
         override val renameCustomizer = LspRenameDisabled
+    }
+
+    override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient {
+        return DartLsp4jClient(project, handler)
+    }
+}
+
+/**
+ * Custom [Lsp4jClient] that intercepts standard `textDocument/publishDiagnostics` notifications
+ * to update the Dart Analysis tool window (`DartProblemsView`) identically in both Bridge mode and Full LSP,
+ * while delegating to [super.publishDiagnostics] for editor highlightings and squiggles.
+ */
+open class DartLsp4jClient(
+    private val project: Project,
+    handler: LspServerNotificationsHandler
+) : Lsp4jClient(handler) {
+
+    override fun publishDiagnostics(params: PublishDiagnosticsParams) {
+        super.publishDiagnostics(params)
+        val diagnostics = params.diagnostics ?: emptyList()
+        val errors = DartLspDiagnosticConverter.convertDiagnostics(project, params.uri, diagnostics)
+            .filter { it.type != "TODO" }
+        val fileInfo = getDartFileInfo(project, params.uri)
+        val filePath = if (fileInfo is DartLocalFileInfo) fileInfo.filePath else params.uri
+        DartProblemsView.getInstance(project).updateErrorsForFile(filePath, errors)
     }
 }
 

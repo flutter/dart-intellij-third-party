@@ -51,7 +51,7 @@ open class Lsp4jClient(private val serverNotificationsHandler: LspServerNotifica
   override fun telemetryEvent(`object`: Any): Unit =
     serverNotificationsHandler.telemetryEvent(`object`)
 
-  final override fun publishDiagnostics(params: PublishDiagnosticsParams): Unit =
+  override fun publishDiagnostics(params: PublishDiagnosticsParams): Unit =
     serverNotificationsHandler.publishDiagnostics(params)
 
   final override fun showMessage(params: MessageParams): Unit =

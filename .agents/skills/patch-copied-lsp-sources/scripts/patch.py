@@ -509,6 +509,18 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             with open(implicit_ref_path, "w", encoding="utf-8") as f:
                 f.write(implicit_ref_content)
 
+    # 14. Make Lsp4jClient.publishDiagnostics open for subclassing in DartLspServerDescriptor
+    lsp4j_client_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/api/Lsp4jClient.kt")
+    if os.path.exists(lsp4j_client_path):
+        with open(lsp4j_client_path, "r", encoding="utf-8") as f:
+            lsp4j_client_content = f.read()
+        old_pub_diag = "  final override fun publishDiagnostics(params: PublishDiagnosticsParams): Unit ="
+        new_pub_diag = "  override fun publishDiagnostics(params: PublishDiagnosticsParams): Unit ="
+        if old_pub_diag in lsp4j_client_content:
+            lsp4j_client_content = lsp4j_client_content.replace(old_pub_diag, new_pub_diag)
+            with open(lsp4j_client_path, "w", encoding="utf-8") as f:
+                f.write(lsp4j_client_content)
+
     print("Patch applied successfully!")
 
 if __name__ == "__main__":

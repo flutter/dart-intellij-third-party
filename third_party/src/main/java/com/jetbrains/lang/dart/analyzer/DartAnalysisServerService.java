@@ -2746,6 +2746,9 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public boolean isFileWithErrors(final @NotNull VirtualFile file) {
+    if (DartProblemsView.getInstance(myProject).isFileWithErrors(file)) {
+      return true;
+    }
     synchronized (myFilePathsWithErrors) {
       return file.isDirectory() ? myFolderPathsWithErrors.getInt(file.getPath()) > 0 : myFilePathsWithErrors.contains(file.getPath());
     }

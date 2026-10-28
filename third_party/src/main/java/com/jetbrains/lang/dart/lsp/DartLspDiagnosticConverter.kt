@@ -27,9 +27,9 @@ object DartLspDiagnosticConverter {
      * into a legacy DAS [AnalysisError] protocol object so it can be displayed in the
      * Dart Analysis tool window (`DartProblemsView`) and used by Project View decorators.
      */
+    @JvmStatic
     fun convertDiagnosticToAnalysisError(
         project: Project,
-        das: DartAnalysisServerService,
         uri: String,
         diagnostic: Diagnostic
     ): AnalysisError {
@@ -46,9 +46,9 @@ object DartLspDiagnosticConverter {
             severity == "WARNING" -> "STATIC_WARNING"
             else -> "HINT"
         }
-        val location = resolveLocation(project, das, uri, diagnostic.range)
+        val location = resolveLocation(project, uri, diagnostic.range)
         val contextMessages = diagnostic.relatedInformation?.mapNotNull { info ->
-            val infoLocation = resolveLocation(project, das, info.location.uri, info.location.range)
+            val infoLocation = resolveLocation(project, info.location.uri, info.location.range)
             DiagnosticMessage(info.message, infoLocation)
         }
         val url = diagnostic.codeDescription?.href
@@ -66,9 +66,30 @@ object DartLspDiagnosticConverter {
         )
     }
 
+    /**
+     * Converts a collection of LSP [Diagnostic] objects into DAS [AnalysisError] protocol objects.
+     */
+    @JvmStatic
+    fun convertDiagnostics(
+        project: Project,
+        uri: String,
+        diagnostics: Collection<Diagnostic>
+    ): List<AnalysisError> = diagnostics.map { convertDiagnosticToAnalysisError(project, uri, it) }
+
+    @JvmStatic
+    @Deprecated(
+        "Use convertDiagnosticToAnalysisError(project, uri, diagnostic) instead",
+        ReplaceWith("convertDiagnosticToAnalysisError(project, uri, diagnostic)")
+    )
+    fun convertDiagnosticToAnalysisError(
+        project: Project,
+        @Suppress("UNUSED_PARAMETER") das: DartAnalysisServerService?,
+        uri: String,
+        diagnostic: Diagnostic
+    ): AnalysisError = convertDiagnosticToAnalysisError(project, uri, diagnostic)
+
     private fun resolveLocation(
         project: Project,
-        das: DartAnalysisServerService,
         uri: String,
         range: Range
     ): Location {
@@ -87,6 +108,7 @@ object DartLspDiagnosticConverter {
                 Triple(f, 0, 0)
             }
         }
+        val das = DartAnalysisServerService.getInstance(project)
         val offset = das.getOriginalOffset(vFile, docOffset)
         val length = (das.getOriginalOffset(vFile, docEnd) - offset).coerceAtLeast(0)
         return Location(
