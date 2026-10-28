@@ -5,87 +5,89 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
-import com.jetbrains.lang.dart.ide.errorTreeView.AnalysisServerDiagnosticsAction;
-import com.jetbrains.lang.dart.ide.errorTreeView.ReanalyzeDartSourcesAction;
-import com.jetbrains.lang.dart.ide.errorTreeView.RestartDartAnalysisServerAction;
-import com.jetbrains.lang.dart.ide.generation.DartGenerateConstructorAction;
-import com.jetbrains.lang.dart.ide.generation.DartGenerateEqualsAndHashcodeAction;
-import com.jetbrains.lang.dart.ide.generation.DartGenerateGetterAction;
-import com.jetbrains.lang.dart.ide.generation.DartGenerateGetterSetterAction;
-import com.jetbrains.lang.dart.ide.generation.DartGenerateNamedConstructorAction;
-import com.jetbrains.lang.dart.ide.generation.DartGenerateSetterAction;
-import com.jetbrains.lang.dart.ide.generation.DartGenerateToStringAction;
 import com.jetbrains.lang.dart.ide.runner.actions.DartPopFrameAction;
 import com.jetbrains.lang.dart.ide.runner.server.OpenDartObservatoryUrlAction;
-import com.jetbrains.lang.dart.ide.toolingDaemon.DartCopyDtdUriAction;
-import com.jetbrains.lang.dart.pubServer.StopDartWebdevServerAction;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Enumeration;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class ActionUpdateThreadTest extends BasePlatformTestCase {
 
-  public void testRegisteredPluginActions_specifyExplicitUpdateThread() {
-    final String[] registeredActionIds = {
-      "Dart.stop.dart.webdev.server",
-      "Dart.NewDartFile",
-      "Dart.Reanalyze",
-      "Dart.Restart.Analysis.Server",
-      "Dart.Analyzer.Diagnostics",
-      "Dart.DartStyle",
-      "Dart.DartSortMembers",
-      "Generate.Constructor.Dart",
-      "Generate.Named.Constructor.Dart",
-      "Generate.GetAccessor.Dart",
-      "Generate.SetAccessor.Dart",
-      "Generate.GetSetAccessor.Dart",
-      "Generate.ToString.Dart",
-      "Generate.EqualsAndHashcode.Dart",
-      "Dart.pub.get",
-      "Dart.pub.upgrade",
-      "Dart.build",
-      "Dart.pub.outdated",
-      "Dart.pub.cache.repair",
-      "DartCopyDtdUriAction"
-    };
+  public void testAllPluginXmlActions_declareExplicitUpdateThread() throws Exception {
+    final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
 
+    Document doc = null;
+    final Enumeration<URL> resources = getClass().getClassLoader().getResources("META-INF/plugin.xml");
+    while (resources.hasMoreElements()) {
+      final URL url = resources.nextElement();
+      try (InputStream stream = url.openStream()) {
+        final Document candidate = factory.newDocumentBuilder().parse(stream);
+        final NodeList idNodes = candidate.getElementsByTagName("id");
+        if (idNodes.getLength() > 0 && "Dart".equals(idNodes.item(0).getTextContent().trim())) {
+          doc = candidate;
+          break;
+        }
+      }
+    }
+    if (doc == null) {
+      final InputStream stream = getClass().getClassLoader().getResourceAsStream("META-INF/plugin.xml");
+      if (stream != null) {
+        try (stream) {
+          doc = factory.newDocumentBuilder().parse(stream);
+        }
+      }
+    }
+    assertNotNull("Dart META-INF/plugin.xml not found on test classpath", doc);
+
+    final Set<String> classNames = new TreeSet<>();
+    final NodeList actions = doc.getElementsByTagName("action");
     final ActionManager actionManager = ActionManager.getInstance();
-    for (String actionId : registeredActionIds) {
-      final AnAction action = actionManager.getAction(actionId);
-      assertNotNull("Action with id '" + actionId + "' must be registered in ActionManager", action);
-      assertActionUpdateThread(ActionUpdateThread.BGT, action);
+
+    for (int i = 0; i < actions.getLength(); i++) {
+      final Element element = (Element) actions.item(i);
+      final String className = element.getAttribute("class");
+      if (!className.isEmpty()) {
+        classNames.add(className);
+      }
+      final String id = element.getAttribute("id");
+      if (!id.isEmpty()) {
+        final AnAction action = actionManager.getAction(id);
+        assertNotNull("Action with id '" + id + "' must be registered in ActionManager", action);
+        assertEquals("Action registered with id '" + id + "' must return BGT",
+                     ActionUpdateThread.BGT, action.getActionUpdateThread());
+      }
+    }
+
+    final NodeList groups = doc.getElementsByTagName("group");
+    for (int i = 0; i < groups.getLength(); i++) {
+      final String className = ((Element) groups.item(i)).getAttribute("class");
+      if (!className.isEmpty()) {
+        classNames.add(className);
+      }
+    }
+
+    assertFalse("No action classes found in plugin.xml", classNames.isEmpty());
+
+    for (String className : classNames) {
+      final Class<?> clazz = Class.forName(className);
+      final AnAction action = (AnAction) clazz.getDeclaredConstructor().newInstance();
+      assertEquals("Action/Group " + className + " must return BGT",
+                   ActionUpdateThread.BGT, action.getActionUpdateThread());
     }
   }
 
-  public void testCoreActions_specifyExplicitUpdateThread() {
-    assertActionUpdateThread(ActionUpdateThread.BGT, new CreateDartFileAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new ReanalyzeDartSourcesAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new RestartDartAnalysisServerAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new AnalysisServerDiagnosticsAction());
+  public void testStandaloneAndUnregisteredActions_declareExplicitUpdateThread() {
     assertActionUpdateThread(ActionUpdateThread.BGT, new DartPopFrameAction());
     assertActionUpdateThread(ActionUpdateThread.BGT, new OpenDartObservatoryUrlAction(null, () -> true));
-    assertActionUpdateThread(ActionUpdateThread.BGT, new StopDartWebdevServerAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartCopyDtdUriAction());
-  }
-
-  public void testSubclassesInheritFromBase() {
-    // AbstractDartFileProcessingAction subclasses
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartStyleAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartSortMembersAction());
     assertActionUpdateThread(ActionUpdateThread.BGT, new DartFixAction());
-
-    // BaseDartGenerateAction subclasses
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartGenerateConstructorAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartGenerateNamedConstructorAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartGenerateGetterAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartGenerateSetterAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartGenerateGetterSetterAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartGenerateToStringAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartGenerateEqualsAndHashcodeAction());
-
-    // DartPubActionBase subclasses
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartPubGetAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartPubUpgradeAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartPubBuildAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartPubOutdatedAction());
-    assertActionUpdateThread(ActionUpdateThread.BGT, new DartPubCacheRepairAction());
   }
 
   private static void assertActionUpdateThread(ActionUpdateThread expected, AnAction action) {

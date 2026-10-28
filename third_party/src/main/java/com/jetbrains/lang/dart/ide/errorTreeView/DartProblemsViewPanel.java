@@ -178,6 +178,8 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
             WriteAction.run(() -> AssistUtils.applySourceChange(myProject, sourceChangeFix, true));
           }
           catch (DartSourceEditException ignored) {/**/}
+
+          Analytics.report(AnalyticsData.forAction(this, event));
         }
       });
     }
