@@ -4,9 +4,10 @@ package com.jetbrains.lang.dart.ide.runner;
 import com.intellij.execution.filters.Filter;
 import com.intellij.execution.filters.HyperlinkInfo;
 import com.intellij.execution.filters.OpenFileHyperlinkInfo;
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -55,7 +56,7 @@ public class DartConsoleFilter implements Filter {
     final DartPositionInfo info = DartPositionInfo.parsePositionInfo(line);
     if (info == null) return null;
 
-    return ReadAction.compute(() -> {
+    return ApplicationManager.getApplication().runReadAction((Computable<Result>)() -> {
       final VirtualFile file = switch (info.type) {
         case FILE -> {
           String path = URLUtil.unescapePercentSequences(info.path);

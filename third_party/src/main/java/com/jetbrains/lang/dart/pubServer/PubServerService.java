@@ -14,12 +14,12 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -153,8 +153,9 @@ final class PubServerService extends NetService {
   protected void configureConsole(final @NotNull TextConsoleBuilder consoleBuilder) {
     final VirtualFile servedDir = firstServedDir;
     // DartConsoleFilter's constructor resolves a DartUrlResolver for servedDir, which requires read access.
-    final DartConsoleFilter dartConsoleFilter = ReadAction.compute(() -> new DartConsoleFilter(getProject(), servedDir));
-    final String parentPath = servedDir == null ? null : ReadAction.compute(() -> {
+    final DartConsoleFilter dartConsoleFilter = ApplicationManager.getApplication()
+      .runReadAction((Computable<DartConsoleFilter>)() -> new DartConsoleFilter(getProject(), servedDir));
+    final String parentPath = servedDir == null ? null : ApplicationManager.getApplication().runReadAction((Computable<String>)() -> {
       final VirtualFile parent = servedDir.getParent();
       return parent != null ? parent.getPath() : null;
     });
@@ -202,7 +203,7 @@ final class PubServerService extends NetService {
     }
 
     final VirtualFile servedDir = firstServedDir;
-    final String[] workDirAndDirName = ReadAction.compute(() -> {
+    final String[] workDirAndDirName = ApplicationManager.getApplication().runReadAction((Computable<String[]>)() -> {
       if (servedDir == null) {
         return new String[]{null, ""};
       }
