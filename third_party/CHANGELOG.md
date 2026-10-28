@@ -16,6 +16,7 @@
 - Restore semantic syntax highlighting after external file modification (#656)
 - Avoid UI freeze during project startup by updating excluded folders directly via `WorkspaceModel` (#728)
 - Support Go to Declaration or Usages and Find Usages on declaration sites when experimental LSP is enabled (#699)
+- Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
 
 ## 510.0.0
 

@@ -521,6 +521,7 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
       StickyLineInfo(textOffset, endOffset, null)"""
         new_sticky_block = """      val endOffset = getOffsetInDocument(document, symbol.range.end)
                       ?: return@mapNotNull null
+      // Dart patch: skip incomplete declarations (#734)
       if (textOffset >= endOffset) return@mapNotNull null
       StickyLineInfo(textOffset, endOffset, null)"""
         if old_sticky_block in breadcrumbs_content:
