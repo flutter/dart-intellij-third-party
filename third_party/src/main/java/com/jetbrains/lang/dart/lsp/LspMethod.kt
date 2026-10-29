@@ -23,7 +23,9 @@ enum class LspMethod(
     INLAY_HINT("textDocument/inlayHint", isExperimental = false),
     SHUTDOWN("shutdown"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
+    PREPARE_RENAME("textDocument/prepareRename", isExperimental = true),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
+    RENAME("textDocument/rename", isExperimental = true, presentableName = "rename"),
     DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols");
 
     companion object {

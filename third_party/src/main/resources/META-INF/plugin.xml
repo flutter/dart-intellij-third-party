@@ -90,7 +90,10 @@
     <lang.importOptimizer language="Dart" implementationClass="com.jetbrains.lang.dart.ide.imports.DartImportOptimizer"/>
 
     <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartServerRenameHandler"/>
+    <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspInplaceRenameHandler"/>
+    <renameHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspRenameAtCaretHandler"/>
     <renamePsiElementProcessor implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspRenamePsiElementProcessor" order="first"/>
+    <renamePsiElementProcessor implementation="com.jetbrains.lang.dart.ide.refactoring.DartLspSymbolRenameProcessor" order="first"/>
     <inlineActionHandler implementation="com.jetbrains.lang.dart.ide.refactoring.DartInlineHandler"/>
 
     <codeInsight.lineMarkerProvider language="Dart" implementationClass="com.jetbrains.lang.dart.ide.marker.DartMethodLineMarkerProvider"/>
@@ -258,6 +261,8 @@
     <intentionAction> <className>com.jetbrains.lang.dart.assists.DartQuickAssistIntention$DartQuickAssistIntention14</className> <language/> <bundleName>messages.DartBundle</bundleName> <categoryKey>inspections.group.name</categoryKey> <descriptionDirectoryName>DartQuickAssistIntention</descriptionDirectoryName></intentionAction>
 
     <projectService serviceImplementation="com.jetbrains.lang.dart.analyzer.DartAnalysisServerService"/>
+    <projectService serviceInterface="com.jetbrains.lang.dart.ide.refactoring.DartLspRenameRequests"
+                    serviceImplementation="com.jetbrains.lang.dart.ide.refactoring.DartLspRenameRequestsImpl"/>
     <cachesInvalidator implementation="com.jetbrains.lang.dart.analyzer.DASSCacheInvalidator"/>
 
     <toolWindow id="Dart Analysis" anchor="bottom" icon="DartIcons.Dart_13" doNotActivateOnStart="true" canCloseContents="false"

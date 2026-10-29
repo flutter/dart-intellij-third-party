@@ -187,6 +187,9 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_INLAY_HINTS_SDK_VERSION = "3.14.0-139.0.dev";
   public static final String MIN_LSP_CLOSING_LABELS_SDK_VERSION = "3.14.0-219.0.dev";
   public static final String MIN_LSP_COMPLETION_SDK_VERSION = "3.14.0-226.0.dev";
+  // textDocument/prepareRename and textDocument/rename are available over LSP-over-Legacy since dart-lang/sdk@3e33bc81443
+  // (no protocol version bump).
+  public static final String MIN_LSP_RENAME_SDK_VERSION = "3.14.0-252.0.dev";
   // The first Dart SDK with dart-lang/sdk@6700ccc4316 (Analysis Server API 1.41.0), which accepts
   // `workspace/didChangeConfiguration` from the client as an `lsp.notification`. An older server
   // logs that notification as an error, so it must not be sent at all.
@@ -646,6 +649,12 @@ public final class DartAnalysisServerService implements Disposable {
       textDocument.add("completion", completion);
     }
 
+    if (isDartSdkVersionSufficientForLspRename(sdkVersion)) {
+      JsonObject rename = new JsonObject();
+      rename.addProperty("prepareSupport", true);
+      textDocument.add("rename", rename);
+    }
+
     if (supportsLspClosingLabels) {
       JsonObject experimental = lspCapabilities.has("experimental")
                                 ? lspCapabilities.getAsJsonObject("experimental")
@@ -703,6 +712,18 @@ public final class DartAnalysisServerService implements Disposable {
     }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspCompletion(sdk.getVersion());
+  }
+
+  public static boolean isDartSdkVersionSufficientForLspRename(@NotNull String sdkVersion) {
+    return DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_RENAME_SDK_VERSION) >= 0;
+  }
+
+  public static boolean isLspRenameEnabled(final @NotNull Project project) {
+    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      return false;
+    }
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    return sdk != null && isDartSdkVersionSufficientForLspRename(sdk.getVersion());
   }
 
   public static boolean isDartSdkVersionSufficientForLspPublishDiagnostics(@NotNull String sdkVersion) {
