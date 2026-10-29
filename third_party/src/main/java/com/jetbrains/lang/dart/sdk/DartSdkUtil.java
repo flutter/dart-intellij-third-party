@@ -54,8 +54,10 @@ public final class DartSdkUtil {
 
     final String version = FileUtil.loadFileOrNull(versionFile);
     if (version != null) {
-      ourVersions.put(versionPair, version);
-      return version;
+      // The SDK's version file ends with a newline; trim it so every consumer (analytics, UI, logs) sees the bare version.
+      final String trimmed = version.trim();
+      ourVersions.put(versionPair, trimmed);
+      return trimmed;
     }
 
     return null;
