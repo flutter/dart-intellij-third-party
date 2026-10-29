@@ -31,13 +31,14 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 public final class DartSdkUtil {
-  private static final Map<Pair<File, Long>, String> ourVersions = new HashMap<>();
+  // Read from background threads (e.g. ReadAction.nonBlocking) as well as the EDT.
+  private static final Map<Pair<File, Long>, String> ourVersions = new ConcurrentHashMap<>();
   private static final String DART_SDK_KNOWN_PATHS = "DART_SDK_KNOWN_PATHS";
 
   public static @Nullable @NlsSafe String getSdkVersion(final @NotNull String sdkHomePath) {
