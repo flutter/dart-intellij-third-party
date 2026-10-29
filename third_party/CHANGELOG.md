@@ -5,6 +5,7 @@
 ### Changed
 
 ### Removed
+- Legacy Dart Analysis Server execution context and URI mapping during debugging (#686)
 
 ### Fixed
 - Avoid a trailing newline in the Dart SDK version, which leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
