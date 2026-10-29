@@ -507,8 +507,8 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             )
             with open(implicit_ref_path, "w", encoding="utf-8") as f:
                 f.write(implicit_ref_content)
-    # 14. Guard StickyLineInfo construction in LspFileBreadcrumbsCollector against incomplete declarations
-    # where selectionRange.start >= range.end (textOffset >= endOffset).
+    # 14. Guard StickyLineInfo construction in LspFileBreadcrumbsCollector (#734 / IJPL-260061) against
+    # incomplete declarations where selectionRange.start >= range.end (textOffset >= endOffset).
     breadcrumbs_collector_path = os.path.join(
         base_dir,
         "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/documentSymbol/LspFileBreadcrumbsCollector.kt"
@@ -521,7 +521,7 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
       StickyLineInfo(textOffset, endOffset, null)"""
         new_sticky_block = """      val endOffset = getOffsetInDocument(document, symbol.range.end)
                       ?: return@mapNotNull null
-      // Dart patch: skip incomplete declarations (#734)
+      // Dart patch: skip incomplete declarations (#734 / IJPL-260061)
       if (textOffset >= endOffset) return@mapNotNull null
       StickyLineInfo(textOffset, endOffset, null)"""
         if old_sticky_block in breadcrumbs_content:
