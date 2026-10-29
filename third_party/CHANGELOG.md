@@ -1,7 +1,7 @@
 ## Unreleased
 
 ### Added
-- Analytics event (`settings_change`) reporting when experimental LSP features are turned on or off in Settings | Languages & Frameworks | Dart
+- Analytics event (`settings_change`) reporting when experimental LSP features are turned on or off in Settings | Languages & Frameworks | Dart (#791)
 
 ### Changed
 
