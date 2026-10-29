@@ -1,15 +1,27 @@
 ## Unreleased
 
 ### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+- Avoid a trailing newline in the Dart SDK version, which leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
+- Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
+
+## 511.0.0
+
+### Added
 - File Structure view implemented with JetBrains LSP (experimental feature) (#673)
 - Code completion with JetBrains LSP (experimental feature) (#399)
 - Support for the Dart "parts with imports" language feature in IDE-side resolution used by Override/Implement Methods, Generate actions, and parameter info: imports in part files and nested parts ([dart-lang/sdk#56209](https://github.com/dart-lang/sdk/issues/56209)) (#721)
 - Error and UI freeze reporting to JetBrains Marketplace (#740)
+- Highlighting examples for tear-offs, type aliases, extension types, and `dynamic` in the Dart color scheme preview (#760)
 
 ### Changed
 - Extract Method, Extract Local Variable, and Inline refactorings now route to LSP code actions when experimental LSP features are enabled, applying refactorings directly without the legacy options dialogs (such as custom naming or choosing between single and all occurrences) (#684)
-
-### Removed
+- Type Hierarchy navigation via LSP is now enabled for all users (#779)
 
 ### Fixed
 - Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)

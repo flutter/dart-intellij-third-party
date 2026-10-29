@@ -31,13 +31,14 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.text.JTextComponent;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 public final class DartSdkUtil {
-  private static final Map<Pair<File, Long>, String> ourVersions = new HashMap<>();
+  // Read from background threads (e.g. ReadAction.nonBlocking) as well as the EDT.
+  private static final Map<Pair<File, Long>, String> ourVersions = new ConcurrentHashMap<>();
   private static final String DART_SDK_KNOWN_PATHS = "DART_SDK_KNOWN_PATHS";
 
   public static @Nullable @NlsSafe String getSdkVersion(final @NotNull String sdkHomePath) {
@@ -54,8 +55,10 @@ public final class DartSdkUtil {
 
     final String version = FileUtil.loadFileOrNull(versionFile);
     if (version != null) {
-      ourVersions.put(versionPair, version);
-      return version;
+      // The SDK's version file ends with a newline; trim it so every consumer (analytics, UI, logs) sees the bare version.
+      final String trimmed = version.trim();
+      ourVersions.put(versionPair, trimmed);
+      return trimmed;
     }
 
     return null;

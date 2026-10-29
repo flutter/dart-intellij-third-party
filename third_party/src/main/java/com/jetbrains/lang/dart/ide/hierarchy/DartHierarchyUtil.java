@@ -23,9 +23,12 @@ import org.dartlang.analysis.server.protocol.TypeHierarchyItem;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.jetbrains.lang.dart.DartTokenTypes.*;
 
@@ -59,6 +62,27 @@ public final class DartHierarchyUtil {
 
     return DartAnalysisServerService.getInstance(dartClass.getProject())
       .search_getTypeHierarchy(file, name.getTextRange().getStartOffset(), false);
+  }
+
+  public static DartClass @NotNull [] filterSuperClasses(final @NotNull Project project,
+                                                         final @NotNull List<? extends TypeHierarchyItem> items) {
+    if (items.isEmpty()) return new DartClass[]{};
+
+    final Set<TypeHierarchyItem> seenItems = new HashSet<>();
+    final List<DartClass> superClasses = new ArrayList<>();
+    Integer superIndex = items.getFirst().getSuperclass();
+    while (superIndex != null && superIndex >= 0 && superIndex < items.size()) {
+      TypeHierarchyItem superItem = items.get(superIndex);
+      if (!seenItems.add(superItem)) {
+        break;
+      }
+      final DartClass superClass = findDartClass(project, superItem);
+      if (superClass != null) {
+        superClasses.add(superClass);
+      }
+      superIndex = superItem.getSuperclass();
+    }
+    return superClasses.toArray(new DartClass[0]);
   }
 
   public static boolean isExecutable(@NotNull PsiElement component) {
