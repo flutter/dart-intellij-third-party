@@ -7,7 +7,7 @@
 ### Removed
 
 ### Fixed
-- Trailing newline stripped from the Dart SDK version, which previously leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs
+- Trailing newline stripped from the Dart SDK version, which previously leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
 
 ## 511.0.0
 
