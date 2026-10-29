@@ -113,7 +113,7 @@ final class DartStructureViewElement extends PsiTreeElementBase<PsiElement> {
       }
       case ElementKind.FUNCTION -> element.isTopLevelOrStatic() ? TOP_LEVEL_FUNCTION_ICON : Lambda;
       case ElementKind.FUNCTION_INVOCATION -> FUNCTION_INVOCATION_ICON;
-      case ElementKind.FUNCTION_TYPE_ALIAS -> DartComponentType.TYPEDEF.getIcon();
+      case ElementKind.FUNCTION_TYPE_ALIAS, ElementKind.TYPE_ALIAS -> DartComponentType.TYPEDEF.getIcon();
       case ElementKind.GETTER -> element.isTopLevelOrStatic() ? PropertyReadStatic : PropertyRead;
       case ElementKind.METHOD -> {
         if (element.isAbstract()) yield AbstractMethod;
