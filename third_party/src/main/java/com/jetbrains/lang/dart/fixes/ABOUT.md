@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-10-29' } *-->
 # fixes
 
 ## Overview
@@ -21,5 +21,5 @@ Quick fixes for Dart analysis errors, backed by Analysis Server `SourceChange` f
 ## Side Effects
 - Mutates document source when a fix is applied. When a file edit has `fileStamp == -1`,
   `DartQuickFix` first creates the missing directories and file.
-- Reports analytics: `forFix` when a fix is applied, and a `dart.legacy_fix` duration event
-  when fixes are fetched.
+- Reports analytics: `forFix` when a fix is applied. Nothing is reported when fixes are
+  fetched for availability checks.

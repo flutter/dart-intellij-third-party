@@ -6,10 +6,6 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Caret;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.psi.PsiFile;
-import com.jetbrains.lang.dart.analytics.Analytics;
-import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
-import com.jetbrains.lang.dart.analytics.AnalyticsData;
-import com.jetbrains.lang.dart.analytics.AssistData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.jetbrains.annotations.NotNull;
@@ -42,17 +38,9 @@ public class DartQuickAssistSet {
       return lastSourceChanges;
     }
 
-    long startTime = System.nanoTime();
-
     final DartAnalysisServerService service = DartAnalysisServerService.getInstance(psiFile.getProject());
     service.updateFilesContent();
     lastSourceChanges = service.edit_getAssists(psiFile.getVirtualFile(), offset, length);
-
-    long durationMs = (System.nanoTime() - startTime) / 1_000_000;
-
-    AssistData assistData = AnalyticsData.forAssist("dart.legacy_assist", psiFile.getProject());
-    assistData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
-    Analytics.report(assistData);
 
     lastFilePath = filePath;
     lastOffset = offset;
