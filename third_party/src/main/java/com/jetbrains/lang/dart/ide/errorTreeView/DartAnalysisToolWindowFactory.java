@@ -27,6 +27,8 @@ final class DartAnalysisToolWindowFactory implements ToolWindowFactory, DumbAwar
     toolWindow.getContentManager().addContent(content);
     toolWindow.setAvailable(true);
 
+    DartProblemsView.getInstance(project).panelCreated(panel);
+
     if (PropertiesComponent.getInstance(project).getBoolean(TOOL_WINDOW_VISIBLE_PROPERTY, true)) {
       toolWindow.activate(null, false);
     }

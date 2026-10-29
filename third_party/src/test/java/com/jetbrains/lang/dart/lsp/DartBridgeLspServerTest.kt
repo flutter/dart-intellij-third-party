@@ -934,10 +934,9 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertNotNull(mockClient.publishedDiagnostics)
         assertEquals(fileUri, mockClient.publishedDiagnostics?.uri)
         assertEquals(1, mockClient.publishedDiagnostics?.diagnostics?.size)
-
-        // Also check that DartAnalysisServerService processed the diagnostic
-        val errorsHash = DartAnalysisServerService.getInstance(project).getFilePathsWithErrorsHash()
-        assertNotSame(0, errorsHash)
+        val publishedDiag = mockClient.publishedDiagnostics?.diagnostics?.first()
+        assertEquals("invalid_assignment", publishedDiag?.code?.left)
+        assertEquals("A value of type 'String' can't be assigned to a variable of type 'int'.", publishedDiag?.message)
     }
 
     fun testPublishClosingLabelsNotification() {

@@ -70,4 +70,7 @@ Here is the details of the changes made by the patch script:
    - Backport upstream commit `0634427a` (`IJPL-156979`) to `LspImplicitReferenceProvider.kt` and `LspSearchTargetsRule.kt` (adapted for `LspServer` / `LspServerImpl` naming) so that invoking *Go to Declaration or Usages* (`GotoDeclarationAction`) on a declaration falls back to *Show Usages* via `LspSearchTarget`. (This backport can be dropped once the `intellij-community` sync source includes `0634427a`.)
    - Keep `CurrentActionHolder` in `LspImplicitReferenceProvider.kt` `internal` (instead of `private`) so `DartTargetElementEvaluatorTest` can set `currentActionClass` in tests.
 
+12. **Make `Lsp4jClient.publishDiagnostics` Open**:
+   - Remove `final` modifier from `publishDiagnostics(params: PublishDiagnosticsParams)` in `Lsp4jClient.kt` so subclasses (such as `DartLsp4jClient` in `DartLspServerDescriptor.kt`) can override it to forward diagnostics to `DartProblemsView`.
+
 

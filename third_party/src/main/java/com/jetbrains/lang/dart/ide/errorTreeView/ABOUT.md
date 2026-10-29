@@ -16,11 +16,11 @@ The Dart Analysis tool window (problems table with filters and settings) and act
 - `AnalysisServerDiagnosticsAction` - gets the port via `diagnostic_getServerPort` and opens `http://localhost:<port>/status`.
 
 ## Invariants
-- Problems are populated from Analysis Server error notifications.
+- Problems are populated from Analysis Server error notifications (DAS mode) or LSP `textDocument/publishDiagnostics` notifications.
 
 ## Side Effects
 - Shows a tool window; persists filter settings.
 - Restarts or reanalyzes the Analysis Server; opens a browser for diagnostics.
 
 ## Verification
-- No dedicated tests; verify via the Dart Analysis tool window and its toolbar actions.
+- Automated tests in `com.jetbrains.lang.dart.lsp.DartLsp4jClientTest`; manually verify via the Dart Analysis tool window and its toolbar actions.
