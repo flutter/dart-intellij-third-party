@@ -13,7 +13,6 @@ import com.google.dart.server.FindElementReferencesConsumer;
 import com.google.dart.server.FormatConsumer;
 import com.google.dart.server.GetAssistsConsumer;
 import com.google.dart.server.GetFixesConsumer;
-import com.google.dart.server.GetImportedElementsConsumer;
 import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
 import com.google.dart.server.GetRefactoringConsumer;
@@ -25,7 +24,6 @@ import com.google.dart.server.GetSuggestionDetailsConsumer2;
 import com.google.dart.server.GetSuggestionsConsumer;
 import com.google.dart.server.GetSuggestionsConsumer2;
 import com.google.dart.server.GetTypeHierarchyConsumer;
-import com.google.dart.server.ImportElementsConsumer;
 import com.google.dart.server.ListPostfixCompletionTemplatesConsumer;
 import com.google.dart.server.MapUriConsumer;
 import com.google.dart.server.OrganizeDirectivesConsumer;
@@ -123,7 +121,6 @@ import org.dartlang.analysis.server.protocol.Element;
 import org.dartlang.analysis.server.protocol.HighlightRegion;
 import org.dartlang.analysis.server.protocol.ImplementedClass;
 import org.dartlang.analysis.server.protocol.ImplementedMember;
-import org.dartlang.analysis.server.protocol.ImportedElements;
 import org.dartlang.analysis.server.protocol.IncludedSuggestionRelevanceTag;
 import org.dartlang.analysis.server.protocol.IncludedSuggestionSet;
 import org.dartlang.analysis.server.protocol.NavigationRegion;
@@ -208,7 +205,6 @@ public final class DartAnalysisServerService implements Disposable {
   private static final long GET_ASSISTS_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(1000);
   private static final long GET_FIXES_TIMEOUT_EDT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long GET_FIXES_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(1000);
-  private static final long IMPORTED_ELEMENTS_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long POSTFIX_COMPLETION_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long POSTFIX_INITIALIZATION_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(5000);
   private static final long STATEMENT_COMPLETION_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(100);
@@ -296,11 +292,6 @@ public final class DartAnalysisServerService implements Disposable {
     @Override
     public void computedAvailableSuggestions(@NotNull List<AvailableSuggestionSet> changed, int @NotNull [] removed) {
       myServerData.computedAvailableSuggestions(changed, removed);
-    }
-
-    @Override
-    public void computedExistingImports(@NotNull String filePathSD, @NotNull Map<String, Map<String, Set<String>>> existingImports) {
-      myServerData.computedExistingImports(filePathSD, existingImports);
     }
 
     @Override
@@ -1088,10 +1079,6 @@ public final class DartAnalysisServerService implements Disposable {
 
   public @Nullable AvailableSuggestionSet getAvailableSuggestionSet(int id) {
     return myServerData.getAvailableSuggestionSet(id);
-  }
-
-  public @Nullable Map<String, Map<String, Set<String>>> getExistingImports(@Nullable String filePathSD) {
-    return myServerData.getExistingImports(filePathSD);
   }
 
   public @NotNull List<DartServerData.DartError> getErrors(final @NotNull VirtualFile file) {
@@ -2012,83 +1999,6 @@ public final class DartAnalysisServerService implements Disposable {
 
     if (latch.getCount() > 0) {
       logTookTooLongMessage("edit_format", EDIT_FORMAT_TIMEOUT, fileUri);
-    }
-
-    return resultRef.get();
-  }
-
-  public @Nullable List<ImportedElements> analysis_getImportedElements(final @NotNull VirtualFile file,
-                                                                       final int _selectionOffset,
-                                                                       final int _selectionLength) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return null;
-    }
-
-    final String fileUri = getFileUri(file);
-    final Ref<List<ImportedElements>> resultRef = new Ref<>();
-    final CountDownLatch latch = new CountDownLatch(1);
-    final int selectionOffset = getOriginalOffset(file, _selectionOffset);
-    final int selectionLength = getOriginalOffset(file, _selectionOffset + _selectionLength) - selectionOffset;
-    server.analysis_getImportedElements(fileUri, selectionOffset, selectionLength, new GetImportedElementsConsumer() {
-      @Override
-      public void computedImportedElements(final List<ImportedElements> importedElements) {
-        resultRef.set(importedElements);
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(final RequestError error) {
-        if (!RequestErrorCode.GET_IMPORTED_ELEMENTS_INVALID_FILE.equals(error.getCode())) {
-          logError("analysis_getImportedElements()", fileUri, error);
-        }
-
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, IMPORTED_ELEMENTS_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("analysis_getImportedElements", IMPORTED_ELEMENTS_TIMEOUT, fileUri);
-    }
-
-    return resultRef.get();
-  }
-
-  public @Nullable SourceFileEdit edit_importElements(final @NotNull VirtualFile file,
-                                                      final @NotNull List<ImportedElements> importedElements,
-                                                      final int _offset) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return null;
-    }
-
-    final String fileUri = getFileUri(file);
-    final Ref<SourceFileEdit> resultRef = new Ref<>();
-    final CountDownLatch latch = new CountDownLatch(1);
-    final int offset = getOriginalOffset(file, _offset);
-    server.edit_importElements(fileUri, importedElements, offset, new ImportElementsConsumer() {
-      @Override
-      public void computedImportedElements(final SourceFileEdit edit) {
-        resultRef.set(edit);
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(final RequestError error) {
-        if (!RequestErrorCode.IMPORT_ELEMENTS_INVALID_FILE.equals(error.getCode())) {
-          logError("edit_importElements()", fileUri, error);
-        }
-
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, IMPORTED_ELEMENTS_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("edit_importElements", IMPORTED_ELEMENTS_TIMEOUT, fileUri);
     }
 
     return resultRef.get();

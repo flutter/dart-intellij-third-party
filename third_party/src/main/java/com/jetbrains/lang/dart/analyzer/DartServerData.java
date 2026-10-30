@@ -48,7 +48,6 @@ public final class DartServerData {
   private final Map<DartFileInfo, Outline> myOutlineData = Collections.synchronizedMap(new HashMap<>());
 
   private final Map<Integer, AvailableSuggestionSet> myAvailableSuggestionSetMap = Collections.synchronizedMap(new HashMap<>());
-  private final Map<String, Map<String, Map<String, Set<String>>>> myExistingImports = Collections.synchronizedMap(new HashMap<>());
 
   private final Set<DartLocalFileInfo> myLocalFilesWithUnsentChanges = ConcurrentHashMap.newKeySet();
 
@@ -166,15 +165,6 @@ public final class DartServerData {
     for (AvailableSuggestionSet suggestionSet : changed) {
       myAvailableSuggestionSetMap.put(suggestionSet.getId(), suggestionSet);
     }
-  }
-
-  void computedExistingImports(@NotNull String filePathSD, @NotNull Map<String, Map<String, Set<String>>> existingImports) {
-    if (existingImports.isEmpty()) {
-      myExistingImports.remove(filePathSD);
-      return;
-    }
-
-    myExistingImports.put(filePathSD, existingImports);
   }
 
   static @NotNull DartNavigationRegion createDartNavigationRegion(final @NotNull DartAnalysisServerService service,
@@ -388,12 +378,6 @@ public final class DartServerData {
            myImplementedMemberData.get(fileInfo) != null &&
            myOutlineData.get(fileInfo) != null &&
            myClosingLabelData.get(fileInfo) != null;
-  }
-
-  @Nullable
-  Map<String, Map<String, Set<String>>> getExistingImports(@Nullable String filePathSD) {
-    if (filePathSD == null) return null;
-    return myExistingImports.get(filePathSD);
   }
 
   private void forceFileAnnotation(final @Nullable VirtualFile file, final boolean clearCache) {
