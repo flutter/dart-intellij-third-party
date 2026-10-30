@@ -25,6 +25,7 @@
 - Type Hierarchy navigation via LSP is now enabled for all users (#779)
 
 ### Fixed
+- Support icon for typedef and type alias in Structure View and code completion (#660)
 - Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
 - Restore semantic syntax highlighting after external file modification (#656)
 - Avoid UI freeze during project startup by updating excluded folders directly via `WorkspaceModel` (#728)

@@ -660,7 +660,7 @@ public final class DartServerCompletionContributor extends CompletionContributor
       null);
   }
 
-  private static Icon getBaseImage(Element element) {
+  static Icon getBaseImage(Element element) {
     final String elementKind = element.getKind();
     return switch (elementKind) {
       case ElementKind.CLASS, ElementKind.CLASS_TYPE_ALIAS -> element.isAbstract() ? AllIcons.Nodes.AbstractClass : AllIcons.Nodes.Class;
@@ -673,7 +673,7 @@ public final class DartServerCompletionContributor extends CompletionContributor
       case ElementKind.SETTER -> element.isTopLevelOrStatic() ? AllIcons.Nodes.PropertyWriteStatic : AllIcons.Nodes.PropertyWrite;
       case ElementKind.METHOD -> element.isAbstract() ? AllIcons.Nodes.AbstractMethod : AllIcons.Nodes.Method;
       case ElementKind.FUNCTION -> AllIcons.Nodes.Lambda;
-      case ElementKind.FUNCTION_TYPE_ALIAS -> AllIcons.Nodes.Annotationtype;
+      case ElementKind.FUNCTION_TYPE_ALIAS, ElementKind.TYPE_ALIAS -> AllIcons.Nodes.Annotationtype;
       case ElementKind.TOP_LEVEL_VARIABLE -> AllIcons.Nodes.Variable;
       case ElementKind.EXTENSION -> AllIcons.Nodes.Include;
       default -> null;
