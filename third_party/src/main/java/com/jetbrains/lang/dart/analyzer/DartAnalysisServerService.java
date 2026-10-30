@@ -203,7 +203,7 @@ public final class DartAnalysisServerService implements Disposable {
   public static final String MIN_LSP_CODE_ACTIONS_SDK_VERSION = MIN_LSP_PUBLISH_DIAGNOSTICS_SDK_VERSION;
   // The first Dart SDK with dart-lang/sdk@d31d8fa0721 (Analysis Server API 1.43.0), which returns
   // semanticTokensProvider in server.setClientCapabilities response for LSP-over-Legacy clients.
-  public static final String MIN_LSP_HIGHLIGHTING_SDK_VERSION = "3.14.0-307.0.dev";
+  public static final String MIN_LSP_HIGHLIGHTING_SDK_VERSION = "3.15.0-67.0.dev";
 
   private static final long UPDATE_FILES_TIMEOUT = 300;
 

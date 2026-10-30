@@ -1113,6 +1113,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             Triple(SemanticTokenTypes.EnumMember, emptyList(), DartSyntaxHighlighterColors.ENUM_CONSTANT),
             Triple(SemanticTokenTypes.TypeParameter, emptyList(), DartSyntaxHighlighterColors.TYPE_PARAMETER),
             Triple(SemanticTokenTypes.Type, emptyList(), DartSyntaxHighlighterColors.TYPE_ALIAS),
+            Triple(SemanticTokenTypes.Type, listOf("typeAlias"), DartSyntaxHighlighterColors.TYPE_ALIAS),
+            Triple(SemanticTokenTypes.Type, listOf("functionTypeAlias"), DartSyntaxHighlighterColors.FUNCTION_TYPE_ALIAS),
+            Triple(SemanticTokenTypes.Class, listOf("mixin"), DartSyntaxHighlighterColors.MIXIN),
+            Triple(SemanticTokenTypes.Class, listOf("extension"), DartSyntaxHighlighterColors.EXTENSION),
+            Triple(SemanticTokenTypes.Class, listOf("extensionType"), DartSyntaxHighlighterColors.EXTENSION_TYPE),
 
             // Methods & Constructors
             Triple(SemanticTokenTypes.Method, listOf("constructor"), DartSyntaxHighlighterColors.CONSTRUCTOR),
@@ -1120,11 +1125,17 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             Triple(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE),
             Triple(SemanticTokenTypes.Method, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION),
             Triple(SemanticTokenTypes.Method, listOf("instance"), DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE),
+            Triple(SemanticTokenTypes.Method, listOf("constructor", "tearOff"), DartSyntaxHighlighterColors.CONSTRUCTOR_TEAR_OFF),
+            Triple(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static, "tearOff"), DartSyntaxHighlighterColors.STATIC_METHOD_TEAR_OFF),
+            Triple(SemanticTokenTypes.Method, listOf("instance", "tearOff"), DartSyntaxHighlighterColors.INSTANCE_METHOD_TEAR_OFF),
 
             // Functions
             Triple(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION),
             Triple(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION),
-            Triple(SemanticTokenTypes.Function, emptyList(), DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE),
+            Triple(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE),
+            Triple(SemanticTokenTypes.Function, listOf(SemanticTokenModifiers.Static, "tearOff"), DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_TEAR_OFF),
+            Triple(SemanticTokenTypes.Function, emptyList(), DartSyntaxHighlighterColors.LOCAL_FUNCTION_REFERENCE),
+            Triple(SemanticTokenTypes.Function, listOf("tearOff"), DartSyntaxHighlighterColors.LOCAL_FUNCTION_TEAR_OFF),
 
             // Properties (Getters / Setters)
             Triple(SemanticTokenTypes.Property, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.STATIC_GETTER_DECLARATION),
@@ -2108,12 +2119,13 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testIsDartSdkVersionSufficientForLspHighlighting() {
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-307.0.dev"))
-        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-308.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.15.0-67.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.15.0-68.0.dev"))
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.15.0"))
         assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("4.0.0"))
 
-        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-306.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.15.0-66.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-307.0.dev"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-217.0.dev"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.14.0-65.0.dev"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.13.0"))

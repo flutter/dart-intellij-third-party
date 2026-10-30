@@ -257,6 +257,8 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
         val isDecl = modifiers.contains(SemanticTokenModifiers.Declaration)
         val isStatic = modifiers.contains(SemanticTokenModifiers.Static)
         val isInstance = modifiers.contains("instance")
+        // Custom modifier added in Dart SDK 3.15.0-67.0.dev (dart-lang/sdk#64621).
+        val isTearOff = modifiers.contains("tearOff")
 
         if (modifiers.contains("annotation") || tokenType == "annotation") {
             return DartSyntaxHighlighterColors.ANNOTATION
@@ -265,25 +267,45 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
         return when (tokenType) {
             SemanticTokenTypes.Class -> when {
                 modifiers.contains("constructor") -> DartSyntaxHighlighterColors.CONSTRUCTOR
+                modifiers.contains("mixin") -> DartSyntaxHighlighterColors.MIXIN
+                modifiers.contains("extensionType") -> DartSyntaxHighlighterColors.EXTENSION_TYPE
+                modifiers.contains("extension") -> DartSyntaxHighlighterColors.EXTENSION
                 else -> DartSyntaxHighlighterColors.CLASS
             }
 
             SemanticTokenTypes.Enum -> DartSyntaxHighlighterColors.ENUM
             SemanticTokenTypes.EnumMember -> DartSyntaxHighlighterColors.ENUM_CONSTANT
             SemanticTokenTypes.TypeParameter -> DartSyntaxHighlighterColors.TYPE_PARAMETER
-            SemanticTokenTypes.Type -> DartSyntaxHighlighterColors.TYPE_ALIAS
-
-            SemanticTokenTypes.Method -> when {
-                modifiers.contains("constructor") -> DartSyntaxHighlighterColors.CONSTRUCTOR
-                isStatic -> if (isDecl) DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION else DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE
-                else -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE
+            SemanticTokenTypes.Type -> when {
+                modifiers.contains("functionTypeAlias") -> DartSyntaxHighlighterColors.FUNCTION_TYPE_ALIAS
+                else -> DartSyntaxHighlighterColors.TYPE_ALIAS
             }
 
+            SemanticTokenTypes.Method -> when {
+                modifiers.contains("constructor") ->
+                    if (isTearOff) DartSyntaxHighlighterColors.CONSTRUCTOR_TEAR_OFF else DartSyntaxHighlighterColors.CONSTRUCTOR
+                isStatic -> when {
+                    isTearOff -> DartSyntaxHighlighterColors.STATIC_METHOD_TEAR_OFF
+                    isDecl -> DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION
+                    else -> DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE
+                }
+                else -> when {
+                    isTearOff -> DartSyntaxHighlighterColors.INSTANCE_METHOD_TEAR_OFF
+                    isDecl -> DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION
+                    else -> DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE
+                }
+            }
+
+            // DAS marks top-level functions (declarations, references, and tear-offs) with `static`; local functions have no `static`.
             SemanticTokenTypes.Function -> when {
-                isDecl -> if (isStatic) DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION else DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION
-                // DAS emits function without modifiers for both top-level and local references.
-                // Default to top-level function reference so standalone calls receive standard function highlighting.
-                else -> DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE
+                isStatic -> when {
+                    isTearOff -> DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_TEAR_OFF
+                    isDecl -> DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION
+                    else -> DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE
+                }
+                isTearOff -> DartSyntaxHighlighterColors.LOCAL_FUNCTION_TEAR_OFF
+                isDecl -> DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION
+                else -> DartSyntaxHighlighterColors.LOCAL_FUNCTION_REFERENCE
             }
 
             SemanticTokenTypes.Property -> when {
