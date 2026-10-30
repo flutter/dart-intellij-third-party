@@ -278,7 +278,9 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             SemanticTokenTypes.TypeParameter -> DartSyntaxHighlighterColors.TYPE_PARAMETER
             SemanticTokenTypes.Type -> when {
                 modifiers.contains("functionTypeAlias") -> DartSyntaxHighlighterColors.FUNCTION_TYPE_ALIAS
-                else -> DartSyntaxHighlighterColors.TYPE_ALIAS
+                modifiers.contains("typeAlias") -> DartSyntaxHighlighterColors.TYPE_ALIAS
+                // Since 3.15.0-67.0.dev every typedef carries an alias modifier, so a bare `type` is `dynamic` (TYPE_NAME_DYNAMIC).
+                else -> DartSyntaxHighlighterColors.TYPE_NAME_DYNAMIC
             }
 
             SemanticTokenTypes.Method -> when {
@@ -308,6 +310,7 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
                 else -> DartSyntaxHighlighterColors.LOCAL_FUNCTION_REFERENCE
             }
 
+            // Known gap: DAS emits identical type/modifiers for getters and setters, so setters use the getter keys.
             SemanticTokenTypes.Property -> when {
                 isStatic -> if (isDecl) DartSyntaxHighlighterColors.STATIC_GETTER_DECLARATION else DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE
                 isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_GETTER_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE
@@ -316,8 +319,10 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
 
             SemanticTokenTypes.Variable -> when {
                 modifiers.contains("importPrefix") -> DartSyntaxHighlighterColors.IMPORT_PREFIX
+                // Known gap: static field and top-level variable declarations are both emitted as [declaration, static].
                 isStatic -> DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION
                 isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_FIELD_REFERENCE
+                // Known gap: dynamic local variables/parameters are not distinguished on the wire.
                 isDecl -> DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION
                 else -> DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE
             }
@@ -327,6 +332,7 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             SemanticTokenTypes.Namespace -> DartSyntaxHighlighterColors.LIBRARY_NAME
             SemanticTokenTypes.Keyword -> DartSyntaxHighlighterColors.KEYWORD
             SemanticTokenTypes.String -> if (modifiers.contains("escape")) DartSyntaxHighlighterColors.VALID_STRING_ESCAPE else null
+            // Covers IDENTIFIER_DEFAULT and UNRESOLVED_INSTANCE_MEMBER_REFERENCE (known gap: not distinguished on the wire).
             "source" -> DartSyntaxHighlighterColors.IDENTIFIER
             // Comments, numbers, plain strings, booleans, and operators are left to DartSyntaxHighlighter (lexer), matching legacy behavior.
             else -> null
