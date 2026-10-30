@@ -1112,7 +1112,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             Triple(SemanticTokenTypes.Enum, emptyList(), DartSyntaxHighlighterColors.ENUM),
             Triple(SemanticTokenTypes.EnumMember, emptyList(), DartSyntaxHighlighterColors.ENUM_CONSTANT),
             Triple(SemanticTokenTypes.TypeParameter, emptyList(), DartSyntaxHighlighterColors.TYPE_PARAMETER),
-            Triple(SemanticTokenTypes.Type, emptyList(), DartSyntaxHighlighterColors.TYPE_ALIAS),
+            Triple(SemanticTokenTypes.Type, emptyList(), DartSyntaxHighlighterColors.TYPE_NAME_DYNAMIC),
             Triple(SemanticTokenTypes.Type, listOf("typeAlias"), DartSyntaxHighlighterColors.TYPE_ALIAS),
             Triple(SemanticTokenTypes.Type, listOf("functionTypeAlias"), DartSyntaxHighlighterColors.FUNCTION_TYPE_ALIAS),
             Triple(SemanticTokenTypes.Class, listOf("mixin"), DartSyntaxHighlighterColors.MIXIN),
