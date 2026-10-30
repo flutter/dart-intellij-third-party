@@ -52,6 +52,7 @@
     <lang.lineWrapStrategy language="Dart" implementationClass="com.jetbrains.lang.dart.ide.editor.DartLineWrapPositionStrategy"/>
     <stripTrailingSpacesFilterFactory implementation="com.jetbrains.lang.dart.ide.editor.DartStripTrailingSpacesFilterFactory"/>
     <copyPastePostProcessor implementation="com.jetbrains.lang.dart.ide.editor.DartCopyPasteProcessor"/>
+    <copyPastePreProcessor implementation="com.jetbrains.lang.dart.ide.editor.DartDocLineCommentCopyPastePreProcessor" order="last"/>
     <autoImportOptionsProvider instance="com.jetbrains.lang.dart.ide.editor.DartAutoImportOptionsProvider"/>
 
     <multiHostInjector implementation="com.jetbrains.lang.dart.injection.DartMultiHostInjector"/>
