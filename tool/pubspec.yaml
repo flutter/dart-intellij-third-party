@@ -11,4 +11,3 @@ environment:
 
 dev_dependencies:
   skills_lint: ^0.5.3
-
