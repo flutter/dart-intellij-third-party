@@ -60,6 +60,10 @@ import org.eclipse.lsp4j.InlayHintParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.SemanticTokens
+import org.eclipse.lsp4j.SemanticTokensLegend
+import org.eclipse.lsp4j.SemanticTokensParams
+import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.ServerCapabilities
@@ -82,6 +86,7 @@ import org.eclipse.lsp4j.services.WorkspaceService
 import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 /**
  * DartBridgeLspServer acts as a lightweight translation bridge between the JetBrains LSP client
@@ -131,6 +136,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     internal val isClientConnected: Boolean
         get() = client != null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
+    @Volatile
+    var isSemanticTokensAdvertised: Boolean = false
+        private set
     private var dasMessageListener: ResponseListener? = null
 
     private val das: DartAnalysisServerService
@@ -367,36 +375,61 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             initialized = false
             das.updateClientCapabilities(false)
         }
+        isSemanticTokensAdvertised = false
+        das.setSemanticTokensAdvertised(false)
     }
 
     // --- LanguageServer Implementation ---
+
+    // Overridable in tests.
+    internal var isLspHighlightingEnabled: () -> Boolean = { DartAnalysisServerService.isLspHighlightingEnabled(project) }
 
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
         initialized = true
         das.updateClientCapabilities(true)
-        val capabilities = ServerCapabilities().apply {
-            setHoverProvider(true)
-            setDefinitionProvider(true)
-            setTypeDefinitionProvider(true)
-            setDocumentHighlightProvider(true)
-            setInlayHintProvider(true)
-            setTypeHierarchyProvider(true)
-            setCallHierarchyProvider(true)
-            setReferencesProvider(true)
-            setDocumentSymbolProvider(true)
-            setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
-            val fileOperationsCaps = FileOperationsServerCapabilities().apply {
-                willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
-            }
-            workspace = WorkspaceServerCapabilities().apply {
-                fileOperations = fileOperationsCaps
-            }
-            setCodeActionProvider(true)
-            setExecuteCommandProvider(ExecuteCommandOptions())
-            // Add other capabilities as we support them.
+        val legendFuture = das.semanticTokensLegendFuture
+        val legendCompletableFuture = when {
+            !isLspHighlightingEnabled() -> CompletableFuture.completedFuture(null)
+            legendFuture.isDone -> CompletableFuture.completedFuture(das.semanticTokensLegend)
+            das.isServerProcessActive -> legendFuture.copy().completeOnTimeout(null, 3, TimeUnit.SECONDS)
+            else -> CompletableFuture.completedFuture(null)
         }
-        return CompletableFuture.completedFuture(InitializeResult(capabilities))
+
+        return legendCompletableFuture.thenApply { serverLegend ->
+            val capabilities = ServerCapabilities().apply {
+                setHoverProvider(true)
+                setDefinitionProvider(true)
+                setTypeDefinitionProvider(true)
+                setDocumentHighlightProvider(true)
+                setInlayHintProvider(true)
+                setTypeHierarchyProvider(true)
+                setCallHierarchyProvider(true)
+                setReferencesProvider(true)
+                setDocumentSymbolProvider(true)
+                setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
+                if (serverLegend != null) {
+                    setSemanticTokensProvider(SemanticTokensWithRegistrationOptions().apply {
+                        legend = serverLegend
+                        setFull(true)
+                        setRange(false)
+                    })
+                }
+                val fileOperationsCaps = FileOperationsServerCapabilities().apply {
+                    willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
+                }
+                workspace = WorkspaceServerCapabilities().apply {
+                    fileOperations = fileOperationsCaps
+                }
+                setCodeActionProvider(true)
+                setExecuteCommandProvider(ExecuteCommandOptions())
+                // Add other capabilities as we support them.
+            }
+            val advertised = serverLegend != null
+            isSemanticTokensAdvertised = advertised
+            das.setSemanticTokensAdvertised(advertised)
+            InitializeResult(capabilities)
+        }
     }
 
     override fun initialized(params: InitializedParams) {
@@ -482,6 +515,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                     hints ?: emptyList()
                 }
             }
+    }
+
+    override fun semanticTokensFull(params: SemanticTokensParams): CompletableFuture<SemanticTokens> {
+        return forwardRequest("textDocument/semanticTokens/full", params, SemanticTokens::class.java).exceptionally { e ->
+            logger.debug("textDocument/semanticTokens/full failed: ${e.message}")
+            null
+        }
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {

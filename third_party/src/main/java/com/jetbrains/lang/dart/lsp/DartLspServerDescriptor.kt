@@ -6,6 +6,7 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
@@ -53,13 +54,17 @@ import com.intellij.platform.dartlsp.api.customization.LspInlayHintDisabled
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSelectionRangeDisabled
+import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
+import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensSupport
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
 import com.intellij.psi.PsiFile
 import com.intellij.util.io.URLUtil
+import com.jetbrains.lang.dart.DartFileType
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.CompletionItem
@@ -67,6 +72,8 @@ import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
 import org.eclipse.lsp4j.PublishDiagnosticsCapabilities
+import org.eclipse.lsp4j.SemanticTokenModifiers
+import org.eclipse.lsp4j.SemanticTokenTypes
 import org.eclipse.lsp4j.TextDocumentClientCapabilities
 import org.eclipse.lsp4j.WorkspaceClientCapabilities
 import javax.swing.Icon
@@ -165,7 +172,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             } else {
                 LspCompletionDisabled
             }
-        override val semanticTokensCustomizer = LspSemanticTokensDisabled
+        override val semanticTokensCustomizer: LspSemanticTokensCustomizer
+            get() = if (DartAnalysisServerService.isLspHighlightingEnabled(project)) {
+                DartLspSemanticTokensSupport
+            } else {
+                LspSemanticTokensDisabled
+            }
         override val diagnosticsCustomizer: LspDiagnosticsCustomizer
             get() = if (DartAnalysisServerService.isLspPublishDiagnosticsEnabled(project)) {
                 LspDiagnosticsSupport()
@@ -233,5 +245,97 @@ object DartLspCompletionSupport : LspCompletionSupport() {
         CompletionItemKind.Constructor -> AllIcons.Nodes.ClassInitializer
         CompletionItemKind.Function -> AllIcons.Nodes.Lambda
         else -> super.getIcon(item)
+    }
+}
+
+object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
+    override fun shouldAskServerForSemanticTokens(psiFile: PsiFile): Boolean {
+        return psiFile.fileType == DartFileType.INSTANCE
+    }
+
+    override fun getTextAttributesKey(tokenType: String, modifiers: List<String>): TextAttributesKey? {
+        val isDecl = modifiers.contains(SemanticTokenModifiers.Declaration)
+        val isStatic = modifiers.contains(SemanticTokenModifiers.Static)
+        val isInstance = modifiers.contains("instance")
+        // Custom modifier added in Dart SDK 3.15.0-67.0.dev (dart-lang/sdk#64621).
+        val isTearOff = modifiers.contains("tearOff")
+
+        if (modifiers.contains("annotation") || tokenType == "annotation") {
+            return DartSyntaxHighlighterColors.ANNOTATION
+        }
+
+        return when (tokenType) {
+            SemanticTokenTypes.Class -> when {
+                modifiers.contains("constructor") -> DartSyntaxHighlighterColors.CONSTRUCTOR
+                modifiers.contains("mixin") -> DartSyntaxHighlighterColors.MIXIN
+                modifiers.contains("extensionType") -> DartSyntaxHighlighterColors.EXTENSION_TYPE
+                modifiers.contains("extension") -> DartSyntaxHighlighterColors.EXTENSION
+                else -> DartSyntaxHighlighterColors.CLASS
+            }
+
+            SemanticTokenTypes.Enum -> DartSyntaxHighlighterColors.ENUM
+            SemanticTokenTypes.EnumMember -> DartSyntaxHighlighterColors.ENUM_CONSTANT
+            SemanticTokenTypes.TypeParameter -> DartSyntaxHighlighterColors.TYPE_PARAMETER
+            SemanticTokenTypes.Type -> when {
+                modifiers.contains("functionTypeAlias") -> DartSyntaxHighlighterColors.FUNCTION_TYPE_ALIAS
+                modifiers.contains("typeAlias") -> DartSyntaxHighlighterColors.TYPE_ALIAS
+                // Since 3.15.0-67.0.dev every typedef carries an alias modifier, so a bare `type` is `dynamic` (TYPE_NAME_DYNAMIC).
+                else -> DartSyntaxHighlighterColors.TYPE_NAME_DYNAMIC
+            }
+
+            SemanticTokenTypes.Method -> when {
+                modifiers.contains("constructor") ->
+                    if (isTearOff) DartSyntaxHighlighterColors.CONSTRUCTOR_TEAR_OFF else DartSyntaxHighlighterColors.CONSTRUCTOR
+                isStatic -> when {
+                    isTearOff -> DartSyntaxHighlighterColors.STATIC_METHOD_TEAR_OFF
+                    isDecl -> DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION
+                    else -> DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE
+                }
+                else -> when {
+                    isTearOff -> DartSyntaxHighlighterColors.INSTANCE_METHOD_TEAR_OFF
+                    isDecl -> DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION
+                    else -> DartSyntaxHighlighterColors.INSTANCE_METHOD_REFERENCE
+                }
+            }
+
+            // DAS marks top-level functions (declarations, references, and tear-offs) with `static`; local functions have no `static`.
+            SemanticTokenTypes.Function -> when {
+                isStatic -> when {
+                    isTearOff -> DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_TEAR_OFF
+                    isDecl -> DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_DECLARATION
+                    else -> DartSyntaxHighlighterColors.TOP_LEVEL_FUNCTION_REFERENCE
+                }
+                isTearOff -> DartSyntaxHighlighterColors.LOCAL_FUNCTION_TEAR_OFF
+                isDecl -> DartSyntaxHighlighterColors.LOCAL_FUNCTION_DECLARATION
+                else -> DartSyntaxHighlighterColors.LOCAL_FUNCTION_REFERENCE
+            }
+
+            // Known gap: DAS emits identical type/modifiers for getters and setters, so setters use the getter keys.
+            SemanticTokenTypes.Property -> when {
+                isStatic -> if (isDecl) DartSyntaxHighlighterColors.STATIC_GETTER_DECLARATION else DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE
+                isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_GETTER_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE
+                else -> if (isDecl) DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_DECLARATION else DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_REFERENCE
+            }
+
+            SemanticTokenTypes.Variable -> when {
+                modifiers.contains("importPrefix") -> DartSyntaxHighlighterColors.IMPORT_PREFIX
+                // Known gap: static field and top-level variable declarations are both emitted as [declaration, static].
+                isStatic -> DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION
+                isInstance -> if (isDecl) DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION else DartSyntaxHighlighterColors.INSTANCE_FIELD_REFERENCE
+                // Known gap: dynamic local variables/parameters are not distinguished on the wire.
+                isDecl -> DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION
+                else -> DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE
+            }
+
+            SemanticTokenTypes.Parameter -> if (isDecl) DartSyntaxHighlighterColors.PARAMETER_DECLARATION else DartSyntaxHighlighterColors.PARAMETER_REFERENCE
+            "label" -> DartSyntaxHighlighterColors.LABEL
+            SemanticTokenTypes.Namespace -> DartSyntaxHighlighterColors.LIBRARY_NAME
+            SemanticTokenTypes.Keyword -> DartSyntaxHighlighterColors.KEYWORD
+            SemanticTokenTypes.String -> if (modifiers.contains("escape")) DartSyntaxHighlighterColors.VALID_STRING_ESCAPE else null
+            // Covers IDENTIFIER_DEFAULT and UNRESOLVED_INSTANCE_MEMBER_REFERENCE (known gap: not distinguished on the wire).
+            "source" -> DartSyntaxHighlighterColors.IDENTIFIER
+            // Comments, numbers, plain strings, booleans, and operators are left to DartSyntaxHighlighter (lexer), matching legacy behavior.
+            else -> null
+        }
     }
 }
