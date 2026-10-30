@@ -7,10 +7,7 @@ import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.xmlb.XmlSerializerUtil;
-import org.intellij.lang.annotations.MagicConstant;
 import org.jetbrains.annotations.NotNull;
-
-import static com.intellij.codeInsight.CodeInsightSettings.*;
 
 @State(name = "DartCodeInsightSettings", storages = @Storage("other.xml"))
 public class DartCodeInsightSettings implements PersistentStateComponent<DartCodeInsightSettings> {
@@ -19,9 +16,6 @@ public class DartCodeInsightSettings implements PersistentStateComponent<DartCod
   }
 
   public boolean INSERT_DEFAULT_ARG_VALUES = true;
-
-  @MagicConstant(intValues = {YES, NO, ASK})
-  public int ADD_IMPORTS_ON_PASTE = ASK;
 
   @Override
   public DartCodeInsightSettings getState() {

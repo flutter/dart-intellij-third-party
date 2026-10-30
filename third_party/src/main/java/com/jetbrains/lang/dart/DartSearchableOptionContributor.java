@@ -9,8 +9,6 @@ import org.jetbrains.annotations.NotNull;
 final class DartSearchableOptionContributor extends SearchableOptionContributor {
   @Override
   public void processOptions(@NotNull SearchableOptionProcessor processor) {
-    processor.addOptions("dart " + DartBundle.message("dialog.paste.on.import.title"), null,
-                         "Dart: " + DartBundle.message("dialog.paste.on.import.title"), "editor.preferences.import", null, false);
     processor.addOptions(DartBundle.message("checkbox.collapse.parts"), null,
                          "Code Folding: collapse Dart parts by default", "editor.preferences.folding", null, false);
     processor.addOptions(DartBundle.message("checkbox.collapse.generic.parameters"), null,
