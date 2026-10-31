@@ -13,6 +13,32 @@ import junit.framework.TestCase
 
 class VmServiceDriverElementTest : TestCase() {
 
+  fun testFunctionGetterAndSetterFlags() {
+    val getterJson = JsonObject().apply {
+      addProperty("isGetter", true)
+      addProperty("isSetter", false)
+    }
+    val setterJson = JsonObject().apply {
+      addProperty("isGetter", false)
+      addProperty("isSetter", true)
+    }
+    val emptyJson = JsonObject()
+
+    assertTrue(FuncRef(getterJson).isGetter)
+    assertFalse(FuncRef(getterJson).isSetter)
+    assertFalse(FuncRef(setterJson).isGetter)
+    assertTrue(FuncRef(setterJson).isSetter)
+    assertFalse(FuncRef(emptyJson).isGetter)
+    assertFalse(FuncRef(emptyJson).isSetter)
+
+    assertTrue(Func(getterJson).isGetter)
+    assertFalse(Func(getterJson).isSetter)
+    assertFalse(Func(setterJson).isGetter)
+    assertTrue(Func(setterJson).isSetter)
+    assertFalse(Func(emptyJson).isGetter)
+    assertFalse(Func(emptyJson).isSetter)
+  }
+
   fun testDeprecatedTypeRefKindRemainsDecodable() {
     val json = JsonObject().apply {
       addProperty("kind", "TypeRef")
