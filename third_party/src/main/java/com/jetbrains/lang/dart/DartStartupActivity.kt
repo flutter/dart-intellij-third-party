@@ -30,6 +30,7 @@ import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.projectWizard.DartModuleBuilder
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.analytics.Analytics
+import com.jetbrains.lang.dart.analytics.AnalyticsConstants
 import com.jetbrains.lang.dart.analytics.SettingsData
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
@@ -106,15 +107,36 @@ class DartStartupActivity : ProjectActivity {
     val config = Analytics.getConfiguration(info.sdk, project)
     if (config.suppressAnalytics) return
 
-    val settingsData = SettingsData(project)
-    settingsData["experimentalLspFeaturesEnabled"] = info.experimentalLspFeaturesEnabled
-    settingsData["sdkVersion"] = info.sdkVersion
-
-    Analytics.report(settingsData)
+    Analytics.report(buildSettingsData(project, info))
   }
 }
 
-private data class SettingsReportInfo(
+/**
+ * Builds the once-per-project-open settings event. Besides settings state, it carries
+ * attribution that the Flutter plugin's events (which go through the Dart reporter) otherwise
+ * lack: the Dart plugin version, the Flutter plugin version (only when io.flutter is enabled),
+ * and the raw IDE product code.
+ *
+ * [productCode] and [pluginVersion] default to the live IDE values; tests pass fakes.
+ */
+@VisibleForTesting
+internal fun buildSettingsData(
+  project: Project,
+  info: SettingsReportInfo,
+  productCode: String = Analytics.productCode,
+  pluginVersion: (String) -> String? = Analytics::pluginVersion,
+): SettingsData {
+  val settingsData = SettingsData(project)
+  settingsData["experimentalLspFeaturesEnabled"] = info.experimentalLspFeaturesEnabled
+  settingsData.add(AnalyticsConstants.SDK_VERSION, info.sdkVersion)
+  settingsData.add(AnalyticsConstants.PRODUCT_CODE, productCode)
+  pluginVersion(AnalyticsConstants.DART_PLUGIN_ID)?.let { settingsData.add(AnalyticsConstants.DART_PLUGIN_VERSION, it) }
+  pluginVersion(AnalyticsConstants.FLUTTER_PLUGIN_ID)?.let { settingsData.add(AnalyticsConstants.FLUTTER_PLUGIN_VERSION, it) }
+  return settingsData
+}
+
+@VisibleForTesting
+internal data class SettingsReportInfo(
   val sdk: DartSdk?,
   val dartSupportEnabled: Boolean,
   val sdkVersion: String,
