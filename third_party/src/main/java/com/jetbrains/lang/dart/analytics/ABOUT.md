@@ -8,15 +8,22 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
 
 ## Interface
 - `Analytics` (`Analytics.kt`): entry point. `getConfiguration(sdk, project)`, `report(data)`,
-  `updateEnvironment(...)`, and the `suppressAnalytics` flag.
+  `updateEnvironment(...)`, and the `suppressAnalytics` flag. Public attribution helpers, also
+  used by the Flutter plugin:
+  - `getTool()`: the unified analytics tool label, `android-studio-plugins` in Android Studio
+    (product code `AI`) and `intellij-plugins` everywhere else.
+  - `getProductCode()`: the raw IDE product code (`IC`, `IU`, `AI`, `WS`, ...). Report it as its
+    own field; never use it as the tool label.
+  - `pluginVersion(id)`: the version of an enabled plugin, or `null` if it is missing or disabled.
 - `AnalyticsData` and subclasses `ActionData`, `AssistData`, `FixData`,
   `LegacyRefactoringData`, `SettingsData`, `SettingsChangeData`, `SessionData`: typed event
-  payloads. `SettingsData` reports settings state once per project open; `SettingsChangeData`
-  (`type=settings_change`) reports a single user-initiated change, such as toggling
-  experimental LSP features (`id=experimental_lsp_features`, `enabled`, `sdkVersion`) from
-  `DartConfigurable.apply()`.
+  payloads. `SettingsData` reports settings state once per project open, plus attribution:
+  `dartPluginVersion`, `productCode`, and `flutterPluginVersion` (only when io.flutter is
+  enabled). `SettingsChangeData` (`type=settings_change`) reports a single user-initiated
+  change, such as toggling experimental LSP features (`id=experimental_lsp_features`, `enabled`,
+  `sdkVersion`) from `DartConfigurable.apply()`.
 - `AnalyticsConstants`: shared event field names (for example `DURATION_MS`, `ENABLED`,
-  `SDK_VERSION`).
+  `SDK_VERSION`, `DART_PLUGIN_VERSION`, `FLUTTER_PLUGIN_VERSION`, `PRODUCT_CODE`).
 - `AnalyticsConfiguration`: consent prompt and telemetry state for the session.
 - `AnalyticsReporter`: delivery strategy chosen from the configuration.
 - `DataValue`, `StringValue`, `IntValue`, `BooleanValue`: typed event field descriptors.
