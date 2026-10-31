@@ -31,8 +31,6 @@ import com.jetbrains.lang.dart.projectWizard.DartModuleBuilder
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analytics.AnalyticsConstants
-import com.jetbrains.lang.dart.analytics.DART_PLUGIN_ID
-import com.jetbrains.lang.dart.analytics.FLUTTER_PLUGIN_ID
 import com.jetbrains.lang.dart.analytics.SettingsData
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
@@ -118,15 +116,22 @@ class DartStartupActivity : ProjectActivity {
  * attribution that the Flutter plugin's events (which go through the Dart reporter) otherwise
  * lack: the Dart plugin version, the Flutter plugin version (only when io.flutter is enabled),
  * and the raw IDE product code.
+ *
+ * [productCode] and [pluginVersion] default to the live IDE values; tests pass fakes.
  */
 @VisibleForTesting
-internal fun buildSettingsData(project: Project, info: SettingsReportInfo): SettingsData {
+internal fun buildSettingsData(
+  project: Project,
+  info: SettingsReportInfo,
+  productCode: String = Analytics.productCode,
+  pluginVersion: (String) -> String? = Analytics::pluginVersion,
+): SettingsData {
   val settingsData = SettingsData(project)
   settingsData["experimentalLspFeaturesEnabled"] = info.experimentalLspFeaturesEnabled
   settingsData.add(AnalyticsConstants.SDK_VERSION, info.sdkVersion)
-  settingsData.add(AnalyticsConstants.PRODUCT_CODE, Analytics.productCode)
-  Analytics.pluginVersion(DART_PLUGIN_ID)?.let { settingsData.add(AnalyticsConstants.DART_PLUGIN_VERSION, it) }
-  Analytics.pluginVersion(FLUTTER_PLUGIN_ID)?.let { settingsData.add(AnalyticsConstants.FLUTTER_PLUGIN_VERSION, it) }
+  settingsData.add(AnalyticsConstants.PRODUCT_CODE, productCode)
+  pluginVersion(AnalyticsConstants.DART_PLUGIN_ID)?.let { settingsData.add(AnalyticsConstants.DART_PLUGIN_VERSION, it) }
+  pluginVersion(AnalyticsConstants.FLUTTER_PLUGIN_ID)?.let { settingsData.add(AnalyticsConstants.FLUTTER_PLUGIN_VERSION, it) }
   return settingsData
 }
 

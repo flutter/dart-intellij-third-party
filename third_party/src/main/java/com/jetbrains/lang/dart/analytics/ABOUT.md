@@ -8,13 +8,16 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
 
 ## Interface
 - `Analytics` (`Analytics.kt`): entry point. `getConfiguration(sdk, project)`, `report(data)`,
-  `updateEnvironment(...)`, and the `suppressAnalytics` flag. Public attribution helpers, also
-  used by the Flutter plugin:
-  - `getTool()`: the unified analytics tool label, `android-studio-plugins` in Android Studio
-    (product code `AI`) and `intellij-plugins` everywhere else.
-  - `getProductCode()`: the raw IDE product code (`IC`, `IU`, `AI`, `WS`, ...). Report it as its
-    own field; never use it as the tool label.
+  `updateEnvironment(...)`, and the `suppressAnalytics` flag. Public attribution helpers for the
+  Flutter plugin, available since Dart plugin 512.0.0 (Flutter callers that support older Dart
+  plugins must catch `LinkageError` or gate on the Dart plugin version):
+  - `tool` (Java: `getTool()`): the unified analytics tool label, `android-studio-plugins` in
+    Android Studio (product code `AI`) and `intellij-plugins` everywhere else.
+  - `productCode` (Java: `getProductCode()`): the raw IDE product code (`IC`, `IU`, `AI`, `WS`,
+    ...). Report it as its own field; never use it as the tool label.
   - `pluginVersion(id)`: the version of an enabled plugin, or `null` if it is missing or disabled.
+    Not cached; cache it on hot paths. Plugin ids are `AnalyticsConstants.DART_PLUGIN_ID` and
+    `FLUTTER_PLUGIN_ID`.
 - `AnalyticsData` and subclasses `ActionData`, `AssistData`, `FixData`,
   `LegacyRefactoringData`, `SettingsData`, `SettingsChangeData`, `SessionData`: typed event
   payloads. `SettingsData` reports settings state once per project open, plus attribution:
@@ -49,4 +52,6 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
 - Sends telemetry events when analytics are not suppressed.
 
 ## Verification
-- Tests live under `third_party/src/test/java/com/jetbrains/dart/analytics`.
+- Tests live under `third_party/src/test/java/com/jetbrains/lang/dart/analytics` (payloads and
+  attribution) and `third_party/src/test/java/com/jetbrains/dart/analytics` (environment
+  propagation).

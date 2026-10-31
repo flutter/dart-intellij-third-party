@@ -49,9 +49,6 @@ private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 
 private val DEFAULT_RESPONSE_TIMEOUT = 1.seconds
 
-internal const val DART_PLUGIN_ID = "Dart"
-internal const val FLUTTER_PLUGIN_ID = "io.flutter"
-
 private object UnifiedAnalytics {
   object Property {
     const val EVENT = "event"
@@ -287,9 +284,15 @@ object Analytics {
   var suppressAnalytics: Boolean = true
     internal set
 
+  // The attribution members below are public API for the Flutter plugin, which supports IDEs and
+  // Dart plugin versions that predate them. Flutter callers must catch LinkageError (or gate on
+  // the Dart plugin version) until their minimum Dart plugin version is 512.0.0.
+
   /**
    * The Dart unified analytics tool label for the running IDE: `android-studio-plugins` in
-   * Android Studio and `intellij-plugins` everywhere else (Java: `Analytics.getTool()`).
+   * Android Studio and `intellij-plugins` everywhere else.
+   *
+   * Java: `Analytics.getTool()`. Available since Dart plugin 512.0.0.
    */
   @JvmStatic
   val tool: String
@@ -300,13 +303,22 @@ object Analytics {
    *
    * Report this as its own field. Never use it as the [tool] label: Dart's `DashTool.fromLabel`
    * throws on unknown labels.
+   *
+   * Java: `Analytics.getProductCode()`. Available since Dart plugin 512.0.0.
    */
   @JvmStatic
   val productCode: String
     get() = ApplicationInfo.getInstance().build.productCode
 
   /**
-   * The version of the plugin with the given [id], or `null` if it isn't installed or is disabled.
+   * The version of the plugin with the given [id] (for example
+   * [AnalyticsConstants.DART_PLUGIN_ID] or [AnalyticsConstants.FLUTTER_PLUGIN_ID]), or `null` if
+   * it isn't installed or is disabled.
+   *
+   * Safe to call from any thread. The result isn't cached and each call scans the loaded plugins,
+   * so callers on hot paths (per event, per URL) should cache it.
+   *
+   * Java: `Analytics.pluginVersion(id)`. Available since Dart plugin 512.0.0.
    */
   @JvmStatic
   fun pluginVersion(id: String): String? = findLoadedPlugin(id)?.version
@@ -392,7 +404,7 @@ object Analytics {
       environment[UnifiedAnalytics.Env.IDE_NAME] = ApplicationInfo.getInstance().versionName
       environment[UnifiedAnalytics.Env.IDE_VERSION] = ApplicationInfo.getInstance().fullVersion
 
-      val plugin = findLoadedPlugin(DART_PLUGIN_ID)
+      val plugin = findLoadedPlugin(AnalyticsConstants.DART_PLUGIN_ID)
       if (plugin != null) {
           environment[UnifiedAnalytics.Env.PLUGIN_NAME] = plugin.name
           environment[UnifiedAnalytics.Env.PLUGIN_VERSION] = plugin.version
@@ -546,13 +558,15 @@ object AnalyticsConstants {
 
   /**
    * The version of the Dart plugin (reported once per project open by [SettingsData]).
+   *
+   * Dev builds report `<version>-dev.<date>-<commit>`, so bucket by prefix in dashboards.
    */
   @JvmField
   val DART_PLUGIN_VERSION = StringValue("dartPluginVersion")
 
   /**
    * The version of the Flutter plugin, when it is enabled (reported once per project open by
-   * [SettingsData]).
+   * [SettingsData]). Dev builds carry a similar suffix to [DART_PLUGIN_VERSION].
    */
   @JvmField
   val FLUTTER_PLUGIN_VERSION = StringValue("flutterPluginVersion")
@@ -562,6 +576,16 @@ object AnalyticsConstants {
    */
   @JvmField
   val PRODUCT_CODE = StringValue("productCode")
+
+  /**
+   * The Dart plugin's id, for [Analytics.pluginVersion]. Available since Dart plugin 512.0.0.
+   */
+  const val DART_PLUGIN_ID = "Dart"
+
+  /**
+   * The Flutter plugin's id, for [Analytics.pluginVersion]. Available since Dart plugin 512.0.0.
+   */
+  const val FLUTTER_PLUGIN_ID = "io.flutter"
 
   internal const val ACTION_TYPE = "action"
   internal const val ASSIST_TYPE = "assist"
