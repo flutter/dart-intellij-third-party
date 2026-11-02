@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Added
+- Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Changed
 
