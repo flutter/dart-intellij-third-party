@@ -1,9 +1,9 @@
 ## Unreleased
 
 ### Added
+- Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Changed
-- Syntax highlighting implemented with JetBrains LSP as an experimental feature, preserving Dart color scheme distinctions for mixins, extensions, extension types, function type aliases, tear-offs, and top-level vs. local functions (requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Removed
 - Per-request `dart.legacy_assist` and `dart.legacy_fix` analytics latency events, which fired on every legacy quick assist and quick fix availability check (caret moves, edits, selection changes) rather than when one was applied. Applied assists and fixes are still reported (#793)
@@ -43,9 +43,6 @@
 - Quick fixes, assists, source actions, and refactorings via LSP code actions (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#526)
 
 ### Changed
-- Highlighting read vs write variable occurrences via LSP is now enabled for all users
-
-### Removed
 - Highlighting read vs write variable occurrences via LSP is now enabled for all users (#693)
 
 ### Fixed
@@ -113,7 +110,6 @@
 ### Added
 
 ### Changed
-- Syntax highlighting implemented with JetBrains LSP as an experimental feature, preserving Dart color scheme distinctions for mixins, extensions, extension types, function type aliases, tear-offs, and top-level vs. local functions (requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Removed
 
@@ -127,7 +123,6 @@
 - Retrieving diagnostics server with lsp4ij (#391)
 
 ### Changed
-- Syntax highlighting implemented with JetBrains LSP as an experimental feature, preserving Dart color scheme distinctions for mixins, extensions, extension types, function type aliases, tear-offs, and top-level vs. local functions (requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Removed
 
@@ -147,7 +142,6 @@
 - Dependency on lsp4ij with basic initialization (#348)
 
 ### Changed
-- Syntax highlighting implemented with JetBrains LSP as an experimental feature, preserving Dart color scheme distinctions for mixins, extensions, extension types, function type aliases, tear-offs, and top-level vs. local functions (requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Removed
 
