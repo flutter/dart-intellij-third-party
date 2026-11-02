@@ -19,6 +19,7 @@ import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -150,8 +151,19 @@ final class PubServerService extends NetService {
 
   @Override
   protected void configureConsole(final @NotNull TextConsoleBuilder consoleBuilder) {
-    consoleBuilder.addFilter(new DartConsoleFilter(getProject(), firstServedDir));
-    consoleBuilder.addFilter(new DartRelativePathsConsoleFilter(getProject(), firstServedDir.getParent().getPath()));
+    final VirtualFile servedDir = firstServedDir;
+    // DartConsoleFilter's constructor resolves a DartUrlResolver for servedDir, which requires read access.
+    final DartConsoleFilter dartConsoleFilter = ApplicationManager.getApplication()
+      .runReadAction((Computable<DartConsoleFilter>)() -> new DartConsoleFilter(getProject(), servedDir));
+    final String parentPath = servedDir == null ? null : ApplicationManager.getApplication().runReadAction((Computable<String>)() -> {
+      final VirtualFile parent = servedDir.getParent();
+      return parent != null ? parent.getPath() : null;
+    });
+
+    consoleBuilder.addFilter(dartConsoleFilter);
+    if (parentPath != null) {
+      consoleBuilder.addFilter(new DartRelativePathsConsoleFilter(getProject(), parentPath));
+    }
     consoleBuilder.addFilter(new UrlFilter());
   }
 
@@ -190,12 +202,22 @@ final class PubServerService extends NetService {
         .invokeAndWait(() -> DartWebdev.INSTANCE.ensureWebdevActivated(getProject()), ModalityState.any());
     }
 
-    final GeneralCommandLine commandLine = new GeneralCommandLine().withWorkDirectory(firstServedDir.getParent().getPath());
+    final VirtualFile servedDir = firstServedDir;
+    final String[] workDirAndDirName = ApplicationManager.getApplication().runReadAction((Computable<String[]>)() -> {
+      if (servedDir == null) {
+        return new String[]{null, ""};
+      }
+      final VirtualFile parent = servedDir.getParent();
+      return new String[]{parent != null ? parent.getPath() : null, servedDir.getName()};
+    });
+    final String workDir = workDirAndDirName[0];
+    final String dirName = workDirAndDirName[1];
+    final GeneralCommandLine commandLine = new GeneralCommandLine().withWorkDirectory(workDir);
     DartPubActionBase.setupPubExePath(commandLine, dartSdk);
     commandLine.withEnvironment(DartPubActionBase.PUB_ENV_VAR_NAME, DartPubActionBase.getPubEnvValue());
 
     commandLine.addParameters("global", "run", "webdev", "serve");
-    commandLine.addParameter(firstServedDir.getName() + ":" + port);
+    commandLine.addParameter(dirName + ":" + port);
     commandLine.withEnvironment(DartPubActionBase.PUB_ENV_VAR_NAME, DartPubActionBase.getPubEnvValue() + ".webdev");
 
     Analytics.updateEnvironment(commandLine);
