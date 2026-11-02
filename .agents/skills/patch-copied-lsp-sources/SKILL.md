@@ -65,9 +65,9 @@ Here is the details of the changes made by the patch script:
    - Update `LspDiagnosticsCustomizer.kt`, `LspDiagnosticAndLazyQuickFixes.kt`, and `LspServerImpl.kt` to use these helpers.
 10. **LSP Structure View Support**:
    - Copy `platform/lsp-impl/structureView/src` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`, register `LspStructureViewFactory` and `LspStructureViewProjectActivity` in `dart-lsp-impl.xml`, and make `LspStructureViewFactory` public (`class LspStructureViewFactory`) so `DartStructureViewFactory` can delegate to it.
-
 11. **LSP Go to Declaration or Usages Backport (`IJPL-156979` / `0634427a`)**:
    - Backport upstream commit `0634427a` (`IJPL-156979`) to `LspImplicitReferenceProvider.kt` and `LspSearchTargetsRule.kt` (adapted for `LspServer` / `LspServerImpl` naming) so that invoking *Go to Declaration or Usages* (`GotoDeclarationAction`) on a declaration falls back to *Show Usages* via `LspSearchTarget`. (This backport can be dropped once the `intellij-community` sync source includes `0634427a`.)
    - Keep `CurrentActionHolder` in `LspImplicitReferenceProvider.kt` `internal` (instead of `private`) so `DartTargetElementEvaluatorTest` can set `currentActionClass` in tests.
-
+12. **Guard `StickyLineInfo` Range in `LspFileBreadcrumbsCollector` (`#734` / `IJPL-260061`, `patch.py` step `#14`)**:
+   - Add `// Dart patch: skip incomplete declarations (#734 / IJPL-260061)` and `if (textOffset >= endOffset) return@mapNotNull null` before constructing `StickyLineInfo(textOffset, endOffset, null)` in `LspFileBreadcrumbsCollector.computeStickyLineInfos` so incomplete declarations (where `selectionRange.start == range.end`) do not throw `IllegalArgumentException`. (This patch can be dropped once `IJPL-260061` is fixed in the `intellij-community` sync source.)
 

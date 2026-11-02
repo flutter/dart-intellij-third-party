@@ -11,6 +11,7 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
@@ -30,6 +31,7 @@ import com.jetbrains.lang.dart.lsp.DartLspService
 import com.jetbrains.lang.dart.psi.DartFile
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdk
+import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.TextEdit
@@ -142,16 +144,20 @@ class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
         if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
             return false
         }
-        val sdk = DartSdk.getDartSdk(project) ?: return false
+        if (DartSdk.getDartSdk(project) == null) {
+            return false
+        }
 
+        val fileIndex = ProjectFileIndex.getInstance(project)
         return when (element) {
             is DartFile -> {
                 val vFile = element.virtualFile ?: return false
-                DartAnalysisServerService.getInstance(project).isInIncludedRoots(vFile)
+                fileIndex.isInContent(vFile)
             }
             is PsiDirectory -> {
                 val vFile = element.virtualFile
-                DartAnalysisServerService.getInstance(project).isInIncludedRoots(vFile)
+                val module = fileIndex.getModuleForFile(vFile) ?: return false
+                DartSdkLibUtil.isDartSdkEnabled(module)
             }
             else -> false
         }

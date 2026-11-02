@@ -10,8 +10,13 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
 - `Analytics` (`Analytics.kt`): entry point. `getConfiguration(sdk, project)`, `report(data)`,
   `updateEnvironment(...)`, and the `suppressAnalytics` flag.
 - `AnalyticsData` and subclasses `ActionData`, `AssistData`, `FixData`,
-  `LegacyRefactoringData`, `SettingsData`, `SessionData`: typed event payloads.
-- `AnalyticsConstants`: shared event field names (for example `DURATION_MS`).
+  `LegacyRefactoringData`, `SettingsData`, `SettingsChangeData`, `SessionData`: typed event
+  payloads. `SettingsData` reports settings state once per project open; `SettingsChangeData`
+  (`type=settings_change`) reports a single user-initiated change, such as toggling
+  experimental LSP features (`id=experimental_lsp_features`, `enabled`, `sdkVersion`) from
+  `DartConfigurable.apply()`.
+- `AnalyticsConstants`: shared event field names (for example `DURATION_MS`, `ENABLED`,
+  `SDK_VERSION`).
 - `AnalyticsConfiguration`: consent prompt and telemetry state for the session.
 - `AnalyticsReporter`: delivery strategy chosen from the configuration.
 - `DataValue`, `StringValue`, `IntValue`, `BooleanValue`: typed event field descriptors.

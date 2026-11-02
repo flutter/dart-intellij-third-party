@@ -59,6 +59,8 @@ internal class LspFileBreadcrumbsCollector(private val project: Project) : FileB
                        ?: return@mapNotNull null
       val endOffset = getOffsetInDocument(document, symbol.range.end)
                       ?: return@mapNotNull null
+      // Dart patch: skip incomplete declarations (#734 / IJPL-260061)
+      if (textOffset >= endOffset) return@mapNotNull null
       StickyLineInfo(textOffset, endOffset, null)
     }
   }

@@ -396,6 +396,15 @@ class LegacyRefactoringData(kind: String?, project: Project?) :
 class SettingsData(project: Project?) :
   AnalyticsData(AnalyticsConstants.SETTINGS_TYPE, "settings", project)
 
+/**
+ * Reports a user-initiated change to a setting, identified by [setting].
+ *
+ * Unlike [SettingsData], which reports the state of settings once per project open, this
+ * reports a single transition (for example, toggling experimental LSP features).
+ */
+class SettingsChangeData(setting: String, project: Project?) :
+  AnalyticsData(AnalyticsConstants.SETTINGS_CHANGE_TYPE, setting, project)
+
 class SessionData(type: String, mechanism: String, project: Project?) :
   AnalyticsData(type, mechanism, project)
 
@@ -496,11 +505,24 @@ object AnalyticsConstants {
   @JvmField
   val CUSTOM_NAME = BooleanValue("custom_name")
 
+  /**
+   * The new value of a boolean setting reported by [SettingsChangeData].
+   */
+  @JvmField
+  val ENABLED = BooleanValue("enabled")
+
+  /**
+   * The Dart SDK version (same key as the per-project-open [SettingsData] event).
+   */
+  @JvmField
+  val SDK_VERSION = StringValue("sdkVersion")
+
   internal const val ACTION_TYPE = "action"
   internal const val ASSIST_TYPE = "assist"
   internal const val FIX_TYPE = "fix"
   internal const val LEGACY_REFACTORING_TYPE = "legacy_refactoring"
   internal const val SETTINGS_TYPE = "settings"
+  internal const val SETTINGS_CHANGE_TYPE = "settings_change"
   internal const val DEBUG_SESSION_TYPE = "debug_session"
   internal const val RUN_SESSION_TYPE = "run_session"
 

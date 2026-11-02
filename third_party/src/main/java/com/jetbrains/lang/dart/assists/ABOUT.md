@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-10-29' } *-->
 # assists
 
 ## Overview
@@ -22,5 +22,5 @@ Quick assist intentions powered by the Analysis Server (`edit_getAssists`).
 
 ## Side Effects
 - Modifies document text when an assist is applied.
-- Reports analytics: `AnalyticsData.forAssist` when an assist is applied, and a
-  `dart.legacy_assist` duration event per `edit_getAssists` request.
+- Reports analytics: `AnalyticsData.forAssist` when an assist is applied. Nothing is reported
+  when assists are fetched for availability checks.
