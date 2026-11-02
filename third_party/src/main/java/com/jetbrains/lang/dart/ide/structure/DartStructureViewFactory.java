@@ -102,11 +102,15 @@ public final class DartStructureViewFactory implements PsiStructureViewFactory {
     Disposer.register(component, () -> component.removeHierarchyListener(hierarchyListener));
 
     ModelListener modelListener = () -> {
-      if (!component.isDisposed() && pendingInitialSelection.get()) {
-        component.rebuildAndUpdate()
-          .onProcessed(ignore -> scheduleScrollToSelectedElement(component, project, pendingInitialSelection));
+      if (pendingInitialSelection.get()) {
+        UIUtil.invokeLaterIfNeeded(() -> {
+          if (!component.isDisposed() && pendingInitialSelection.get()) {
+            component.rebuildAndUpdate().onProcessed(ignore -> scheduleScrollToSelectedElement(component, project, pendingInitialSelection));
+          }
+        });
       }
     };
+
     StructureViewModel model = component.getTreeModel();
     model.addModelListener(modelListener);
     Disposer.register(component, () -> model.removeModelListener(modelListener));
