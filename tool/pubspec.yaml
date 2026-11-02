@@ -7,7 +7,7 @@ description: Tooling and verification scripts for dart-intellij-third-party.
 publish_to: none
 
 environment:
-  sdk: ^3.0.0
+  sdk: ^3.12.0
 
 dev_dependencies:
-  skills_lint: ^0.5.2
+  skills_lint: ^0.5.3
