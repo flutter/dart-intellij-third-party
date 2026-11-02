@@ -10,7 +10,7 @@ Contains repository maintenance and automated validation tooling for AI agent sk
 - `validate_skills.sh`: Runs `dart pub get` and `dart run skills_lint` (extra arguments are forwarded) to lint the agent skills.
 - `provision_dart.sh`: Shell script that downloads and provisions the pinned Dart SDK (`DART_VERSION`, currently `3.13.0`) for the host OS and architecture into `../dart-sdk` relative to the current directory.
 - `pubspec.yaml` / `pubspec.lock`: Dart package `dart_intellij_tool` with the `skills_lint` dev dependency.
-- `skills_lint.yaml`: `skills_lint` rules (relative/absolute path checks, trailing whitespace, disallowed frontmatter fields) applied to `../.agents/skills`.
+- `skills_lint.yaml`: `skills_lint` configuration for `../.agents/skills`.
 
 ## Invariants
 - `check_agent_skills.sh` resolves `README.md` and `.agents/skills` relative to the current directory and never changes directory, so it must be run from the repository root.
