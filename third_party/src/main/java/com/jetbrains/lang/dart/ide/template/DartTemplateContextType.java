@@ -13,23 +13,12 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartLanguage;
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighter;
 import com.jetbrains.lang.dart.psi.IDartBlock;
-import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class DartTemplateContextType extends TemplateContextType {
   protected DartTemplateContextType(@NotNull @NlsContexts.Label String presentableName) {
     super(presentableName);
-  }
-
-  /**
-   * @deprecated Set contextId and baseContextId in plugin.xml instead
-   */
-  @Deprecated
-  protected DartTemplateContextType(@NotNull @NonNls String id,
-                                    @NotNull @NlsContexts.Label String presentableName,
-                                    @Nullable Class<? extends TemplateContextType> baseContextType) {
-    super(id, presentableName, baseContextType);
   }
 
   @Override
