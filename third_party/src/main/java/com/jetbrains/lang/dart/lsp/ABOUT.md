@@ -15,8 +15,9 @@ on the existing [analyzer](../analyzer/ABOUT.md) connection.
   `LspCommunicationChannel.Socket(port, startProcess = false)`. Also defines `DartLspCompletionSupport`,
   `DartLspSemanticTokensSupport`, and `DartLsp4jClient`.
 - `DartLspServerSupportProvider`: provider registered in plugin.xml.
-- `DartLanguageServer`: custom protocol extensions (`dart/diagnosticServer`), `DartLanguageClient`
-  (`dart/textDocument/publishClosingLabels`), `DiagnosticServerResult`, and the `DartLspService` object.
+- `DartLanguageServer`: custom protocol extensions (`dart/diagnosticServer`, `dart/connectToDtd`),
+  `DartLanguageClient` (`dart/textDocument/publishClosingLabels`), `DiagnosticServerResult`,
+  `ConnectToDtdParams`, and the `DartLspService` object.
 - `DartLspDiagnosticConverter`: converts LSP diagnostics into legacy `AnalysisError`s for the
   Dart Analysis tool window and Project View.
 - `DartLspClosingLabelsService` (with `DartPublishClosingLabelsParams`, `DartLspClosingLabel`):

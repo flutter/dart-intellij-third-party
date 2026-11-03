@@ -24,11 +24,14 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.project.Project
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.sdk.DartSdk
+import java.lang.reflect.Proxy
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
 import org.dartlang.analysis.server.protocol.RequestError
@@ -55,6 +58,7 @@ import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
+import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.InlayHintKind
 import org.eclipse.lsp4j.InlayHintParams
 import org.eclipse.lsp4j.InsertTextFormat
@@ -387,6 +391,78 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val result = future.get(5, TimeUnit.SECONDS)
         assertNotNull(result)
         assertEquals(9123, result.port)
+    }
+
+    fun testConnectToDtdRequest() {
+        val dtdUri = "ws://127.0.0.1:9124/secret"
+        val future = bridgeServer.connectToDtd(ConnectToDtdParams(dtdUri))
+
+        val jsonObject = capturedRequests.find { it.get("method")?.asString == "lsp.handle" }
+        assertNotNull("An lsp.handle request should be sent to DAS", jsonObject)
+        assertEquals("123", jsonObject!!.get("id").asString)
+
+        val outerParams = jsonObject.getAsJsonObject("params")
+        val lspMessage = outerParams.getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("dart/connectToDtd", lspMessage.get("method").asString)
+        val params = lspMessage.getAsJsonObject("params")
+        assertNotNull("lspMessage should include params with uri", params)
+        assertEquals(dtdUri, params.get("uri").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        assertNull(future.get(5, TimeUnit.SECONDS))
+    }
+
+    fun testDescriptorLspServerListenerDoesNotEagerlyCreateDtdService() {
+        var getServiceIfCreatedCalled = false
+        var getServiceCalled = false
+        val mockProject = Proxy.newProxyInstance(
+            Project::class.java.classLoader,
+            arrayOf(Project::class.java)
+        ) { _, method, args ->
+            if (args?.firstOrNull() == DartToolingDaemonService::class.java) {
+                when (method.name) {
+                    "getServiceIfCreated" -> {
+                        getServiceIfCreatedCalled = true
+                        return@newProxyInstance null
+                    }
+                    "getService" -> {
+                        getServiceCalled = true
+                        return@newProxyInstance null
+                    }
+                }
+            }
+            if (args == null) method.invoke(project) else method.invoke(project, *args)
+        } as Project
+
+        val descriptor = DartLspServerDescriptor(mockProject)
+        val listener = descriptor.lspServerListener
+        assertNotNull("DartLspServerDescriptor should provide an LspServerListener", listener)
+
+        listener.serverInitialized(InitializeResult())
+
+        assertTrue(
+            "serverInitialized should query DartToolingDaemonService via getServiceIfCreated",
+            getServiceIfCreatedCalled
+        )
+        assertFalse(
+            "serverInitialized should not eagerly instantiate DartToolingDaemonService via getService",
+            getServiceCalled
+        )
     }
 
     fun testForwardNotification() {

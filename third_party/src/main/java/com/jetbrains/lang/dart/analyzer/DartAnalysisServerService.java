@@ -98,7 +98,6 @@ import com.jetbrains.lang.dart.ide.actions.DartPubActionBase;
 import com.jetbrains.lang.dart.ide.completion.DartCompletionTimerExtension;
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
 import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
-import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
 import com.jetbrains.lang.dart.lsp.DartLspClosingLabel;
@@ -281,7 +280,6 @@ public final class DartAnalysisServerService implements Disposable {
 
   private boolean myHaveShownInitialProgress;
   private boolean mySentAnalysisBusy;
-  private @Nullable String myDtdUri;
 
   // files with red squiggles in Project View. This field is also used as a lock to access these 3 collections
   private final @NotNull Set<String> myFilePathsWithErrors = new HashSet<>();
@@ -2668,14 +2666,9 @@ public final class DartAnalysisServerService implements Disposable {
         // This must be done after myServer is set, and should be done each time the server starts.
         registerPostfixCompletionTemplates();
 
-        myDtdUri = null;
-        DartToolingDaemonService dtdService = myProject.getServiceIfCreated(DartToolingDaemonService.class);
-        String dtdUri = dtdService != null ? dtdService.getUri() : null;
-        if (dtdUri != null) {
-          connectToDtd(dtdUri);
-        }
-
-        // Start the LSP Bridge Server unless in unit test mode
+        // Start the LSP Bridge Server unless in unit test mode.
+        // Once initialized, DartLspServerDescriptor.lspServerListener connects the server to DTD
+        // via dart/connectToDtd if DartToolingDaemonService is already running.
         if (!ApplicationManager.getApplication().isUnitTestMode()) {
           myProject.getService(DartBridgeLspServerManager.class).startBridgeServer();
         }
@@ -2786,20 +2779,6 @@ public final class DartAnalysisServerService implements Disposable {
       if (myProject.isOpen() && !myProject.isDisposed()) {
         ApplicationManager.getApplication().invokeLater(this::clearAllErrors, ModalityState.nonModal(), myDisposedCondition);
       }
-    }
-  }
-
-  public void connectToDtd(@NotNull String uri) {
-    AnalysisServer server = myServer;
-    if (server == null) {
-      return;
-    }
-
-    boolean supportsWorkspaceApplyEdits = isDartSdkVersionSufficientForWorkspaceApplyEdits(mySdkVersion);
-    // Connection to DTD is used for server-initiated edits (workspace.applyEdits)
-    if (supportsWorkspaceApplyEdits && !uri.equals(myDtdUri)) {
-      myDtdUri = uri;
-      server.lsp_connectToDtd(uri);
     }
   }
 

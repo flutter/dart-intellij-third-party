@@ -15,6 +15,7 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.Lsp4jClient
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.LspServerListener
 import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
@@ -69,12 +70,14 @@ import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.DartFileType
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
+import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
+import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.PublishDiagnosticsCapabilities
 import org.eclipse.lsp4j.SemanticTokenModifiers
 import org.eclipse.lsp4j.SemanticTokenTypes
@@ -99,6 +102,17 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
 
     override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
         DartLsp4jClient(project, handler)
+
+    override val lspServerListener: LspServerListener = object : LspServerListener {
+        override fun serverInitialized(params: InitializeResult) {
+            // If the Dart Tooling Daemon (DTD) started before the LSP server (or if the LSP server was
+            // restarted), connect the newly initialized LSP server to the running DTD instance.
+            val dtdUri = project.getServiceIfCreated(DartToolingDaemonService::class.java)?.uri
+            if (dtdUri != null) {
+                DartLspService.connectToDtd(project, dtdUri)
+            }
+        }
+    }
 
     override val clientCapabilities: ClientCapabilities
         get() = super.clientCapabilities.apply {
