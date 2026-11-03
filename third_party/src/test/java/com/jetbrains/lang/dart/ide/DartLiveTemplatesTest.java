@@ -3,6 +3,9 @@ package com.jetbrains.lang.dart.ide;
 import com.intellij.codeInsight.lookup.Lookup;
 import com.intellij.codeInsight.lookup.LookupManager;
 import com.intellij.codeInsight.lookup.impl.LookupImpl;
+import com.intellij.codeInsight.template.LiveTemplateContextService;
+import com.intellij.codeInsight.template.TemplateActionContext;
+import com.intellij.codeInsight.template.TemplateContextType;
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl;
 import com.intellij.codeInsight.template.impl.TemplateState;
 import com.intellij.codeInsight.template.impl.actions.ListTemplatesAction;
@@ -13,7 +16,10 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.jetbrains.lang.dart.ide.template.DartTemplateContextType;
 import com.jetbrains.lang.dart.util.DartTestUtils;
+
+import java.lang.reflect.Constructor;
 
 /**
  * Test the Dart live templates.
@@ -87,5 +93,29 @@ public class DartLiveTemplatesTest extends BasePlatformTestCase {
 
   public void testSoutm2() {
     doTest();
+  }
+
+  public void testDartTemplateContextTypesRegisteredDeclaratively() {
+    final Constructor<?>[] constructors = DartTemplateContextType.class.getDeclaredConstructors();
+    assertEquals(1, constructors.length);
+    assertEquals(1, constructors[0].getParameterCount());
+    assertEquals(String.class, constructors[0].getParameterTypes()[0]);
+
+    final LiveTemplateContextService service = LiveTemplateContextService.getInstance();
+    final TemplateContextType dartContext = service.getTemplateContextType("DART");
+    final TemplateContextType statementContext = service.getTemplateContextType("DART_STATEMENT");
+    assertInstanceOf(dartContext, DartTemplateContextType.Generic.class);
+    assertInstanceOf(statementContext, DartTemplateContextType.Statement.class);
+    assertSame(dartContext, statementContext.getBaseContextType());
+
+    myFixture.configureByText("in_block.dart", "void main() {\n  <caret>\n}\n");
+    final TemplateActionContext blockActionContext = TemplateActionContext.expanding(myFixture.getFile(), myFixture.getEditor());
+    assertTrue(dartContext.isInContext(blockActionContext));
+    assertTrue(statementContext.isInContext(blockActionContext));
+
+    myFixture.configureByText("top_level.dart", "<caret>\nvoid main() {}\n");
+    final TemplateActionContext topLevelActionContext = TemplateActionContext.expanding(myFixture.getFile(), myFixture.getEditor());
+    assertTrue(dartContext.isInContext(topLevelActionContext));
+    assertFalse(statementContext.isInContext(topLevelActionContext));
   }
 }

@@ -15,8 +15,10 @@ import com.intellij.testFramework.DumbModeTestUtils;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.ide.runner.DartExecutionHelper;
 import com.jetbrains.lang.dart.psi.DartClass;
+import com.jetbrains.lang.dart.psi.DartClassResolveCache;
 import com.jetbrains.lang.dart.psi.DartType;
 import com.jetbrains.lang.dart.psi.DartVarAccessDeclaration;
+import com.jetbrains.lang.dart.util.DartClassResolveResult;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 
 import java.util.List;
@@ -416,5 +418,31 @@ public class DartResolveTest extends DartCodeInsightFixtureTestCase {
     for (VirtualFile file : expectedOutsideScope) {
       assertFalse("Expected to be out of scope: " + file.getPath(), scope.contains(file));
     }
+  }
+
+  public void testDartClassResolveCacheStoresAndClearsOnPsiChange() {
+    final PsiFile psiFile = myFixture.addFileToProject("resolve_cache.dart", "class CachedBox {}\n");
+    final DartClass cachedBox = PsiTreeUtil.findChildOfType(psiFile, DartClass.class);
+    assertNotNull(cachedBox);
+
+    final DartClassResolveCache cache = DartClassResolveCache.getInstance(getProject());
+    assertNull(cache.get(cachedBox));
+
+    final DartClassResolveResult created = DartClassResolveResult.create(cachedBox);
+    final DartClassResolveResult cached = cache.get(cachedBox);
+    assertNotNull(cached);
+    assertSame(cachedBox, cached.getDartClass());
+
+    cache.put(cachedBox, created);
+    assertSame(created, cache.get(cachedBox));
+
+    final Document document = PsiDocumentManager.getInstance(getProject()).getDocument(psiFile);
+    assertNotNull(document);
+    WriteCommandAction.runWriteCommandAction(getProject(), () -> {
+      document.setText("class CachedBox { int value = 1; }\n");
+      PsiDocumentManager.getInstance(getProject()).commitDocument(document);
+    });
+
+    assertNull(cache.get(cachedBox));
   }
 }
