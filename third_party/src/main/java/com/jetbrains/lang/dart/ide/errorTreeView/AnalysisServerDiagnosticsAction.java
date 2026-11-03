@@ -33,7 +33,7 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
   @Override
   public void update(@NotNull AnActionEvent e) {
     final Project project = e.getProject();
-    final boolean isRunning = project != null &&
+    final boolean isRunning = project != null && !project.isDisposed() &&
                               (DartLspService.isServerRunning(project) ||
                                DartAnalysisServerService.getInstance(project).isServerProcessActive());
     e.getPresentation().setEnabledAndVisible(isRunning);
@@ -93,7 +93,7 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
     DartAnalysisServerService server = DartAnalysisServerService.getInstance(project);
     if (!server.isServerProcessActive()) {
       String title = DartBundle.message("analysis.server.show.diagnostics.error");
-      String message = "Dart Analysis Server is not running";
+      String message = DartBundle.message("analysis.server.not.running");
       Notification notification = new Notification("Dart Analysis Server", title, message, NotificationType.ERROR);
       Notifications.Bus.notify(notification, project);
       return;
@@ -106,6 +106,7 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
 
       @Override
       public void onError(RequestError requestError) {
+        if (project.isDisposed()) return;
         String title = DartBundle.message("analysis.server.show.diagnostics.error");
         String message = requestError.getMessage();
         Notification notification = new Notification("Dart Analysis Server", title, message, NotificationType.ERROR);
