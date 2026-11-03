@@ -1272,8 +1272,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         // 2. Verify DartBridgeLspServer forwarded the notification to the LSP client proxy
         val published = mockClient.publishedClosingLabels
         assertNotNull("dart/textDocument/publishClosingLabels should be forwarded to client", published)
-        assertEquals(fileUri, published!!.uri)
-        val closingLabels = published.labels ?: emptyList()
+        assertEquals(fileUri, published?.uri)
+        val closingLabels = published?.labels ?: emptyList()
         assertEquals(1, closingLabels.size)
         assertEquals("MyWidget", closingLabels[0].label)
         assertEquals(2, closingLabels[0].range?.start?.line)
