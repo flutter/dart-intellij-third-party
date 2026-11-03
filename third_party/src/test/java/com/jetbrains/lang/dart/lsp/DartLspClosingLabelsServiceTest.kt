@@ -175,4 +175,36 @@ class DartLspClosingLabelsServiceTest: DartCodeInsightFixtureTestCase() {
         val capsDisabled = DartAnalysisServerService.buildLspCapabilities("3.14.0-219.0.dev", false, false)
         assertNull("experimental capability should NOT exist when disabled", capsDisabled.getAsJsonObject("experimental"))
     }
+
+    fun testLegacyComputedClosingLabelsAdapterForOlderSdks() {
+        val code = """
+            void main() {
+              runApp(
+                MyWidget(
+                  child: Text('Hello'),
+                ),
+              );
+            }
+        """.trimIndent()
+        val testFile = myFixture.configureByText("test_legacy_adapter.dart", code)
+        val fileUri = "file://${testFile.virtualFile.path}"
+
+        // The test fixture SDK version is 3.14.0-65.0.dev (< 3.14.0-219.0.dev), so LSP closing labels are disabled.
+        assertFalse(DartAnalysisServerService.isLspClosingLabelsEnabled(project))
+
+        val startOffset = code.indexOf("MyWidget(")
+        val endOffset = code.indexOf("),\n  );") + 2
+        val legacyLabel = org.dartlang.analysis.server.protocol.ClosingLabel(
+            startOffset,
+            endOffset - startOffset,
+            "MyWidget"
+        )
+
+        DartAnalysisServerService.getInstance(project).computedClosingLabels(fileUri, listOf(legacyLabel))
+
+        val stored = DartLspClosingLabelsService.getInstance(project).getClosingLabels(testFile.virtualFile)
+        assertEquals(1, stored.size)
+        assertEquals("MyWidget", stored[0].label)
+        assertEquals(4, stored[0].range?.end?.line)
+    }
 }
