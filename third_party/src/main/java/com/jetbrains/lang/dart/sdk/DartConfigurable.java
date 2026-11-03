@@ -34,9 +34,9 @@ import com.intellij.ui.ColorUtil;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.PortField;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.treeStructure.treetable.TreeColumnInfo;
 import com.intellij.util.ui.ColumnInfo;
 import com.intellij.util.ui.JBUI;
@@ -63,6 +63,7 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JTree;
+import javax.swing.ListCellRenderer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeWillExpandListener;
@@ -75,6 +76,7 @@ import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 public final class DartConfigurable implements SearchableConfigurable, NoScroll, Disposable {
@@ -173,7 +175,7 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
     });
 
     mySdkUpdateChannelCombo.setModel(new DefaultComboBoxModel<>(DartSdkUpdateOption.OPTIONS_TO_SHOW_IN_COMBO));
-    mySdkUpdateChannelCombo.setRenderer(SimpleListCellRenderer.create("", DartSdkUpdateOption::getPresentableName));
+    mySdkUpdateChannelCombo.setRenderer(createSdkUpdateChannelRenderer());
 
     myCheckSdkUpdateButton.addActionListener(e -> {
       final Runnable runnable = this::checkSdkUpdate;
@@ -482,34 +484,10 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
   private void createUIComponents() {
     mySdkPathComboWithBrowse = new BasicComboBoxWithBrowseButton<>();
 
-    final CheckboxTree.CheckboxTreeCellRenderer checkboxTreeCellRenderer = new CheckboxTree.CheckboxTreeCellRenderer() {
-      @Override
-      public void customizeRenderer(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
-        if (!(value instanceof CheckedTreeNode node)) return;
-
-        final boolean dartSupportEnabled = myEnableDartSupportCheckBox.isSelected();
-
-        final Object userObject = node.getUserObject();
-
-        if (userObject instanceof Project) {
-          if (!dartSupportEnabled) {
-            //disabled state is also used as partially selected, that's why we do not change 'enabled' state if dartSupportEnabled
-            getCheckbox().setEnabled(false);
-          }
-          getTextRenderer().setEnabled(dartSupportEnabled);
-
-          getTextRenderer().append(DartBundle.message("project.0", ((Project)userObject).getName()));
-        }
-        else if (userObject instanceof Module) {
-          getCheckbox().setEnabled(dartSupportEnabled);
-          getTextRenderer().setEnabled(dartSupportEnabled);
-
-          final Icon moduleIcon = ModuleType.get((Module)userObject).getIcon();
-          getTextRenderer().setIcon(dartSupportEnabled ? moduleIcon : IconLoader.getDisabledIcon(moduleIcon));
-          getTextRenderer().append(((Module)userObject).getName());
-        }
-      }
-    };
+    // Use a lambda rather than a bound method reference because GUI Designer initializes
+    // myEnableDartSupportCheckBox after createUIComponents() returns.
+    final CheckboxTree.CheckboxTreeCellRenderer checkboxTreeCellRenderer =
+      createModulesCheckboxTreeCellRenderer(() -> myEnableDartSupportCheckBox.isSelected());
 
     myModulesCheckboxTreeTable = new CheckboxTreeTable(null, checkboxTreeCellRenderer, new ColumnInfo[]{new TreeColumnInfo("")});
     myModulesCheckboxTreeTable.addCheckboxTreeListener(new CheckboxTreeListener() {
@@ -529,6 +507,43 @@ public final class DartConfigurable implements SearchableConfigurable, NoScroll,
         throw new ExpandVetoException(event);
       }
     });
+  }
+
+  @VisibleForTesting
+  static @NotNull ListCellRenderer<DartSdkUpdateOption> createSdkUpdateChannelRenderer() {
+    return BuilderKt.textListCellRenderer(value -> value == null ? "" : value.getPresentableName());
+  }
+
+  @VisibleForTesting
+  static @NotNull CheckboxTree.CheckboxTreeCellRenderer createModulesCheckboxTreeCellRenderer(
+    final @NotNull BooleanSupplier isDartSupportEnabled) {
+    return new CheckboxTree.CheckboxTreeCellRenderer() {
+      @Override
+      public void customizeRenderer(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
+        if (!(value instanceof CheckedTreeNode node)) return;
+
+        final boolean dartSupportEnabled = isDartSupportEnabled.getAsBoolean();
+        final Object userObject = node.getUserObject();
+
+        if (userObject instanceof Project project) {
+          if (!dartSupportEnabled) {
+            //disabled state is also used as partially selected, that's why we do not change 'enabled' state if dartSupportEnabled
+            getThreeStateCheckBox().setEnabled(false);
+          }
+          getTextRenderer().setEnabled(dartSupportEnabled);
+
+          getTextRenderer().append(DartBundle.message("project.0", project.getName()));
+        }
+        else if (userObject instanceof Module module) {
+          getThreeStateCheckBox().setEnabled(dartSupportEnabled);
+          getTextRenderer().setEnabled(dartSupportEnabled);
+
+          final Icon moduleIcon = ModuleType.get(module).getIcon();
+          getTextRenderer().setIcon(dartSupportEnabled ? moduleIcon : IconLoader.getDisabledIcon(moduleIcon));
+          getTextRenderer().append(module.getName());
+        }
+      }
+    };
   }
 
   public static void openDartSettings(final @NotNull Project project) {
