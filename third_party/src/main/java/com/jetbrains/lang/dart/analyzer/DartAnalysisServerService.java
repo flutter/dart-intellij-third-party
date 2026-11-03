@@ -769,9 +769,6 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public static boolean isLspClosingLabelsEnabled(final @NotNull Project project) {
-    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-      return false;
-    }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspClosingLabels(sdk.getVersion());
   }
