@@ -3,8 +3,9 @@ package com.jetbrains.lang.dart.ide.findUsages;
 
 import com.intellij.find.findUsages.FindUsagesHandler;
 import com.intellij.find.findUsages.FindUsagesOptions;
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiComment;
@@ -44,7 +45,7 @@ public class DartServerFindUsagesHandler extends FindUsagesHandler {
                                       final @NotNull Processor<? super UsageInfo> processor,
                                       final @NotNull FindUsagesOptions options) {
     final SearchScope scope = options.searchScope;
-    final Project project = ReadAction.compute(this::getProject);
+    final Project project = ApplicationManager.getApplication().runReadAction((Computable<Project>)this::getProject);
     final DartAnalysisServerService service = DartAnalysisServerService.getInstance(project);
 
     final ReadActionConsumer<SearchResult> searchResultProcessor = new ReadActionConsumer<>() {
@@ -79,7 +80,8 @@ public class DartServerFindUsagesHandler extends FindUsagesHandler {
       }
     };
 
-    final VirtualFile file = ReadAction.compute(() -> elementToSearch.getContainingFile().getVirtualFile());
+    final VirtualFile file =
+      ApplicationManager.getApplication().runReadAction((Computable<VirtualFile>)() -> elementToSearch.getContainingFile().getVirtualFile());
 
     final int offset = elementToSearch.getTextRange().getStartOffset();
     service.search_findElementReferences(file, offset, searchResultProcessor);

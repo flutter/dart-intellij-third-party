@@ -6,15 +6,22 @@ import com.intellij.openapi.module.Module;
 import com.intellij.openapi.roots.ContentEntry;
 import com.intellij.openapi.roots.ModifiableRootModel;
 import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.backend.workspace.WorkspaceModel;
+import com.intellij.util.containers.BidirectionalMap;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.DartStartupActivityKt;
+import com.jetbrains.lang.dart.ide.index.DartLibraryIndex;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import kotlin.Unit;
 
 /**
@@ -240,5 +247,37 @@ public class DartWorkflowTest extends DartCodeInsightFixtureTestCase {
     assertNotNull(file);
     assertEquals(rootPath + "/pub/global/cache/SomePackage/lib/somepack.dart", file.getPath());
     assertEquals("package:SomePackage/somepack.dart", resolver.getDartUrlForFile(file));
+  }
+
+  public void testDartUrlResolverAndLibraryIndexFromBackgroundThread() throws Exception {
+    final VirtualFile pubspec = myFixture.addFileToProject("pubspec.yaml", "name: BgProject").getVirtualFile();
+    final VirtualFile libFile = myFixture.addFileToProject("lib/bg.dart", "").getVirtualFile();
+
+    final Path tempSdkDir = FileUtil.createTempDirectory("dart-sdk-bg", null).toPath();
+    try {
+      final Path internalDir = Files.createDirectories(tempSdkDir.resolve("lib/_internal"));
+      final Path librariesDart = internalDir.resolve("libraries.dart");
+      Files.writeString(librariesDart, """
+        const Map<String, LibraryInfo> LIBRARIES = const {
+          "async": const LibraryInfo("async/async.dart"),
+        };
+        """);
+      assertNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(librariesDart));
+
+      ApplicationManager.getApplication().executeOnPooledThread(() -> {
+        assertFalse(ApplicationManager.getApplication().isReadAccessAllowed());
+
+        final DartUrlResolver resolver = DartUrlResolver.getInstance(getProject(), pubspec);
+        assertEquals(libFile, resolver.findFileByDartUrl("package:BgProject/bg.dart"));
+
+        final BidirectionalMap<String, String> sdkMap =
+          DartLibraryIndex.getSdkLibUriToRelativePathMap(getProject(), tempSdkDir.toString());
+        assertEquals("async/async.dart", sdkMap.get("dart:async"));
+        return null;
+      }).get(10, TimeUnit.SECONDS);
+    }
+    finally {
+      FileUtil.delete(tempSdkDir.toFile());
+    }
   }
 }

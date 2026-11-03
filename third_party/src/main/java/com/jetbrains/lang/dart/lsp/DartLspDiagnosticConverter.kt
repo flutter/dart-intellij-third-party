@@ -5,9 +5,10 @@
  */
 package com.jetbrains.lang.dart.lsp
 
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Computable
 import com.intellij.platform.dartlsp.util.getOffsetInDocument
 import com.intellij.platform.dartlsp.util.messageIfStringOrEmpty
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -74,7 +75,7 @@ object DartLspDiagnosticConverter {
     ): Location {
         val fileInfo = getDartFileInfo(project, uri)
         val filePath = if (fileInfo is DartLocalFileInfo) fileInfo.filePath else uri
-        val (vFile, docOffset, docEnd) = runReadAction {
+        val (vFile, docOffset, docEnd) = ApplicationManager.getApplication().runReadAction(Computable {
             val f = fileInfo.findFile()
             val doc = f?.let { FileDocumentManager.getInstance().getDocument(it) }
             if (doc != null) {
@@ -86,7 +87,7 @@ object DartLspDiagnosticConverter {
             } else {
                 Triple(f, 0, 0)
             }
-        }
+        })
         val offset = das.getOriginalOffset(vFile, docOffset)
         val length = (das.getOriginalOffset(vFile, docEnd) - offset).coerceAtLeast(0)
         return Location(
