@@ -33,9 +33,13 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
   @Override
   public void update(@NotNull AnActionEvent e) {
     final Project project = e.getProject();
-    final boolean isRunning = project != null && !project.isDisposed() &&
-                              (DartLspService.isServerRunning(project) ||
-                               DartAnalysisServerService.getInstance(project).isServerProcessActive());
+    if (project == null || project.isDisposed()) {
+      e.getPresentation().setEnabledAndVisible(false);
+      return;
+    }
+    DartAnalysisServerService server = project.getServiceIfCreated(DartAnalysisServerService.class);
+    final boolean isRunning = DartLspService.isServerRunning(project) ||
+                              (server != null && server.isServerProcessActive());
     e.getPresentation().setEnabledAndVisible(isRunning);
   }
 

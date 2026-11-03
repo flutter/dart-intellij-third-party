@@ -23,4 +23,4 @@ The Dart Analysis tool window (problems table with filters and settings) and act
 - Restarts or reanalyzes the Analysis Server; opens a browser for diagnostics.
 
 ## Verification
-- No dedicated tests; verify via the Dart Analysis tool window and its toolbar actions.
+- `AnalysisServerDiagnosticsActionTest.kt` verifies the basic update logic of `AnalysisServerDiagnosticsAction`.
