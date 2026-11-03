@@ -10,11 +10,11 @@ import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.execution.ui.ExecutionConsole;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.ui.InputValidator;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
@@ -402,11 +402,12 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
       if (remoteUri.startsWith(DartUrlResolver.DART_PREFIX)) continue;
       if (remoteUri.startsWith(DartUrlResolver.PACKAGE_PREFIX)) continue;
 
-      final Collection<VirtualFile> localFilesWithSameName = ReadAction.compute(() -> {
-        final String remoteFileName = PathUtil.getFileName(remoteUri);
-        final GlobalSearchScope scope = GlobalSearchScopesCore.directoryScope(getSession().getProject(), projectRoot, true);
-        return FilenameIndex.getVirtualFilesByName(remoteFileName, scope);
-      });
+      final Collection<VirtualFile> localFilesWithSameName =
+        ApplicationManager.getApplication().runReadAction((Computable<Collection<VirtualFile>>)() -> {
+          final String remoteFileName = PathUtil.getFileName(remoteUri);
+          final GlobalSearchScope scope = GlobalSearchScopesCore.directoryScope(getSession().getProject(), projectRoot, true);
+          return FilenameIndex.getVirtualFilesByName(remoteFileName, scope);
+        });
 
       int howManyFilesMatch = 0;
 
@@ -617,7 +618,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
   }
 
   public @Nullable XSourcePosition getSourcePosition(@NotNull String isolateId, @NotNull ScriptRef scriptRef, int tokenPos) {
-    VirtualFile file = ReadAction.compute(() -> {
+    VirtualFile file = ApplicationManager.getApplication().runReadAction((Computable<VirtualFile>)() -> {
       String uri = scriptRef.getUri();
 
       if (myDASExecutionContextId != null && !isDartPatchUri(uri)) {

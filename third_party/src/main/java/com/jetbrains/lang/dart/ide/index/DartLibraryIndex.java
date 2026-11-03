@@ -1,8 +1,9 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.index;
 
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
@@ -102,7 +103,7 @@ public final class DartLibraryIndex extends ScalarIndexExtension<String> {
     }
 
     final VirtualFile finalLibrariesDartFile = librariesDartFile;
-    return ReadAction.compute(() -> {
+    return ApplicationManager.getApplication().runReadAction((Computable<BidirectionalMap<String, String>>)() -> {
       try {
         final String contents = StringUtil.convertLineSeparators(VfsUtilCore.loadText(finalLibrariesDartFile));
         final PsiFile psiFile =

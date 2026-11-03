@@ -83,9 +83,11 @@ import org.eclipse.lsp4j.jsonrpc.Launcher
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.Callable
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
@@ -175,7 +177,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             val sdkHomeField = serviceClass.getDeclaredField("mySdkHome").apply { isAccessible = true }
             sdkHomeField.set(das, null)
             val dasSdkVersionField = serviceClass.getDeclaredField("mySdkVersion").apply { isAccessible = true }
-            dasSdkVersionField.set(das, null)
+            dasSdkVersionField.set(das, "")
             
             capturedRequests.clear()
             capturedNotifications.clear()
@@ -2204,6 +2206,45 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val legend = SemanticTokensLegend(listOf("class"), listOf("declaration"))
         assertTrue("Original future should accept completion", legendFuture.complete(legend))
         assertEquals(legend, das.semanticTokensLegendFuture.get())
+    }
+
+    fun testForwardRequest_acquiresReadAccessWhenCheckingServerReadyOnBackgroundThread() {
+        val das = DartAnalysisServerService.getInstance(project)
+        val socketOpenCalls = AtomicInteger(0)
+        val recoveringServer = object : RemoteAnalysisServerImpl(createStubSocket()) {
+            override fun generateUniqueId(): String = "123"
+            // First check in isServerProcessActive returns false; second check inside serverReadyForRequest returns true.
+            override fun isSocketOpen(): Boolean = socketOpenCalls.incrementAndGet() > 1
+            override fun sendRequestToServer(id: String, request: JsonObject) {
+                capturedRequests.add(request)
+            }
+            override fun sendRequestToServer(id: String, request: JsonObject, consumer: Consumer) {
+                capturedRequests.add(request)
+                capturedConsumer = consumer
+            }
+            override fun server_openUrlRequest(url: String?) {}
+            override fun server_showMessageRequest(
+                messageType: String?,
+                message: String?,
+                messageActions: MutableList<MessageAction>?,
+                consumer: ShowMessageRequestConsumer?
+            ) {}
+            override fun lsp_workspaceApplyEdit(
+                params: DartLspApplyWorkspaceEditParams?,
+                consumer: DartLspWorkspaceApplyEditRequestConsumer?
+            ) {}
+        }
+        das.setServer(recoveringServer)
+
+        val hoverFuture = ApplicationManager.getApplication().executeOnPooledThread(Callable {
+            assertFalse(ApplicationManager.getApplication().isReadAccessAllowed)
+            bridgeServer.textDocumentService.hover(
+                HoverParams(TextDocumentIdentifier("file:///test.dart"), Position(0, 0))
+            )
+        }).get(10, TimeUnit.SECONDS)
+
+        assertFalse("Request should be forwarded instead of failing immediately", hoverFuture.isCompletedExceptionally)
+        assertTrue("Expected at least two isSocketOpen checks across readiness fallback", socketOpenCalls.get() >= 2)
     }
 
     private class MockLanguageClient : LanguageClient {

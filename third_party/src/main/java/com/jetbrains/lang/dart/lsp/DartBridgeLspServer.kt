@@ -13,9 +13,10 @@ import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ex.ApplicationManagerEx
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Computable
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import org.eclipse.lsp4j.CompletionItem
@@ -639,7 +640,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val ready = if (das.isServerProcessActive) {
             true
         } else {
-            runCatching { runReadAction { das.serverReadyForRequest() } }.getOrDefault(false)
+            runCatching {
+                ApplicationManager.getApplication().runReadAction(Computable { das.serverReadyForRequest() })
+            }.getOrDefault(false)
         }
         if (!ready) {
             future.completeExceptionally(ResponseErrorException(ResponseError(-32001, "Dart Analysis Server is not ready", null)))
