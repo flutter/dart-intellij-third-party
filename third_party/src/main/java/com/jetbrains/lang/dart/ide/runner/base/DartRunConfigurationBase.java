@@ -19,6 +19,7 @@ import com.intellij.util.PathUtil;
 import com.intellij.util.xmlb.SkipDefaultValuesSerializationFilters;
 import com.intellij.util.xmlb.XmlSerializer;
 import com.jetbrains.lang.dart.ide.runner.server.DartCommandLineRunnerParameters;
+import com.jetbrains.lang.dart.ide.runner.test.DartTestRunnerParameters;
 import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -41,7 +42,10 @@ public abstract class DartRunConfigurationBase extends LocatableConfigurationBas
   @Override
   public void writeExternal(final @NotNull Element element) throws WriteExternalException {
     super.writeExternal(element);
-    XmlSerializer.serializeInto(getRunnerParameters(), element, new SkipDefaultValuesSerializationFilters());
+    XmlSerializer.serializeInto(
+      getRunnerParameters(),
+      element,
+      new SkipDefaultValuesSerializationFilters(new DartCommandLineRunnerParameters(), new DartTestRunnerParameters()));
   }
 
   @Override

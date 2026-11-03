@@ -83,7 +83,7 @@ public class DartRemoteDebugConfiguration extends RunConfigurationBase<Element> 
   @Override
   public void writeExternal(@NotNull Element element) throws WriteExternalException {
     super.writeExternal(element);
-    XmlSerializer.serializeInto(myParameters, element, new SkipDefaultValuesSerializationFilters());
+    XmlSerializer.serializeInto(myParameters, element, new SkipDefaultValuesSerializationFilters(new DartRemoteDebugParameters()));
   }
 
   @Override
