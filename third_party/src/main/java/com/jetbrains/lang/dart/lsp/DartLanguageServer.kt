@@ -61,6 +61,14 @@ object DartLspService {
         Collections.synchronizedMap(WeakHashMap())
 
     @JvmStatic
+    fun isServerRunning(project: Project): Boolean {
+        if (project.isDisposed) return false
+        return LspServerManager.getInstance(project)
+            .getServersForProvider(DartLspServerSupportProvider::class.java)
+            .any { it.state == com.intellij.platform.dartlsp.api.LspServerState.Running }
+    }
+
+    @JvmStatic
     fun getDiagnosticServerPort(project: Project): CompletableFuture<Int?> {
         return CompletableFuture.supplyAsync({
             if (project.isDisposed) return@supplyAsync null

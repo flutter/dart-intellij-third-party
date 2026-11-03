@@ -13,7 +13,7 @@ The Dart Analysis tool window (problems table with filters and settings) and act
 - `DartProblemsViewSettings` - persisted filter/scope settings bean.
 - `ReanalyzeDartSourcesAction` - `analysis_reanalyze`, or `restartServer()` when the server process isn't active; reports action analytics.
 - `RestartDartAnalysisServerAction` - `restartServer()`.
-- `AnalysisServerDiagnosticsAction` - gets the port via `diagnostic_getServerPort` and opens `http://localhost:<port>/status`.
+- `AnalysisServerDiagnosticsAction` - gets the port via `DartLspService.getDiagnosticServerPort` (`dart/diagnosticServer`) with fallback to `diagnostic_getServerPort` for older SDKs in legacy/bridge mode, and opens `http://localhost:<port>/status`.
 
 ## Invariants
 - Problems are populated from Analysis Server error notifications (DAS mode) or LSP `textDocument/publishDiagnostics` notifications.
