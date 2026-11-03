@@ -24,3 +24,4 @@ The Dart Analysis tool window (problems table with filters and settings) and act
 
 ## Verification
 - Automated tests in `com.jetbrains.lang.dart.lsp.DartLsp4jClientTest`; manually verify via the Dart Analysis tool window and its toolbar actions.
+- `AnalysisServerDiagnosticsActionTest.kt` verifies the basic update logic of `AnalysisServerDiagnosticsAction`.
