@@ -171,22 +171,6 @@ public interface AnalysisServer {
   public void analysis_getNavigation(String file, int offset, int length, GetNavigationConsumer consumer);
 
   /**
-   * {@code analysis.getReachableSources}
-   *
-   * Return the transitive closure of reachable sources for a given file.
-   *
-   * If a request is made for a file which does not exist, or which is not currently subject to
-   * analysis (e.g. because it is not associated with any analysis root specified to
-   * analysis.setAnalysisRoots), an error of type GET_REACHABLE_SOURCES_INVALID_FILE will be
-   * generated.
-   *
-   * @param file The file for which reachable source information is being requested.
-   *
-   * @deprecated
-   */
-  public void analysis_getReachableSources(String file, GetReachableSourcesConsumer consumer);
-
-  /**
    * {@code analysis.getSignature}
    *
    * Return the signature information associated with the given location in the given file. If the
@@ -332,21 +316,6 @@ public interface AnalysisServer {
   public void analysis_updateContent(Map<String, Object> files, UpdateContentConsumer consumer);
 
   /**
-   * {@code analysis.updateOptions}
-   *
-   * Deprecated: all of the options can be set by users in an analysis options file.
-   *
-   * Update the options controlling analysis based on the given set of options. Any options that are
-   * not included in the analysis options will not be changed. If there are options in the analysis
-   * options that are not valid, they will be silently ignored.
-   *
-   * @param options The options that are to be used to control analysis.
-   *
-   * @deprecated
-   */
-  public void analysis_updateOptions(AnalysisOptions options);
-
-  /**
    * {@code analytics.enable}
    *
    * Enable or disable the sending of analytics data. Note that there are other ways for users to
@@ -479,24 +448,6 @@ public interface AnalysisServer {
    *        that the default timeout is used.
    */
   public void completion_getSuggestions2(String file, int offset, int maxResults, String completionCaseMatchingMode, String completionMode, int invocationCount, int timeout, GetSuggestionsConsumer2 consumer);
-
-  /**
-   * {@code completion.registerLibraryPaths}
-   *
-   * The client can make this request to express interest in certain libraries to receive completion
-   * suggestions from based on the client path. If this request is received before the client has
-   * used 'completion.setSubscriptions' to subscribe to the AVAILABLE_SUGGESTION_SETS service, then
-   * an error of type NOT_SUBSCRIBED_TO_AVAILABLE_SUGGESTION_SETS will be generated. All previous
-   * paths are replaced by the given set of paths.
-   *
-   * @param paths A list of objects each containing a path and the additional libraries from which
-   *        the client is interested in receiving completion suggestions. If one configured path is
-   *        beneath another, the descendant will override the ancestors' configured libraries of
-   *        interest.
-   *
-   * @deprecated
-   */
-  public void completion_registerLibraryPaths(List<LibraryPathSet> paths);
 
   /**
    * {@code completion.setSubscriptions}
@@ -824,22 +775,6 @@ public interface AnalysisServer {
    * @param uri The URI to be mapped into a file path.
    */
   public void execution_mapUri(String id, String file, String uri, MapUriConsumer consumer);
-
-  /**
-   * {@code execution.setSubscriptions}
-   *
-   * Deprecated: the analysis server no longer fires LAUNCH_DATA events.
-   *
-   * Subscribe for services. All previous subscriptions are replaced by the given set of services.
-   *
-   * It is an error if any of the elements in the list are not valid services. If there is an error,
-   * then the current subscriptions will remain unchanged.
-   *
-   * @param subscriptions A list of the services being subscribed to.
-   *
-   * @deprecated
-   */
-  public void execution_setSubscriptions(List<String> subscriptions);
 
   /**
    * {@code flutter.getWidgetDescription}

@@ -39,7 +39,6 @@ import com.google.dart.server.GetImportedElementsConsumer;
 import com.google.dart.server.GetLibraryDependenciesConsumer;
 import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
-import com.google.dart.server.GetReachableSourcesConsumer;
 import com.google.dart.server.GetRefactoringConsumer;
 import com.google.dart.server.GetRuntimeCompletionConsumer;
 import com.google.dart.server.GetServerPortConsumer;
@@ -128,7 +127,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import org.dartlang.analysis.server.protocol.AnalysisOptions;
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams;
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditResult;
 import org.dartlang.analysis.server.protocol.DartLspDocumentChange;
@@ -140,7 +138,6 @@ import org.dartlang.analysis.server.protocol.DartLspVersionedTextDocumentIdentif
 import org.dartlang.analysis.server.protocol.DartLspWorkspaceEdit;
 import org.dartlang.analysis.server.protocol.FlutterWidgetPropertyValue;
 import org.dartlang.analysis.server.protocol.ImportedElements;
-import org.dartlang.analysis.server.protocol.LibraryPathSet;
 import org.dartlang.analysis.server.protocol.MessageAction;
 import org.dartlang.analysis.server.protocol.RefactoringOptions;
 import org.dartlang.analysis.server.protocol.RequestError;
@@ -336,11 +333,6 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   }
 
   @Override
-  public void analysis_getReachableSources(String file, GetReachableSourcesConsumer consumer) {
-    // TODO(scheglov) implement
-  }
-
-  @Override
   public void analysis_getSignature(String file, int offset, GetSignatureConsumer consumer) {
   }
 
@@ -399,12 +391,6 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   }
 
   @Override
-  public void analysis_updateOptions(AnalysisOptions options) {
-    String id = generateUniqueId();
-    sendRequestToServer(id, RequestUtilities.generateAnalysisUpdateOptions(id, options));
-  }
-
-  @Override
   public void analytics_enable(boolean value) {
     String id = generateUniqueId();
     sendRequestToServer(id, RequestUtilities.generateAnalyticsEnable(id, value));
@@ -426,11 +412,6 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   public void analytics_sendTiming(String event, int millis) {
     String id = generateUniqueId();
     sendRequestToServer(id, RequestUtilities.generateAnalyticsSendTiming(id, event, millis));
-  }
-
-  @Override
-  public void completion_registerLibraryPaths(List<LibraryPathSet> paths) {
-    // this call is now deprecated in the Analysis Server, a future syncs with the protocol will remove this method
   }
 
   @Override
@@ -606,15 +587,6 @@ public abstract class RemoteAnalysisServerImpl implements AnalysisServer {
   public void execution_mapUri(String contextId, String file, String uri, MapUriConsumer consumer) {
     String id = generateUniqueId();
     sendRequestToServer(id, RequestUtilities.generateExecutionMapUri(id, contextId, file, uri), consumer);
-  }
-
-  @Override
-  public void execution_setSubscriptions(List<String> subscriptions) {
-    String id = generateUniqueId();
-    if (subscriptions == null) {
-      subscriptions = StringUtilities.EMPTY_LIST;
-    }
-    sendRequestToServer(id, RequestUtilities.generateExecutionSetSubscriptions(id, subscriptions));
   }
 
   @Override
