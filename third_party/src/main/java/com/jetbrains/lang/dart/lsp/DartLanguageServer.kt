@@ -74,8 +74,8 @@ object DartLspService {
         return CompletableFuture.supplyAsync({
             if (project.isDisposed) return@supplyAsync null
             // Connection to DTD is used for server-initiated edits (workspace/applyEdit), which require Dart 3.8+.
-            val sdk = DartSdk.getDartSdk(project)
-            if (sdk != null && !DartAnalysisServerService.isDartSdkVersionSufficientForWorkspaceApplyEdits(sdk.version)) {
+            val sdk = DartSdk.getDartSdk(project) ?: return@supplyAsync null
+            if (!DartAnalysisServerService.isDartSdkVersionSufficientForWorkspaceApplyEdits(sdk.version)) {
                 return@supplyAsync null
             }
             val server = LspServerManager.getInstance(project)
