@@ -253,26 +253,31 @@ public class DartWorkflowTest extends DartCodeInsightFixtureTestCase {
     final VirtualFile pubspec = myFixture.addFileToProject("pubspec.yaml", "name: BgProject").getVirtualFile();
     final VirtualFile libFile = myFixture.addFileToProject("lib/bg.dart", "").getVirtualFile();
 
-    final Path tempSdkDir = FileUtil.createTempDirectory("dart-sdk-bg", null, true).toPath();
-    final Path internalDir = Files.createDirectories(tempSdkDir.resolve("lib/_internal"));
-    final Path librariesDart = internalDir.resolve("libraries.dart");
-    Files.writeString(librariesDart, """
-      const Map<String, LibraryInfo> LIBRARIES = const {
-        "async": const LibraryInfo("async/async.dart"),
-      };
-      """);
-    assertNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(librariesDart));
+    final Path tempSdkDir = FileUtil.createTempDirectory("dart-sdk-bg", null).toPath();
+    try {
+      final Path internalDir = Files.createDirectories(tempSdkDir.resolve("lib/_internal"));
+      final Path librariesDart = internalDir.resolve("libraries.dart");
+      Files.writeString(librariesDart, """
+        const Map<String, LibraryInfo> LIBRARIES = const {
+          "async": const LibraryInfo("async/async.dart"),
+        };
+        """);
+      assertNotNull(LocalFileSystem.getInstance().refreshAndFindFileByNioFile(librariesDart));
 
-    ApplicationManager.getApplication().executeOnPooledThread(() -> {
-      assertFalse(ApplicationManager.getApplication().isReadAccessAllowed());
+      ApplicationManager.getApplication().executeOnPooledThread(() -> {
+        assertFalse(ApplicationManager.getApplication().isReadAccessAllowed());
 
-      final DartUrlResolver resolver = DartUrlResolver.getInstance(getProject(), pubspec);
-      assertEquals(libFile, resolver.findFileByDartUrl("package:BgProject/bg.dart"));
+        final DartUrlResolver resolver = DartUrlResolver.getInstance(getProject(), pubspec);
+        assertEquals(libFile, resolver.findFileByDartUrl("package:BgProject/bg.dart"));
 
-      final BidirectionalMap<String, String> sdkMap =
-        DartLibraryIndex.getSdkLibUriToRelativePathMap(getProject(), tempSdkDir.toString());
-      assertEquals("async/async.dart", sdkMap.get("dart:async"));
-      return null;
-    }).get(10, TimeUnit.SECONDS);
+        final BidirectionalMap<String, String> sdkMap =
+          DartLibraryIndex.getSdkLibUriToRelativePathMap(getProject(), tempSdkDir.toString());
+        assertEquals("async/async.dart", sdkMap.get("dart:async"));
+        return null;
+      }).get(10, TimeUnit.SECONDS);
+    }
+    finally {
+      FileUtil.delete(tempSdkDir.toFile());
+    }
   }
 }

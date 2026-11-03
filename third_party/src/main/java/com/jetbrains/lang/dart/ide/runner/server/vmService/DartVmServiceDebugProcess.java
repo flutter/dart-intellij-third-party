@@ -402,6 +402,7 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
       if (remoteUri.startsWith(DartUrlResolver.DART_PREFIX)) continue;
       if (remoteUri.startsWith(DartUrlResolver.PACKAGE_PREFIX)) continue;
 
+      ProgressManager.checkCanceled();
       final Collection<VirtualFile> localFilesWithSameName =
         ApplicationManager.getApplication().runReadAction((Computable<Collection<VirtualFile>>)() -> {
           final String remoteFileName = PathUtil.getFileName(remoteUri);
