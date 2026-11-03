@@ -10,10 +10,7 @@ import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
-import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.DartFileType;
-import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
-import com.jetbrains.lang.dart.analyzer.DartServerData;
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import org.jetbrains.annotations.Nls;
@@ -21,7 +18,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import java.util.List;
 
 public final class DartExecutionHelper {
   private DartExecutionHelper() {}
@@ -35,12 +31,10 @@ public final class DartExecutionHelper {
     GlobalSearchScope scope = getScopeOfFilesThatMayAffectExecution(project, launchFile);
     if (scope == null) return;
 
-    DartAnalysisServerService das = DartAnalysisServerService.getInstance(project);
-    List<DartServerData.DartError> errors = ContainerUtil.filter(das.getErrors(scope), DartServerData.DartError::isError);
-    if (errors.isEmpty()) return;
+    final DartProblemsView problemsView = DartProblemsView.getInstance(project);
+    if (!problemsView.hasErrorsInScope(scope)) return;
 
     // Show a notification on the dart analysis tool window.
-    final DartProblemsView problemsView = DartProblemsView.getInstance(project);
     problemsView.showErrorNotification("", message, icon, true);
   }
 

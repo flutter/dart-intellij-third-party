@@ -281,10 +281,6 @@ public final class DartAnalysisServerService implements Disposable {
   private boolean myHaveShownInitialProgress;
   private boolean mySentAnalysisBusy;
 
-  // files with red squiggles in Project View. This field is also used as a lock to access these 3 collections
-  private final @NotNull Set<String> myFilePathsWithErrors = new HashSet<>();
-  // how many files with errors are in this folder (recursively)
-  private final @NotNull Object2IntMap<String> myFolderPathsWithErrors = new Object2IntOpenHashMap<>();
   // errors hash is tracked to optimize error notification listener: do not handle equal notifications more than once
   private final @NotNull Object2IntMap<String> myFilePathToErrorsHash = new Object2IntOpenHashMap<>();
 
@@ -368,7 +364,7 @@ public final class DartAnalysisServerService implements Disposable {
 
       for (DartFileInfo fileInfo : fileInfos) {
         if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-          onErrorsUpdated(localFileInfo, AnalysisError.EMPTY_LIST, false, 0);
+          onErrorsUpdated(localFileInfo, AnalysisError.EMPTY_LIST, 0);
         }
       }
     }
@@ -1423,12 +1419,8 @@ public final class DartAnalysisServerService implements Disposable {
     }
 
     final List<AnalysisError> errorsWithoutTodo = errors.isEmpty() ? Collections.emptyList() : new ArrayList<>(errors.size());
-    boolean hasSevereProblems = false;
 
     for (AnalysisError error : errors) {
-      if (AnalysisErrorSeverity.ERROR.equals(error.getSeverity())) {
-        hasSevereProblems = true;
-      }
       if (!AnalysisErrorType.TODO.equals(error.getType())) {
         errorsWithoutTodo.add(error);
       }
@@ -1438,8 +1430,8 @@ public final class DartAnalysisServerService implements Disposable {
 
     if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
       int oldHash;
-      synchronized (myFilePathsWithErrors) {
-        // TObjectIntHashMap returns 0 if there's no such entry, it's equivalent to empty error set for this file
+      synchronized (myFilePathToErrorsHash) {
+        // Object2IntMap returns 0 if there's no such entry, it's equivalent to empty error set for this file
         oldHash = myFilePathToErrorsHash.getInt(localFileInfo.getFilePath());
       }
 
@@ -1454,60 +1446,29 @@ public final class DartAnalysisServerService implements Disposable {
 
     if (myServerData.computedErrors(fileInfo, errorsWithoutTodo, restartHighlighting)) {
       if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-        onErrorsUpdated(localFileInfo, errorsWithoutTodo, hasSevereProblems, newHash);
+        onErrorsUpdated(localFileInfo, errorsWithoutTodo, newHash);
       }
     }
   }
 
   private void onErrorsUpdated(@NotNull DartLocalFileInfo localFileInfo,
                                @NotNull List<? extends AnalysisError> errors,
-                               boolean hasSevereProblems,
                                int errorsHash) {
     String filePath = localFileInfo.getFilePath();
-    updateFilesWithErrorsSet(filePath, hasSevereProblems, errorsHash);
-    DartProblemsView.getInstance(myProject).updateErrorsForFile(filePath, errors);
-  }
-
-  private void updateFilesWithErrorsSet(final @NotNull String filePath, final boolean hasSevereProblems, final int errorsHash) {
-    synchronized (myFilePathsWithErrors) {
+    synchronized (myFilePathToErrorsHash) {
       if (errorsHash == 0) {
-        // no errors
         myFilePathToErrorsHash.removeInt(filePath);
       }
       else {
         myFilePathToErrorsHash.put(filePath, errorsHash);
       }
-
-      if (hasSevereProblems) {
-        if (myFilePathsWithErrors.add(filePath)) {
-          String parentPath = PathUtil.getParentPath(filePath);
-          while (!parentPath.isEmpty()) {
-            final int count = myFolderPathsWithErrors.getInt(parentPath); // returns zero if there were no path in the map
-            myFolderPathsWithErrors.put(parentPath, count + 1);
-            parentPath = PathUtil.getParentPath(parentPath);
-          }
-        }
-      }
-      else {
-        if (myFilePathsWithErrors.remove(filePath)) {
-          String parentPath = PathUtil.getParentPath(filePath);
-          while (!parentPath.isEmpty()) {
-            final int count = myFolderPathsWithErrors.removeInt(parentPath); // returns zero if there was no path in the map
-            if (count > 1) {
-              myFolderPathsWithErrors.put(parentPath, count - 1);
-            }
-            parentPath = PathUtil.getParentPath(parentPath);
-          }
-        }
-      }
     }
+    DartProblemsView.getInstance(myProject).updateErrorsForFile(filePath, errors);
   }
 
   private void clearAllErrors() {
-    synchronized (myFilePathsWithErrors) {
-      myFilePathsWithErrors.clear();
+    synchronized (myFilePathToErrorsHash) {
       myFilePathToErrorsHash.clear();
-      myFolderPathsWithErrors.clear();
     }
 
     if (myInitializationOnServerStartupDone) {
@@ -2838,18 +2799,7 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public boolean isFileWithErrors(final @NotNull VirtualFile file) {
-    if (DartProblemsView.getInstance(myProject).isFileWithErrors(file)) {
-      return true;
-    }
-    synchronized (myFilePathsWithErrors) {
-      return file.isDirectory() ? myFolderPathsWithErrors.getInt(file.getPath()) > 0 : myFilePathsWithErrors.contains(file.getPath());
-    }
-  }
-
-  public int getFilePathsWithErrorsHash() {
-    synchronized (myFilePathsWithErrors) {
-      return myFilePathsWithErrors.hashCode();
-    }
+    return DartProblemsView.getInstance(myProject).isFileWithErrors(file);
   }
 
   private void logError(final @NonNls @NotNull String methodName, final @Nullable String filePath, final @NotNull RequestError error) {

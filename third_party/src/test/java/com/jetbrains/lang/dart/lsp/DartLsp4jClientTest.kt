@@ -5,9 +5,13 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl
 import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.testFramework.PlatformTestUtil
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView
+import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsViewPanel
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.Position
@@ -155,11 +159,56 @@ class DartLsp4jClientTest : DartCodeInsightFixtureTestCase() {
 
         assertTrue("File should be reported as having errors", problemsView.isFileWithErrors(vFile))
         assertTrue("Parent directory should be reported as having errors", problemsView.isFileWithErrors(parentDir))
+        assertTrue(
+            "Scope containing file should report errors for launch notifications",
+            problemsView.hasErrorsInScope(GlobalSearchScope.fileScope(project, vFile))
+        )
 
         // Empty diagnostics clears errors
         client.publishDiagnostics(PublishDiagnosticsParams(fileUri, emptyList()))
         assertFalse("File should no longer have errors", problemsView.isFileWithErrors(vFile))
         assertFalse("Parent directory should no longer have errors", problemsView.isFileWithErrors(parentDir))
+        assertFalse(
+            "Scope should no longer report errors after diagnostics cleared",
+            problemsView.hasErrorsInScope(GlobalSearchScope.fileScope(project, vFile))
+        )
+    }
+
+    fun testPanelCreatedReplaysPreExistingDiagnostics() {
+        val testFile = myFixture.addFileToProject(
+            "lib/replay_test.dart",
+            """
+            void main() {
+              int x = "string";
+            }
+            """.trimIndent()
+        )
+        val fileUri = "file://${testFile.virtualFile.path}"
+
+        val handler = createMockHandler { }
+        val client = DartLsp4jClient(project, handler)
+        val problemsView = DartProblemsView.getInstance(project)
+        problemsView.clearAll()
+
+        // 1. Diagnostics arrive before DartProblemsViewPanel exists
+        val diagnostic = Diagnostic(
+            Range(Position(1, 10), Position(1, 18)),
+            "A value of type 'String' can't be assigned to a variable of type 'int'.",
+            DiagnosticSeverity.Error,
+            "dart",
+            "invalid_assignment"
+        )
+        client.publishDiagnostics(PublishDiagnosticsParams(fileUri, listOf(diagnostic)))
+
+        // 2. Panel is created afterwards and notified via panelCreated(panel)
+        val panel = DartProblemsViewPanel(project, problemsView.presentationHelper)
+        assertEquals("Panel should initially have 0 rows before replay", 0, panel.rowCount)
+
+        problemsView.panelCreated(panel)
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+
+        assertEquals("Panel should display replayed diagnostic row", 1, panel.rowCount)
     }
 
     fun testPublishDiagnosticsFiltersOutTodoDiagnostics() {
