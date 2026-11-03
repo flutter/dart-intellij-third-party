@@ -29,6 +29,7 @@ import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
+import com.jetbrains.lang.dart.lsp.DartLspService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.websocket.WebSocket
@@ -111,7 +112,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     DartDevToolsService.getInstance(project).startService(uri)
     uri?.let {
       connectToDtdWebSocket(it)
-      DartAnalysisServerService.getInstance(project).connectToDtd(uri)
+      DartLspService.connectToDtd(project, it)
     }
     DtdEditorService(project, this).setUpService()
   }

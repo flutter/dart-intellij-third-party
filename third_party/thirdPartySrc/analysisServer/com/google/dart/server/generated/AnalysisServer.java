@@ -14,9 +14,8 @@
  * generator output in July 2023 (protocol version 1.34.0) and has been edited by hand since, so it
  * has drifted from what the generator produces today:
  * - It declares methods that the generator cannot produce, because the spec only knows the generic
- *   lsp.handle request: lsp_connectToDtd sends the dart/connectToDtd LSP request, and
- *   lsp_workspaceApplyEdit handles the workspace/applyEdit request that the server sends to the
- *   client.
+ *   lsp.handle request: lsp_workspaceApplyEdit handles the workspace/applyEdit request that the
+ *   server sends to the client.
  * - It still declares requests that the SDK has removed, such as completion.getSuggestions and
  *   completion.setSubscriptions of the old completion protocol, and it lacks lsp.handle, which the
  *   plugin sends without this interface.
@@ -1119,8 +1118,6 @@ public interface AnalysisServer {
   public void server_showMessageRequest(String type, String message, List<MessageAction> actions, ShowMessageRequestConsumer consumer);
 
   public void lsp_workspaceApplyEdit(DartLspApplyWorkspaceEditParams params, DartLspWorkspaceApplyEditRequestConsumer consumer);
-
-  public void lsp_connectToDtd(String uri);
 
   /**
    * {@code server.shutdown}
