@@ -26,7 +26,7 @@ public abstract class DartNamedElementImpl extends DartPsiCompositeElementImpl i
     final DartId identifier = getId();
     final DartId identifierNew = DartElementGenerator.createIdentifierFromText(getProject(), newElementName);
 
-    if (identifierNew != null) {
+    if (identifier != null && identifierNew != null) {
       getNode().replaceChild(identifier.getNode(), identifierNew.getNode());
     }
 
@@ -35,7 +35,8 @@ public abstract class DartNamedElementImpl extends DartPsiCompositeElementImpl i
 
   @Override
   public String getName() {
-    return getId().getText();
+    final DartId id = getId();
+    return id != null ? id.getText() : getText();
   }
 
   @Override
@@ -59,7 +60,7 @@ public abstract class DartNamedElementImpl extends DartPsiCompositeElementImpl i
   }
 
   @Override
-  public @NotNull DartId getId() {
+  public @Nullable DartId getId() {
     return PsiTreeUtil.getChildOfType(this, DartId.class);
   }
 }
