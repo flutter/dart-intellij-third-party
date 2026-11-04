@@ -41,7 +41,7 @@ Because `third_party/thirdPartySrc/platform-lsp/` is a temporary copy of JetBrai
 
 ## Record of Adjustments Applied
 
-Here is the details of the changes made by the patch script:
+Here are the details of the changes made by the patch script:
 
 1. **Direct Package Copy & Rename**:
    - Copies files directly from `platform/lsp/src/com/intellij/platform/lsp` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`.
