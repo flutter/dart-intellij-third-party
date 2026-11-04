@@ -16,8 +16,26 @@ import org.dartlang.analysis.server.protocol.ElementKind;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 @SuppressWarnings("deprecation")
 public class DartServerCompletionContributorTest extends BasePlatformTestCase {
+
+  @Override
+  protected void setUp() throws Exception {
+    super.setUp();
+    DartServerCompletionContributor.WARNED_EXTENSIONS.clear();
+  }
+
+  @Override
+  protected void tearDown() throws Exception {
+    try {
+      DartServerCompletionContributor.WARNED_EXTENSIONS.clear();
+    }
+    finally {
+      super.tearDown();
+    }
+  }
 
   public void testTypedefBaseImage() {
     Element typeAlias = new Element(ElementKind.TYPE_ALIAS, "MyTypeAlias", null, 0, null, null, null, null);
@@ -27,20 +45,28 @@ public class DartServerCompletionContributorTest extends BasePlatformTestCase {
     assertEquals(AllIcons.Nodes.Annotationtype, DartServerCompletionContributor.getBaseImage(functionTypeAlias));
   }
 
-  public void testCreateLookupElementAskingExtensionsIsolatesThrowable() {
+  public void testCreateLookupElementAskingExtensionsIsolatesAndSkipsFailingExtension() {
+    AtomicInteger invocations = new AtomicInteger();
     ExtensionPoint<DartCompletionExtension> ep =
       ApplicationManager.getApplication().getExtensionArea().getExtensionPoint("Dart.completionExtension");
     ep.registerExtension(new DartCompletionExtension() {
       @Override
       public @Nullable LookupElementBuilder createLookupElement(@NotNull Project project, @NotNull CompletionSuggestion suggestion) {
+        invocations.incrementAndGet();
         throw new NoClassDefFoundError("org/apache/commons/lang/StringUtils");
       }
     }, getTestRootDisposable());
 
     CompletionSuggestion suggestion = createSuggestion("myFunction");
-    LookupElement lookup =
+    LookupElement firstLookup =
       DartServerCompletionContributor.createLookupElementAskingExtensions(getProject(), suggestion, null, null);
-    assertEquals("myFunction", lookup.getLookupString());
+    assertEquals("myFunction", firstLookup.getLookupString());
+    assertEquals(1, invocations.get());
+
+    LookupElement secondLookup =
+      DartServerCompletionContributor.createLookupElementAskingExtensions(getProject(), suggestion, null, null);
+    assertEquals("myFunction", secondLookup.getLookupString());
+    assertEquals(1, invocations.get());
   }
 
   public void testCreateLookupElementAskingExtensionsContinuesToNextExtensionAfterThrowable() {
