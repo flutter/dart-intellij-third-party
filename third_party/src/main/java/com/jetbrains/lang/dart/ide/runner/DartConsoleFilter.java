@@ -4,7 +4,10 @@ package com.jetbrains.lang.dart.ide.runner;
 import com.intellij.execution.filters.Filter;
 import com.intellij.execution.filters.HyperlinkInfo;
 import com.intellij.execution.filters.OpenFileHyperlinkInfo;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -53,41 +56,46 @@ public class DartConsoleFilter implements Filter {
     final DartPositionInfo info = DartPositionInfo.parsePositionInfo(line);
     if (info == null) return null;
 
-    final VirtualFile file = switch (info.type) {
-      case FILE -> {
-        String path = URLUtil.unescapePercentSequences(info.path);
-        if (SystemInfo.isWindows) {
-          path = StringUtil.trimLeading(path, '/');
-        }
-        yield LocalFileSystem.getInstance().findFileByPath(path);
-      }
-      case DART -> DartUrlResolver.findFileInDartSdkLibFolder(myProject, mySdk, DART_PREFIX + info.path);
-      case PACKAGE -> {
-        if (myDartUrlResolver != null) {
-          yield myDartUrlResolver.findFileByDartUrl(PACKAGE_PREFIX + info.path);
-        }
-        if (myAllPubspecYamlFiles == null) {
-          myAllPubspecYamlFiles = FilenameIndex.getVirtualFilesByName(PUBSPEC_YAML, GlobalSearchScope.projectScope(myProject));
-        }
-
-        VirtualFile inPackage = null;
-        for (VirtualFile yamlFile : myAllPubspecYamlFiles) {
-          inPackage = DartUrlResolver.getInstance(myProject, yamlFile).findFileByDartUrl(PACKAGE_PREFIX + info.path);
-          if (inPackage != null) {
-            break;
+    return ApplicationManager.getApplication().runReadAction((Computable<Result>)() -> {
+      final VirtualFile file = switch (info.type) {
+        case FILE -> {
+          String path = URLUtil.unescapePercentSequences(info.path);
+          if (SystemInfo.isWindows) {
+            path = StringUtil.trimLeading(path, '/');
           }
+          yield LocalFileSystem.getInstance().findFileByPath(path);
         }
-        yield inPackage;
+        case DART -> DartUrlResolver.findFileInDartSdkLibFolder(myProject, mySdk, DART_PREFIX + info.path);
+        case PACKAGE -> {
+          if (myDartUrlResolver != null) {
+            yield myDartUrlResolver.findFileByDartUrl(PACKAGE_PREFIX + info.path);
+          }
+          if (myAllPubspecYamlFiles == null) {
+            myAllPubspecYamlFiles = FilenameIndex.getVirtualFilesByName(PUBSPEC_YAML, GlobalSearchScope.projectScope(myProject));
+          }
+
+          VirtualFile inPackage = null;
+          for (VirtualFile yamlFile : myAllPubspecYamlFiles) {
+            ProgressManager.checkCanceled();
+            if (yamlFile.isValid()) {
+              inPackage = DartUrlResolver.getInstance(myProject, yamlFile).findFileByDartUrl(PACKAGE_PREFIX + info.path);
+              if (inPackage != null) {
+                break;
+              }
+            }
+          }
+          yield inPackage;
+        }
+      };
+
+      if (file != null && !file.isDirectory()) {
+        final int highlightStartOffset = entireLength - line.length() + info.highlightingStartIndex;
+        final int highlightEndOffset = entireLength - line.length() + info.highlightingEndIndex;
+        return new Result(highlightStartOffset, highlightEndOffset, new OpenFileHyperlinkInfo(myProject, file, info.line, info.column));
       }
-    };
 
-    if (file != null && !file.isDirectory()) {
-      final int highlightStartOffset = entireLength - line.length() + info.highlightingStartIndex;
-      final int highlightEndOffset = entireLength - line.length() + info.highlightingEndIndex;
-      return new Result(highlightStartOffset, highlightEndOffset, new OpenFileHyperlinkInfo(myProject, file, info.line, info.column));
-    }
-
-    return null;
+      return null;
+    });
   }
 
   private static @Nullable Result getObservatoryUrlResult(final String line, final int lineStartOffset) {
