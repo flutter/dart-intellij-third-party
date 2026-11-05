@@ -10,6 +10,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
+/**
+ * @deprecated Coupled to legacy DAS {@link CompletionSuggestion}; not invoked when LSP code completion is active.
+ */
+@Deprecated
 public class DartCompletionExtension {
   private static final ExtensionPointName<DartCompletionExtension> EP_NAME = ExtensionPointName.create("Dart.completionExtension");
 

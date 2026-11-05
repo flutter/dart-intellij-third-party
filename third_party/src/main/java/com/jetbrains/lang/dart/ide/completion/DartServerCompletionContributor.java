@@ -19,10 +19,12 @@ import com.intellij.lang.html.HTMLLanguage;
 import com.intellij.lang.injection.InjectedLanguageManager;
 import com.intellij.lang.xml.XMLLanguage;
 import com.intellij.openapi.actionSystem.IdeActions;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.keymap.KeymapUtil;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
@@ -41,6 +43,7 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.assists.DartSourceEditException;
 import com.jetbrains.lang.dart.ide.codeInsight.DartCodeInsightSettings;
+import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
@@ -51,12 +54,16 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.intellij.patterns.PlatformPatterns.psiElement;
 import static com.intellij.patterns.PlatformPatterns.psiFile;
 import static com.intellij.patterns.StandardPatterns.or;
 
 public final class DartServerCompletionContributor extends CompletionContributor {
+  private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartServerCompletionContributor.class);
+  static final Set<String> WARNED_EXTENSIONS = ConcurrentHashMap.newKeySet();
+
   public DartServerCompletionContributor() {
     extend(CompletionType.BASIC,
            or(psiElement().withLanguage(DartLanguage.INSTANCE),
@@ -429,14 +436,29 @@ public final class DartServerCompletionContributor extends CompletionContributor
     return base;
   }
 
-  private static @NotNull LookupElement createLookupElementAskingExtensions(@NotNull Project project,
-                                                                            @NotNull CompletionSuggestion suggestion,
-                                                                            @Nullable String displayUri,
-                                                                            @Nullable SuggestionDetailsInsertHandlerBase insertHandler) {
+  @SuppressWarnings("deprecation")
+  static @NotNull LookupElement createLookupElementAskingExtensions(@NotNull Project project,
+                                                                    @NotNull CompletionSuggestion suggestion,
+                                                                    @Nullable String displayUri,
+                                                                    @Nullable SuggestionDetailsInsertHandlerBase insertHandler) {
     for (DartCompletionExtension extension : DartCompletionExtension.getExtensions()) {
-      LookupElement lookupElement = extension.createLookupElement(project, suggestion);
-      if (lookupElement != null) {
-        return lookupElement;
+      String extensionName = extension.getClass().getName();
+      if (WARNED_EXTENSIONS.contains(extensionName)) {
+        continue;
+      }
+      try {
+        LookupElement lookupElement = extension.createLookupElement(project, suggestion);
+        if (lookupElement != null) {
+          return lookupElement;
+        }
+      }
+      catch (ProcessCanceledException e) {
+        throw e;
+      }
+      catch (Throwable t) {
+        if (WARNED_EXTENSIONS.add(extensionName)) {
+          LOG.warn("Exception from DartCompletionExtension: " + extensionName, t);
+        }
       }
     }
     return createLookupElement(project, suggestion, displayUri, insertHandler);
