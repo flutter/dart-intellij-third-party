@@ -60,6 +60,10 @@ public class DartVmServiceStackFrame extends XStackFrame {
     return mySourcePosition;
   }
 
+  public @Nullable ElementList<BoundVariable> getBoundVariables() {
+    return myVmFrame.getVars();
+  }
+
   public int getFrameIndex() {
     return myVmFrames == null ? 0 : myVmFrames.indexOf(myVmFrame);
   }

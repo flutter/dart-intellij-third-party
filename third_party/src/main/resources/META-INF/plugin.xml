@@ -224,6 +224,7 @@
     <gotoSymbolContributor implementation="com.jetbrains.lang.dart.ide.DartSymbolContributor"/>
 
     <completion.contributor language="Dart" implementationClass="com.jetbrains.lang.dart.ide.completion.DartServerCompletionContributor"/>
+    <completion.contributor language="Dart" implementationClass="com.jetbrains.lang.dart.ide.completion.DartDebuggerExpressionCompletionContributor"/>
     <gotoDeclarationHandler implementation="com.jetbrains.lang.dart.ide.completion.DartGotoDeclarationHandler"/>
     <lookup.charFilter implementation="com.jetbrains.lang.dart.ide.completion.DartCharFilter"/>
     <lang.smartEnterProcessor language="Dart"
