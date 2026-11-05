@@ -14,6 +14,7 @@
 - Avoid a trailing newline in the Dart SDK version, which leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
 - Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
 - Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
+- Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
 
 ## 511.0.0
 
@@ -33,7 +34,6 @@
 - Restore semantic syntax highlighting after external file modification (#656)
 - Avoid UI freeze during project startup by updating excluded folders directly via `WorkspaceModel` (#728)
 - Support Go to Declaration or Usages and Find Usages on declaration sites when experimental LSP is enabled (#699)
-- Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
 
 ## 510.0.0
 
