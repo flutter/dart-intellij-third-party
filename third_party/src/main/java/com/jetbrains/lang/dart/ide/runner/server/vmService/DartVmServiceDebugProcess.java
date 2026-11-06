@@ -36,9 +36,6 @@ import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartFileType;
-import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
-import com.jetbrains.lang.dart.analyzer.DartFileInfo;
-import com.jetbrains.lang.dart.analyzer.DartFileInfoKt;
 import com.jetbrains.lang.dart.ide.runner.DartConsoleFilter;
 import com.jetbrains.lang.dart.ide.runner.actions.DartPopFrameAction;
 import com.jetbrains.lang.dart.ide.runner.base.DartDebuggerEditorsProvider;
@@ -89,7 +86,6 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
   private final Map<String, LightVirtualFile> myScriptIdToContentMap = new HashMap<>();
   private final Map<String, Int2ObjectMap<Pair<Integer, Integer>>> myScriptIdToLinesAndColumnsMap = new HashMap<>();
 
-  private final @Nullable String myDASExecutionContextId;
   private final @NotNull DebugType myDebugType;
   private final int myTimeout;
   private final @Nullable VirtualFile myCurrentWorkingDirectory;
@@ -106,7 +102,6 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
   public DartVmServiceDebugProcess(@NotNull XDebugSession session,
                                    @Nullable ExecutionResult executionResult,
                                    @NotNull DartUrlResolver dartUrlResolver,
-                                   @Nullable String dasExecutionContextId,
                                    @NotNull DebugType debugType,
                                    int timeout,
                                    @Nullable VirtualFile currentWorkingDirectory) {
@@ -126,16 +121,12 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
 
     session.setPauseActionSupported(true);
 
-    myDASExecutionContextId = dasExecutionContextId;
 
     if (DebugType.REMOTE == debugType) {
-      LOG.assertTrue(myExecutionResult == null && myDASExecutionContextId == null, myExecutionResult);
+      LOG.assertTrue(myExecutionResult == null, myExecutionResult);
     }
-    else if (DebugType.CLI == debugType) {
-      LOG.assertTrue(myExecutionResult != null && myDASExecutionContextId != null, myDASExecutionContextId + myExecutionResult);
-    }
-    else if (DebugType.WEBDEV == debugType) {
-      LOG.assertTrue(myExecutionResult != null && myDASExecutionContextId == null, myExecutionResult);
+    else {
+      LOG.assertTrue(myExecutionResult != null, "ExecutionResult must not be null for " + debugType);
     }
   }
 
@@ -461,9 +452,6 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
     myVmConnected = false;
 
     if (myVmServiceWrapper != null) {
-      if (myDASExecutionContextId != null) {
-        DartAnalysisServerService.getInstance(getSession().getProject()).execution_deleteContext(myDASExecutionContextId);
-      }
 
       Disposer.dispose(myVmServiceWrapper);
     }
@@ -569,15 +557,6 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
       result.add(threeSlashize(new File(filePath).toURI().toString()));
     }
 
-    // package: (if applicable)
-    if (myDASExecutionContextId != null) {
-      final String uriByServer =
-        DartAnalysisServerService.getInstance(getSession().getProject()).execution_mapUri(myDASExecutionContextId, file);
-      if (uriByServer != null) {
-        result.add(uriByServer);
-      }
-    }
-
     // remote prefix (if applicable)
     if (myRemoteProjectRootUri != null) {
       final VirtualFile pubspec = myDartUrlResolver.getPubspecYamlFile();
@@ -619,15 +598,6 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
   public @Nullable XSourcePosition getSourcePosition(@NotNull String isolateId, @NotNull ScriptRef scriptRef, int tokenPos) {
     VirtualFile file = ReadAction.compute(() -> {
       String uri = scriptRef.getUri();
-
-      if (myDASExecutionContextId != null && !isDartPatchUri(uri)) {
-        String filePathOrUri =
-          DartAnalysisServerService.getInstance(getSession().getProject()).execution_mapUri(myDASExecutionContextId, uri);
-        if (filePathOrUri != null) {
-          DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(getSession().getProject(), filePathOrUri);
-          return fileInfo.findFile();
-        }
-      }
 
       final VirtualFile pubspec = myDartUrlResolver.getPubspecYamlFile();
       if (myRemoteProjectRootUri != null && uri.startsWith(myRemoteProjectRootUri) && pubspec != null) {
@@ -691,11 +661,6 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
     if (lineAndColumn == null) return XDebuggerUtil.getInstance().createPositionByOffset(file, 0);
 
     return XDebuggerUtil.getInstance().createPosition(file, lineAndColumn.first, lineAndColumn.second);
-  }
-
-  private static boolean isDartPatchUri(@NotNull String uri) {
-    // dart:_builtin or dart:core-patch/core_patch.dart
-    return uri.startsWith("dart:_") || uri.startsWith("dart:") && uri.contains("-patch/");
   }
 
   private static Int2ObjectMap<Pair<Integer, Integer>> createTokenPosToLineAndColumnMap(@NotNull List<List<Integer>> tokenPosTable) {
