@@ -30,4 +30,4 @@ SM test runner.
 
 ## Verification
 
-- No dedicated unit test found in `third_party/src/test`.
+- `com.jetbrains.lang.dart.ide.runner.test.ui.DartTestScopeComboRendererTest`

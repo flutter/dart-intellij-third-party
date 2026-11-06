@@ -15,8 +15,8 @@ import com.intellij.psi.search.FileTypeIndex;
 import com.intellij.psi.search.FilenameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.GlobalSearchScopesCore;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartFileType;
@@ -26,6 +26,7 @@ import com.jetbrains.lang.dart.ui.BasicComboBoxWithBrowseButton;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import javax.swing.*;
 import java.util.SortedSet;
@@ -55,7 +56,7 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
   }
 
   private void initDartProjectsCombo(final @NotNull Project project) {
-    myDartProjectCombo.setRenderer(SimpleListCellRenderer.create("", NameAndPath::getPresentableText));
+    myDartProjectCombo.setRenderer(createDartProjectComboRenderer());
 
     if (project.isDefault()) return;
 
@@ -85,6 +86,11 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
         }
       })
       .submit(AppExecutorUtil.getAppExecutorService());
+  }
+
+  @VisibleForTesting
+  static @NotNull ListCellRenderer<NameAndPath> createDartProjectComboRenderer() {
+    return BuilderKt.textListCellRenderer(value -> value == null ? "" : value.getPresentableText());
   }
 
   @Override
@@ -131,7 +137,8 @@ public class DartRemoteDebugConfigurationEditor extends SettingsEditor<DartRemot
     myDartProjectCombo = new BasicComboBoxWithBrowseButton<>();
   }
 
-  private static class NameAndPath implements Comparable<NameAndPath> {
+  @VisibleForTesting
+  static class NameAndPath implements Comparable<NameAndPath> {
     private final @Nullable String myName;
     private final @NotNull String myPath;
 
