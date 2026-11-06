@@ -26,9 +26,22 @@ To copy the sources from `intellij-community` and apply the adjustments automati
 > python3 .agents/skills/patch-copied-lsp-sources/scripts/patch.py
 > ```
 
+## Guidelines for Adding New Patches & Filing YouTrack Issues
+
+Because `third_party/thirdPartySrc/platform-lsp/` is a temporary copy of JetBrains' platform LSP client that will eventually be dropped in favor of the official platform module:
+1. **Check Upstream `intellij-community` and YouTrack (`IJPL`) First**: Before inventing a custom patch or PSI workaround, check whether JetBrains has already fixed the issue in a newer `intellij-community` commit (which can be backported in [scripts/patch.py](scripts/patch.py), like `IJPL-156979` / `0634427a`) or whether an uncopied `platform/lsp-impl` module already exists (like `platform/lsp-impl/structureView`).
+2. **Evaluate Whether to File a JetBrains YouTrack (`IJPL-...`) Issue**: Whenever you add a patch to [scripts/patch.py](scripts/patch.py) that:
+   - Fixes a bug in JetBrains' LSP client code that is not specific to Dart (e.g., `IJPL-260061` in `LspFileBreadcrumbsCollector`), or
+   - Opens/relaxes visibility on a platform API (`open`, `public`) that the Dart plugin will still need to customize once it switches to the built-in IntelliJ platform LSP module (e.g., making a method on `Lsp4jClient` `open`),
+   ask whether a YouTrack ticket (`IJPL-...`) should be filed against JetBrains so the fix or extension point lands upstream before we retire `platform-lsp`.
+3. **Record the `IJPL-...` Ticket & Removal Criteria**: Always reference the YouTrack issue ID (and upstream commit hash, if backported) in:
+   - The inline code comment inserted by [scripts/patch.py](scripts/patch.py),
+   - The step comment inside [scripts/patch.py](scripts/patch.py), and
+   - The **Record of Adjustments Applied** section below, explicitly noting *when* the patch can be removed (e.g., once the `intellij-community` sync source or minimum supported IDE version includes the upstream fix).
+
 ## Record of Adjustments Applied
 
-Here is the details of the changes made by the patch script:
+Here are the details of the changes made by the patch script:
 
 1. **Direct Package Copy & Rename**:
    - Copies files directly from `platform/lsp/src/com/intellij/platform/lsp` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`.
@@ -65,4 +78,8 @@ Here is the details of the changes made by the patch script:
    - Update `LspDiagnosticsCustomizer.kt`, `LspDiagnosticAndLazyQuickFixes.kt`, and `LspServerImpl.kt` to use these helpers.
 10. **LSP Structure View Support**:
    - Copy `platform/lsp-impl/structureView/src` into `third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp`, register `LspStructureViewFactory` and `LspStructureViewProjectActivity` in `dart-lsp-impl.xml`, and make `LspStructureViewFactory` public (`class LspStructureViewFactory`) so `DartStructureViewFactory` can delegate to it.
-
+11. **LSP Go to Declaration or Usages Backport (`IJPL-156979` / `0634427a`)**:
+   - Backport upstream commit `0634427a` (`IJPL-156979`) to `LspImplicitReferenceProvider.kt` and `LspSearchTargetsRule.kt` (adapted for `LspServer` / `LspServerImpl` naming) so that invoking *Go to Declaration or Usages* (`GotoDeclarationAction`) on a declaration falls back to *Show Usages* via `LspSearchTarget`. (This backport can be dropped once the `intellij-community` sync source includes `0634427a`.)
+   - Keep `CurrentActionHolder` in `LspImplicitReferenceProvider.kt` `internal` (instead of `private`) so `DartTargetElementEvaluatorTest` can set `currentActionClass` in tests.
+12. **Guard `StickyLineInfo` Range in `LspFileBreadcrumbsCollector` (`#734` / `IJPL-260061`, `patch.py` step `#14`)**:
+   - Add `// Dart patch: skip incomplete declarations (#734 / IJPL-260061)` and `if (textOffset >= endOffset) return@mapNotNull null` before constructing `StickyLineInfo(textOffset, endOffset, null)` in `LspFileBreadcrumbsCollector.computeStickyLineInfos` so incomplete declarations (where `selectionRange.start == range.end`) do not throw `IllegalArgumentException`. (This patch can be dropped once `IJPL-260061` is fixed in the `intellij-community` sync source.)

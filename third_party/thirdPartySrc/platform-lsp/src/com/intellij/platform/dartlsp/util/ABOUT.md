@@ -1,16 +1,16 @@
-<!--* freshness: { reviewed: '2026-08-31' } *-->
+<!--* freshness: { reviewed: '2026-10-25' } *-->
 # util
 
 ## Overview
-Utility functions for LSP URI resolution, positioning conversion, and lsp4j data conversion.
+Utility functions for LSP/Document position conversion, text edit application, navigation to LSP locations, and parsing locations from LSP command arguments.
 
 ## Interface
-- `Lsp4jUtil.kt`: Extension functions and converters between IntelliJ Document/VirtualFile offsets and LSP Position/Range.
-- `LspNavigationUtils.kt`: Navigation helpers for opening LSP locations and finding editor elements.
-- `Lsp4jService.kt`: Coroutine and threading helpers for asynchronous LSP operations.
+- `Lsp4jUtil.kt`: `getLsp4jPosition`, `getLsp4jRange`, `getOffsetInDocument`, `getRangeInDocument` (IntelliJ `Document` offsets <-> lsp4j `Position`/`Range`); `applyTextEdits`/`applyTextEdit` (apply lsp4j `TextEdit`s to a `Document`); `getDocumentFilterPattern` (extract a `DocumentFilter` pattern); `Diagnostic.messageIfStringOrEmpty` (string message accessor used by diagnostics code, added via `patch.py`).
+- `LspNavigationUtils.kt`: `navigateOrShowPopup`, `navigateToLocation`, `showLspNavigationPopup` for opening LSP `Location`s.
+- `Lsp4jService.kt`: Abstract application service with `extractLocationsFromJson(arguments)`, which parses `Location` lists from LSP command arguments (e.g. "showReferences"); implemented by `impl/util/Lsp4jServiceImpl`.
 
 ## Invariants
-- Converts between IntelliJ VirtualFile/Document offsets and LSP Range/Position/DocumentUri.
+- Position conversions work on IntelliJ `Document` offsets only; this package has no `VirtualFile`/URI converters.
 
 ## Side Effects
-- Read-only data mapping and document offset calculations.
+- `applyTextEdits`/`applyTextEdit` modify `Document` contents; navigation helpers open editors or show popups. Other functions are pure conversions.

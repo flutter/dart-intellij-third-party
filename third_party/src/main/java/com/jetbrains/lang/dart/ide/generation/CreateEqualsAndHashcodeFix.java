@@ -11,7 +11,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
-import com.jetbrains.lang.dart.ide.hierarchy.type.DartServerTypeHierarchyTreeStructure;
+import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.psi.DartComponent;
 import com.jetbrains.lang.dart.psi.DartComponentName;
@@ -70,7 +70,7 @@ public class CreateEqualsAndHashcodeFix extends BaseCreateMethodsFix<DartCompone
     final List<TypeHierarchyItem> items = DartAnalysisServerService.getInstance(dartClass.getProject())
       .search_getTypeHierarchy(file, name.getTextRange().getStartOffset(), true);
 
-    for (DartClass superClass : DartServerTypeHierarchyTreeStructure.filterSuperClasses(project, items)) {
+    for (DartClass superClass : DartHierarchyUtil.filterSuperClasses(project, items)) {
       if (superClass != null && superClass.getName() != null && !superClass.getName().equals("Object")) {
         if (DartGenerateEqualsAndHashcodeAction.doesClassContainEqualsAndHashCode(superClass)) {
           return true;

@@ -1,20 +1,40 @@
 ## Unreleased
 
 ### Added
-- File Structure view implemented with JetBrains LSP (experimental feature) (#673)
-- Code completion with JetBrains LSP (experimental feature) (#399)
-- Support for the Dart "parts with imports" language feature in IDE-side resolution used by Override/Implement Methods, Generate actions, and parameter info: imports in part files and nested parts ([dart-lang/sdk#56209](https://github.com/dart-lang/sdk/issues/56209)) (#721)
-- Error and UI freeze reporting to JetBrains Marketplace (#740)
+- Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Changed
 
 ### Removed
 - Legacy Dart Analysis Server execution context and URI mapping during debugging (#686)
+- Per-request `dart.legacy_assist` and `dart.legacy_fix` analytics latency events, which fired on every legacy quick assist and quick fix availability check (caret moves, edits, selection changes) rather than when one was applied. Applied assists and fixes are still reported (#793)
+
+### Fixed
+- Support icon for typedef and type alias in Structure View and code completion (#660)
+- Avoid read-access error when invoking Type Hierarchy, Method Hierarchy, Go to Super Method, or Go to Implementation(s) in IntelliJ 2026.1+ (#780)
+- Avoid a trailing newline in the Dart SDK version, which leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
+- Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
+- Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
+- Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
+
+## 511.0.0
+
+### Added
+- File Structure view implemented with JetBrains LSP (experimental feature) (#673)
+- Code completion with JetBrains LSP (experimental feature) (#399)
+- Support for the Dart "parts with imports" language feature in IDE-side resolution used by Override/Implement Methods, Generate actions, and parameter info: imports in part files and nested parts ([dart-lang/sdk#56209](https://github.com/dart-lang/sdk/issues/56209)) (#721)
+- Error and UI freeze reporting to JetBrains Marketplace (#740)
+- Highlighting examples for tear-offs, type aliases, extension types, and `dynamic` in the Dart color scheme preview (#760)
+
+### Changed
+- Extract Method, Extract Local Variable, and Inline refactorings now route to LSP code actions when experimental LSP features are enabled, applying refactorings directly without the legacy options dialogs (such as custom naming or choosing between single and all occurrences) (#684)
+- Type Hierarchy navigation via LSP is now enabled for all users (#779)
 
 ### Fixed
 - Avoid UI freeze in Highlight Usages in File when waiting for LSP document highlights (#720)
 - Restore semantic syntax highlighting after external file modification (#656)
 - Avoid UI freeze during project startup by updating excluded folders directly via `WorkspaceModel` (#728)
+- Support Go to Declaration or Usages and Find Usages on declaration sites when experimental LSP is enabled (#699)
 
 ## 510.0.0
 

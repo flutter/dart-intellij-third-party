@@ -25,10 +25,12 @@ import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.assists.DartSourceEditException;
 import com.jetbrains.lang.dart.ide.refactoring.DartInlineHandler;
+import com.jetbrains.lang.dart.ide.refactoring.DartLspRefactoringHelper;
 import com.jetbrains.lang.dart.ide.refactoring.ServerExtractLocalVariableRefactoring;
 import com.jetbrains.lang.dart.ide.refactoring.ServerRefactoringDialog;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
 import com.jetbrains.lang.dart.psi.DartExpression;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.jetbrains.annotations.NotNull;
@@ -45,6 +47,11 @@ public class DartServerExtractLocalVariableHandler implements RefactoringActionH
 
   @Override
   public void invoke(final @NotNull Project project, final Editor editor, PsiFile file, DataContext dataContext) {
+    if (DartConfigurable.isLspCodeActionsEnabled(project)) {
+      DartLspRefactoringHelper.performExtractLocalVariable(project, editor, file);
+      return;
+    }
+
     final DartSdk sdk = DartSdk.getDartSdk(project);
     if (sdk == null) {
       return;
