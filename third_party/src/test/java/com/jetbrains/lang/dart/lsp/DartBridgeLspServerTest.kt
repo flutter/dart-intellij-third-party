@@ -24,6 +24,8 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
+import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartSdk
@@ -69,6 +71,7 @@ import org.eclipse.lsp4j.SemanticTokenTypes
 import org.eclipse.lsp4j.SemanticTokensLegend
 import org.eclipse.lsp4j.SemanticTokensParams
 import org.eclipse.lsp4j.ShowMessageRequestParams
+import org.eclipse.lsp4j.SignatureHelpParams
 import org.eclipse.lsp4j.SymbolKind
 import org.eclipse.lsp4j.TextDocumentIdentifier
 import org.eclipse.lsp4j.TypeDefinitionParams
@@ -881,6 +884,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val experimentalNames = LspMethod.getExperimentalFeatures().mapNotNull { it.presentableName }
         assertTrue("Experimental features list should contain 'code actions'", experimentalNames.contains("code actions"))
         assertTrue("Experimental features list should contain 'errors and warnings'", experimentalNames.contains("errors and warnings"))
+        assertTrue("Experimental features list should contain 'signature help'", experimentalNames.contains("signature help"))
         assertFalse("DOCUMENT_HIGHLIGHT should not be experimental", LspMethod.getExperimentalFeatures().contains(LspMethod.DOCUMENT_HIGHLIGHT))
     }
 
@@ -2204,6 +2208,106 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val legend = SemanticTokensLegend(listOf("class"), listOf("declaration"))
         assertTrue("Original future should accept completion", legendFuture.complete(legend))
         assertEquals(legend, das.semanticTokensLegendFuture.get())
+    }
+
+    fun testInitializeCapabilitiesIncludesSignatureHelpOptions() {
+        val initResult = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+        val signatureHelpOptions = initResult.capabilities.signatureHelpProvider
+        assertNotNull("signatureHelpProvider capability must be set", signatureHelpOptions)
+        assertEquals(listOf("(", ","), signatureHelpOptions.triggerCharacters)
+        assertEquals(listOf(","), signatureHelpOptions.retriggerCharacters)
+    }
+
+    fun testSignatureHelpRequest() {
+        val params = SignatureHelpParams(TextDocumentIdentifier("file:///test.dart"), Position(1, 10))
+        val future = bridgeServer.signatureHelp(params)
+
+        val jsonObject = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }
+        assertEquals("123", jsonObject.get("id")?.asString)
+
+        val lspMessage = jsonObject.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("textDocument/signatureHelp", lspMessage.get("method").asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "signatures": [
+                      {
+                        "label": "someFn(int a, String b)",
+                        "parameters": [
+                          { "label": "int a" },
+                          { "label": "String b" }
+                        ]
+                      }
+                    ],
+                    "activeSignature": 0,
+                    "activeParameter": 1
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNotNull(result)
+        assertEquals(1, result.signatures.size)
+        assertEquals("someFn(int a, String b)", result.signatures[0].label)
+        assertEquals(2, result.signatures[0].parameters.size)
+        assertEquals("int a", result.signatures[0].parameters[0].label.left)
+        assertEquals("String b", result.signatures[0].parameters[1].label.left)
+        assertEquals(0, result.activeSignature)
+        assertEquals(1, result.activeParameter)
+    }
+
+    fun testSignatureHelpRequestWithNullResult() {
+        val params = SignatureHelpParams(TextDocumentIdentifier("file:///test.dart"), Position(0, 0))
+        val future = bridgeServer.signatureHelp(params)
+
+        val jsonObject = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }
+        assertEquals("123", jsonObject.get("id")?.asString)
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        val result = future.get(5, TimeUnit.SECONDS)
+        assertNull(result)
+    }
+
+    fun testDescriptorSignatureHelpCustomizer() {
+        val properties = PropertiesComponent.getInstance(project)
+        val descriptor = DartLspServerDescriptor(project)
+        try {
+            properties.setValue("dart.lsp.experimental.enabled", true, true)
+            assertTrue(descriptor.lspCustomization.signatureHelpCustomizer is LspSignatureHelpSupport)
+
+            properties.setValue("dart.lsp.experimental.enabled", false, true)
+            assertSame(LspSignatureHelpDisabled, descriptor.lspCustomization.signatureHelpCustomizer)
+        } finally {
+            properties.unsetValue("dart.lsp.experimental.enabled")
+        }
     }
 
     private class MockLanguageClient : LanguageClient {

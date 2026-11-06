@@ -550,7 +550,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
-    override fun signatureHelp(params: SignatureHelpParams?): CompletableFuture<SignatureHelp> {
+    override fun signatureHelp(params: SignatureHelpParams): CompletableFuture<SignatureHelp> {
         return forwardRequest("textDocument/signatureHelp", params, SignatureHelp::class.java)
     }
 
