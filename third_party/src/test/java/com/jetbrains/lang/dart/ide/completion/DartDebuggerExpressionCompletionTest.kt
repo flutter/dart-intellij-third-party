@@ -144,13 +144,14 @@ class DartDebuggerExpressionCompletionTest : DartCodeInsightFixtureTestCase() {
     assertDoesntContain(suggestions, "this", "instanceCount")
   }
 
-  fun testMemberAccessPositionDoesNotLeakUnqualifiedGlobals() {
+  fun testInstanceMemberAccessSuggestsReceiverMembersOnly() {
     val suggestions = completeInDebuggerFragment(
       """
       final int globalValue = 1;
 
       class Counter {
         int value = 0;
+        static int staticTotal = 5;
 
         void increment(int step) {
           final counter = this;
@@ -161,7 +162,76 @@ class DartDebuggerExpressionCompletionTest : DartCodeInsightFixtureTestCase() {
       "counter.<caret>",
     )
 
-    assertEmpty(suggestions)
+    assertContainsElements(suggestions, "value", "increment")
+    assertDoesntContain(suggestions, "globalValue", "staticTotal", "step", "counter", "this")
+  }
+
+  fun testClassReceiverAccessSuggestsStaticMembersAndNamedConstructors() {
+    val suggestions = completeInDebuggerFragment(
+      """
+      class Counter {
+        int instanceValue = 0;
+        static int instancesCreated = 0;
+
+        Counter._(this.instanceValue);
+        factory Counter.create(int initial) => Counter._(initial);
+
+        static int computeInitial(int seed) => seed * 2;
+        void increment() {}
+      }
+
+      void main() {
+        /*breakpoint*/final c = Counter.create(1);
+      }
+      """.trimIndent(),
+      "Counter.<caret>",
+    )
+
+    assertContainsElements(suggestions, "instancesCreated", "computeInitial", "create", "_")
+    assertDoesntContain(suggestions, "instanceValue", "increment")
+  }
+
+  fun testEnumReceiverAndChainedCallAndCycleSafety() {
+    val enumSuggestions = completeInDebuggerFragment(
+      """
+      enum Status { idle, running, stopped }
+
+      void main() {
+        /*breakpoint*/final current = Status.idle;
+      }
+      """.trimIndent(),
+      "Status.<caret>",
+    )
+    assertContainsElements(enumSuggestions, "idle", "running", "stopped")
+
+    val chainedSuggestions = completeInDebuggerFragment(
+      """
+      class Counter {
+        int value = 0;
+        static int staticField = 1;
+        factory Counter.create(int seed) => Counter();
+        void reset() {}
+      }
+
+      void main() {
+        /*breakpoint*/final c = Counter.create(1);
+      }
+      """.trimIndent(),
+      "Counter.create(1).<caret>",
+    )
+    assertContainsElements(chainedSuggestions, "value", "reset")
+    assertDoesntContain(chainedSuggestions, "staticField", "create")
+
+    val cyclicSuggestions = completeInDebuggerFragment(
+      """
+      void main() {
+        var cyclic = cyclic;
+        /*breakpoint*/return;
+      }
+      """.trimIndent(),
+      "cyclic.<caret>",
+    )
+    assertEmpty(cyclicSuggestions)
   }
 
   fun testBoundVariableLookupsFilterSyntheticsAndSentinels() {
