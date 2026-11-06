@@ -96,11 +96,14 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
     onRequest = latest -> {
       if (cancelFirst) {
         cancel(obsolete);
+        assertRequestsStillPending();
       }
       complete(latest, "latest", latestChange, List.of());
       if (!cancelFirst) {
+        assertRequestsStillPending();
         cancel(obsolete);
       }
+      assertAllRequestsCompleted();
     };
 
     RefactoringStatus status = refactoring.checkFinalConditions();
@@ -114,6 +117,7 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
     GetRefactoringConsumer obsolete = startValidation();
     onRequest = latest -> {
       complete(latest, "latest", latestChange, List.of());
+      assertRequestsStillPending();
       complete(obsolete, "obsolete", obsoleteChange, List.of());
     };
 
@@ -128,6 +132,7 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
     GetRefactoringConsumer obsolete = startValidation();
     onRequest = latest -> {
       complete(latest, "latest", latestChange, List.of());
+      assertRequestsStillPending();
       complete(obsolete, "obsolete", obsoleteChange,
                List.of(new RefactoringProblem(RefactoringProblemSeverity.ERROR, "obsolete options", null)));
     };
@@ -159,7 +164,10 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
   public void testSynchronousReentrantDispatchKeepsNewestResult() {
     // The nested request completes before the outer server dispatch returns.
     onRequest = outer -> {
-      onRequest = inner -> complete(inner, "latest", latestChange, List.of());
+      onRequest = inner -> {
+        complete(inner, "latest", latestChange, List.of());
+        assertRequestsStillPending();
+      };
       refactoring.setNewName("latest");
       complete(outer, "obsolete", obsoleteChange, List.of());
     };
@@ -175,7 +183,9 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
     onRequest = outer -> refactoring.setNewName("latest");
     refactoring.setNewName("outer");
     assertEquals(2, requests.size());
+    assertRequestsStillPending();
     complete(requests.get(1), "latest", latestChange, List.of());
+    assertRequestsStillPending();
     complete(requests.get(0), "obsolete", obsoleteChange, List.of());
 
     assertLatestResult();
@@ -194,6 +204,11 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
     assertEquals("Latest feedback must be retained", "latest", refactoring.getOldName());
     assertSame("Latest source edits must be retained", latestChange, refactoring.getChange());
     assertEquals(Set.of("latest-edit"), refactoring.getPotentialEdits());
+  }
+
+  private void assertRequestsStillPending() {
+    assertFalse("Pending state must be observable through the listener", pendingStates.isEmpty());
+    assertEquals("Completing one request must not hide another pending request", Boolean.TRUE, pendingStates.getLast());
   }
 
   private void assertAllRequestsCompleted() {
