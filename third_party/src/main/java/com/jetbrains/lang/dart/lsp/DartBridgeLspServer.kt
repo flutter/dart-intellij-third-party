@@ -67,6 +67,9 @@ import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.ServerCapabilities
+import org.eclipse.lsp4j.SignatureHelp
+import org.eclipse.lsp4j.SignatureHelpOptions
+import org.eclipse.lsp4j.SignatureHelpParams
 import org.eclipse.lsp4j.SymbolInformation
 import org.eclipse.lsp4j.TypeDefinitionParams
 import org.eclipse.lsp4j.TypeHierarchyItem
@@ -423,6 +426,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 }
                 setCodeActionProvider(true)
                 setExecuteCommandProvider(ExecuteCommandOptions())
+                signatureHelpProvider = SignatureHelpOptions(listOf("(", ","), listOf(","))
                 // Add other capabilities as we support them.
             }
             val advertised = serverLegend != null
@@ -544,6 +548,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest<List<DocumentSymbol>>("textDocument/documentSymbol", params, type).thenApply { symbols ->
             symbols?.map { Either.forRight<SymbolInformation, DocumentSymbol>(it) } ?: emptyList()
         }
+    }
+
+    override fun signatureHelp(params: SignatureHelpParams?): CompletableFuture<SignatureHelp> {
+        return forwardRequest("textDocument/signatureHelp", params, SignatureHelp::class.java)
     }
 
     // Implement other TextDocumentService methods as needed, returning unsupported or forwarding.

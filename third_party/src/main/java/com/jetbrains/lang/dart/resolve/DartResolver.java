@@ -20,6 +20,7 @@ import com.jetbrains.lang.dart.analyzer.DartServerData.DartNavigationRegion;
 import com.jetbrains.lang.dart.analyzer.DartServerData.DartNavigationTarget;
 import com.jetbrains.lang.dart.psi.*;
 import com.jetbrains.lang.dart.DartTokenTypes;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,6 +32,9 @@ public class DartResolver implements ResolveCache.AbstractResolver<DartReference
 
   @Override
   public @Nullable List<? extends PsiElement> resolve(@NotNull DartReference reference, boolean incompleteCode) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(reference.getProject())) {
+      return null;
+    }
     reference = replaceQualifiedReferenceWithLast(reference);
     final PsiFile refPsiFile = reference.getContainingFile();
     int refOffset = reference.getTextRange().getStartOffset();
