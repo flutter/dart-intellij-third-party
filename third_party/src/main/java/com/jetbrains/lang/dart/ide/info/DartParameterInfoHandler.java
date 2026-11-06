@@ -11,6 +11,7 @@ import com.intellij.openapi.util.text.Strings;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.psi.*;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartClassResolveResult;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import org.jetbrains.annotations.NotNull;
@@ -22,6 +23,9 @@ public final class DartParameterInfoHandler implements ParameterInfoHandler<PsiE
 
   @Override
   public @Nullable PsiElement findElementForParameterInfo(@NotNull CreateParameterInfoContext context) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(context.getProject())) {
+      return null;
+    }
     final PsiElement contextElement = context.getFile().findElementAt(context.getEditor().getCaretModel().getOffset());
     return findElementForParameterInfo(contextElement);
   }
