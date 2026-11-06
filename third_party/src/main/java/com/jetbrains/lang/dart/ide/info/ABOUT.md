@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-11-06' } *-->
 
 # info
 
@@ -18,6 +18,9 @@ Parameter info popups (Ctrl+P) for Dart calls.
 ## Invariants
 
 - Read-only. The handler never modifies documents.
+- `DartParameterInfoHandler.findElementForParameterInfo(CreateParameterInfoContext)`
+  returns `null` when experimental LSP features are enabled so LSP
+  `textDocument/signatureHelp` serves parameter info instead.
 
 ## Side Effects
 
