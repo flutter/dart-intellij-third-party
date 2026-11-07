@@ -15,6 +15,7 @@
 - Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
 - Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
 - Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
+- Auto-selecting the current editor element in the Structure view when navigating across files (#800)
 
 ## 511.0.0
 
