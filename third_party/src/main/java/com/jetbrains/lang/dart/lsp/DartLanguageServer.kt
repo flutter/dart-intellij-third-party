@@ -15,7 +15,9 @@ import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.TextDocumentPositionParams
 import org.eclipse.lsp4j.WorkspaceEdit
+import org.eclipse.lsp4j.jsonrpc.services.JsonNotification
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest
+import org.eclipse.lsp4j.services.LanguageClient
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -31,6 +33,14 @@ interface DartLanguageServer : Lsp4jServer {
      */
     @JsonRequest("dart/diagnosticServer")
     fun diagnosticServer(): CompletableFuture<DiagnosticServerResult>
+}
+
+/**
+ * Custom Language Client interface for Dart to support custom LSP notifications from the server.
+ */
+interface DartLanguageClient : LanguageClient {
+    @JsonNotification("dart/textDocument/publishClosingLabels")
+    fun publishClosingLabels(params: DartPublishClosingLabelsParams)
 }
 
 data class DiagnosticServerResult(

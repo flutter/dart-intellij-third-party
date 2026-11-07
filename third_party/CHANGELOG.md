@@ -4,6 +4,7 @@
 - Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Changed
+- Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
 - Go to Super uses JetBrains LSP when experimental LSP features are enabled, navigating to the server's single effective target. Go to Implementation, gutter navigation and Method Hierarchy are unchanged (#821)
 
 ### Removed
