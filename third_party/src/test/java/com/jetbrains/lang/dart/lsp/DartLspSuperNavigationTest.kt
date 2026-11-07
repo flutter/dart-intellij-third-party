@@ -334,6 +334,7 @@ class DartLspSuperNavigationTest : DartCodeInsightFixtureTestCase() {
                     return pending
                 }
                 override fun diagnosticServer() = CompletableFuture.completedFuture(DiagnosticServerResult(0))
+                override fun connectToDtd(params: ConnectToDtdParams) = CompletableFuture.completedFuture<Any>(null)
                 override fun initialize(params: InitializeParams) = CompletableFuture.completedFuture(InitializeResult(ServerCapabilities()))
                 override fun shutdown(): CompletableFuture<Any> {
                     shutdownEntered.complete(Unit)

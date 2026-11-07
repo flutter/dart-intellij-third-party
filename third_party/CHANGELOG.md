@@ -7,7 +7,7 @@
 ### Changed
 - Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
 - Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
-- Go to Implementation and Go to Super use JetBrains LSP when experimental LSP features are enabled; Super navigates to the server's single effective target. Gutter navigation and Method Hierarchy are unchanged (#404)
+- Go to Super uses JetBrains LSP when experimental LSP features are enabled, navigating to the server's single effective target. Go to Implementation, gutter navigation and Method Hierarchy are unchanged (#821)
 
 ### Removed
 - Per-request `dart.legacy_assist` and `dart.legacy_fix` analytics latency events, which fired on every legacy quick assist and quick fix availability check (caret moves, edits, selection changes) rather than when one was applied. Applied assists and fixes are still reported (#793)
