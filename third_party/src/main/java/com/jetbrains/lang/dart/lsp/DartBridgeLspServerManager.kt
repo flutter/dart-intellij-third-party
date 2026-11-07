@@ -50,6 +50,8 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
         get() = activeConnection?.bridgeServer
 
     fun isClientConnected(): Boolean = bridgeServer?.isClientConnected == true
+    val isSemanticTokensAdvertised: Boolean
+        get() = bridgeServer?.isSemanticTokensAdvertised == true
 
 
     fun startBridgeServer() {

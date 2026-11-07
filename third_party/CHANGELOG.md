@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Added
+- Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Changed
 
@@ -8,11 +9,13 @@
 - Per-request `dart.legacy_assist` and `dart.legacy_fix` analytics latency events, which fired on every legacy quick assist and quick fix availability check (caret moves, edits, selection changes) rather than when one was applied. Applied assists and fixes are still reported (#793)
 
 ### Fixed
+- Support icon for typedef and type alias in Structure View and code completion (#660)
 - Avoid read-access error when invoking Type Hierarchy, Method Hierarchy, Go to Super Method, or Go to Implementation(s) in IntelliJ 2026.1+ (#780)
 - Avoid a trailing newline in the Dart SDK version, which leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
 - Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
 - Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
-- Auto-selecting the current editor element in the Structure view when navigating across files (#655)
+- Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
+- Auto-selecting the current editor element in the Structure view when navigating across files (#800)
 
 ## 511.0.0
 
