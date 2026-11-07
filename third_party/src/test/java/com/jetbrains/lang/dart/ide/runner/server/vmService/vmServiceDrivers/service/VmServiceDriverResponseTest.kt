@@ -8,13 +8,16 @@ package com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.ser
 
 import com.google.gson.JsonObject
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.GetIsolatePauseEventConsumer
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.GetObjectConsumer
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.GetPerfettoCpuSamplesConsumer
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Event
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.EventKind
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Obj
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.PerfettoCpuSamples
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.RPCError
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Sentinel
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.SentinelKind
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.TypeParameters
 import junit.framework.TestCase
 
 class VmServiceDriverResponseTest : TestCase() {
@@ -84,6 +87,38 @@ class VmServiceDriverResponseTest : TestCase() {
     assertEquals(SentinelKind.Collected, consumer.sentinel?.kind)
     assertNull(consumer.response)
     assertNull(consumer.error)
+  }
+
+  fun testTypeParametersResponseDispatch() {
+    val consumer = RecordingGetObjectConsumer()
+    val json = JsonObject().apply {
+      addProperty("type", "TypeParameters")
+      addProperty("id", "objects/type-parameters")
+    }
+
+    VmService().forwardResponse(consumer, "TypeParameters", json)
+
+    assertTrue(consumer.response is TypeParameters)
+    assertNull(consumer.sentinel)
+    assertNull(consumer.error)
+  }
+
+  private class RecordingGetObjectConsumer : GetObjectConsumer {
+    var response: Any? = null
+    var sentinel: Sentinel? = null
+    var error: RPCError? = null
+
+    override fun received(response: Obj) {
+      this.response = response
+    }
+
+    override fun received(response: Sentinel) {
+      sentinel = response
+    }
+
+    override fun onError(error: RPCError) {
+      this.error = error
+    }
   }
 
   private class RecordingPerfettoCpuSamplesConsumer : GetPerfettoCpuSamplesConsumer {
