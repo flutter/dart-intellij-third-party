@@ -198,7 +198,10 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
         is DartNewExpression -> {
           val type = expression.type
           return DartResolveUtil.resolveClassByType(type).dartClass
-            ?: type?.referenceExpression?.text?.substringBefore('.')?.let { findClassByName(it, contextElement) }
+            ?: type?.referenceExpression?.text?.let { text ->
+              findClassByName(text.substringBefore('.'), contextElement)
+                ?: findClassByName(text.substringAfterLast('.'), contextElement)
+            }
         }
         is DartCallExpression -> {
           val callee = expression.expression as? DartReference ?: return null
@@ -261,7 +264,7 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
       val dartType = extractDartType(declaration)
       if (dartType != null) {
         DartResolveUtil.resolveClassByType(dartType).dartClass?.let { return it }
-        dartType.referenceExpression?.text?.let { findClassByName(it, contextElement) }?.let { return it }
+        dartType.referenceExpression?.text?.substringAfterLast('.')?.let { findClassByName(it, contextElement) }?.let { return it }
       }
 
       val varHolder = declaration as? DartVarDeclarationListPart ?: declaration.parent as? DartVarDeclarationList
@@ -507,7 +510,8 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
 
     private fun isInStaticClassContext(contextElement: PsiElement, enclosingClass: DartClass): Boolean {
       val varList = PsiTreeUtil.getParentOfType(contextElement, DartVarDeclarationList::class.java)
-      if (varList != null && varList.parent is DartClassMembers && varList.parent?.parent?.parent == enclosingClass) {
+      if (varList != null && varList.parent is DartClassMembers &&
+        PsiTreeUtil.getParentOfType(varList, DartClass::class.java) == enclosingClass) {
         return varList.varAccessDeclaration.isStatic
       }
       var current = PsiTreeUtil.getParentOfType(contextElement, DartComponent::class.java, false)
