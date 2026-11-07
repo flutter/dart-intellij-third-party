@@ -6,7 +6,6 @@
 package com.jetbrains.lang.dart.lsp
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.LspServerDescriptor
@@ -14,25 +13,12 @@ import com.intellij.platform.dartlsp.api.LspCommunicationChannel
 import com.intellij.platform.dartlsp.api.LspServerManager
 import com.intellij.platform.dartlsp.api.LspServerState
 import com.intellij.testFramework.PlatformTestUtil
-import com.intellij.openapi.progress.EmptyProgressIndicator
-import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.psi.PsiElement
-import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.psi.search.searches.DefinitionsScopedSearch
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.util.Processor
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
-import com.jetbrains.lang.dart.psi.DartClass
-import com.jetbrains.lang.dart.psi.DartComponent
 import com.jetbrains.lang.dart.sdk.DartConfigurable
-import org.eclipse.lsp4j.ImplementationParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.ServerCapabilities
-import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.jsonrpc.Launcher
-import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
@@ -40,161 +26,24 @@ import java.net.ServerSocket
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
-import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
-import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 
 class DartLspNavigationTest : DartCodeInsightFixtureTestCase() {
-    // Light fixtures use an in-memory VFS, rather than the local filesystem used by the real descriptor.
-    private val descriptor: LspServerDescriptor
-        get() = object : LspServerDescriptor(project, "Navigation test") {
-            override fun isSupportedFile(file: VirtualFile) = true
-            override fun getFileUri(file: VirtualFile) = file.url
-            override fun findFileByUri(fileUri: String) = VirtualFileManager.getInstance().findFileByUrl(fileUri)
-        }
-
-    fun testLocationsResolveToDeduplicatedScopedDeclarations() {
-        val file = myFixture.addFileToProject("targets.dart", "class First {}\nclass Second {}")
-        val excluded = myFixture.addFileToProject("excluded.dart", "class Excluded {}")
-        val descriptor = descriptor
-        val first = location(descriptor.getFileUri(file.virtualFile), 0, 6)
-        val second = location(first.uri, 1, 6)
-        val targets = mutableListOf<PsiElement>()
-
-        DartLspNavigationService.processLocations(
-            project, descriptor,
-            listOf(first, first, second, location(descriptor.getFileUri(excluded.virtualFile), 0, 6)),
-            GlobalSearchScope.fileScope(file), Processor { targets.add(it); true }
-        )
-
-        assertEquals(listOf("First", "Second"), targets.map { (it as DartClass).name })
-        assertTrue(targets.all { it.navigationElement.containingFile == file })
-    }
-
-    fun testMemberLocationsResolveToMembersRatherThanClasses() {
-        val file = myFixture.addFileToProject("members.dart", "class Target {\n  void method() {}\n  Target operator +(Target other) => this;\n}")
-        val descriptor = descriptor
-        val uri = descriptor.getFileUri(file.virtualFile)
-        val targets = mutableListOf<PsiElement>()
-        DartLspNavigationService.processLocations(
-            project, descriptor, listOf(location(uri, 1, 7), location(uri, 2, 18)),
-            GlobalSearchScope.allScope(project), Processor { targets.add(it); true }
-        )
-        assertEquals(listOf("method", "+"), targets.map { (it as DartComponent).name })
-    }
-
-    fun testMissingFilesAndInvalidPositionsAreIgnored() {
-        val file = myFixture.addFileToProject("target.dart", "class Target {}")
-        val descriptor = descriptor
-        val uri = descriptor.getFileUri(file.virtualFile)
-        val targets = mutableListOf<PsiElement>()
-        DartLspNavigationService.processLocations(
-            project, descriptor,
-            listOf(location("file:///nonexistent/navigation-target.dart", 0, 0), location(uri, -1, 0),
-                   location(uri, 10, 0), location(uri, 0, -1), location(uri, 0, 100)),
-            GlobalSearchScope.allScope(project), Processor { targets.add(it); true }
-        )
-        assertEmpty(targets)
-    }
-
-    fun testBodyWhitespaceIsNotADeclarationTarget() {
-        val file = myFixture.addFileToProject("whitespace.dart", "class Target {\n  \n}")
-        val targets = mutableListOf<PsiElement>()
-        DartLspNavigationService.processLocations(
-            project, descriptor, listOf(location(file.virtualFile.url, 1, 0)),
-            GlobalSearchScope.allScope(project), Processor { targets.add(it); true }
-        )
-        assertEmpty("Body whitespace must not navigate to the enclosing class", targets)
-    }
-
-    fun testReversedAndOutOfBoundsEndsAreRejected() {
-        val file = myFixture.addFileToProject("ranges.dart", "class Target {}")
-        val targets = mutableListOf<PsiElement>()
-        val invalidEnds = listOf(Position(0, 0), Position(-1, 6), Position(0, -1), Position(1, 0), Position(0, 100))
-        for (end in invalidEnds) {
-            DartLspNavigationService.processLocations(
-                project, descriptor, listOf(Location(file.virtualFile.url, Range(Position(0, 6), end))),
-                GlobalSearchScope.allScope(project), Processor { targets.add(it); true }
-            )
-            assertEmpty("Invalid end $end must not deliver a declaration", targets)
-        }
-    }
-
-    fun testMalformedLocationsAndNameEndAreSkipped() {
-        val file = myFixture.addFileToProject("malformed.dart", "class Target {}")
-        val targets = mutableListOf<PsiElement>()
-        DartLspNavigationService.processLocations(
-            project, descriptor,
-            listOf(null, Location(), Location().apply { uri = file.virtualFile.url },
-                   Location(file.virtualFile.url, Range()), location(file.virtualFile.url, 0, 12)),
-            GlobalSearchScope.allScope(project), Processor { targets.add(it); true }
-        )
-        assertEmpty(targets)
-    }
-
-    fun testDeclarationStartAndNameRemainNavigationTargets() {
-        val file = myFixture.addFileToProject("declarations.dart", "class First {}\nclass Second {}")
-        val targets = mutableListOf<PsiElement>()
-        DartLspNavigationService.processLocations(
-            project, descriptor,
-            listOf(Location(file.virtualFile.url, Range(Position(0, 0), Position(0, 14))),
-                   location(file.virtualFile.url, 1, 6)),
-            GlobalSearchScope.allScope(project), Processor { targets.add(it); true }
-        )
-        assertEquals(listOf("First", "Second"), targets.map { (it as DartClass).name })
-    }
-
-    fun testConsumerStopsAfterFirstTarget() {
-        val file = myFixture.addFileToProject("targets.dart", "class First {}\nclass Second {}")
-        val descriptor = descriptor
-        val uri = descriptor.getFileUri(file.virtualFile)
-        val targets = mutableListOf<PsiElement>()
-        DartLspNavigationService.processLocations(
-            project, descriptor, listOf(location(uri, 0, 6), location(uri, 1, 6)),
-            GlobalSearchScope.allScope(project), Processor { targets.add(it); false }
-        )
-        assertEquals(1, targets.size)
-    }
-
-    fun testCancellationPropagates() {
-        ApplicationManager.getApplication().executeOnPooledThread {
-            val indicator = EmptyProgressIndicator()
-            try {
-                ProgressManager.getInstance().runProcess(Runnable {
-                    indicator.cancel()
-                    DartLspNavigationService.processLocations(
-                        project, descriptor, listOf(location("file:///target.dart", 0, 0)),
-                        GlobalSearchScope.allScope(project), Processor { fail("Canceled search must not deliver targets"); true }
-                    )
-                }, indicator)
-                fail("Cancellation must propagate")
-            } catch (_: ProcessCanceledException) {
-                // Expected: cancellation must not be converted to an empty successful search.
-            }
-        }.get()
-    }
-
-    fun testRunningServerImplementationSearchAndSafeguards() {
+    fun testRunningServerSuperNavigatesToNativeTargets() {
         val previous = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
         try {
             DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
-            checkRunningServerImplementationSearch()
+            checkRunningServerSuperNavigation()
         } finally {
             DartConfigurable.setExperimentalLspFeaturesEnabled(project, previous)
         }
     }
 
-    private fun checkRunningServerImplementationSearch() {
-        val source = myFixture.addFileToProject("source.dart", "// source\nclass Source {}")
+    private fun checkRunningServerSuperNavigation() {
         val target = myFixture.addFileToProject("target.dart", "class Target {}")
-        val declaration = requireNotNull(PsiTreeUtil.findChildOfType(source, DartClass::class.java))
         val targetUri = target.virtualFile.url
-        val requests = CopyOnWriteArrayList<ImplementationParams>()
-        val response = AtomicReference(CompletableFuture.completedFuture(
-            Either.forLeft<List<Location>, List<LocationLink>>(listOf(location(targetUri, 0, 6)))
-        ))
         val superRequests = CopyOnWriteArrayList<org.eclipse.lsp4j.TextDocumentPositionParams>()
         val superResponse = AtomicReference<CompletableFuture<Location?>>(CompletableFuture.completedFuture(location(targetUri, 0, 6)))
         val manager = LspServerManager.getInstance(project)
@@ -206,7 +55,7 @@ class DartLspNavigationTest : DartCodeInsightFixtureTestCase() {
                     return superResponse.get()
                 }
                 override fun initialize(params: InitializeParams) = CompletableFuture.completedFuture(
-                    InitializeResult(ServerCapabilities().apply { setImplementationProvider(true) })
+                    InitializeResult(ServerCapabilities())
                 )
                 override fun shutdown() = CompletableFuture.completedFuture<Any>(null)
                 override fun exit() {}
@@ -218,10 +67,6 @@ class DartLspNavigationTest : DartCodeInsightFixtureTestCase() {
                 override fun didSave(params: org.eclipse.lsp4j.DidSaveTextDocumentParams) {}
                 override fun didChangeConfiguration(params: org.eclipse.lsp4j.DidChangeConfigurationParams) {}
                 override fun didChangeWatchedFiles(params: org.eclipse.lsp4j.DidChangeWatchedFilesParams) {}
-                override fun implementation(params: ImplementationParams): CompletableFuture<Either<List<Location>, List<LocationLink>>> {
-                    requests.add(params)
-                    return response.get()
-                }
             }
             val connection = ApplicationManager.getApplication().executeOnPooledThread(java.util.concurrent.Callable {
                 listener.accept()
@@ -244,208 +89,6 @@ class DartLspNavigationTest : DartCodeInsightFixtureTestCase() {
                     PlatformTestUtil.waitWithEventsDispatching("LSP initialization", {
                         manager.getServersForProvider(DartLspServerSupportProvider::class.java).any { it.state == LspServerState.Running }
                     }, 10)
-                    val targets = CopyOnWriteArrayList<PsiElement>()
-                    fun search() {
-                        val search = ApplicationManager.getApplication().executeOnPooledThread {
-                            val query = runReadAction { DefinitionsScopedSearch.search(declaration) }
-                            assertFalse("Search execution must not require caller read access", ApplicationManager.getApplication().isReadAccessAllowed)
-                            query.forEach(Processor { targets.add(it); true })
-                        }
-                        PlatformTestUtil.waitWithEventsDispatching("Implementation search", { search.isDone }, 10)
-                        search.get()
-                    }
-                    search()
-                    assertEquals(1, requests.size)
-                    assertEquals(source.virtualFile.url, requests.single().textDocument.uri)
-                    assertEquals(Position(1, 6), requests.single().position)
-                    assertEquals(listOf("Target"), targets.map { (it as DartClass).name })
-
-                    val server = manager.getServersForProvider(DartLspServerSupportProvider::class.java).single()
-                    val capabilities = requireNotNull(server.initializeResult).capabilities
-                    targets.clear()
-                    // Exercise both unsupported forms in the real client's public capability snapshot.
-                    capabilities.setImplementationProvider(false)
-                    search()
-                    capabilities.implementationProvider = null
-                    search()
-                    assertEquals("Unsupported capability must not send a request", 1, requests.size)
-                    assertEmpty(targets)
-
-                    fun invalidate() {
-                        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-                            val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(target.virtualFile)!!
-                            document.insertString(document.textLength, "\n// changed")
-                        }
-                        com.intellij.psi.PsiDocumentManager.getInstance(project).commitAllDocuments()
-                        com.intellij.openapi.application.impl.NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
-                    }
-                    capabilities.setImplementationProvider(true)
-                    invalidate()
-                    response.set(CompletableFuture.completedFuture(Either.forLeft(emptyList())))
-                    search()
-                    assertEquals(2, requests.size)
-                    assertEmpty(targets)
-
-                    invalidate()
-                    response.set(CompletableFuture.failedFuture(ResponseErrorException(ResponseError(-32601, "Method not found", null))))
-                    search()
-                    assertEquals("Server error must end the search without delivery", 3, requests.size)
-                    assertEmpty(targets)
-
-                    // Complete the implementation cancellation check before navigation changes the editor context.
-                    val canceledResponse = CompletableFuture<Either<List<Location>, List<LocationLink>>>()
-                    response.set(canceledResponse)
-                    val indicator = EmptyProgressIndicator()
-                    val canceledSearch = ApplicationManager.getApplication().executeOnPooledThread(java.util.concurrent.Callable {
-                        try {
-                            ProgressManager.getInstance().runProcess(Runnable {
-                                val query = runReadAction { DefinitionsScopedSearch.search(declaration) }
-                                query.forEach(Processor { targets.add(it); true })
-                            }, indicator)
-                            false
-                        } catch (_: ProcessCanceledException) {
-                            true
-                        }
-                    })
-                    PlatformTestUtil.waitWithEventsDispatching("Pending implementation request", { requests.size == 4 }, 10)
-                    indicator.cancel()
-                    PlatformTestUtil.waitWithEventsDispatching("Canceled implementation search", { canceledSearch.isDone }, 10)
-                    assertTrue("Request cancellation must propagate", canceledSearch.get())
-                    assertEmpty(targets)
-                    canceledResponse.complete(Either.forLeft(listOf(location(targetUri, 0, 6))))
-                    response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(location(targetUri, 0, 6)))))
-                    search()
-                    assertEquals("Canceled completion must not publish a cache entry", 5, requests.size)
-                    assertEquals(listOf("Target"), targets.map { (it as DartClass).name })
-
-                    // Cache only raw results: scope and consumer termination are reapplied on hits.
-                    val other = myFixture.addFileToProject("other.dart", "class Other {}")
-                    val sourceOffset = 16
-                    fun directSearch(file: VirtualFile = source.virtualFile, offset: Int = sourceOffset,
-                                     scope: com.intellij.psi.search.SearchScope = GlobalSearchScope.allScope(project),
-                                     stop: Boolean = false): List<String?> {
-                        val found = CopyOnWriteArrayList<String?>()
-                        val task = ApplicationManager.getApplication().executeOnPooledThread {
-                            DartLspNavigationService.processImplementations(project, file, offset, scope, Processor {
-                                found.add((it as DartClass).name)
-                                !stop
-                            })
-                        }
-                        PlatformTestUtil.waitWithEventsDispatching("Direct implementation search", { task.isDone }, 10)
-                        task.get()
-                        return found
-                    }
-                    response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(
-                        location(targetUri, 0, 6), location(targetUri, 0, 6), location(other.virtualFile.url, 0, 6)
-                    ))))
-                    val beforeReuse = requests.size
-                    assertEquals(listOf("Target"), directSearch(stop = true))
-                    assertEquals(listOf("Other"), directSearch(scope = GlobalSearchScope.fileScope(other)))
-                    assertEquals(listOf("Target", "Other"), directSearch())
-                    assertEquals("Hits must reprocess scope, deduplication and consumers", beforeReuse + 1, requests.size)
-
-                    fun expectMiss(change: () -> Unit) {
-                        val before = requests.size
-                        val cache = project.getService(DartLspImplementationCache::class.java)
-                        val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(source.virtualFile)!!
-                        fun snapshot() = runReadAction {
-                            cache.snapshot(source.virtualFile, document, source.virtualFile.url, Position(1, 6), server)
-                        }
-                        val previousKey = snapshot()
-                        change()
-                        assertFalse("Change must invalidate before any explicit PSI commit", previousKey.matches(snapshot()))
-                        com.intellij.psi.PsiDocumentManager.getInstance(project).commitAllDocuments()
-                        com.intellij.openapi.application.impl.NonBlockingReadActionImpl.waitForAsyncTaskCompletion()
-                        directSearch()
-                        assertEquals("Semantic change must invalidate", before + 1, requests.size)
-                        directSearch()
-                        assertEquals("Unchanged result must then be reused", before + 1, requests.size)
-                    }
-                    expectMiss {
-                        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-                            val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(source.virtualFile)!!
-                            document.insertString(document.textLength, "\n// source change")
-                        }
-                    }
-                    // An uncommitted edit in a different document must invalidate immediately.
-                    expectMiss {
-                        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-                            val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(other.virtualFile)!!
-                            document.insertString(document.textLength, "\n// other change")
-                            assertTrue(com.intellij.psi.PsiDocumentManager.getInstance(project).isUncommited(document))
-                        }
-                    }
-                    val contentFile = myFixture.addFileToProject("content.txt", "before")
-                    expectMiss {
-                        val vfm = VirtualFileManager.getInstance()
-                        val before = vfm.modificationCount
-                        ApplicationManager.getApplication().runWriteAction {
-                            contentFile.virtualFile.setBinaryContent("after!".toByteArray())
-                        }
-                        assertTrue("Content-only changes must advance all-content VFS counter", vfm.modificationCount > before)
-                    }
-                    expectMiss {
-                        val tracker = com.intellij.openapi.roots.ProjectRootModificationTracker.getInstance(project)
-                        val before = tracker.modificationCount
-                        com.intellij.openapi.roots.ModuleRootModificationUtil.updateModel(myFixture.module) { model ->
-                            model.contentEntries.first().addExcludeFolder(source.virtualFile.parent.url + "/excluded-cache-test")
-                        }
-                        assertTrue("Root edits must advance public tracker", tracker.modificationCount > before)
-                    }
-                    val beforePositions = requests.size
-                    directSearch(offset = sourceOffset + 1)
-                    directSearch(file = other.virtualFile, offset = 6)
-                    assertEquals("Distinct positions and source files must miss", beforePositions + 2, requests.size)
-
-                    invalidate()
-                    response.set(CompletableFuture.completedFuture(Either.forLeft(emptyList())))
-                    val beforeEmpty = requests.size
-                    assertEmpty(directSearch())
-                    assertEmpty(directSearch())
-                    assertEquals("Empty successes are reusable", beforeEmpty + 1, requests.size)
-
-                    invalidate()
-                    response.set(CompletableFuture.failedFuture(ResponseErrorException(ResponseError(-32601, "Method not found", null))))
-                    val beforeFailure = requests.size
-                    assertEmpty(directSearch())
-                    response.set(CompletableFuture.completedFuture(null))
-                    assertEmpty(directSearch())
-                    response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(location(targetUri, 0, 6)))))
-                    assertEquals(listOf("Target"), directSearch())
-                    assertEquals("Errors and direct client null responses must not be cached", beforeFailure + 3, requests.size)
-
-                    // A document edit while an RPC is pending prevents delivery and publication.
-                    invalidate()
-                    val pending = CompletableFuture<Either<List<Location>, List<LocationLink>>>()
-                    response.set(pending)
-                    val beforePending = requests.size
-                    val staleTargets = CopyOnWriteArrayList<PsiElement>()
-                    val staleSearch = ApplicationManager.getApplication().executeOnPooledThread {
-                        DartLspNavigationService.processImplementations(project, source.virtualFile, sourceOffset,
-                            GlobalSearchScope.allScope(project), Processor { staleTargets.add(it); true })
-                    }
-                    PlatformTestUtil.waitWithEventsDispatching("Pending stale search", { requests.size == beforePending + 1 }, 10)
-                    invalidate()
-                    pending.complete(Either.forLeft(listOf(location(targetUri, 0, 6))))
-                    PlatformTestUtil.waitWithEventsDispatching("Stale search completed", { staleSearch.isDone }, 10)
-                    staleSearch.get()
-                    assertEmpty("Stale snapshot must not deliver", staleTargets)
-                    response.set(CompletableFuture.completedFuture(Either.forLeft(listOf(location(targetUri, 0, 6)))))
-                    assertEquals(listOf("Target"), directSearch())
-                    assertEquals("Stale response must not publish", beforePending + 2, requests.size)
-
-                    invalidate()
-                    val link = LocationLink().apply {
-                        this.targetUri = target.virtualFile.url
-                        targetRange = Range(Position(0, 0), Position(0, 15))
-                        targetSelectionRange = Range(Position(0, 6), Position(0, 12))
-                    }
-                    response.set(CompletableFuture.completedFuture(Either.forRight(listOf(link))))
-                    val beforeLink = requests.size
-                    assertEquals(listOf("Target"), directSearch())
-                    assertEquals(listOf("Target"), directSearch())
-                    assertEquals("LocationLink selection ranges must be cached", beforeLink + 1, requests.size)
-
                     // The direct action sends the actual caret, not an enclosing declaration's name.
                     val superSource = myFixture.addFileToProject("superSource.dart", "class Source {\n  void method() {}\n}")
                     myFixture.openFileInEditor(superSource.virtualFile)

@@ -25,17 +25,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.application.runReadAction
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.platform.dartlsp.api.LspCommunicationChannel
-import com.intellij.platform.dartlsp.api.LspServerDescriptor
-import com.intellij.platform.dartlsp.api.LspServerManager
-import com.intellij.platform.dartlsp.api.LspServerState
 import com.intellij.psi.search.searches.DefinitionsScopedSearch
-import com.intellij.psi.util.PsiModificationTracker
-import com.intellij.testFramework.PlatformTestUtil
-import com.intellij.util.Processor
-import com.jetbrains.lang.dart.ide.actions.DartInheritorsSearcher
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.lang.dart.psi.DartClass
 import com.jetbrains.lang.dart.sdk.DartConfigurable
@@ -67,7 +57,6 @@ import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
-import org.eclipse.lsp4j.ImplementationParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InlayHintKind
 import org.eclipse.lsp4j.InlayHintParams
@@ -100,12 +89,9 @@ import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer
-import org.eclipse.lsp4j.jsonrpc.messages.CancelParams
-import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode
-import java.lang.ref.WeakReference
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -1361,8 +1347,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals("file://target.dart", result.right[0].targetUri)
     }
 
-    fun testImplementationEnabledWithoutServerDoesNotRequestLegacyHierarchy() {
-        checkImplementationRouting(true, 0)
+    fun testImplementationEnabledPreservesLegacyHierarchy() {
+        checkImplementationRouting(true, 1)
     }
 
     fun testImplementationDisabledPreservesLegacyHierarchy() {
@@ -1382,176 +1368,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         }
     }
 
-    fun testCompletedImplementationQueriesReuseSeparateCaches() {
-        val previous = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
-        val manager = LspServerManager.getInstance(project)
-        val executor = Executors.newCachedThreadPool()
-        val file = myFixture.configureByText("source.dart", "class Source {}")
-        val declaration = requireNotNull(PsiTreeUtil.findChildOfType(file, DartClass::class.java))
-        val searcher = DartInheritorsSearcher()
-        // This constructor is present in the cached IntelliJ SDK; reuse one searcher, not the extension registry.
-        val parameters = DefinitionsScopedSearch.SearchParameters(declaration)
-        fun search() {
-            val task = executor.submit {
-                searcher.processQuery(parameters, Processor { fail("Empty hierarchy must not deliver targets"); true })
-            }
-            PlatformTestUtil.waitWithEventsDispatching("Completed implementation query", { task.isDone }, 10)
-            task.get(5, TimeUnit.SECONDS)
-        }
-        try {
-            DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
-            val offModCount = PsiModificationTracker.getInstance(project).modificationCount
-            search()
-            val cacheField = DartInheritorsSearcher::class.java.getDeclaredField("myLastResult").apply { isAccessible = true }
-            val retained = requireNotNull((cacheField.get(searcher) as WeakReference<*>).get())
-            search()
-            assertSame(retained, (cacheField.get(searcher) as WeakReference<*>).get())
-            java.lang.ref.Reference.reachabilityFence(retained)
-            assertEquals(offModCount, PsiModificationTracker.getInstance(project).modificationCount)
-            assertEquals("Completed OFF queries reuse the live weak-cache entry", 1, legacyHierarchyRequests)
-            assertEquals(1, legacyHierarchyArguments.size)
-            assertFalse(legacyHierarchyArguments.single().third)
-
-            DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
-            requestObserver = { request ->
-                if (request.lspMethod() == "textDocument/implementation") completeEmptyImplementation(request)
-            }
-            ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { listener ->
-                listener.soTimeout = 10000
-                val connection = executor.submit<Socket> { listener.accept() }
-                try {
-                    val descriptor = object : LspServerDescriptor(project, "Bridge cache diagnostic") {
-                        override val lsp4jServerClass = DartLanguageServer::class.java
-                        override val lspCommunicationChannel = LspCommunicationChannel.Socket(listener.localPort, startProcess = false)
-                        override fun isSupportedFile(file: VirtualFile) = file.extension == "dart"
-                        override fun getFileUri(file: VirtualFile) = file.url
-                    }
-                    manager.ensureServerStarted(DartLspServerSupportProvider::class.java, descriptor)
-                    PlatformTestUtil.waitWithEventsDispatching("Bridge connection", { connection.isDone }, 10)
-                    connection.get(5, TimeUnit.SECONDS).use { socket ->
-                        val launcher = Launcher.Builder<LanguageClient>().setLocalService(bridgeServer)
-                            .setRemoteInterface(LanguageClient::class.java).setExecutorService(executor)
-                            .setInput(socket.getInputStream()).setOutput(socket.getOutputStream()).create()
-                        bridgeServer.connect(launcher.remoteProxy)
-                        launcher.startListening()
-                        PlatformTestUtil.waitWithEventsDispatching("Running bridge", {
-                            manager.getServersForProvider(DartLspServerSupportProvider::class.java).any { it.state == LspServerState.Running }
-                        }, 10)
-                        capturedRequests.clear()
-                        legacyHierarchyRequests = 0
-                        legacyHierarchyArguments.clear()
-                        val onModCount = runReadAction { PsiModificationTracker.getInstance(project).modificationCount }
-                        search()
-                        search()
-                        assertEquals(onModCount, PsiModificationTracker.getInstance(project).modificationCount)
-                        assertEquals("Completed ON queries must reuse a separate LSP cache for unchanged queries", 1,
-                                     capturedRequests.count { it.lspMethod() == "textDocument/implementation" })
-                        assertEquals(0, legacyHierarchyRequests)
-                        assertEmpty(legacyHierarchyArguments)
-                        manager.stopServers(DartLspServerSupportProvider::class.java)
-                        PlatformTestUtil.waitWithEventsDispatching("Bridge shutdown", {
-                            manager.getServersForProvider(DartLspServerSupportProvider::class.java).none { it.state == LspServerState.Running }
-                        }, 10)
-                    }
-                } finally {
-                    listener.close()
-                    try {
-                        connection.get(5, TimeUnit.SECONDS).close()
-                    } catch (e: java.util.concurrent.ExecutionException) {
-                        if (e.cause !is java.net.SocketException) throw e
-                    }
-                }
-            }
-        } finally {
-            manager.stopServers(DartLspServerSupportProvider::class.java)
-            requestObserver = null
-            DartConfigurable.setExperimentalLspFeaturesEnabled(project, previous)
-            capturedRequests.clear()
-            legacyHierarchyRequests = 0
-            legacyHierarchyArguments.clear()
-            executor.shutdownNow()
-            assertTrue("Bridge launcher threads must terminate", executor.awaitTermination(10, TimeUnit.SECONDS))
-        }
-    }
-
-    fun testImplementationRpcCancellationRetainsDasPendingWithoutSecondResponse() {
-        val executor = Executors.newCachedThreadPool()
-        val dasRequest = CompletableFuture<JsonObject>()
-        val rpcRequest = CompletableFuture<RequestMessage>()
-        val cancelSent = CompletableFuture<CancelParams>()
-        val responseReceived = CountDownLatch(1)
-        val responses = CopyOnWriteArrayList<ResponseMessage>()
-        requestObserver = { request ->
-            if (request.lspMethod() == "textDocument/implementation") dasRequest.complete(request)
-        }
-        try {
-            ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { listener ->
-                listener.soTimeout = 10000
-                Socket().use { clientSocket ->
-                    clientSocket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), listener.localPort), 5000)
-                    listener.accept().use { serverSocket ->
-                        val server = Launcher.Builder<LanguageClient>().setLocalService(bridgeServer)
-                            .setRemoteInterface(LanguageClient::class.java).setExecutorService(executor)
-                            .setInput(serverSocket.getInputStream()).setOutput(serverSocket.getOutputStream()).create()
-                        val client = Launcher.Builder<DartLanguageServer>().setLocalService(mockClient)
-                            .setRemoteInterface(DartLanguageServer::class.java).setExecutorService(executor)
-                            .setInput(clientSocket.getInputStream()).setOutput(clientSocket.getOutputStream())
-                            .wrapMessages { consumer -> MessageConsumer { message ->
-                                if (message is RequestMessage && message.method == "textDocument/implementation") rpcRequest.complete(message)
-                                if (message is ResponseMessage) responses.add(message)
-                                consumer.consume(message)
-                                if (message is NotificationMessage && message.method == "$/cancelRequest") {
-                                    cancelSent.complete(message.params as CancelParams)
-                                }
-                                if (message is ResponseMessage && message.id == rpcRequest.getNow(null)?.id) responseReceived.countDown()
-                            } }.create()
-                        bridgeServer.connect(server.remoteProxy)
-                        server.startListening()
-                        client.startListening()
-                        val future = client.remoteProxy.textDocumentService.implementation(
-                            ImplementationParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 6)))
-                        val request = dasRequest.get(5, TimeUnit.SECONDS)
-                        val rpcId = rpcRequest.get(5, TimeUnit.SECONDS).id
-                        val dasId = request.get("id").asString
-                        val pendingField = DartBridgeLspServer::class.java.getDeclaredField("pendingRequests").apply { isAccessible = true }
-                        val pending = pendingField.get(bridgeServer) as Map<*, *>
-                        val entry = requireNotNull(pending[dasId])
-                        val upstream = entry.javaClass.getDeclaredField("future").apply { isAccessible = true }.get(entry) as CompletableFuture<*>
-                        assertFalse(upstream.isDone)
-                        assertTrue(future.cancel(true))
-                        assertEquals(rpcId, cancelSent.get(5, TimeUnit.SECONDS).id)
-                        assertTrue("Server must answer the canceled RPC", responseReceived.await(5, TimeUnit.SECONDS))
-                        assertEquals(ResponseErrorCode.RequestCancelled.value, responses.single { it.id == rpcId }.error.code)
-                        assertSame(entry, pending[dasId])
-                        assertFalse("Canceling the dependent RPC leaves DAS work pending", upstream.isDone)
-                        assertEquals(1, capturedRequests.size)
-                        assertFalse("Client cancellation must not be mistaken for DAS cancellation", capturedNotifications.any {
-                            it.get("method")?.asString?.contains("cancel", ignoreCase = true) == true ||
-                                it.lspMethod()?.contains("cancel", ignoreCase = true) == true
-                        })
-                        completeEmptyImplementation(request)
-                        assertFalse(pending.containsKey(dasId))
-                        assertTrue(upstream.isDone)
-                        assertFalse(upstream.isCancelled)
-                        // Late completion runs synchronously before this next RPC. Its response is an ordered wire barrier.
-                        client.remoteProxy.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
-                        assertEquals("Late DAS completion must not produce a second response", 1, responses.count { it.id == rpcId })
-                    }
-                }
-            }
-        } finally {
-            requestObserver = null
-            bridgeServer.stop()
-            executor.shutdownNow()
-            assertTrue("Paired launcher threads must terminate", executor.awaitTermination(10, TimeUnit.SECONDS))
-        }
-    }
-
-    fun testImplementationResponseAfterSocketCloseMatchesExistingRpcFailure() {
-        // Definition predates implementation and uses the same forwardRequest(...).thenApply response shape.
-        for (method in listOf("textDocument/implementation", "textDocument/definition")) {
-            checkResponseAfterLocalSocketClose(method)
-        }
+    fun testDefinitionResponseAfterSocketCloseMatchesExistingRpcFailure() {
+        checkResponseAfterLocalSocketClose("textDocument/definition")
     }
 
     private fun checkResponseAfterLocalSocketClose(method: String) {
@@ -1605,13 +1423,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
                         bridge.connect(server.remoteProxy)
                         server.startListening()
                         client.startListening()
-                        clientFuture = if (method == "textDocument/implementation") {
-                            client.remoteProxy.textDocumentService.implementation(
-                                ImplementationParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 6)))
-                        } else {
-                            client.remoteProxy.textDocumentService.definition(
-                                org.eclipse.lsp4j.DefinitionParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 6)))
-                        }
+                        clientFuture = client.remoteProxy.textDocumentService.definition(
+                            org.eclipse.lsp4j.DefinitionParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 6)))
                         val request = dasRequest.get(5, TimeUnit.SECONDS)
                         // Completion after consume proves handleRequest has installed thenAccept/exceptionally.
                         val rpc = requestHandled.get(5, TimeUnit.SECONDS)
@@ -1626,7 +1439,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
                         assertEmpty(attempts)
                         serverSocket.close() // Local close, not a peer FIN: the retained output stream must fail its next write.
                         assertTrue(serverSocket.isClosed)
-                        completeEmptyImplementation(request) // Both RPCs accept an empty list from DAS.
+                        completeEmptyNavigationResponse(request)
                         assertTrue("$method must reach both actual response writes", failedWrites.await(5, TimeUnit.SECONDS))
                         assertFalse(pending.containsKey(dasId))
                         assertEquals(listOf(rpc.id, rpc.id), attempts.map { it.id })
@@ -1673,7 +1486,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         return (params.getAsJsonObject("lspMessage") ?: params.getAsJsonObject("lspNotification"))?.get("method")?.asString
     }
 
-    private fun completeEmptyImplementation(request: JsonObject) {
+    private fun completeEmptyNavigationResponse(request: JsonObject) {
         val id = request.get("id").asString
         capturedListener.onResponse("""{"id":"$id","result":{"lspResponse":{"jsonrpc":"2.0","id":"$id","result":[]}}}""")
     }
@@ -1779,65 +1592,6 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             }
         }
         assertEquals(0, legacyHierarchyRequests)
-    }
-
-    fun testInitializeAdvertisesImplementation() {
-        val capabilities = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS).capabilities
-        assertNotNull("Implementation capability must be advertised", capabilities.implementationProvider)
-        assertTrue(capabilities.implementationProvider.isLeft)
-        assertEquals(true, capabilities.implementationProvider.left)
-    }
-
-    fun testImplementationRequestReturnsLocations() {
-        val params = ImplementationParams().apply {
-            textDocument = TextDocumentIdentifier("file:///source.dart")
-            position = Position(1, 6)
-        }
-        val future = bridgeServer.implementation(params)
-        val request = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" })
-        val message = request.getAsJsonObject("params").getAsJsonObject("lspMessage")
-        assertEquals("textDocument/implementation", message.get("method").asString)
-        val sentParams = message.getAsJsonObject("params")
-        assertEquals("file:///source.dart", sentParams.getAsJsonObject("textDocument").get("uri").asString)
-        assertEquals(1, sentParams.getAsJsonObject("position").get("line").asInt)
-        assertEquals(6, sentParams.getAsJsonObject("position").get("character").asInt)
-        assertFalse(capturedRequests.any { it.get("method")?.asString == "search.getTypeHierarchy" })
-
-        capturedListener.onResponse("""
-            {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123","result":[
-              {"uri":"file:///target.dart","range":{"start":{"line":2,"character":6},"end":{"line":2,"character":11}}}
-            ]}}}
-        """.trimIndent())
-
-        val result = future.get(5, TimeUnit.SECONDS)
-        assertTrue("Implementation uses Location, not LocationLink", result.isLeft)
-        assertEquals(1, result.left.size)
-        assertEquals("file:///target.dart", result.left.single().uri)
-        assertEquals(Position(2, 6), result.left.single().range.start)
-    }
-
-    fun testImplementationNullResultIsEmpty() {
-        val future = bridgeServer.implementation(ImplementationParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 0)))
-        capturedListener.onResponse("""
-            {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123","result":null}}}
-        """.trimIndent())
-        assertTrue(future.get(5, TimeUnit.SECONDS).left.isEmpty())
-    }
-
-    fun testImplementationErrorDoesNotRequestLegacyHierarchy() {
-        val future = bridgeServer.implementation(ImplementationParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 0)))
-        capturedListener.onResponse("""
-            {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123",
-            "error":{"code":-32601,"message":"Method not found"}}}}
-        """.trimIndent())
-        try {
-            future.get(5, TimeUnit.SECONDS)
-            fail("The public LSP request API must receive the server error")
-        } catch (e: java.util.concurrent.ExecutionException) {
-            assertTrue(e.cause is org.eclipse.lsp4j.jsonrpc.ResponseErrorException)
-        }
-        assertEquals(0, legacyHierarchyRequests)
-        assertFalse(capturedRequests.any { it.get("method")?.asString == "search.getTypeHierarchy" })
     }
 
     // --- Hierarchy ---
