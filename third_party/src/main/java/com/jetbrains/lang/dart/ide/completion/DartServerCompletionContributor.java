@@ -21,7 +21,6 @@ import com.intellij.lang.xml.XMLLanguage;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.keymap.KeymapUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
@@ -73,6 +72,10 @@ public final class DartServerCompletionContributor extends CompletionContributor
                final PsiFile originalFile = parameters.getOriginalFile();
                final Project project = originalFile.getProject();
 
+               if (originalFile instanceof DartExpressionCodeFragment || DartAnalysisServerService.isLspCompletionEnabled(project)) {
+                 return;
+               }
+
                if (originalResultSet.getPrefixMatcher().getPrefix().isEmpty() &&
                    isRightAfterBadIdentifier(parameters.getEditor().getDocument().getImmutableCharSequence(), parameters.getOffset())) {
                  return;
@@ -83,16 +86,6 @@ public final class DartServerCompletionContributor extends CompletionContributor
                final CompletionResultSet resultSet = uriPrefix != null
                                                      ? originalResultSet.withRelevanceSorter(sorter).withPrefixMatcher(uriPrefix)
                                                      : originalResultSet.withRelevanceSorter(sorter);
-
-               // If completion is requested in "Evaluate Expression" dialog or when editing a breakpoint condition, use runtime completion.
-               if (originalFile instanceof DartExpressionCodeFragment) {
-                 appendRuntimeCompletion(parameters, resultSet);
-                 return;
-               }
-
-               if (DartAnalysisServerService.isLspCompletionEnabled(project)) {
-                 return;
-               }
 
                VirtualFile file = DartResolveUtil.getRealVirtualFile(originalFile);
                if (file instanceof VirtualFileWindow) {
@@ -264,38 +257,6 @@ public final class DartServerCompletionContributor extends CompletionContributor
     return !Character.isJavaIdentifierStart(text.charAt(currentOffset));
   }
 
-  private static void appendRuntimeCompletion(@NotNull CompletionParameters parameters,
-                                              @NotNull CompletionResultSet resultSet) {
-    final PsiFile originalFile = parameters.getOriginalFile();
-    final Project project = originalFile.getProject();
-    final PsiElement contextElement = originalFile.getContext();
-    if (contextElement == null) {
-      return;
-    }
-
-    final VirtualFile contextFile = contextElement.getContainingFile().getVirtualFile();
-    final int contextOffset = contextElement.getTextOffset();
-
-    final Document dummyDocument = FileDocumentManager.getInstance().getDocument(originalFile.getVirtualFile());
-    if (dummyDocument == null) {
-      return;
-    }
-
-    final String code = dummyDocument.getText();
-    final int codeOffset = parameters.getOffset();
-
-    final DartAnalysisServerService das = DartAnalysisServerService.getInstance(project);
-    final Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>> completionResult =
-      das.execution_getSuggestions(code, codeOffset,
-                                   contextFile, contextOffset,
-                                   Collections.emptyList(), Collections.emptyList());
-    if (completionResult != null && completionResult.getFirst() != null) {
-      for (CompletionSuggestion suggestion : completionResult.getFirst()) {
-        resultSet.addElement(createLookupElementAskingExtensions(project, suggestion, null, null));
-      }
-    }
-  }
-
   private static CompletionSorter createSorter(@NotNull CompletionParameters parameters, @NotNull PrefixMatcher prefixMatcher) {
     final LookupElementWeigher dartWeigher = new LookupElementWeigher("dartRelevance", true, false) {
       @Override
@@ -370,8 +331,7 @@ public final class DartServerCompletionContributor extends CompletionContributor
 
   @Override
   public void beforeCompletion(@NotNull CompletionInitializationContext context) {
-    if (DartAnalysisServerService.isLspCompletionEnabled(context.getProject()) &&
-        !(context.getFile() instanceof DartExpressionCodeFragment)) {
+    if (DartAnalysisServerService.isLspCompletionEnabled(context.getProject())) {
       return;
     }
     final PsiElement psiElement = context.getFile().findElementAt(context.getStartOffset());
