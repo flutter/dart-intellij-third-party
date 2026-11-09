@@ -119,51 +119,6 @@ class DartStructureViewFactoryTest : DartCodeInsightFixtureTestCase() {
     }
   }
 
-  fun testColdCacheModelUpdateSelectsOnceAndIgnoresSubsequentTypingUpdates() {
-    setAutoscrollFromSource(true)
-    // Simulate cold cache on first open: outline is not yet available (currentElement == null)
-    val model = FakeStructureViewModel(currentElement = null)
-    val component = RecordingStructureViewComponent(model)
-    try {
-      component.showing = false
-      DartStructureViewFactory.configureAutoScrollFromSource(component, project)
-
-      // Component becomes showing while outline is still null
-      component.showing = true
-      fireShowingChanged(component)
-      drainAsyncTasks()
-      assertTrue("No selection yet while outline is null", component.selectedElements.isEmpty())
-
-      // Asynchronous outline arrives from DAS and triggers fireModelUpdate()
-      model.currentElement = "calculateSymbol"
-      model.fireModelUpdate()
-      drainAsyncTasks()
-
-      assertEquals(1, component.rebuildAndUpdateCount)
-      assertEquals(listOf("calculateSymbol" to false), component.selectedElements)
-
-      // Subsequent model updates while typing in the editor should NOT trigger extra rebuildAndUpdate/select
-      model.currentElement = "editedSymbol"
-      model.fireModelUpdate()
-      drainAsyncTasks()
-
-      assertEquals(
-        "Subsequent typing model updates must not trigger extra rebuildAndUpdate calls",
-        1,
-        component.rebuildAndUpdateCount
-      )
-      assertEquals(
-        "Subsequent typing model updates must not override selection via initial-selection listener",
-        listOf("calculateSymbol" to false),
-        component.selectedElements
-      )
-    }
-    finally {
-      Disposer.dispose(component)
-      Disposer.dispose(model)
-    }
-  }
-
   fun testReShowingComponentReTriggersSelection() {
     setAutoscrollFromSource(true)
     val model = FakeStructureViewModel(currentElement = "firstSymbol")
@@ -197,12 +152,13 @@ class DartStructureViewFactoryTest : DartCodeInsightFixtureTestCase() {
     setAutoscrollFromSource(true)
     val model = FakeStructureViewModel(currentElement = null)
     val component = RecordingStructureViewComponent(model)
+    val initialListenerCount = component.hierarchyListeners.size
     DartStructureViewFactory.configureAutoScrollFromSource(component, project)
-    assertTrue("ModelListener should be registered", model.modelListeners.isNotEmpty())
+    assertEquals("HierarchyListener should be registered", initialListenerCount + 1, component.hierarchyListeners.size)
 
     Disposer.dispose(component)
     Disposer.dispose(model)
-    assertTrue("ModelListener should be removed upon component disposal", model.modelListeners.isEmpty())
+    assertEquals("HierarchyListener should be removed upon component disposal", initialListenerCount, component.hierarchyListeners.size)
   }
 
   private fun setAutoscrollFromSource(enabled: Boolean) {
@@ -234,7 +190,6 @@ class DartStructureViewFactoryTest : DartCodeInsightFixtureTestCase() {
     model: StructureViewModel,
   ) : StructureViewComponent(null, model, project, false) {
     var showing: Boolean = false
-    var rebuildAndUpdateCount: Int = 0
     val selectedElements = CopyOnWriteArrayList<Pair<Any?, Boolean>>()
 
     override fun isShowing(): Boolean = showing
@@ -243,19 +198,11 @@ class DartStructureViewFactoryTest : DartCodeInsightFixtureTestCase() {
       selectedElements.add(element to requestFocus)
       return AsyncPromise<TreePath>().apply { setResult(null) }
     }
-
-    override fun rebuildAndUpdate(): AsyncPromise<Void> {
-      rebuildAndUpdateCount++
-      val promise = AsyncPromise<Void>()
-      promise.setResult(null)
-      return promise
-    }
   }
 
   private class FakeStructureViewModel(
     @Volatile var currentElement: Any?,
   ) : StructureViewModel {
-    val modelListeners = CopyOnWriteArrayList<ModelListener>()
 
     override fun getCurrentEditorElement(): Any? = currentElement
 
@@ -263,19 +210,9 @@ class DartStructureViewFactoryTest : DartCodeInsightFixtureTestCase() {
 
     override fun removeEditorPositionListener(listener: FileEditorPositionListener) {}
 
-    override fun addModelListener(modelListener: ModelListener) {
-      modelListeners.add(modelListener)
-    }
+    override fun addModelListener(modelListener: ModelListener) { }
 
-    override fun removeModelListener(modelListener: ModelListener) {
-      modelListeners.remove(modelListener)
-    }
-
-    fun fireModelUpdate() {
-      for (listener in modelListeners) {
-        listener.onModelChanged()
-      }
-    }
+    override fun removeModelListener(modelListener: ModelListener) { }
 
     override fun getRoot(): StructureViewTreeElement = object : StructureViewTreeElement {
       override fun getValue(): Any = "root"
