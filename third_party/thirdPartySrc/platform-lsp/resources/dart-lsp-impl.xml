@@ -88,6 +88,8 @@
                                 order="last"/>
 
     <renameHandler implementation="com.intellij.platform.dartlsp.impl.features.rename.LspRenameHandler" order="last"/>
+    <renamePsiElementProcessor implementation="com.intellij.platform.dartlsp.impl.platformListeners.LspRenameEventDataFallback" order="last"/>
+    <moveFileHandler implementation="com.intellij.platform.dartlsp.impl.platformListeners.LspMoveEventDataFallback" order="last"/>
 
     <!--@formatter:off-->
     <intentionAction> <className>com.intellij.platform.dartlsp.impl.features.intention.LspIntention0</className>  <bundleName>messages.DartLspBundle</bundleName> <categoryKey>intention.group.name</categoryKey> <descriptionDirectoryName>DartLspIntention</descriptionDirectoryName> <language/> </intentionAction>
@@ -111,6 +113,8 @@
   <projectListeners>
     <listener topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"
               class="com.intellij.platform.dartlsp.impl.platformListeners.LspFileEditorManagerListener"/>
+    <listener topic="com.intellij.refactoring.listeners.RefactoringEventListener"
+              class="com.intellij.platform.dartlsp.impl.platformListeners.LspRefactoringEventListener"/>
   </projectListeners>
 
   <applicationListeners>
