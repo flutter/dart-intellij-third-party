@@ -25,7 +25,10 @@ public class DartCompletionExtension {
    * Implementations may use {@link DartServerCompletionContributor#createLookupElement(Project, CompletionSuggestion)} as a base for the
    * returned {@link LookupElementBuilder};
    * if <code>null</code> is returned then the Dart plugin defaults to
-   * {@link DartServerCompletionContributor#createLookupElement(Project, CompletionSuggestion, String, DartServerCompletionContributor.SuggestionDetailsInsertHandlerBase)}
+   * {@link DartServerCompletionContributor#createLookupElement(Project, CompletionSuggestion, String, DartServerCompletionContributor.SuggestionDetailsInsertHandlerBase)}.
+   * <p>
+   * If an implementation throws any {@link Throwable} (other than {@code ProcessCanceledException}), the failure is logged once and that
+   * extension is disabled for the remainder of the IDE session.
    */
   public @Nullable LookupElementBuilder createLookupElement(final @NotNull Project project, final @NotNull CompletionSuggestion suggestion) {
     return null;

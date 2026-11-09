@@ -51,6 +51,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.dartlang.analysis.server.protocol.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import javax.swing.*;
 import java.util.*;
@@ -62,7 +63,8 @@ import static com.intellij.patterns.StandardPatterns.or;
 
 public final class DartServerCompletionContributor extends CompletionContributor {
   private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartServerCompletionContributor.class);
-  static final Set<String> WARNED_EXTENSIONS = ConcurrentHashMap.newKeySet();
+  @VisibleForTesting
+  static final Set<String> DISABLED_EXTENSIONS = ConcurrentHashMap.newKeySet();
 
   public DartServerCompletionContributor() {
     extend(CompletionType.BASIC,
@@ -436,6 +438,7 @@ public final class DartServerCompletionContributor extends CompletionContributor
     return base;
   }
 
+  @VisibleForTesting
   @SuppressWarnings("deprecation")
   static @NotNull LookupElement createLookupElementAskingExtensions(@NotNull Project project,
                                                                     @NotNull CompletionSuggestion suggestion,
@@ -443,7 +446,7 @@ public final class DartServerCompletionContributor extends CompletionContributor
                                                                     @Nullable SuggestionDetailsInsertHandlerBase insertHandler) {
     for (DartCompletionExtension extension : DartCompletionExtension.getExtensions()) {
       String extensionName = extension.getClass().getName();
-      if (WARNED_EXTENSIONS.contains(extensionName)) {
+      if (DISABLED_EXTENSIONS.contains(extensionName)) {
         continue;
       }
       try {
@@ -456,8 +459,8 @@ public final class DartServerCompletionContributor extends CompletionContributor
         throw e;
       }
       catch (Throwable t) {
-        if (WARNED_EXTENSIONS.add(extensionName)) {
-          LOG.warn("Exception from DartCompletionExtension: " + extensionName, t);
+        if (DISABLED_EXTENSIONS.add(extensionName)) {
+          LOG.warn("Exception from DartCompletionExtension (disabling for session): " + extensionName, t);
         }
       }
     }

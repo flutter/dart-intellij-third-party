@@ -10,7 +10,7 @@ Code completion for Dart backed by the Analysis Server, plus statement completio
 - `DartLookupObject` - lookup element payload that resolves back to PSI for documentation.
 - `DartCharFilter` - `CharFilter` controlling which typed chars commit or continue a lookup.
 - `DartGotoDeclarationHandler` - `GotoDeclarationHandlerBase` for Dart.
-- `DartCompletionExtension` - deprecated extension point `Dart.completionExtension` for customising legacy DAS completion lookups (used by e.g. Flutter); exceptions and linkage errors thrown by extensions are logged and isolated.
+- `DartCompletionExtension` - deprecated extension point `Dart.completionExtension` for customising legacy DAS completion lookups (used by e.g. Flutter); extensions that throw an exception or linkage error are logged once and disabled for the rest of the session.
 - `DartCompletionTimerExtension` - extension point `Dart.completionTimerExtension` for completion latency reporting.
 
 ## Invariants

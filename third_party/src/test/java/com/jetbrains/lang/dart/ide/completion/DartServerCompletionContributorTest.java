@@ -24,13 +24,13 @@ public class DartServerCompletionContributorTest extends BasePlatformTestCase {
   @Override
   protected void setUp() throws Exception {
     super.setUp();
-    DartServerCompletionContributor.WARNED_EXTENSIONS.clear();
+    DartServerCompletionContributor.DISABLED_EXTENSIONS.clear();
   }
 
   @Override
   protected void tearDown() throws Exception {
     try {
-      DartServerCompletionContributor.WARNED_EXTENSIONS.clear();
+      DartServerCompletionContributor.DISABLED_EXTENSIONS.clear();
     }
     finally {
       super.tearDown();
