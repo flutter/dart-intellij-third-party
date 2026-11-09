@@ -15,9 +15,7 @@ import com.intellij.util.concurrency.AppExecutorUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import org.eclipse.lsp4j.Location
-import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.TextDocumentPositionParams
-import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.services.JsonNotification
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest
 import org.eclipse.lsp4j.services.LanguageClient
@@ -89,7 +87,6 @@ object DartLspService {
             port
         }, AppExecutorUtil.getAppExecutorService())
     }
-
     @JvmStatic
     fun connectToDtd(project: Project, uri: String): CompletableFuture<Any?> {
         return CompletableFuture.supplyAsync({
@@ -139,20 +136,5 @@ object DartLspService {
 
     private fun evictConnectedDtdUri(server: LspServer, uri: String) {
         connectedDtdUriByServer.remove(server, uri)
-    }
-
-    @JvmStatic
-    fun willRenameFiles(project: Project, params: RenameFilesParams): CompletableFuture<WorkspaceEdit?> {
-        return CompletableFuture.supplyAsync({
-            if (project.isDisposed) return@supplyAsync null
-            val server = LspServerManager.getInstance(project)
-                .getServersForProvider(DartLspServerSupportProvider::class.java)
-                .firstOrNull() ?: return@supplyAsync null
-            var edit: WorkspaceEdit? = null
-            ProgressManager.getInstance().executeNonCancelableSection {
-                edit = server.sendRequestSync { it.workspaceService.willRenameFiles(params) }
-            }
-            edit
-        }, AppExecutorUtil.getAppExecutorService())
     }
 }

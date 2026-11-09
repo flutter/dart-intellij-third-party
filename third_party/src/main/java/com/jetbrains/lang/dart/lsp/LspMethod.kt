@@ -31,7 +31,8 @@ enum class LspMethod(
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
     DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols"),
-    SIGNATURE_HELP("textDocument/signatureHelp", isExperimental = true, presentableName = "signature help");
+    SIGNATURE_HELP("textDocument/signatureHelp", isExperimental = true, presentableName = "signature help"),
+    WILL_RENAME_FILES("workspace/willRenameFiles", isExperimental = true, presentableName = "file rename and move");
 
     companion object {
         fun fromMethod(method: String): LspMethod? = entries.find { it.method == method }

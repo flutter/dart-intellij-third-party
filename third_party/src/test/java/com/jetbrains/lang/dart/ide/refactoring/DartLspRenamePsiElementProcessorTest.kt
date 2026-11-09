@@ -6,22 +6,12 @@
 package com.jetbrains.lang.dart.ide.refactoring
 
 import com.intellij.openapi.application.WriteAction
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.testFramework.LightVirtualFile
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
-import com.jetbrains.lang.dart.psi.DartFile
+import com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
-import org.eclipse.lsp4j.Position
-import org.eclipse.lsp4j.Range
-import org.eclipse.lsp4j.TextDocumentEdit
-import org.eclipse.lsp4j.TextEdit
-import org.eclipse.lsp4j.VersionedTextDocumentIdentifier
-import org.eclipse.lsp4j.WorkspaceEdit
-import org.eclipse.lsp4j.jsonrpc.messages.Either
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeoutException
 
 class DartLspRenamePsiElementProcessorTest : DartCodeInsightFixtureTestCase() {
 
@@ -98,52 +88,6 @@ class DartLspRenamePsiElementProcessorTest : DartCodeInsightFixtureTestCase() {
         }
     }
 
-    fun testApplyWorkspaceEdit() {
-        val mainFile = myFixture.addFileToProject(
-            "lib/main.dart",
-            """
-            import 'package:test_project/old_folder/foo.dart';
-
-            void main() {
-              print('hello');
-            }
-            """.trimIndent()
-        )
-
-        val mainVirtualFile = mainFile.virtualFile
-        val fileUri = mainVirtualFile.url
-
-        val workspaceEdit = WorkspaceEdit(
-            listOf(
-                Either.forLeft(
-                    TextDocumentEdit(
-                        VersionedTextDocumentIdentifier(fileUri, null),
-                        listOf(
-                            TextEdit(
-                                Range(Position(0, 7), Position(0, 49)),
-                                "'package:test_project/new_folder/foo.dart'"
-                            )
-                        )
-                    )
-                )
-            )
-        )
-
-        DartLspRenamePsiElementProcessor.applyWorkspaceEdit(project, workspaceEdit)
-
-        val doc = checkNotNull(FileDocumentManager.getInstance().getDocument(mainVirtualFile))
-        assertEquals(
-            """
-            import 'package:test_project/new_folder/foo.dart';
-
-            void main() {
-              print('hello');
-            }
-            """.trimIndent(),
-            doc.text
-        )
-    }
-
     fun testFindReferencesReturnsEmptyToPreventLegacyDoubleEdits() {
         val processor = DartLspRenamePsiElementProcessor()
         val file = myFixture.addFileToProject("lib/b.dart", "class B {}")
@@ -151,20 +95,18 @@ class DartLspRenamePsiElementProcessorTest : DartCodeInsightFixtureTestCase() {
         assertTrue("findReferences should return empty to prevent legacy PSI string double-edits", references.isEmpty())
     }
 
-    fun testAwaitFutureCheckingCanceledSuccess() {
-        val future = CompletableFuture<String>()
-        future.complete("result")
-        val result = DartLspRenamePsiElementProcessor.awaitFutureCheckingCanceled(future, 1)
-        assertEquals("result", result)
-    }
+    fun testMoveFileHandlerYieldsWhenExperimentalLspEnabled() {
+        val moveHandler = DartServerMoveDartFileHandler()
+        val file = myFixture.addFileToProject("lib/move_target.dart", "class MoveTarget {}")
 
-    fun testAwaitFutureCheckingCanceledTimeout() {
-        val future = CompletableFuture<String>()
+        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
         try {
-            DartLspRenamePsiElementProcessor.awaitFutureCheckingCanceled(future, 0)
-            fail("Expected TimeoutException")
-        } catch (_: TimeoutException) {
-            // Expected
+            assertFalse(
+                "DartServerMoveDartFileHandler should yield to LspWillRenameFilesHandler when experimental LSP is enabled",
+                moveHandler.canProcessElement(file)
+            )
+        } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
         }
     }
 }

@@ -259,6 +259,9 @@ codeLens.LspCodeVisionProvider.description=Displays code lens information from L
 lsp.rename.prepare.progress.title=Preparing Rename\\u2026
 lsp.rename.progress.title=Renaming\\u2026
 lsp.rename.action.text=LSP-Based Rename
+
+lsp.will.rename.files.progress.title=Collecting references\\u2026
+lsp.will.rename.files.skip=Skip
 '''
 
     with open(properties_path, "w", encoding="utf-8") as f:
@@ -860,6 +863,778 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             intention_content = intention_content.replace(old_is_available, new_is_available)
             with open(intention_action_path, "w", encoding="utf-8") as f:
                 f.write(intention_content)
+
+    # 17. Backport IJPL-249183 (752ad55221cc): workspace/willRenameFiles support.
+    # Can be simplified once the intellij-community sync source includes 752ad55221cc and
+    # pluginSinceBuild >= 263 (keep the 10s timeout adjustment and trailing-slash directory glob fix
+    # until resolved upstream).
+
+    # 17a. Register LspRefactoringEventListener and 253-262 fallback extensions in dart-lsp-impl.xml
+    if os.path.exists(xml_path):
+        with open(xml_path, "r", encoding="utf-8") as f:
+            xml_content = f.read()
+        xml_modified = False
+        rename_handler_anchor = (
+            '    <renameHandler implementation="com.intellij.platform.dartlsp.impl.features.rename.LspRenameHandler" order="last"/>'
+        )
+        fallback_extensions = (
+            '    <renamePsiElementProcessor implementation="com.intellij.platform.dartlsp.impl.platformListeners.LspRenameEventDataFallback" order="last"/>\n'
+            '    <moveFileHandler implementation="com.intellij.platform.dartlsp.impl.platformListeners.LspMoveEventDataFallback" order="last"/>'
+        )
+        if "LspRenameEventDataFallback" not in xml_content and rename_handler_anchor in xml_content:
+            xml_content = xml_content.replace(rename_handler_anchor, rename_handler_anchor + "\n" + fallback_extensions)
+            xml_modified = True
+        listener_anchor = (
+            '    <listener topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"\n'
+            '              class="com.intellij.platform.dartlsp.impl.platformListeners.LspFileEditorManagerListener"/>'
+        )
+        refactoring_listener = (
+            '    <listener topic="com.intellij.refactoring.listeners.RefactoringEventListener"\n'
+            '              class="com.intellij.platform.dartlsp.impl.platformListeners.LspRefactoringEventListener"/>'
+        )
+        if "LspRefactoringEventListener" not in xml_content and listener_anchor in xml_content:
+            xml_content = xml_content.replace(listener_anchor, listener_anchor + "\n" + refactoring_listener)
+            xml_modified = True
+        if xml_modified:
+            with open(xml_path, "w", encoding="utf-8") as f:
+                f.write(xml_content)
+
+    # 17b. Expose getFilePath and advertise workspace.fileOperations.willRename in LspServerDescriptor.kt
+    descriptor_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/api/LspServerDescriptor.kt"
+    )
+    if os.path.exists(descriptor_path):
+        with open(descriptor_path, "r", encoding="utf-8") as f:
+            descriptor_content = f.read()
+        modified = False
+        file_ops_import = "import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities"
+        if file_ops_import not in descriptor_content:
+            descriptor_content = descriptor_content.replace(
+                "import org.eclipse.lsp4j.FailureHandlingKind\n",
+                f"import org.eclipse.lsp4j.FailureHandlingKind\n{file_ops_import}\n"
+            )
+            modified = True
+        old_get_file_path = "  protected open fun getFilePath(file: VirtualFile): String = file.path"
+        new_get_file_path = "  @ApiStatus.Internal\n  open fun getFilePath(file: VirtualFile): String = file.path"
+        if old_get_file_path in descriptor_content:
+            descriptor_content = descriptor_content.replace(old_get_file_path, new_get_file_path)
+            modified = True
+        old_symbol_caps = """        symbol = SymbolCapabilities(true).apply {
+          symbolKind = SymbolKindCapabilities().apply {
+            valueSet = lspCustomization.symbolKindCustomizer.supportedKinds
+          }
+        }
+      }"""
+        new_symbol_caps = """        symbol = SymbolCapabilities(true).apply {
+          symbolKind = SymbolKindCapabilities().apply {
+            valueSet = lspCustomization.symbolKindCustomizer.supportedKinds
+          }
+        }
+        fileOperations = FileOperationsWorkspaceCapabilities().apply {
+          dynamicRegistration = true
+          willRename = true
+        }
+      }"""
+        if "FileOperationsWorkspaceCapabilities()" not in descriptor_content and old_symbol_caps in descriptor_content:
+            descriptor_content = descriptor_content.replace(old_symbol_caps, new_symbol_caps)
+            modified = True
+        if modified:
+            with open(descriptor_path, "w", encoding="utf-8") as f:
+                f.write(descriptor_content)
+
+    # 17c. Pass InitializeParams alongside InitializeResult in Lsp4jServerConnector.kt
+    if os.path.exists(connector_path):
+        with open(connector_path, "r", encoding="utf-8") as f:
+            connector_content = f.read()
+        modified = False
+        init_params_import = "import org.eclipse.lsp4j.InitializeParams"
+        if init_params_import not in connector_content:
+            connector_content = connector_content.replace(
+                "import org.eclipse.lsp4j.InitializeResult\n",
+                f"{init_params_import}\nimport org.eclipse.lsp4j.InitializeResult\n"
+            )
+            modified = True
+        old_connect_sig = "  internal fun connect(onSuccess: (InitializeResult) -> Unit) {"
+        new_connect_sig = "  internal fun connect(onSuccess: (InitializeParams, InitializeResult) -> Unit) {"
+        if old_connect_sig in connector_content:
+            connector_content = connector_content.replace(old_connect_sig, new_connect_sig)
+            modified = True
+        old_init_server = """  private fun initializeServer(onSuccess: (InitializeResult) -> Unit) {
+    logger.debug("$descriptor: initializing LSP server")
+
+    var error: Throwable? = null
+    val countDownLatch = CountDownLatch(1)
+
+    lsp4jServer.initialize(descriptor.createInitializeParams())
+      .whenComplete { result: InitializeResult?, th: Throwable? ->
+        if (result != null) {
+          lsp4jServer.initialized(InitializedParams())
+          onSuccess(result)"""
+        new_init_server = """  private fun initializeServer(onSuccess: (InitializeParams, InitializeResult) -> Unit) {
+    logger.debug("$descriptor: initializing LSP server")
+
+    var error: Throwable? = null
+    val countDownLatch = CountDownLatch(1)
+
+    val initializeParams = descriptor.createInitializeParams()
+
+    lsp4jServer.initialize(initializeParams)
+      .whenComplete { result: InitializeResult?, th: Throwable? ->
+        if (result != null) {
+          lsp4jServer.initialized(InitializedParams())
+          onSuccess(initializeParams, result)"""
+        if old_init_server in connector_content:
+            connector_content = connector_content.replace(old_init_server, new_init_server)
+            modified = True
+        if modified:
+            with open(connector_path, "w", encoding="utf-8") as f:
+                f.write(connector_content)
+
+    # 17d. Store effective clientCapabilities on LspServerImpl.kt
+    if os.path.exists(lsp_server_impl_path):
+        with open(lsp_server_impl_path, "r", encoding="utf-8") as f:
+            server_content = f.read()
+        modified = False
+        client_caps_import = "import org.eclipse.lsp4j.ClientCapabilities"
+        if client_caps_import not in server_content:
+            server_content = server_content.replace(
+                "import org.eclipse.lsp4j.CodeLens\n",
+                f"{client_caps_import}\nimport org.eclipse.lsp4j.CodeLens\n"
+            )
+            modified = True
+        old_server_caps = "  internal val serverCapabilities: ServerCapabilities?"
+        new_server_caps = """  /**
+   * Holds the effective [ClientCapabilities] sent to the LSP server in [org.eclipse.lsp4j.InitializeParams].
+   *
+   * Unlike [LspServerDescriptor.clientCapabilities] or [LspServerDescriptor.createInitializeParams],
+   * this property guarantees the same instance across multiple reads.
+   *
+   * The value is `null` before the server initializes.
+   */
+  internal var clientCapabilities: ClientCapabilities? = null
+    private set
+
+  internal val serverCapabilities: ServerCapabilities?"""
+        if "var clientCapabilities: ClientCapabilities?" not in server_content and old_server_caps in server_content:
+            server_content = server_content.replace(old_server_caps, new_server_caps)
+            modified = True
+        old_connect_call = """          lsp4jServerConnector.connect { initializeResult ->
+            this.initializeResult = initializeResult"""
+        new_connect_call = """          lsp4jServerConnector.connect { initializeParams, initializeResult ->
+            this.initializeResult = initializeResult
+            this.clientCapabilities = initializeParams.capabilities"""
+        if old_connect_call in server_content:
+            server_content = server_content.replace(old_connect_call, new_connect_call)
+            modified = True
+        if modified:
+            with open(lsp_server_impl_path, "w", encoding="utf-8") as f:
+                f.write(server_content)
+
+    # 17e. Register workspace/willRenameFiles dynamic capability in LspDynamicCapabilities.kt
+    dynamic_caps_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/LspDynamicCapabilities.kt"
+    )
+    if os.path.exists(dynamic_caps_path):
+        with open(dynamic_caps_path, "r", encoding="utf-8") as f:
+            dyn_content = f.read()
+        modified = False
+        file_op_options_import = "import org.eclipse.lsp4j.FileOperationOptions"
+        if file_op_options_import not in dyn_content:
+            dyn_content = dyn_content.replace(
+                "import org.eclipse.lsp4j.ExecuteCommandRegistrationOptions\n",
+                f"import org.eclipse.lsp4j.ExecuteCommandRegistrationOptions\n{file_op_options_import}\n"
+            )
+            modified = True
+        symbol_reg = '    val symbol = registration("workspace/symbol", WorkspaceSymbolRegistrationOptions::class.java)'
+        will_rename_reg = '    val willRenameFiles = registration("workspace/willRenameFiles", FileOperationOptions::class.java)'
+        if "val willRenameFiles =" not in dyn_content and symbol_reg in dyn_content:
+            dyn_content = dyn_content.replace(symbol_reg, f"{symbol_reg}\n{will_rename_reg}")
+            modified = True
+        if modified:
+            with open(dynamic_caps_path, "w", encoding="utf-8") as f:
+                f.write(dyn_content)
+
+    # 17f. Add pathMatchesFileOperationFilter (with trailing-slash folder glob fix) to LspGlobMatcher.kt
+    glob_matcher_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/LspGlobMatcher.kt"
+    )
+    if os.path.exists(glob_matcher_path):
+        with open(glob_matcher_path, "r", encoding="utf-8") as f:
+            glob_content = f.read()
+        modified = False
+        if "fun pathMatchesFileOperationFilter(" not in glob_content:
+            glob_content = """package com.intellij.platform.dartlsp.impl
+
+import com.intellij.openapi.util.getPathMatcher
+import org.eclipse.lsp4j.FileOperationFilter
+import org.eclipse.lsp4j.FileOperationPatternKind
+import java.nio.file.InvalidPathException
+import java.nio.file.Path
+import java.nio.file.PathMatcher
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+
+internal class LspGlobMatcher {
+  private val patternToPathMatcherCache: MutableMap<String, PathMatcher> = ConcurrentHashMap()
+
+  fun pathMatches(path: String, isDirectory: Boolean, globPattern: String, basePath: String?): Boolean {
+    val pathToMatch = when {
+      basePath == null -> path
+      path == basePath -> ""
+      path.startsWith("$basePath/") -> path.substring(basePath.length + 1)
+      else -> return false // base URI doesn't match this path
+    }
+
+    if (isDirectory) {
+      // Any directory may contain files that match the glob pattern.
+      // Per-file events are not generated, so we need to inform the server about all directory events.
+      return true
+    }
+
+    val pathMatcher = patternToPathMatcherCache.getOrPut(globPattern) { getPathMatcher(globPattern) }
+    return pathMatcher.matches(Path.of(pathToMatch))
+  }
+
+  /**
+   * @param path file path as seen by server; to get a file path, use [com.intellij.platform.dartlsp.api.LspServerDescriptor.getFilePath]
+   */
+  fun pathMatchesFileOperationFilter(
+    path: String,
+    uriScheme: String,
+    isDirectory: Boolean,
+    filter: FileOperationFilter,
+  ): Boolean {
+    if (filter.scheme != null && !filter.scheme.equals(uriScheme, ignoreCase = true)) return false
+
+    val pattern = filter.pattern ?: return false
+    when (pattern.matches) {
+      null -> {}
+      FileOperationPatternKind.File -> if (isDirectory) return false
+      FileOperationPatternKind.Folder -> if (!isDirectory) return false
+      else -> return false
+    }
+
+    val rawGlobPattern = pattern.glob ?: return false
+    // Dart patch (IJPL-249183): trim trailing slashes on directory globs (such as Dart's "**/" folder filter),
+    // because getPathMatcher("**/") compiles to "glob:{**/,}" while Path.of(path) strips trailing slashes.
+    val globPattern = if (isDirectory && rawGlobPattern.length > 1) rawGlobPattern.trimEnd('/') else rawGlobPattern
+    val ignoreCase = pattern.options?.ignoreCase == true
+    val glob = if (ignoreCase) globPattern.lowercase(Locale.ROOT) else globPattern
+    val pathToMatch = if (ignoreCase) path.lowercase(Locale.ROOT) else path
+    val pathMatcher = patternToPathMatcherCache.getOrPut(glob) { getPathMatcher(glob) }
+    return try {
+      pathMatcher.matches(Path.of(pathToMatch))
+    }
+    catch (_: InvalidPathException) {
+      false
+    }
+  }
+}
+"""
+            modified = True
+        elif "    val globPattern = pattern.glob ?: return false\n" in glob_content:
+            glob_content = glob_content.replace(
+                "    val globPattern = pattern.glob ?: return false\n",
+                """    val rawGlobPattern = pattern.glob ?: return false
+    // Dart patch (IJPL-249183): trim trailing slashes on directory globs (such as Dart's "**/" folder filter),
+    // because getPathMatcher("**/") compiles to "glob:{**/,}" while Path.of(path) strips trailing slashes.
+    val globPattern = if (isDirectory && rawGlobPattern.length > 1) rawGlobPattern.trimEnd('/') else rawGlobPattern
+"""
+            )
+            modified = True
+        if modified:
+            with open(glob_matcher_path, "w", encoding="utf-8") as f:
+                f.write(glob_content)
+
+    # 17g. Write or patch LspRefactoringEventListener.kt (with 253-262 RefactoringEventData fallbacks)
+    refactoring_listener_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/platformListeners/LspRefactoringEventListener.kt"
+    )
+    refactoring_listener_content = """// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+package com.intellij.platform.dartlsp.impl.platformListeners
+
+import com.intellij.openapi.project.DumbAware
+import com.intellij.openapi.project.Project
+import com.intellij.platform.dartlsp.impl.features.workspaceFileOperations.LspWillRenameFilesHandler
+import com.intellij.psi.PsiDirectory
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiFileSystemItem
+import com.intellij.refactoring.listeners.RefactoringEventData
+import com.intellij.refactoring.listeners.RefactoringEventListener
+import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFileHandler
+import com.intellij.refactoring.rename.RenamePsiElementProcessor
+import com.intellij.refactoring.rename.RenamePsiElementProcessorBase
+import com.intellij.usageView.UsageInfo
+import com.intellij.util.containers.MultiMap
+
+/** The ID of the refactoring in [com.intellij.refactoring.rename.RenameProcessor]. */
+internal const val RENAME_REFACTORING_ID = "refactoring.rename"
+
+/** The ID of the refactoring in [com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesProcessor]. */
+internal const val MOVE_REFACTORING_ID = "refactoring.move"
+
+internal class LspRefactoringEventListener(private val project: Project) : RefactoringEventListener {
+  override fun refactoringStarted(refactoringId: String, beforeData: RefactoringEventData?) {
+    if (beforeData == null) return
+    if (refactoringId == RENAME_REFACTORING_ID || refactoringId == MOVE_REFACTORING_ID) {
+      LspWillRenameFilesHandler.renameOrMoveRefactoringStarted(project, refactoringId, beforeData)
+    }
+  }
+
+  override fun refactoringDone(refactoringId: String, afterData: RefactoringEventData?) {
+    if (refactoringId == RENAME_REFACTORING_ID || refactoringId == MOVE_REFACTORING_ID) {
+      LspWillRenameFilesHandler.renameOrMoveRefactoringDone(project, refactoringId, afterData)
+    }
+  }
+}
+
+/**
+ * Dart patch (IJPL-249183): compatibility fallback for IntelliJ 2025.3-2026.2 (`pluginSinceBuild < 263`),
+ * where `RefactoringEventData.RENAMES_KEY` does not yet exist.
+ *
+ * Inactive when `RefactoringEventData.RENAMES_KEY` is present at runtime (2026.3+).
+ * Implements [RenamePsiElementProcessorBase.DefaultRenamePsiElementProcessor] with `order="last"` so
+ * platform default-processor checks behave identically for directories and files without a custom processor.
+ */
+internal class LspRenameEventDataFallback :
+  RenamePsiElementProcessor(),
+  RenamePsiElementProcessorBase.DefaultRenamePsiElementProcessor,
+  DumbAware {
+
+  override fun canProcessElement(element: PsiElement): Boolean {
+    if (LspWillRenameFilesHandler.hasPlatformRenamesKey) return false
+    if (element !is PsiFileSystemItem) return false
+    val virtualFile = element.virtualFile ?: return false
+    return LspWillRenameFilesHandler.hasWillRenameCapableServerForFile(element.project, virtualFile)
+  }
+
+  override fun prepareRenaming(element: PsiElement, newName: String, allRenames: MutableMap<PsiElement, String>) {
+    if (!LspWillRenameFilesHandler.hasPlatformRenamesKey) {
+      LspWillRenameFilesHandler.recordFallbackRename(element, allRenames)
+    }
+  }
+}
+
+/**
+ * Dart patch (IJPL-249183): compatibility fallback for IntelliJ 2025.3-2026.2 (`pluginSinceBuild < 263`),
+ * where `RefactoringEventData.TARGET_ELEMENT_KEY` does not yet exist.
+ *
+ * [canProcessElement] always returns `false` so [MoveFileHandler.forElement] never selects this handler;
+ * [MoveFileHandler.detectConflicts] invokes all registered handlers regardless of [canProcessElement].
+ */
+internal class LspMoveEventDataFallback : MoveFileHandler() {
+  override fun canProcessElement(element: PsiFile?): Boolean = false
+
+  override fun prepareMovedFile(file: PsiFile?, moveDestination: PsiDirectory?, oldToNewMap: MutableMap<PsiElement, PsiElement>?) {}
+
+  override fun findUsages(
+    psiFile: PsiFile,
+    newParent: PsiDirectory,
+    searchInComments: Boolean,
+    searchInNonJavaFiles: Boolean,
+  ): List<UsageInfo>? = null
+
+  override fun retargetUsages(usageInfos: List<UsageInfo>, oldToNewMap: Map<PsiElement, PsiElement>) {}
+
+  override fun updateMovedFile(file: PsiFile?) {}
+
+  override fun detectConflicts(
+    conflicts: MultiMap<PsiElement, String>?,
+    elementsToMove: Array<out PsiElement>?,
+    usages: Array<out UsageInfo>?,
+    targetDirectory: PsiDirectory?,
+  ) {
+    if (LspWillRenameFilesHandler.hasPlatformTargetElementKey) return
+    if (elementsToMove == null || targetDirectory == null) return
+    if (!LspWillRenameFilesHandler.hasWillRenameCapableServer(targetDirectory.project)) return
+    LspWillRenameFilesHandler.recordFallbackMove(elementsToMove, targetDirectory)
+  }
+}
+"""
+    existing_listener_content = None
+    if os.path.exists(refactoring_listener_path):
+        with open(refactoring_listener_path, "r", encoding="utf-8") as f:
+            existing_listener_content = f.read()
+    if existing_listener_content != refactoring_listener_content and (
+        existing_listener_content is None or "LspRenameEventDataFallback" not in existing_listener_content
+    ):
+        os.makedirs(os.path.dirname(refactoring_listener_path), exist_ok=True)
+        with open(refactoring_listener_path, "w", encoding="utf-8") as f:
+            f.write(refactoring_listener_content)
+
+    # 17h. Write or patch LspWillRenameFilesHandler.kt (backported from IJPL-249183 / 752ad55221cc
+    # with 10s timeout and 253-262 RefactoringEventData compatibility)
+    will_rename_handler_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/workspaceFileOperations/LspWillRenameFilesHandler.kt"
+    )
+    will_rename_handler_content = """// Copyright 2000-2026 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+package com.intellij.platform.dartlsp.impl.features.workspaceFileOperations
+
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ex.ApplicationManagerEx
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.diagnostic.ControlFlowException
+import com.intellij.openapi.diagnostic.fileLogger
+import com.intellij.openapi.progress.runBlockingCancellable
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Key
+import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.newvfs.impl.FakeVirtualFile
+import com.intellij.platform.dartlsp.api.LspBundle
+import com.intellij.platform.dartlsp.impl.LspDynamicCapabilities
+import com.intellij.platform.dartlsp.impl.LspServerImpl
+import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
+import com.intellij.platform.dartlsp.impl.platformListeners.MOVE_REFACTORING_ID
+import com.intellij.platform.dartlsp.impl.platformListeners.RENAME_REFACTORING_ID
+import com.intellij.platform.dartlsp.impl.util.LspWorkspaceEditApplier
+import com.intellij.psi.PsiDirectory
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiFileSystemItem
+import com.intellij.refactoring.listeners.RefactoringEventData
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresEdt
+import com.intellij.util.io.URLUtil
+import java.lang.ref.WeakReference
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withTimeoutOrNull
+import org.eclipse.lsp4j.FileOperationFilter
+import org.eclipse.lsp4j.FileRename
+import org.eclipse.lsp4j.RenameFilesParams
+import org.eclipse.lsp4j.WorkspaceEdit
+import kotlin.time.Duration.Companion.milliseconds
+
+private val LOG = fileLogger()
+
+// The spec allows a client to drop a response that takes too long.
+// Dart patch (IJPL-249183): use a 10s timeout (instead of upstream's 1000ms) to accommodate
+// Dart Analysis Server cross-package import resolution; users can still click "Skip" in the progress dialog.
+private val WILL_RENAME_FILES_TIMEOUT = 10_000.milliseconds
+
+internal object LspWillRenameFilesHandler {
+  // Dart patch (IJPL-249183): RefactoringEventData.RENAMES_KEY and TARGET_ELEMENT_KEY were added in
+  // IntelliJ 2026.3. Resolve them reflectively when running on 263+, and fall back to pre-refactoring
+  // listeners (LspRenameEventDataFallback / LspMoveEventDataFallback) on 2025.3-2026.2.
+  @Suppress("UNCHECKED_CAST")
+  private val RENAMES_KEY: Key<Map<PsiElement, String>>? = runCatching {
+    RefactoringEventData::class.java.getField("RENAMES_KEY").get(null) as? Key<Map<PsiElement, String>>
+  }.getOrNull()
+
+  @Suppress("UNCHECKED_CAST")
+  private val TARGET_ELEMENT_KEY: Key<PsiElement>? = runCatching {
+    RefactoringEventData::class.java.getField("TARGET_ELEMENT_KEY").get(null) as? Key<PsiElement>
+  }.getOrNull()
+
+  internal val hasPlatformRenamesKey: Boolean
+    get() = RENAMES_KEY != null
+
+  internal val hasPlatformTargetElementKey: Boolean
+    get() = TARGET_ELEMENT_KEY != null
+
+  private const val MAX_FALLBACK_ENTRIES = 16
+  private val fallbackLock = Any()
+  private val capturedRenames = ArrayDeque<CapturedRename>()
+  private val capturedMoves = ArrayDeque<CapturedMove>()
+
+  private class CapturedRename(
+    val projectRef: WeakReference<Project>,
+    val primaryElementRef: WeakReference<PsiElement>,
+    val allRenamesRef: WeakReference<Map<PsiElement, String>>,
+  )
+
+  private class CapturedMove(
+    val projectRef: WeakReference<Project>,
+    val elementsRef: WeakReference<Array<out PsiElement>>,
+    val targetDirRef: WeakReference<PsiDirectory>,
+  )
+
+  internal fun hasWillRenameCapableServer(project: Project): Boolean {
+    if (project.isDisposed) return false
+    return LspServerManagerImpl.getInstanceImpl(project).getAllRunningServers()
+      .any { it.clientCapabilities?.workspace?.fileOperations?.willRename == true }
+  }
+
+  internal fun hasWillRenameCapableServerForFile(project: Project, fileOrDir: VirtualFile): Boolean {
+    if (project.isDisposed) return false
+    return LspServerManagerImpl.getInstanceImpl(project).getAllRunningServers()
+      .any { server ->
+        server.clientCapabilities?.workspace?.fileOperations?.willRename == true &&
+        server.descriptor.roots.any { root -> VfsUtilCore.isAncestor(root, fileOrDir, false) }
+      }
+  }
+
+  internal fun recordFallbackRename(primaryElement: PsiElement, allRenames: Map<PsiElement, String>) {
+    synchronized(fallbackLock) {
+      pruneFallbackEntriesLocked()
+      capturedRenames.removeAll { it.allRenamesRef.get() === allRenames }
+      capturedRenames.addFirst(
+        CapturedRename(WeakReference(primaryElement.project), WeakReference(primaryElement), WeakReference(allRenames))
+      )
+      while (capturedRenames.size > MAX_FALLBACK_ENTRIES) {
+        capturedRenames.removeLast()
+      }
+    }
+  }
+
+  internal fun recordFallbackMove(elementsToMove: Array<out PsiElement>, targetDirectory: PsiDirectory) {
+    synchronized(fallbackLock) {
+      pruneFallbackEntriesLocked()
+      capturedMoves.removeAll { it.elementsRef.get() === elementsToMove }
+      capturedMoves.addFirst(
+        CapturedMove(WeakReference(targetDirectory.project), WeakReference(elementsToMove), WeakReference(targetDirectory))
+      )
+      while (capturedMoves.size > MAX_FALLBACK_ENTRIES) {
+        capturedMoves.removeLast()
+      }
+    }
+  }
+
+  internal fun renameOrMoveRefactoringDone(project: Project, refactoringId: String, afterData: RefactoringEventData?) {
+    if (RENAMES_KEY != null && TARGET_ELEMENT_KEY != null) return
+    val element = afterData?.getUserData(RefactoringEventData.PSI_ELEMENT_KEY)
+    synchronized(fallbackLock) {
+      pruneFallbackEntriesLocked()
+      when (refactoringId) {
+        RENAME_REFACTORING_ID -> if (element != null) {
+          capturedRenames.removeAll { entry ->
+            entry.projectRef.get() == project &&
+            (entry.primaryElementRef.get() == element || entry.allRenamesRef.get()?.containsKey(element) == true)
+          }
+        }
+        MOVE_REFACTORING_ID -> if (element != null) {
+          val index = capturedMoves.indexOfFirst { it.projectRef.get() == project && it.targetDirRef.get() == element }
+          if (index >= 0) capturedMoves.removeAt(index)
+        }
+      }
+    }
+  }
+
+  private fun pruneFallbackEntriesLocked() {
+    capturedRenames.removeAll { it.projectRef.get()?.isDisposed != false || it.allRenamesRef.get() == null }
+    capturedMoves.removeAll {
+      it.projectRef.get()?.isDisposed != false || it.elementsRef.get() == null || it.targetDirRef.get() == null
+    }
+  }
+
+  private fun findFallbackRename(project: Project, primaryElement: PsiElement?): Map<PsiElement, String>? {
+    if (primaryElement == null) return null
+    synchronized(fallbackLock) {
+      pruneFallbackEntriesLocked()
+      val match = capturedRenames.firstOrNull { entry ->
+        val map = entry.allRenamesRef.get() ?: return@firstOrNull false
+        entry.projectRef.get() == project && (entry.primaryElementRef.get() == primaryElement || map.containsKey(primaryElement))
+      }
+      return match?.allRenamesRef?.get()?.let { LinkedHashMap(it) }
+    }
+  }
+
+  private fun findFallbackMoveTarget(project: Project, elements: Array<out PsiElement>): PsiDirectory? {
+    synchronized(fallbackLock) {
+      pruneFallbackEntriesLocked()
+      val match = capturedMoves.firstOrNull { entry ->
+        val capturedElements = entry.elementsRef.get() ?: return@firstOrNull false
+        entry.projectRef.get() == project && (capturedElements === elements || capturedElements.contentEquals(elements))
+      }
+      return match?.targetDirRef?.get()
+    }
+  }
+
+  /**
+   * Sends the
+   * [workspace/willRenameFiles](https://microsoft.github.io/language-server-protocol/specification/#workspace_willRenameFiles)
+   * request before a Rename or Move refactoring changes the files, and applies the edits from the servers in the command of the refactoring.
+   */
+  internal fun renameOrMoveRefactoringStarted(project: Project, refactoringId: String, beforeData: RefactoringEventData) {
+    val lspServers = LspServerManagerImpl.getInstanceImpl(project).getAllRunningServers()
+      .filter { it.clientCapabilities?.workspace?.fileOperations?.willRename == true }
+    if (lspServers.isEmpty()) return
+
+    val application = ApplicationManager.getApplication()
+    if (!application.isDispatchThread || application.isWriteAccessAllowed) {
+      LOG.warn("Skipping workspace/willRenameFiles for '$refactoringId': the event came " +
+               "${if (application.isDispatchThread) "on the EDT" else "off the EDT"}, " +
+               "${if (application.isWriteAccessAllowed) "inside" else "outside"} a write action. " +
+               "Expected: EDT outside a write action.")
+      return
+    }
+
+    val plannedRenames = when (refactoringId) {
+      RENAME_REFACTORING_ID -> getPlannedRenamesFromRenameRefactoring(project, beforeData)
+      MOVE_REFACTORING_ID -> getPlannedRenamesFromMoveRefactoring(project, beforeData)
+      else -> emptyList()
+    }
+    if (plannedRenames.isEmpty()) return
+
+    try {
+      sendWillRenameFilesRequestsAndApplyEdits(project, lspServers, plannedRenames)
+    }
+    catch (e: Throwable) {
+      if (e is CancellationException || e is ControlFlowException) throw e
+      LOG.error(e)
+    }
+  }
+
+  private fun getPlannedRenamesFromRenameRefactoring(project: Project, beforeData: RefactoringEventData): List<LspPlannedRename> {
+    val renames = (if (RENAMES_KEY != null) {
+      beforeData.getUserData(RENAMES_KEY)
+    }
+    else {
+      findFallbackRename(project, beforeData.getUserData(RefactoringEventData.PSI_ELEMENT_KEY))
+    }) ?: return emptyList()
+    return renames.mapNotNull { (element, newName) ->
+      if (element !is PsiFileSystemItem || !element.isValid || element.name == newName) return@mapNotNull null
+      val parentDir = element.parent as? PsiDirectory ?: return@mapNotNull null
+      createPlannedRename(element, parentDir, newName)
+    }
+  }
+
+  private fun getPlannedRenamesFromMoveRefactoring(project: Project, beforeData: RefactoringEventData): List<LspPlannedRename> {
+    val elements = beforeData.getUserData(RefactoringEventData.PSI_ELEMENT_ARRAY_KEY) ?: return emptyList()
+    val targetDir = (if (TARGET_ELEMENT_KEY != null) {
+      beforeData.getUserData(TARGET_ELEMENT_KEY) as? PsiDirectory
+    }
+    else {
+      findFallbackMoveTarget(project, elements)
+    }) ?: return emptyList()
+    return elements.mapNotNull { element ->
+      // the move skips an item that is already in the target, and a file whose name already exists there
+      if (element !is PsiFileSystemItem || !element.isValid || element.parent == targetDir) return@mapNotNull null
+      if (element is PsiFile && targetDir.findFile(element.name) != null) return@mapNotNull null
+      createPlannedRename(element, targetDir, element.name)
+    }
+  }
+
+  private fun createPlannedRename(fileSystemItem: PsiFileSystemItem, newParentDir: PsiDirectory, newName: String): LspPlannedRename? {
+    val fileOrDir = fileSystemItem.virtualFile
+    if (fileOrDir == null || !fileOrDir.isValid) return null
+    return LspPlannedRename(fileOrDir, newParentDir.virtualFile, newName)
+  }
+
+  private class LspPlannedRename(val fileOrDir: VirtualFile, val newParentDir: VirtualFile, val newName: String)
+
+  @RequiresEdt
+  private fun sendWillRenameFilesRequestsAndApplyEdits(
+    project: Project,
+    lspServers: List<LspServerImpl>,
+    plannedRenames: List<LspPlannedRename>,
+  ) {
+    val lspServerToFilters = lspServers
+      .mapNotNull { lspServer -> getWillRenameFilters(lspServer).takeIf { it.isNotEmpty() }?.let { lspServer to it } }
+    if (lspServerToFilters.isEmpty()) return
+
+    var workspaceEditAppliers = emptyList<LspWorkspaceEditApplier>()
+    val completed = ApplicationManagerEx.getApplicationEx().runProcessWithProgressSynchronously(
+      { workspaceEditAppliers = sendWillRenameFilesRequests(lspServerToFilters, plannedRenames) },
+      LspBundle.message("lsp.will.rename.files.progress.title"),
+      true,
+      true,
+      project,
+      null,
+      LspBundle.message("lsp.will.rename.files.skip"),
+    )
+
+    if (completed) {
+      workspaceEditAppliers.forEach { it.applyWorkspaceEdit() }
+    }
+  }
+
+  private fun getWillRenameFilters(lspServer: LspServerImpl): List<FileOperationFilter> {
+    val staticFilters = lspServer.serverCapabilities?.workspace?.fileOperations?.willRename?.filters.orEmpty()
+    val dynamicFilters = lspServer.dynamicCapabilities.getCapabilityRegistrationOptions(LspDynamicCapabilities.willRenameFiles)
+      .flatMap { it.filters.orEmpty() }
+    return staticFilters + dynamicFilters
+  }
+
+  @RequiresBackgroundThread
+  private fun sendWillRenameFilesRequests(
+    lspServerToFilters: List<Pair<LspServerImpl, List<FileOperationFilter>>>,
+    plannedRenames: List<LspPlannedRename>,
+  ): List<LspWorkspaceEditApplier> = runBlockingCancellable {
+    lspServerToFilters.map { (lspServer, filters) ->
+      async {
+        val serverPlannedRenames = filterPlannedRenames(lspServer, filters, plannedRenames)
+        if (serverPlannedRenames.isEmpty()) return@async null
+        val edit = sendWillRenameFilesRequest(lspServer, serverPlannedRenames) ?: return@async null
+        readAction { LspWorkspaceEditApplier.create(lspServer, edit) }
+      }
+    }.awaitAll().filterNotNull()
+  }
+
+  @RequiresBackgroundThread
+  private fun filterPlannedRenames(
+    lspServer: LspServerImpl,
+    filters: List<FileOperationFilter>,
+    plannedRenames: List<LspPlannedRename>,
+  ): List<LspPlannedRename> {
+    return plannedRenames.filter { plannedRename ->
+      val filePath = lspServer.descriptor.getFilePath(plannedRename.fileOrDir)
+      val uriScheme = plannedRename.fileOrDir.fileSystem.protocol
+      val isDirectory = plannedRename.fileOrDir.isDirectory
+
+      lspServer.descriptor.roots.any { root -> VfsUtilCore.isAncestor(root, plannedRename.fileOrDir, false) } &&
+      filters.any { lspServer.globMatcher.pathMatchesFileOperationFilter(filePath, uriScheme, isDirectory, it) }
+    }
+  }
+
+  private suspend fun sendWillRenameFilesRequest(lspServer: LspServerImpl, plannedRenames: List<LspPlannedRename>): WorkspaceEdit? {
+    val fileRenames = plannedRenames.map {
+      val oldUri = lspServer.descriptor.getFileUri(it.fileOrDir)
+      val newUri = lspServer.descriptor.getFileUri(LspRenameTargetFile(it.newParentDir, it.newName, it.fileOrDir.isDirectory))
+      FileRename(oldUri, newUri)
+    }
+    val params = RenameFilesParams(fileRenames)
+
+    return try {
+      withTimeoutOrNull(WILL_RENAME_FILES_TIMEOUT) {
+        lspServer.sendRequest { it.workspaceService.willRenameFiles(params) }
+      }
+    }
+    catch (e: CancellationException) {
+      throw e
+    }
+    catch (e: Exception) {
+      // a failed server must not cancel the requests to other servers
+      LOG.warn("${lspServer.descriptor}: workspace/willRenameFiles request failed", e)
+      null
+    }
+  }
+}
+
+/**
+ * The file or directory at the new location of a planned rename. It does not exist yet.
+ * It has the file system and the path of the real file after the rename,
+ * so [com.intellij.platform.dartlsp.api.LspServerDescriptor.getFileUri] and its overrides give the same URI for both.
+ */
+private class LspRenameTargetFile(
+  newParentDir: VirtualFile,
+  newName: String,
+  private val isDirectory: Boolean,
+) : FakeVirtualFile(newParentDir, newName) {
+
+  override fun getUrl(): String = fileSystem.protocol + URLUtil.SCHEME_SEPARATOR + path
+  override fun isDirectory(): Boolean = isDirectory
+  override fun isValid(): Boolean = true
+}
+"""
+    existing_handler_content = None
+    if os.path.exists(will_rename_handler_path):
+        with open(will_rename_handler_path, "r", encoding="utf-8") as f:
+            existing_handler_content = f.read()
+    if existing_handler_content != will_rename_handler_content and (
+        existing_handler_content is None or "hasPlatformRenamesKey" not in existing_handler_content
+    ):
+        os.makedirs(os.path.dirname(will_rename_handler_path), exist_ok=True)
+        with open(will_rename_handler_path, "w", encoding="utf-8") as f:
+            f.write(will_rename_handler_content)
 
     print("Patch applied successfully!")
 

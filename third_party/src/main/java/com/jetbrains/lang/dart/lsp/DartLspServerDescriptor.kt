@@ -127,9 +127,8 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
     override val clientCapabilities: ClientCapabilities
         get() = super.clientCapabilities.apply {
             val ws = workspace ?: WorkspaceClientCapabilities().also { workspace = it }
-            ws.fileOperations = FileOperationsWorkspaceCapabilities().apply {
-                willRename = true
-            }
+            val fileOps = ws.fileOperations ?: FileOperationsWorkspaceCapabilities().also { ws.fileOperations = it }
+            fileOps.willRename = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
             val td = textDocument ?: TextDocumentClientCapabilities().also { textDocument = it }
             val pd = td.publishDiagnostics ?: PublishDiagnosticsCapabilities().also { td.publishDiagnostics = it }
             pd.relatedInformation = true

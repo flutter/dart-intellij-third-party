@@ -16,6 +16,7 @@ import com.intellij.platform.dartlsp.impl.logging.LanguageServiceLoggerService
 import com.intellij.util.ConcurrencyUtil
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
+import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.InitializedParams
 import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint
@@ -52,7 +53,7 @@ internal abstract class Lsp4jServerConnector protected constructor(private val l
 
   @RequiresBackgroundThread
   @RequiresReadLockAbsence
-  internal fun connect(onSuccess: (InitializeResult) -> Unit) {
+  internal fun connect(onSuccess: (InitializeParams, InitializeResult) -> Unit) {
     prepareConnect()
 
     val messageJsonHandler = createMessageJsonHandler()
@@ -93,17 +94,19 @@ internal abstract class Lsp4jServerConnector protected constructor(private val l
 
   @RequiresBackgroundThread
   @RequiresReadLockAbsence
-  private fun initializeServer(onSuccess: (InitializeResult) -> Unit) {
+  private fun initializeServer(onSuccess: (InitializeParams, InitializeResult) -> Unit) {
     logger.debug("$descriptor: initializing LSP server")
 
     var error: Throwable? = null
     val countDownLatch = CountDownLatch(1)
 
-    lsp4jServer.initialize(descriptor.createInitializeParams())
+    val initializeParams = descriptor.createInitializeParams()
+
+    lsp4jServer.initialize(initializeParams)
       .whenComplete { result: InitializeResult?, th: Throwable? ->
         if (result != null) {
           lsp4jServer.initialized(InitializedParams())
-          onSuccess(result)
+          onSuccess(initializeParams, result)
         }
         else {
           error = th ?: RuntimeException("No InitializeResult")
