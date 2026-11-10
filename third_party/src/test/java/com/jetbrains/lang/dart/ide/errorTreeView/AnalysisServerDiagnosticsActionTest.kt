@@ -3,9 +3,10 @@ package com.jetbrains.lang.dart.ide.errorTreeView
 
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.testFramework.TestActionEvent
-import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
+import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 
-class AnalysisServerDiagnosticsActionTest : DartCodeInsightFixtureTestCase() {
+class AnalysisServerDiagnosticsActionTest : BasePlatformTestCase() {
 
     fun testUpdateWhenNoServerRunning() {
         val action = AnalysisServerDiagnosticsAction()
@@ -16,5 +17,16 @@ class AnalysisServerDiagnosticsActionTest : DartCodeInsightFixtureTestCase() {
         action.update(event)
         
         assertFalse(event.presentation.isEnabledAndVisible)
+        assertNull(project.getServiceIfCreated(DartAnalysisServerService::class.java))
+    }
+
+    fun testRunDoesNotInstantiateLegacyServerService() {
+        val action = AnalysisServerDiagnosticsAction()
+        val dataContext = SimpleDataContext.getProjectContext(project)
+        val event = TestActionEvent.createTestEvent(dataContext)
+
+        action.run(project, event)
+
+        assertNull(project.getServiceIfCreated(DartAnalysisServerService::class.java))
     }
 }

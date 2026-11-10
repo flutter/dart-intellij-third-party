@@ -23,6 +23,8 @@ import org.dartlang.analysis.server.protocol.RequestError;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.concurrent.CompletionException;
+
 public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
   private static final String MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION = "3.13.0-106.0.dev";
 
@@ -37,9 +39,7 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
       e.getPresentation().setEnabledAndVisible(false);
       return;
     }
-    DartAnalysisServerService server = project.getServiceIfCreated(DartAnalysisServerService.class);
-    final boolean isRunning = DartLspService.isServerRunning(project) ||
-                              (server != null && server.isServerProcessActive());
+    final boolean isRunning = DartLspService.isServerRunning(project) || isLegacyServerRunning(project);
     e.getPresentation().setEnabledAndVisible(isRunning);
   }
 
@@ -60,7 +60,7 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
     DartSdk sdk = DartSdk.getDartSdk(project);
     String sdkVersion = sdk != null ? sdk.getVersion() : "";
     if ((!sdkVersion.isEmpty() && DartSdkUpdateChecker.compareDartSdkVersions(sdkVersion, MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION) >= 0) ||
-        !DartAnalysisServerService.getInstance(project).isServerProcessActive()) {
+        !isLegacyServerRunning(project)) {
       useLspOverLegacy(project);
     } else {
       fallbackToLegacy(project);
@@ -82,24 +82,29 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
         if (project.isDisposed()) return;
         if (port != null) {
           BrowserUtil.browse("http://localhost:" + port + "/status");
-        } else {
+        } else if (isLegacyServerRunning(project)) {
           fallbackToLegacy(project);
+        } else {
+          showErrorNotification(project, DartBundle.message("analysis.server.not.running"));
         }
       })
       .exceptionally(ex -> {
         if (project.isDisposed()) return null;
-        fallbackToLegacy(project);
+        if (isLegacyServerRunning(project)) {
+          fallbackToLegacy(project);
+        } else {
+          Throwable cause = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
+          String message = cause.getMessage();
+          showErrorNotification(project, message != null ? message : DartBundle.message("analysis.server.not.running"));
+        }
         return null;
       });
   }
 
   private void fallbackToLegacy(@NotNull Project project) {
-    DartAnalysisServerService server = DartAnalysisServerService.getInstance(project);
-    if (!server.isServerProcessActive()) {
-      String title = DartBundle.message("analysis.server.show.diagnostics.error");
-      String message = DartBundle.message("analysis.server.not.running");
-      Notification notification = new Notification("Dart Analysis Server", title, message, NotificationType.ERROR);
-      Notifications.Bus.notify(notification, project);
+    DartAnalysisServerService server = project.getServiceIfCreated(DartAnalysisServerService.class);
+    if (server == null || !server.isServerProcessActive()) {
+      showErrorNotification(project, DartBundle.message("analysis.server.not.running"));
       return;
     }
     server.diagnostic_getServerPort(new GetServerPortConsumer() {
@@ -111,11 +116,19 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
       @Override
       public void onError(RequestError requestError) {
         if (project.isDisposed()) return;
-        String title = DartBundle.message("analysis.server.show.diagnostics.error");
-        String message = requestError.getMessage();
-        Notification notification = new Notification("Dart Analysis Server", title, message, NotificationType.ERROR);
-        Notifications.Bus.notify(notification, project);
+        showErrorNotification(project, requestError.getMessage());
       }
     });
+  }
+
+  private static boolean isLegacyServerRunning(@NotNull Project project) {
+    DartAnalysisServerService server = project.getServiceIfCreated(DartAnalysisServerService.class);
+    return server != null && server.isServerProcessActive();
+  }
+
+  private static void showErrorNotification(@NotNull Project project, @NotNull String message) {
+    String title = DartBundle.message("analysis.server.show.diagnostics.error");
+    Notification notification = new Notification("Dart Analysis Server", title, message, NotificationType.ERROR);
+    Notifications.Bus.notify(notification, project);
   }
 }
