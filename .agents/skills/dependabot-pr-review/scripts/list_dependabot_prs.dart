@@ -75,7 +75,8 @@ enum PrSource {
 /// The `--json` fields requested from `gh pr list`.
 const prFields =
     'number,title,url,author,createdAt,updatedAt,headRefName,isDraft,'
-    'mergeable,reviewDecision,labels,statusCheckRollup';
+    'mergeable,reviewDecision,labels,statusCheckRollup,'
+    'baseRefName,headRefOid';
 
 const failingConclusions = <String>{
   'FAILURE',
@@ -101,6 +102,98 @@ const kokoroRunLabel = 'kokoro:run';
 /// Kokoro posts legacy commit statuses named after the platform, such as
 /// `kokoro-mac`. The match ignores case.
 bool isKokoroCheck(String name) => name.toLowerCase().startsWith('kokoro');
+
+/// Repositories whose Kokoro job only reads [kokoroRunLabel] when a commit is
+/// pushed, so a re-run there always goes through `@dependabot recreate`.
+///
+/// Must match `recreateRepos` in `approve_and_label.dart`.
+const recreateRepos = {'flutter/dart-intellij-third-party'};
+
+/// How long a [kokoroRunLabel] may sit on a PR without Kokoro posting a
+/// status before it is treated as stuck rather than queued.
+///
+/// Kokoro normally starts within a minute. A label added while a build is
+/// already running is ignored and left in place, which is how it gets stuck.
+const kokoroLabelStuckAfter = Duration(minutes: 15);
+
+/// Commit author logins that count as Dependabot's own commits.
+///
+/// Any other author means the branch was edited by hand (for example, a
+/// merge from the base branch), so Dependabot will refuse `@dependabot
+/// rebase` and only `@dependabot recreate` or a manual update will work.
+const dependabotCommitLogins = {'dependabot[bot]', 'dependabot'};
+
+/// What to do about a PR that is blocked on Kokoro.
+enum KokoroAction {
+  /// Nothing Kokoro-related is needed.
+  none('-'),
+
+  /// A Kokoro build is running on the current head, or a run is queued.
+  wait('wait'),
+
+  /// Add [kokoroRunLabel] to re-run Kokoro on the current head.
+  rerun('re-run'),
+
+  /// [kokoroRunLabel] is stuck: remove it and add it again.
+  relabel('re-label'),
+
+  /// The branch is behind its base. Bring it up to date first (a fix may be
+  /// on the base branch), then re-run Kokoro on the new head.
+  updateBranch('update branch + re-run'),
+
+  /// The repository needs `@dependabot recreate` for any re-run.
+  recreate('recreate');
+
+  const KokoroAction(this.label);
+
+  /// Short label used in the summary footnotes.
+  final String label;
+}
+
+/// Extra Kokoro diagnostics, fetched only for PRs where Kokoro matters.
+///
+/// Each field is null when its lookup failed, so a broken lookup is never
+/// mistaken for "fine".
+final class KokoroDiagnostics {
+  KokoroDiagnostics({
+    required this.behindBy,
+    required this.kokoroLabelAddedAt,
+    required this.latestKokoroStatusAt,
+    required this.headKokoroPending,
+    required this.baseKokoroState,
+    required this.hasNonBotCommits,
+  });
+
+  /// How many commits the head is behind its base branch.
+  final int? behindBy;
+
+  /// When [kokoroRunLabel] was last added, if it ever was.
+  final DateTime? kokoroLabelAddedAt;
+
+  /// When Kokoro last posted any status on the head commit.
+  final DateTime? latestKokoroStatusAt;
+
+  /// Whether the newest Kokoro status on the head commit is `pending`.
+  final bool headKokoroPending;
+
+  /// The newest Kokoro status state on the base branch, such as `success`.
+  ///
+  /// A green base with a red, out-of-date PR usually means the fix landed on
+  /// the base after the PR branched.
+  final String? baseKokoroState;
+
+  /// Whether someone other than Dependabot committed to the branch.
+  final bool hasNonBotCommits;
+
+  Map<String, Object?> toJson() => {
+    'behindBy': behindBy,
+    'kokoroLabelAddedAt': kokoroLabelAddedAt?.toIso8601String(),
+    'latestKokoroStatusAt': latestKokoroStatusAt?.toIso8601String(),
+    'headKokoroPending': headKokoroPending,
+    'baseKokoroState': baseKokoroState,
+    'hasNonBotCommits': hasNonBotCommits,
+  };
+}
 
 /// Stand-in name for a PR whose title cannot be parsed or is missing.
 ///
@@ -296,6 +389,8 @@ final class PullRequest {
     required this.labels,
     required this.hasLabel,
     required this.checks,
+    this.baseRefName = '',
+    this.headRefOid = '',
   }) : dependency = DependencyBump.parse(title);
 
   /// Builds a [PullRequest] from one `gh pr list --json` entry.
@@ -332,6 +427,8 @@ final class PullRequest {
       labels: labels,
       hasLabel: labels.contains(label),
       checks: summarizeChecks(json['statusCheckRollup'] as List<Object?>?),
+      baseRefName: (json['baseRefName'] ?? '').toString(),
+      headRefOid: (json['headRefOid'] ?? '').toString(),
     );
   }
 
@@ -353,6 +450,67 @@ final class PullRequest {
 
   final ChecksSummary checks;
 
+  /// The branch the PR targets, usually `main`.
+  final String baseRefName;
+
+  /// The SHA of the PR's head commit.
+  final String headRefOid;
+
+  /// Kokoro diagnostics, filled in by [fetchKokoroDiagnostics] only for PRs
+  /// where Kokoro matters.
+  KokoroDiagnostics? kokoro;
+
+  /// Whether someone other than Dependabot committed to the branch.
+  ///
+  /// Dependabot refuses `@dependabot rebase` on such a branch.
+  ///
+  /// Only known once [kokoro] diagnostics are fetched; false until then.
+  bool get hasNonBotCommits => kokoro?.hasNonBotCommits ?? false;
+
+  /// Whether Kokoro is relevant to this PR at all: either it is the only
+  /// failing check, or a [kokoroRunLabel] is sitting on the PR.
+  bool get kokoroRelevant => checks.onlyKokoroFailing || hasKokoroRunLabel;
+
+  /// Whether [kokoroRunLabel] has sat on the PR for longer than
+  /// [kokoroLabelStuckAfter] without Kokoro posting a status since.
+  bool kokoroLabelStuck(DateTime now) {
+    final diag = kokoro;
+    if (!hasKokoroRunLabel || diag == null) return false;
+    final addedAt = diag.kokoroLabelAddedAt;
+    if (addedAt == null) return false;
+    final statusAt = diag.latestKokoroStatusAt;
+    final noStatusSince = statusAt == null || statusAt.isBefore(addedAt);
+    return noStatusSince && now.difference(addedAt) > kokoroLabelStuckAfter;
+  }
+
+  /// The recommended Kokoro action, or [KokoroAction.none].
+  ///
+  /// In [recreateRepos] every re-run is a recreate. Elsewhere:
+  /// - a build running on the head means wait;
+  /// - an out-of-date branch is updated first, because re-running Kokoro on
+  ///   it would rebuild code that predates any fix on the base branch;
+  /// - a stuck label is removed and added again;
+  /// - otherwise the label is added (or, if present and fresh, waited on).
+  KokoroAction kokoroAction(DateTime now) {
+    if (!kokoroRelevant) return KokoroAction.none;
+    // A leftover label on a green PR needs nothing. In flutter-intellij it may
+    // start one extra build on the next push, which is harmless.
+    if (checks.status == BuildStatus.passing) return KokoroAction.none;
+    final diag = kokoro;
+    if (diag != null && diag.headKokoroPending) return KokoroAction.wait;
+    if (recreateRepos.contains(repo.toLowerCase())) {
+      return checks.onlyKokoroFailing && source == PrSource.dependabot
+          ? KokoroAction.recreate
+          : KokoroAction.none;
+    }
+    if (checks.onlyKokoroFailing && (diag?.behindBy ?? 0) > 0) {
+      return KokoroAction.updateBranch;
+    }
+    if (kokoroLabelStuck(now)) return KokoroAction.relabel;
+    if (hasKokoroRunLabel) return KokoroAction.wait;
+    return checks.onlyKokoroFailing ? KokoroAction.rerun : KokoroAction.none;
+  }
+
   /// The dependency being bumped, parsed from [title].
   final DependencyBump dependency;
 
@@ -365,10 +523,12 @@ final class PullRequest {
   /// Whether [kokoroRunLabel] is on the PR.
   ///
   /// Where Kokoro acts on the label as soon as it is added, as in
-  /// `flutter/flutter-intellij`, it removes the label when it starts, so a
-  /// label that is still present means a run is queued. In
-  /// `flutter/dart-intellij-third-party`, Kokoro only reads the label when a
-  /// commit is pushed, so a present label may just be left over.
+  /// `flutter/flutter-intellij`, it removes the label when it starts. A label
+  /// added while a build is already running is ignored and stays put, so a
+  /// present label usually means a run is queued, but may be stuck (see
+  /// [kokoroLabelStuck]). In `flutter/dart-intellij-third-party`, Kokoro only
+  /// reads the label when a commit is pushed, so a present label may just be
+  /// left over.
   bool get hasKokoroRunLabel => labels.contains(kokoroRunLabel);
 
   /// The `owner/repo#number` reference accepted by `approve_and_label.dart`.
@@ -392,6 +552,12 @@ final class PullRequest {
     'hasLabel': hasLabel,
     'hasKokoroRunLabel': hasKokoroRunLabel,
     'checks': checks.toJson(),
+    'baseRefName': baseRefName,
+    'headRefOid': headRefOid,
+    'hasNonBotCommits': hasNonBotCommits,
+    'kokoro': kokoro?.toJson(),
+    'kokoroLabelStuck': kokoroLabelStuck(DateTime.now().toUtc()),
+    'kokoroAction': kokoroAction(DateTime.now().toUtc()).name,
   };
 }
 
@@ -570,6 +736,96 @@ List<PullRequest>? fetchPullRequests(
 /// Escapes a value for safe interpolation into a markdown table cell.
 String escapeCell(String value) => value.replaceAll('|', r'\|');
 
+/// Newest Kokoro status `(state, createdAt)` on [ref] in [repo], or null.
+///
+/// Uses the commit statuses API, which lists newest first, because the
+/// `statusCheckRollup` from `gh pr list` omits status timestamps.
+({String state, DateTime createdAt})? newestKokoroStatus(
+  String repo,
+  String ref,
+) {
+  final raw = runCommand('gh', [
+    'api',
+    'repos/$repo/commits/$ref/statuses',
+    '--jq',
+    '[.[] | select(.context | ascii_downcase | startswith("kokoro"))][0]'
+        ' | if . == null then "" else "\\(.state) \\(.created_at)" end',
+  ]);
+  if (raw == null || raw.isEmpty) return null;
+  final parts = raw.split(' ');
+  final createdAt = parts.length == 2 ? DateTime.tryParse(parts[1]) : null;
+  if (createdAt == null) return null;
+  return (state: parts[0], createdAt: createdAt);
+}
+
+/// Cache of the newest Kokoro state per `repo@branch`, so each base branch is
+/// queried once per run.
+final _baseKokoroStateCache = <String, String?>{};
+
+/// Fills in [PullRequest.kokoro] for [pr].
+///
+/// Costs four or five extra `gh api` calls, so callers only invoke it for
+/// PRs where [PullRequest.kokoroRelevant] is true. Individual lookup failures
+/// leave the matching field null rather than failing the whole listing.
+void fetchKokoroDiagnostics(PullRequest pr) {
+  int? behindBy;
+  if (pr.baseRefName.isNotEmpty && pr.headRefOid.isNotEmpty) {
+    final raw = runCommand('gh', [
+      'api',
+      'repos/${pr.repo}/compare/${pr.baseRefName}...${pr.headRefOid}',
+      '--jq',
+      '.behind_by',
+    ]);
+    behindBy = raw == null ? null : int.tryParse(raw);
+  }
+
+  DateTime? labelAddedAt;
+  if (pr.hasKokoroRunLabel) {
+    final raw = runCommand('gh', [
+      'api',
+      '--paginate',
+      'repos/${pr.repo}/issues/${pr.number}/timeline',
+      '--jq',
+      '.[] | select(.event == "labeled" and .label.name == "$kokoroRunLabel")'
+          ' | .created_at',
+    ]);
+    final stamps = const LineSplitter().convert(raw ?? '');
+    if (stamps.isNotEmpty) labelAddedAt = DateTime.tryParse(stamps.last);
+  }
+
+  final head = pr.headRefOid.isEmpty
+      ? null
+      : newestKokoroStatus(pr.repo, pr.headRefOid);
+
+  final baseKey = '${pr.repo}@${pr.baseRefName}';
+  final baseState = pr.baseRefName.isEmpty
+      ? null
+      : _baseKokoroStateCache.putIfAbsent(
+          baseKey,
+          () => newestKokoroStatus(pr.repo, pr.baseRefName)?.state,
+        );
+
+  final authors = runCommand('gh', [
+    'api',
+    '--paginate',
+    'repos/${pr.repo}/pulls/${pr.number}/commits',
+    '--jq',
+    '.[] | (.author.login // .commit.author.name)',
+  ]);
+  final hasNonBotCommits = const LineSplitter()
+      .convert(authors ?? '')
+      .any((login) => !dependabotCommitLogins.contains(login));
+
+  pr.kokoro = KokoroDiagnostics(
+    behindBy: behindBy,
+    kokoroLabelAddedAt: labelAddedAt,
+    latestKokoroStatusAt: head?.createdAt,
+    headKokoroPending: head?.state == 'pending',
+    baseKokoroState: baseState,
+    hasNonBotCommits: hasNonBotCommits,
+  );
+}
+
 /// Prints the markdown summary table for [prs].
 void printTable(List<PullRequest> prs) {
   stdout.writeln(
@@ -600,19 +856,53 @@ void printTable(List<PullRequest> prs) {
   }
 }
 
+/// A one-line explanation of [pr]'s Kokoro state and recommended action.
+///
+/// For example: `branch 5 behind main (main's Kokoro: success); update branch
+/// + re-run`.
+String describeKokoro(PullRequest pr) {
+  final now = DateTime.now().toUtc();
+  final diag = pr.kokoro;
+  final facts = <String>[
+    if (diag?.headKokoroPending ?? false) 'Kokoro running on head',
+    if ((diag?.behindBy ?? 0) > 0)
+      'branch ${diag!.behindBy} behind ${pr.baseRefName}'
+          "${diag.baseKokoroState == null ? '' : " (${pr.baseRefName}'s Kokoro: ${diag.baseKokoroState})"}",
+    if (pr.kokoroLabelStuck(now))
+      "'$kokoroRunLabel' added "
+          '${now.difference(diag!.kokoroLabelAddedAt!).inMinutes}m ago with no '
+          'Kokoro status since'
+    else if (pr.hasKokoroRunLabel)
+      "'$kokoroRunLabel' applied",
+    if (pr.hasNonBotCommits) 'branch has non-Dependabot commits',
+  ];
+  final action = pr.kokoroAction(now);
+  return [...facts, if (action != KokoroAction.none) action.label].join('; ');
+}
+
 /// Prints the per-PR notes that follow the table.
 void printFootnotes(List<PullRequest> prs, String label) {
   stdout.writeln();
 
   for (final pr in prs.where((pr) => pr.checks.failing.isNotEmpty)) {
     final names = pr.checks.failing.map((c) => c.name).join(', ');
-    final rerunNote = !pr.checks.onlyKokoroFailing
-        ? ''
-        : pr.hasKokoroRunLabel
-        ? " (only Kokoro failed; '$kokoroRunLabel' already applied)"
-        : " (only Kokoro failed; can re-run)";
+    final kokoroNote = pr.checks.onlyKokoroFailing
+        ? ' (only Kokoro failed; ${describeKokoro(pr)})'
+        : '';
     stdout.writeln(
-      '- ${pr.ref} (${pr.dependency.name}) failing: $names$rerunNote',
+      '- ${pr.ref} (${pr.dependency.name}) failing: $names$kokoroNote',
+    );
+  }
+
+  final stuck = prs.where(
+    (pr) =>
+        !pr.checks.onlyKokoroFailing &&
+        pr.kokoroAction(DateTime.now().toUtc()) == KokoroAction.relabel,
+  );
+  for (final pr in stuck) {
+    stdout.writeln(
+      "- ${pr.ref} (${pr.dependency.name}): '$kokoroRunLabel' looks stuck "
+      '(${describeKokoro(pr)})',
     );
   }
 
@@ -845,6 +1135,10 @@ void main(List<String> args) {
       final byRepo => byRepo,
     },
   );
+
+  for (final pr in prs.where((pr) => pr.kokoroRelevant)) {
+    fetchKokoroDiagnostics(pr);
+  }
 
   reportResults(prs, failedQueries, attemptedQueries, options);
 

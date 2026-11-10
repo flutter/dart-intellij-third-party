@@ -19,16 +19,17 @@
 /// the `auto-submit` bot, which merges it once every requirement is met and
 /// strips the label again if any of them fail.
 ///
-/// PRs passed with `--rerun-kokoro` are neither approved nor labeled for
-/// auto-submit. They get the [kokoroRunLabel], plus a [recreateComment] in
-/// [recreateRepos], whose Kokoro job ignores a label added after the PR was
-/// opened. Approve them on a later pass, once the new build passes.
+/// PRs passed with `--rerun-kokoro` get the [kokoroRunLabel], plus a
+/// [recreateComment] in [recreateRepos], whose Kokoro job ignores a label
+/// added after the PR was opened. Elsewhere, an out-of-date branch is updated
+/// first and a stuck label is re-added (see [rerunKokoro]). They are neither
+/// approved nor labeled for auto-submit unless `--queue` is passed.
 ///
 /// Only run this after the user has explicitly confirmed each PR.
 ///
 /// Usage:
 ///   dart run approve_and_label.dart [--pr owner/repo#123 ...]
-///       [--rerun-kokoro owner/repo#456 ...] [--label autosubmit]
+///       [--rerun-kokoro owner/repo#456 ...] [--queue] [--label autosubmit]
 ///       [--body "text"] [--dry-run]
 ///
 /// Exits 0 when every PR succeeded, 1 if any failed, and 2 for invalid
@@ -80,7 +81,37 @@ typedef PrRef = ({String repo, int number});
 typedef CommandResult = ({bool ok, String output});
 
 /// The parts of a PR's current state that a Kokoro re-run depends on.
-typedef PrInfo = ({String author, Set<String> labels});
+typedef PrInfo = ({
+  String state,
+  String author,
+  Set<String> labels,
+  String headRefOid,
+  String baseRefName,
+});
+
+/// Commit author logins that count as Dependabot's own commits.
+///
+/// Must match `dependabotCommitLogins` in `list_dependabot_prs.dart`.
+const dependabotCommitLogins = {'dependabot[bot]', 'dependabot'};
+
+/// Comment that asks Dependabot to rebase its branch onto the base branch.
+///
+/// Dependabot refuses it once anyone else has committed to the branch.
+const rebaseComment = '@dependabot rebase';
+
+/// How long to wait for a branch update to produce a new head commit.
+const headMoveTimeout = Duration(minutes: 10);
+
+/// How long to wait after a push for Kokoro to start on its own, before
+/// adding [kokoroRunLabel] to start it explicitly.
+///
+/// In `flutter/flutter-intellij`, a push made while the label is present
+/// starts a build, so a leftover label may already have done the job.
+const pushTriggerGrace = Duration(seconds: 60);
+
+/// How long a [kokoroRunLabel] may sit without a Kokoro status before it is
+/// treated as stuck. Must match `kokoroLabelStuckAfter` in the listing script.
+const kokoroLabelStuckAfter = Duration(minutes: 15);
 
 /// Runs [executable] with [args], capturing stdout and stderr.
 ///
@@ -211,20 +242,26 @@ PrInfo? fetchPrInfo(PrRef pr) {
     '--repo',
     pr.repo,
     '--json',
-    'author,labels',
+    'state,author,labels,headRefOid,baseRefName',
   ]);
   if (result.ok) {
     try {
       if (jsonDecode(result.output) case {
+        'state': final String state,
         'author': {'login': final String author},
         'labels': final List<dynamic> labels,
+        'headRefOid': final String headRefOid,
+        'baseRefName': final String baseRefName,
       }) {
         return (
+          state: state,
           author: author,
           labels: {
             for (final label in labels)
               if (label case {'name': final String name}) name,
           },
+          headRefOid: headRefOid,
+          baseRefName: baseRefName,
         );
       }
     } on FormatException {
@@ -281,6 +318,135 @@ bool requestRecreate(PrRef pr) => mutate(pr, "comment '$recreateComment'", [
   recreateComment,
 ]);
 
+/// Removes [label] from [pr], returning whether the edit succeeded.
+bool removeLabel(PrRef pr, String label) => mutate(
+  pr,
+  "remove label '$label'",
+  ['pr', 'edit', '${pr.number}', '--repo', pr.repo, '--remove-label', label],
+);
+
+/// How many commits [info]'s head is behind its base, or null on failure.
+int? behindBy(PrRef pr, PrInfo info) {
+  final result = runCommand('gh', [
+    'api',
+    'repos/${pr.repo}/compare/${info.baseRefName}...${info.headRefOid}',
+    '--jq',
+    '.behind_by',
+  ]);
+  return result.ok ? int.tryParse(result.output) : null;
+}
+
+/// Whether anyone other than Dependabot committed to [pr]'s branch.
+///
+/// Fails closed, returning true when the lookup fails: then a manual update
+/// is used, which works either way, instead of a rebase comment that
+/// Dependabot might refuse.
+bool hasNonBotCommits(PrRef pr) {
+  final result = runCommand('gh', [
+    'api',
+    '--paginate',
+    'repos/${pr.repo}/pulls/${pr.number}/commits',
+    '--jq',
+    '.[] | (.author.login // .commit.author.name)',
+  ]);
+  if (!result.ok) return true;
+  return const LineSplitter()
+      .convert(result.output)
+      .any((login) => !dependabotCommitLogins.contains(login));
+}
+
+/// The newest Kokoro status `(state, createdAt)` on [sha], or null.
+({String state, DateTime createdAt})? newestKokoroStatus(PrRef pr, String sha) {
+  final result = runCommand('gh', [
+    'api',
+    'repos/${pr.repo}/commits/$sha/statuses',
+    '--jq',
+    '[.[] | select(.context | ascii_downcase | startswith("kokoro"))][0]'
+        ' | if . == null then "" else "\\(.state) \\(.created_at)" end',
+  ]);
+  if (!result.ok || result.output.isEmpty) return null;
+  final parts = result.output.split(' ');
+  final createdAt = parts.length == 2 ? DateTime.tryParse(parts[1]) : null;
+  return createdAt == null ? null : (state: parts[0], createdAt: createdAt);
+}
+
+/// When [kokoroRunLabel] was last added to [pr], or null.
+DateTime? kokoroLabelAddedAt(PrRef pr) {
+  final result = runCommand('gh', [
+    'api',
+    '--paginate',
+    'repos/${pr.repo}/issues/${pr.number}/timeline',
+    '--jq',
+    '.[] | select(.event == "labeled" and .label.name == "$kokoroRunLabel")'
+        ' | .created_at',
+  ]);
+  final stamps = const LineSplitter().convert(result.ok ? result.output : '');
+  return stamps.isEmpty ? null : DateTime.tryParse(stamps.last);
+}
+
+/// Brings [pr]'s branch up to date with its base and returns the new head
+/// SHA, or null on failure or timeout.
+///
+/// Uses [rebaseComment] when only Dependabot has committed, which keeps
+/// Dependabot managing the PR. Otherwise Dependabot would refuse to rebase,
+/// so it merges the base in with `gh pr update-branch` instead. That works at
+/// once and keeps existing approvals, but Dependabot stops managing the PR.
+/// (`@dependabot recreate` is the other way out, but it can take a long time
+/// to act, or not act at all.)
+String? updateBranch(PrRef pr, PrInfo info) {
+  final ref = describe(pr);
+  final manual = hasNonBotCommits(pr);
+  final ok = manual
+      ? mutate(pr, 'update the branch (merge ${info.baseRefName})', [
+          'pr',
+          'update-branch',
+          '${pr.number}',
+          '--repo',
+          pr.repo,
+        ])
+      : mutate(pr, "comment '$rebaseComment'", [
+          'pr',
+          'comment',
+          '${pr.number}',
+          '--repo',
+          pr.repo,
+          '--body',
+          rebaseComment,
+        ]);
+  if (!ok) return null;
+  if (dryRun) return '<new head>';
+
+  final deadline = DateTime.now().add(headMoveTimeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final head = fetchPrInfo(pr)?.headRefOid;
+    if (head != null && head != info.headRefOid) {
+      stdout.writeln('$ref: branch updated, new head ${head.substring(0, 8)}.');
+      return head;
+    }
+    sleep(const Duration(seconds: 15));
+  }
+  stderr.writeln(
+    '$ref: FAILED: the head did not move within '
+    '${headMoveTimeout.inMinutes} minutes. Run --rerun-kokoro again once '
+    'Dependabot has rebased the branch.',
+  );
+  return null;
+}
+
+/// Starts Kokoro on [headSha] unless a build is already running there.
+///
+/// A [kokoroRunLabel] that is already present is removed first, since
+/// re-adding a present label fires no event.
+bool startKokoro(PrRef pr, String headSha, {required bool labelPresent}) {
+  final ref = describe(pr);
+  if (newestKokoroStatus(pr, headSha)?.state == 'pending') {
+    stdout.writeln('$ref: Kokoro is already running on the head.');
+    return true;
+  }
+  if (labelPresent && !removeLabel(pr, kokoroRunLabel)) return false;
+  return applyLabel(pr, kokoroRunLabel);
+}
+
 /// Approves [pr] and adds [label]. Returns true when the PR is fully queued.
 ///
 /// Labeling is skipped when approval fails. Labeling an unapproved PR would
@@ -304,24 +470,36 @@ bool approveAndLabel(
 
 /// Asks Kokoro to build [pr] again.
 ///
-/// Adds [kokoroRunLabel] unless it is already present, then, for repositories
-/// in [recreateRepos], asks Dependabot to recreate the PR. The label must be in
-/// place before Dependabot pushes, because that push is when those
-/// repositories' Kokoro job reads it. Only Dependabot acts on the comment, so
-/// any other author is refused there before anything changes.
+/// In [recreateRepos], adds [kokoroRunLabel] unless it is already present,
+/// then asks Dependabot to recreate the PR. The label must be in place before
+/// Dependabot pushes, because that push is when those repositories' Kokoro
+/// job reads it. Only Dependabot acts on the comment, so any other author is
+/// refused there before anything changes.
 ///
-/// Elsewhere, a label that is still present means a run is already queued:
-/// Kokoro removes it as soon as it starts. Re-adding it would fire no new
-/// event, so that case is reported and treated as success. When the PR can't
-/// be read, the label is added anyway, since re-adding it is harmless.
+/// Elsewhere (in `flutter/flutter-intellij`), Kokoro starts when the label is
+/// added, and also on a push made while the label is present:
+/// - If the branch is behind its base, it is updated first (see
+///   [updateBranch]). Re-running Kokoro on an out-of-date branch would only
+///   rebuild code that predates any fix on the base branch. If the push
+///   itself does not start Kokoro within [pushTriggerGrace], the label is
+///   added.
+/// - Otherwise, a label that is present and fresh means a run is queued.
+///   One older than [kokoroLabelStuckAfter] with no Kokoro status since is
+///   stuck: it was added while a build was running, which Kokoro ignores. It
+///   is removed and added again.
+/// - Otherwise the label is added.
 ///
-/// Does not approve the PR or add the auto-submit label: while the failed
-/// Kokoro status is still attached, the auto-submit bot would strip that label
-/// straight away.
+/// Does not approve the PR or add the auto-submit label; see [queueAfterRerun]
+/// for that.
 bool rerunKokoro(PrRef pr) {
   final ref = describe(pr);
   final info = fetchPrInfo(pr);
   final recreate = needsRecreate(pr);
+
+  if (info != null && info.state != 'OPEN') {
+    stderr.writeln('$ref: FAILED: the PR is ${info.state.toLowerCase()}.');
+    return false;
+  }
 
   if (recreate) {
     if (info == null) {
@@ -337,25 +515,75 @@ bool rerunKokoro(PrRef pr) {
       );
       return false;
     }
-  }
-
-  if (info?.labels.contains(kokoroRunLabel) ?? false) {
-    stdout.writeln("$ref: '$kokoroRunLabel' is already applied.");
-    if (!recreate) {
-      stdout.writeln('$ref: a Kokoro run is already queued.');
-      return true;
+    if (info.labels.contains(kokoroRunLabel)) {
+      stdout.writeln("$ref: '$kokoroRunLabel' is already applied.");
+    } else if (!applyLabel(pr, kokoroRunLabel)) {
+      return false;
     }
-  } else if (!applyLabel(pr, kokoroRunLabel)) {
+    if (requestRecreate(pr)) return true;
+    stderr.writeln(
+      "$ref: '$kokoroRunLabel' is on the PR, so re-running with "
+      '--rerun-kokoro will only post the comment.',
+    );
     return false;
   }
 
-  if (!recreate || requestRecreate(pr)) return true;
-  stderr.writeln(
-    "$ref: '$kokoroRunLabel' is on the PR, so re-running with "
-    '--rerun-kokoro will only post the comment.',
-  );
-  return false;
+  if (info == null) {
+    // Can't check freshness or the branch; adding the label is harmless.
+    return applyLabel(pr, kokoroRunLabel);
+  }
+  final labelPresent = info.labels.contains(kokoroRunLabel);
+
+  if ((behindBy(pr, info) ?? 0) > 0) {
+    stdout.writeln(
+      '$ref: the branch is behind ${info.baseRefName}; updating it first.',
+    );
+    final head = updateBranch(pr, info);
+    if (head == null) return false;
+    if (dryRun) {
+      stdout.writeln(
+        "[dry-run] $ref: would add '$kokoroRunLabel' if the push does not "
+        'start Kokoro.',
+      );
+      return true;
+    }
+    sleep(pushTriggerGrace);
+    final stillPresent =
+        fetchPrInfo(pr)?.labels.contains(kokoroRunLabel) ?? labelPresent;
+    return startKokoro(pr, head, labelPresent: stillPresent);
+  }
+
+  if (labelPresent) {
+    final addedAt = kokoroLabelAddedAt(pr);
+    final statusAt = newestKokoroStatus(pr, info.headRefOid)?.createdAt;
+    final stuck =
+        addedAt != null &&
+        (statusAt == null || statusAt.isBefore(addedAt)) &&
+        DateTime.now().toUtc().difference(addedAt) > kokoroLabelStuckAfter;
+    if (!stuck) {
+      stdout.writeln("$ref: '$kokoroRunLabel' is already applied.");
+      stdout.writeln('$ref: a Kokoro run is already queued.');
+      return true;
+    }
+    stdout.writeln("$ref: '$kokoroRunLabel' looks stuck; re-adding it.");
+  }
+  return startKokoro(pr, info.headRefOid, labelPresent: labelPresent);
 }
+
+/// After a successful re-run, approves [pr] if needed and adds [label], so
+/// the auto-submit bot merges it once the new build passes.
+///
+/// Only safe once the failed Kokoro status is no longer on the head, which
+/// is true after a branch update or recreate, but not after a plain label
+/// re-run on the same commit: then the bot would strip [label] straight
+/// away. Whether the bot also strips it while a build is still pending is
+/// unverified, so the caller warns that the label may bounce.
+bool queueAfterRerun(
+  PrRef pr, {
+  required String label,
+  required String body,
+  required String? login,
+}) => approveAndLabel(pr, label: label, body: body, login: login);
 
 final usage =
     '''
@@ -373,8 +601,14 @@ Options:
                                  Adds '$kokoroRunLabel', and in
                                  ${recreateRepos.join(', ')}
                                  also comments '$recreateComment' (Dependabot
-                                 PRs only). The PR is not approved. Repeat for
-                                 multiple PRs.
+                                 PRs only). Elsewhere, updates an out-of-date
+                                 branch first and re-adds a stuck label. The
+                                 PR is not approved unless --queue is given.
+                                 Repeat for multiple PRs.
+  --queue                        With --rerun-kokoro: also approve (if needed)
+                                 and add the label, so the PR merges once the
+                                 new build passes. It may bounce if the bot
+                                 rejects a pending build (unverified).
   --label <name>                 Label to apply after approval.
                                  (default: autosubmit)
   --body <text>                  Optional review comment body.
@@ -400,6 +634,7 @@ typedef Options = ({
   String label,
   String body,
   bool dryRun,
+  bool queue,
 });
 
 /// Splits `--flag=value` into its parts. The value is null for a bare flag.
@@ -418,6 +653,7 @@ Options validateOptions({
   required String label,
   required String body,
   required bool dryRun,
+  required bool queue,
 }) {
   if (prs.isEmpty && reruns.isEmpty) {
     stderr.writeln('At least one --pr or --rerun-kokoro is required.\n');
@@ -430,7 +666,19 @@ Options validateOptions({
     exit(exitBadUsage);
   }
 
-  return (prs: prs, reruns: reruns, label: label, body: body, dryRun: dryRun);
+  if (queue && reruns.isEmpty) {
+    stderr.writeln('--queue only applies to --rerun-kokoro PRs.');
+    exit(exitBadUsage);
+  }
+
+  return (
+    prs: prs,
+    reruns: reruns,
+    label: label,
+    body: body,
+    dryRun: dryRun,
+    queue: queue,
+  );
 }
 
 /// Minimal argument parser; avoids a package:args dependency so the script
@@ -443,6 +691,7 @@ Options? parseArgs(List<String> args) {
   var label = 'autosubmit';
   var body = '';
   var dryRun = false;
+  var queue = false;
 
   for (var i = 0; i < args.length; i++) {
     final (flag, inlineValue) = splitFlag(args[i]);
@@ -462,6 +711,8 @@ Options? parseArgs(List<String> args) {
         return null;
       case '--dry-run':
         dryRun = true;
+      case '--queue':
+        queue = true;
       case '--pr':
         prs.add(nextValue());
       case '--rerun-kokoro':
@@ -483,6 +734,7 @@ Options? parseArgs(List<String> args) {
     label: label,
     body: body,
     dryRun: dryRun,
+    queue: queue,
   );
 }
 
@@ -498,7 +750,7 @@ void refuseOverlap(Set<PrRef> approvals, Set<PrRef> reruns) {
   stderr.writeln(
     'These PRs were passed to both --pr and --rerun-kokoro: '
     '${both.map(describe).join(', ')}. Re-run Kokoro first, then approve '
-    'once the build passes.',
+    'once the build passes, or use --rerun-kokoro with --queue.',
   );
   exit(exitBadUsage);
 }
@@ -515,7 +767,9 @@ void main(List<String> args) {
   refuseOverlap(approvals, reruns);
 
   requireGitHubCli();
-  final login = approvals.isEmpty ? null : fetchAuthenticatedLogin();
+  final login = approvals.isEmpty && !options.queue
+      ? null
+      : fetchAuthenticatedLogin();
 
   var failures = 0;
   for (final pr in approvals) {
@@ -528,12 +782,30 @@ void main(List<String> args) {
     if (!ok) failures++;
   }
   final rerun = <PrRef>[];
+  final queued = <PrRef>[];
   for (final pr in reruns) {
-    if (rerunKokoro(pr)) {
-      rerun.add(pr);
-    } else {
+    if (!rerunKokoro(pr)) {
       failures++;
+      continue;
     }
+    if (options.queue &&
+        queueAfterRerun(
+          pr,
+          label: options.label,
+          body: options.body,
+          login: login,
+        )) {
+      queued.add(pr);
+    } else {
+      rerun.add(pr);
+    }
+  }
+  if (queued.isNotEmpty) {
+    stdout.writeln(
+      "\nRe-run and queued with '${options.label}': "
+      '${queued.map(describe).join(', ')}. If the new build fails, the '
+      'auto-submit bot will remove the label again.',
+    );
   }
 
   final total = approvals.length + reruns.length;
