@@ -121,7 +121,6 @@ public class DartVmServiceDebugProcess extends XDebugProcess {
 
     session.setPauseActionSupported(true);
 
-
     if (DebugType.REMOTE == debugType) {
       LOG.assertTrue(myExecutionResult == null, myExecutionResult);
     }
