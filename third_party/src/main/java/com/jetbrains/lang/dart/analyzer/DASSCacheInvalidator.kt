@@ -1,11 +1,32 @@
 package com.jetbrains.lang.dart.analyzer
 
 import com.intellij.ide.caches.CachesInvalidator
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.SystemInfoRt
+import com.intellij.openapi.util.io.NioFiles
 import com.jetbrains.lang.dart.DartBundle
-import com.intellij.openapi.util.io.FileUtil
+import com.jetbrains.lang.dart.logging.PluginLogger
 import java.io.File
+import java.io.IOException
+import java.util.concurrent.Future
+
+private val LOG = PluginLogger.createLogger(DASSCacheInvalidator::class.java)
+
+@JvmSynthetic
+internal fun deleteDartServerCacheAsync(cacheDirectory: File?): Future<*>? {
+    if (cacheDirectory == null || !cacheDirectory.exists()) {
+        return null
+    }
+    val cachePath = cacheDirectory.toPath()
+    return ApplicationManager.getApplication().executeOnPooledThread {
+        try {
+            NioFiles.deleteRecursively(cachePath)
+        } catch (e: IOException) {
+            LOG.warn("Failed to delete Dart analysis server cache at $cachePath", e)
+        }
+    }
+}
 
 /**
  * A CachesInvalidator for the Dart IntelliJ plugin, on the execution of this invalidator,
@@ -25,10 +46,7 @@ private class DASSCacheInvalidator : CachesInvalidator() {
             val serverService = DartAnalysisServerService.getInstance(project)
             serverService.stopServer()
         }
-        val dartServerCacheDirectory = getDartServerCacheDirectory()
-        if (dartServerCacheDirectory != null && dartServerCacheDirectory.exists()) {
-            FileUtil.asyncDelete(dartServerCacheDirectory)
-        }
+        deleteDartServerCacheAsync(getDartServerCacheDirectory())
     }
 
     private fun getDartServerCacheDirectory(): File? {
