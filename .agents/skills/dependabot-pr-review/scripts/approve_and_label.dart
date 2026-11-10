@@ -416,6 +416,10 @@ String? updateBranch(PrRef pr, PrInfo info) {
   if (!ok) return null;
   if (dryRun) return '<new head>';
 
+  stdout.writeln(
+    '$ref: waiting up to ${headMoveTimeout.inMinutes} minutes for the new '
+    'head...',
+  );
   final deadline = DateTime.now().add(headMoveTimeout);
   while (DateTime.now().isBefore(deadline)) {
     final head = fetchPrInfo(pr)?.headRefOid;
@@ -547,6 +551,10 @@ bool rerunKokoro(PrRef pr) {
       );
       return true;
     }
+    stdout.writeln(
+      '$ref: waiting ${pushTriggerGrace.inSeconds}s to see whether the push '
+      'starts Kokoro by itself...',
+    );
     sleep(pushTriggerGrace);
     final stillPresent =
         fetchPrInfo(pr)?.labels.contains(kokoroRunLabel) ?? labelPresent;

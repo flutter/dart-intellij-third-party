@@ -812,9 +812,13 @@ void fetchKokoroDiagnostics(PullRequest pr) {
     '--jq',
     '.[] | (.author.login // .commit.author.name)',
   ]);
-  final hasNonBotCommits = const LineSplitter()
-      .convert(authors ?? '')
-      .any((login) => !dependabotCommitLogins.contains(login));
+  // Fail closed, as approve_and_label.dart does: when the authors can't be
+  // read, assume the branch was edited, so a rebase isn't suggested.
+  final hasNonBotCommits =
+      authors == null ||
+      const LineSplitter()
+          .convert(authors)
+          .any((login) => !dependabotCommitLogins.contains(login));
 
   pr.kokoro = KokoroDiagnostics(
     behindBy: behindBy,
