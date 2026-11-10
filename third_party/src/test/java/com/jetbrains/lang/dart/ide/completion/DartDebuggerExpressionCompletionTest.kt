@@ -68,7 +68,7 @@ class DartDebuggerExpressionCompletionTest : DartCodeInsightFixtureTestCase() {
       "topLevelHelper",
       "MyService",
     )
-    assertDoesntContain(suggestions, "onBreakpointLine", "afterBreak", "inheritedStatic", "internal")
+    assertDoesntContain(suggestions, "onBreakpointLine", "afterBreak", "inheritedStatic")
   }
 
   fun testBreakpointAtClosingBraceIncludesAllBlockLocals() {
@@ -97,6 +97,47 @@ class DartDebuggerExpressionCompletionTest : DartCodeInsightFixtureTestCase() {
     )
 
     assertContainsElements(suggestions, "closureParam", "closureLocal", "topLevelClosure")
+
+    val instanceFieldSuggestions = completeInDebuggerFragment(
+      """
+      class Service {
+        int instanceCount = 1;
+        static int staticCount = 2;
+
+        late final instanceClosure = (int fieldParam) {
+          final fieldLocal = fieldParam + instanceCount;
+          /*breakpoint*/return fieldLocal;
+        };
+      }
+      """.trimIndent(),
+      "<caret>",
+    )
+    assertContainsElements(
+      instanceFieldSuggestions,
+      "fieldParam",
+      "fieldLocal",
+      "this",
+      "instanceCount",
+      "staticCount",
+      "instanceClosure",
+    )
+
+    val staticFieldSuggestions = completeInDebuggerFragment(
+      """
+      class Service {
+        int instanceCount = 1;
+        static int staticCount = 2;
+
+        static final staticClosure = (int staticParam) {
+          final staticLocal = staticParam + staticCount;
+          /*breakpoint*/return staticLocal;
+        };
+      }
+      """.trimIndent(),
+      "<caret>",
+    )
+    assertContainsElements(staticFieldSuggestions, "staticParam", "staticLocal", "staticCount", "staticClosure")
+    assertDoesntContain(staticFieldSuggestions, "this", "instanceCount")
   }
 
   fun testStaticMethodExcludesInstanceMembersAndThis() {

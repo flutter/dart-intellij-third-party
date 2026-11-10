@@ -79,13 +79,12 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
           val fragment = parameters.originalFile as? DartExpressionCodeFragment ?: return
           if (parameters.position.node?.elementType != DartTokenTypes.IDENTIFIER) return
 
-
           val seenNames = HashSet<String>()
           val contextElement = fragment.context?.takeIf { it.isValid }
           val stackFrame = XDebuggerManager.getInstance(fragment.project)
             ?.currentSession
             ?.currentStackFrame as? DartVmServiceStackFrame
-          val activeBoundVariables =  if (stackFrame != null && isFrameMatchingContext(stackFrame, contextElement)) {
+          val activeBoundVariables = if (stackFrame != null && isFrameMatchingContext(stackFrame, contextElement)) {
             stackFrame.boundVariables
           } else {
             null
@@ -386,7 +385,7 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
       if (position.file != contextFile) return false
       val frameElement =
         XDebuggerUtil.getInstance().findContextElement(contextFile, position.offset, contextElement.project, false)
-          ?: return true
+          ?: return false
       return findEnclosingExecutable(frameElement) == findEnclosingExecutable(contextElement)
     }
 
