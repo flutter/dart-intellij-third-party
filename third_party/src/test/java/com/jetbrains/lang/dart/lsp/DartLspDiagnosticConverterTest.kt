@@ -5,6 +5,7 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.platform.dartlsp.util.getDocumentFilterPattern
 import com.intellij.platform.dartlsp.util.messageIfStringOrEmpty
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
@@ -14,6 +15,8 @@ import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.DocumentFilter
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
+import java.util.concurrent.Callable
+import java.util.concurrent.TimeUnit
 
 class DartLspDiagnosticConverterTest : DartCodeInsightFixtureTestCase() {
 
@@ -102,6 +105,35 @@ class DartLspDiagnosticConverterTest : DartCodeInsightFixtureTestCase() {
         assertNotNull(filterPattern)
         assertEquals(true, filterPattern?.isLeft)
         assertEquals("**/*.dart", filterPattern?.left)
+    }
+
+    fun testConvertDiagnosticFromBackgroundThread() {
+        val testFile = myFixture.addFileToProject(
+            "lib/test_bg_diag.dart",
+            """
+            void main() {
+              int x = "string";
+            }
+            """.trimIndent()
+        )
+        val fileUri = testFile.virtualFile.url
+        val das = DartAnalysisServerService.getInstance(project)
+        val diagnostic = Diagnostic(
+            Range(Position(1, 10), Position(1, 18)),
+            "Type mismatch",
+            DiagnosticSeverity.Error,
+            "dart",
+            "invalid_assignment"
+        )
+
+        val error = ApplicationManager.getApplication().executeOnPooledThread(Callable {
+            assertFalse(ApplicationManager.getApplication().isReadAccessAllowed)
+            DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, fileUri, diagnostic)
+        }).get(10, TimeUnit.SECONDS)
+
+        assertEquals("ERROR", error.severity)
+        assertEquals(2, error.location.startLine)
+        assertEquals(8, error.location.length)
     }
 }
 
