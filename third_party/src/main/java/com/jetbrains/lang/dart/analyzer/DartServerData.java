@@ -407,7 +407,7 @@ public final class DartServerData {
       // but it will cache RemoteAnalysisServerImpl$ServerResponseReaderThread in FileStatusMap.threads and as a result,
       // DartAnalysisServerService.myProject will be leaked in tests
       ApplicationManager.getApplication()
-        .invokeLater(() -> DaemonCodeAnalyzer.getInstance(project).restart(),
+        .invokeLater(() -> DaemonCodeAnalyzer.getInstance(project).restart("Dart analysis server force file annotation"),
                      ModalityState.nonModal(),
                      myService.getDisposedCondition());
     }
