@@ -1269,8 +1269,12 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         // 1. Simulate the reverse notification arriving from DAS over the bridge
         capturedListener.onResponse(notificationJson)
 
-        // 2. Verify DartAnalysisServerService / DartServerData processed and stored the label
-        val closingLabels = DartLspClosingLabelsService.getInstance(project).getClosingLabels(testFile.virtualFile)
+        // 2. Verify DartBridgeLspServer forwarded the notification to the LanguageClient
+        val publishedParams = requireNotNull(mockClient.publishedClosingLabels) {
+            "Expected publishClosingLabels to be forwarded to client"
+        }
+        assertEquals(fileUri, publishedParams.uri)
+        val closingLabels = requireNotNull(publishedParams.labels)
         assertEquals(1, closingLabels.size)
         assertEquals("MyWidget", closingLabels[0].label)
         assertEquals(2, closingLabels[0].range?.start?.line)
@@ -2206,12 +2210,17 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertEquals(legend, das.semanticTokensLegendFuture.get())
     }
 
-    private class MockLanguageClient : LanguageClient {
+    private class MockLanguageClient : DartLanguageClient {
         var publishedDiagnostics: PublishDiagnosticsParams? = null
+        var publishedClosingLabels: DartPublishClosingLabelsParams? = null
         var lastApplyWorkspaceEditParams: ApplyWorkspaceEditParams? = null
         var applyEditResult: ApplyWorkspaceEditResponse = ApplyWorkspaceEditResponse(true)
         var lastConfigurationParams: ConfigurationParams? = null
         var configurationResult: List<Any?> = emptyList()
+
+        override fun publishClosingLabels(params: DartPublishClosingLabelsParams) {
+            publishedClosingLabels = params
+        }
 
         override fun applyEdit(params: ApplyWorkspaceEditParams?): CompletableFuture<ApplyWorkspaceEditResponse> {
             lastApplyWorkspaceEditParams = params
