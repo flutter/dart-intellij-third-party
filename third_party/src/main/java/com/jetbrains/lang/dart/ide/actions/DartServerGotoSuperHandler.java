@@ -14,6 +14,8 @@ import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartLanguage;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.hierarchy.DartHierarchyUtil;
+import com.jetbrains.lang.dart.lsp.DartLspNavigationService;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.psi.DartComponent;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
@@ -29,6 +31,10 @@ import java.util.List;
 public final class DartServerGotoSuperHandler implements LanguageCodeInsightActionHandler {
   @Override
   public void invoke(@NotNull Project project, @NotNull Editor editor, @NotNull PsiFile psiFile) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      DartLspNavigationService.gotoSuper(project, editor, psiFile);
+      return;
+    }
     final PsiElement at = psiFile.findElementAt(editor.getCaretModel().getOffset());
     final DartComponent inComponent = PsiTreeUtil.getParentOfType(at, DartComponent.class);
     final DartComponent inClass = PsiTreeUtil.getParentOfType(at, DartClass.class);
