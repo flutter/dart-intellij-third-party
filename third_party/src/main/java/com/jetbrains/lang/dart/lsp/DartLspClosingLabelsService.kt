@@ -40,14 +40,18 @@ class DartLspClosingLabelsService(private val project: Project) {
     fun updateClosingLabels(uri: String?, labels: List<DartLspClosingLabel>?) {
         if (project.isDisposed || uri.isNullOrEmpty()) return
         val fileInfo = getDartFileInfo(project, uri)
-        val vFile = fileInfo.findFile() ?: (fileInfo as? DartLocalFileInfo) ?.let {
+        val vFile = fileInfo.findFile() ?: (fileInfo as? DartLocalFileInfo)?.let {
             val path = FileUtil.toSystemIndependentName(it.filePath)
             VirtualFileManager.getInstance().findFileByUrl("temp://$path")
-        }?: return
-        if (!vFile.isValid) return
+        } ?: return
+        updateClosingLabels(vFile, labels)
+    }
+
+    fun updateClosingLabels(vFile: VirtualFile, labels: List<DartLspClosingLabel>?) {
+        if (project.isDisposed || !vFile.isValid) return
         val validLabels =
             labels?.filter { !it.label.isNullOrBlank() && it.range?.end != null }
-            ?: emptyList()
+                ?: emptyList()
         closingLabelsByFile[vFile] = validLabels
         EditorFactory.getInstance().allEditors
             .filter { vFile == it.virtualFile }
