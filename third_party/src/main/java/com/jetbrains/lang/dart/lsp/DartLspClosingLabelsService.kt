@@ -9,13 +9,13 @@ import com.intellij.codeInsight.hints.declarative.impl.DeclarativeInlayHintsPass
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.jetbrains.lang.dart.analyzer.DartLocalFileInfo
 import com.jetbrains.lang.dart.analyzer.getDartFileInfo
 import org.eclipse.lsp4j.Range
-import java.util.concurrent.ConcurrentHashMap
 
 data class DartPublishClosingLabelsParams(
     val uri: String?,
@@ -35,7 +35,7 @@ class DartLspClosingLabelsService(private val project: Project) {
             project.getService(DartLspClosingLabelsService::class.java)
     }
 
-    private val closingLabelsByFile = ConcurrentHashMap<VirtualFile, List<DartLspClosingLabel>>()
+    private val closingLabelsKey = Key.create<List<DartLspClosingLabel>>("dart.lsp.closing.labels")
 
     fun updateClosingLabels(uri: String?, labels: List<DartLspClosingLabel>?) {
         if (project.isDisposed || uri.isNullOrEmpty()) return
@@ -52,7 +52,7 @@ class DartLspClosingLabelsService(private val project: Project) {
         val validLabels =
             labels?.filter { !it.label.isNullOrBlank() && it.range?.end != null }
                 ?: emptyList()
-        closingLabelsByFile[vFile] = validLabels
+        vFile.putUserData(closingLabelsKey, validLabels.ifEmpty { null })
         EditorFactory.getInstance().allEditors
             .filter { vFile == it.virtualFile }
             .forEach { editor ->
@@ -61,7 +61,7 @@ class DartLspClosingLabelsService(private val project: Project) {
     }
 
     fun getClosingLabels(file: VirtualFile): List<DartLspClosingLabel> {
-        return closingLabelsByFile[file] ?: emptyList()
+        return file.getUserData(closingLabelsKey) ?: emptyList()
     }
 
 }

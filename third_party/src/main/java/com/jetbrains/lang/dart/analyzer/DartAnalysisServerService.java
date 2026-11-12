@@ -484,9 +484,8 @@ public final class DartAnalysisServerService implements Disposable {
     // Note: this method is invoked on the Analysis Server reader thread, which must never call
     // runReadAction synchronously (otherwise it deadlocks if the EDT holds the write lock while
     // awaiting an Analysis Server response, e.g. during MoveFileRefactoring).
-    boolean lspClosingLabelsEnabled = !mySdkVersion.isEmpty()
-                                      ? isDartSdkVersionSufficientForLspClosingLabels(mySdkVersion)
-                                      : isLspClosingLabelsEnabled(myProject);
+    boolean lspClosingLabelsEnabled = !mySdkVersion.isEmpty() &&
+                                      isDartSdkVersionSufficientForLspClosingLabels(mySdkVersion);
     if (!lspClosingLabelsEnabled) {
       VirtualFile file = fileInfo.findFile();
       if (file == null && fileInfo instanceof DartLocalFileInfo localFileInfo) {
