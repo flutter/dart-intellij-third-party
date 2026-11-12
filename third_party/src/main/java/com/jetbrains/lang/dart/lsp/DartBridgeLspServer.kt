@@ -426,6 +426,8 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 }
                 setCodeActionProvider(true)
                 setExecuteCommandProvider(ExecuteCommandOptions())
+                // Include "," in triggerCharacters (not only retriggerCharacters) because
+                // LspServerImpl.getSignatureHelpTriggerCharacters only inspects triggerCharacters.
                 signatureHelpProvider = SignatureHelpOptions(listOf("(", ","), listOf(","))
                 // Add other capabilities as we support them.
             }
