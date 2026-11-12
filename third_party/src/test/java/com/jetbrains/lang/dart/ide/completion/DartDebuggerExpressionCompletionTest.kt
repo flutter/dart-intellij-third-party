@@ -243,7 +243,22 @@ class DartDebuggerExpressionCompletionTest : DartCodeInsightFixtureTestCase() {
       """.trimIndent(),
       "Status.<caret>",
     )
-    assertContainsElements(enumSuggestions, "idle", "running", "stopped")
+    assertContainsElements(enumSuggestions, "idle", "running", "stopped", "values")
+    assertDoesntContain(enumSuggestions, "index", "name")
+
+    val enumInstanceSuggestions = completeInDebuggerFragment(
+      """
+      enum Status { idle, running, stopped }
+
+      void main() {
+        final current = Status.idle;
+        /*breakpoint*/return;
+      }
+      """.trimIndent(),
+      "current.<caret>",
+    )
+    assertContainsElements(enumInstanceSuggestions, "index", "name")
+    assertDoesntContain(enumInstanceSuggestions, "values")
 
     val chainedSuggestions = completeInDebuggerFragment(
       """

@@ -225,6 +225,9 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
           val qualifierTarget = findDeclarationInScope(qualifier.text, contextElement)?.parent
           if (qualifierTarget is DartClass) {
             if (memberName == "new") return qualifierTarget
+            if (qualifierTarget.isEnum && memberName == "values") {
+              return findClassByName("List", contextElement)
+            }
             val staticOrCtor = qualifierTarget.findNamedConstructor(memberName)
               ?: qualifierTarget.findMembersByName(memberName).firstOrNull { isStaticOrEnumConstant(it) }
               ?: return null
@@ -232,6 +235,12 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
           }
         }
         val qualifierClass = resolveExpressionDartClass(qualifier, contextElement, boundVariables, visited) ?: return null
+        if (qualifierClass.isEnum) {
+          when(memberName) {
+            "index" -> findClassByName("int", contextElement)?.let { return it }
+            "name" -> findClassByName("String", contextElement)?.let { return it }
+          }
+        }
         val member = DartResolveUtil.findNamedSubComponents(qualifierClass)
           .sortedBy { it.isSetter }
           .firstOrNull { it.name == memberName && !it.isConstructor && !it.isOperator && !isStaticOrEnumConstant(it) }
@@ -328,6 +337,10 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
         val componentName = member.componentName ?: continue
         addComponentNameLookup(componentName, CLASS_MEMBER_PRIORITY, seenNames, resultSet)
       }
+      if (dartClass.isEnum) {
+        addSynthesizedEnumProperty("index", "int", seenNames, resultSet)
+        addSynthesizedEnumProperty("name", "String", seenNames, resultSet)
+      }
     }
 
     private fun addStaticMembersOfClass(
@@ -345,6 +358,23 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
         val componentName = member.componentName ?: continue
         addComponentNameLookup(componentName, CLASS_MEMBER_PRIORITY, seenNames, resultSet)
       }
+      if (dartClass.isEnum) {
+        val valuesType = dartClass.name?.let { "List<$it>" } ?: "List"
+        addSynthesizedEnumProperty("values", valuesType, seenNames, resultSet)
+      }
+    }
+
+    private fun addSynthesizedEnumProperty(
+      name: String,
+      typeText: String,
+      seenNames: MutableSet<String>,
+      resultSet: CompletionResultSet,
+    ) {
+      if (!seenNames.add(name)) return
+      val lookup = LookupElementBuilder.create(name)
+        .withIcon(AllIcons.Nodes.Property)
+        .withTypeText(typeText, true)
+      resultSet.addElement(PrioritizedLookupElement.withPriority(lookup, CLASS_MEMBER_PRIORITY))
     }
 
     private fun isStaticOrEnumConstant(member: DartComponent): Boolean =
@@ -504,6 +534,15 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
         if (!member.isPublic && !DartResolveUtil.sameLibrary(contextElement, member)) continue
         val componentName = member.componentName ?: continue
         addComponentNameLookup(componentName, CLASS_MEMBER_PRIORITY, seenNames, resultSet)
+      }
+      if (enclosingClass.isEnum) {
+        val valuesType = enclosingClass.name?.let { "List<$it>" } ?: "List"
+        addSynthesizedEnumProperty("values", valuesType, seenNames, resultSet)
+        if (!inStaticContext) {
+          addSynthesizedEnumProperty("index", "int", seenNames, resultSet)
+          addSynthesizedEnumProperty("name", "String", seenNames, resultSet)
+
+        }
       }
     }
 
