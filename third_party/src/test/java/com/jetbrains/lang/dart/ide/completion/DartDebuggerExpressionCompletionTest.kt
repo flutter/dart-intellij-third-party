@@ -2,10 +2,15 @@
 package com.jetbrains.lang.dart.ide.completion
 
 import com.google.gson.JsonParser
+import com.intellij.codeInsight.lookup.Lookup
 import com.intellij.codeInsight.lookup.LookupElementPresentation
+import com.intellij.codeInsight.lookup.LookupManager
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.xdebugger.XDebuggerUtil
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
+import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.BoundVariable
+import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.DartElementGenerator
 
 class DartDebuggerExpressionCompletionTest : DartCodeInsightFixtureTestCase() {
@@ -369,5 +374,45 @@ class DartDebuggerExpressionCompletionTest : DartCodeInsightFixtureTestCase() {
     val userPresentation = LookupElementPresentation()
     lookups[1].renderElement(userPresentation)
     assertEquals("User", userPresentation.typeText)
+  }
+
+  fun testTabCompletionInsideParenthesesDoesNotEatClosingParenWithLspEnabled() {
+    val properties = PropertiesComponent.getInstance(project)
+    val sdk = DartSdk.getDartSdk(project)
+    assertNotNull(sdk)
+    val versionField = DartSdk::class.java.getDeclaredField("myVersion").apply { isAccessible = true }
+    val originalVersion = sdk!!.version
+    try {
+      properties.setValue("dart.lsp.experimental.enabled", true, true)
+      versionField.set(sdk, "3.15.0")
+      assertTrue(DartAnalysisServerService.isLspCompletionEnabled(project))
+
+      completeInDebuggerFragment(
+        """
+        class Counter {
+          int value = 0;
+        }
+
+        void main() {
+          final counter = Counter();
+          /*breakpoint*/return;
+        }
+        """.trimIndent(),
+        "(counter.<caret>)",
+      )
+
+      val activeLookup = LookupManager.getActiveLookup(myFixture.editor)
+      assertNotNull("Expected active completion lookup", activeLookup)
+      val valueItem = activeLookup!!.items.firstOrNull { it.lookupString == "value" }
+      assertNotNull("Expected 'value' in completion lookup", valueItem)
+
+      activeLookup.currentItem = valueItem
+      myFixture.finishLookup(Lookup.REPLACE_SELECT_CHAR)
+      myFixture.checkResult("(counter.value<caret>)")
+    }
+    finally {
+      properties.unsetValue("dart.lsp.experimental.enabled")
+      versionField.set(sdk, originalVersion)
+    }
   }
 }

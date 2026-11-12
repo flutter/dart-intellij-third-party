@@ -422,7 +422,7 @@ class DartDebuggerExpressionCompletionContributor : CompletionContributor() {
     private fun findEnclosingExecutable(element: PsiElement): PsiElement? {
       var current: PsiElement? = element
       while (current != null && current !is PsiFile) {
-        if (current is DartFunctionExpression) return current
+        if (current is DartFunctionExpression || current is DartVarDeclarationList) return current
         if (current is DartComponent) {
           val type = DartComponentType.typeOf(current)
           if (type == DartComponentType.METHOD || type == DartComponentType.FUNCTION || type == DartComponentType.CONSTRUCTOR) {
