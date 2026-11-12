@@ -528,6 +528,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest("dart/diagnosticServer", null, DiagnosticServerResult::class.java)
     }
 
+    override fun reanalyze(): CompletableFuture<Any> {
+        return forwardRequest("dart/reanalyze", null, Any::class.java)
+    }
+
     // Note: We advertise codeActionLiteralSupport in server.setClientCapabilities (see DartAnalysisServerService.buildLspCapabilities)
     // so DAS is guaranteed to return List<CodeAction> for textDocument/codeAction.
     override fun codeAction(params: CodeActionParams): CompletableFuture<List<Either<Command, CodeAction>>> {

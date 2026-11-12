@@ -25,6 +25,12 @@ interface DartLanguageServer : Lsp4jServer {
      */
     @JsonRequest("dart/diagnosticServer")
     fun diagnosticServer(): CompletableFuture<DiagnosticServerResult>
+
+    /**
+     * Forces re-reading of all potentially changed files, clearing of caches, and re-analysis of everything.
+     */
+    @JsonRequest("dart/reanalyze")
+    fun reanalyze(): CompletableFuture<Any>
 }
 
 data class DiagnosticServerResult(
@@ -60,6 +66,23 @@ object DartLspService {
                 edit = server.sendRequestSync { it.workspaceService.willRenameFiles(params) }
             }
             edit
+        }, AppExecutorUtil.getAppExecutorService())
+    }
+
+    @JvmStatic
+    fun reanalyze(project: Project): CompletableFuture<Boolean> {
+        return CompletableFuture.supplyAsync({
+            if (project.isDisposed) return@supplyAsync false
+            val server = LspServerManager.getInstance(project)
+                .getServersForProvider(DartLspServerSupportProvider::class.java)
+                .firstOrNull() ?: return@supplyAsync false
+            var succeeded = false
+            ProgressManager.getInstance().executeNonCancelableSection {
+                succeeded = server.sendRequestSync {
+                    (it as DartLanguageServer).reanalyze().thenApply { true }
+                } == true
+            }
+            succeeded
         }, AppExecutorUtil.getAppExecutorService())
     }
 }

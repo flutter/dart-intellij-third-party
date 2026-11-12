@@ -77,14 +77,16 @@ import org.eclipse.lsp4j.TypeHierarchyPrepareParams
 import org.eclipse.lsp4j.TypeHierarchySubtypesParams
 import org.eclipse.lsp4j.TypeHierarchySupertypesParams
 import org.eclipse.lsp4j.WorkspaceEdit
+import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
-import org.eclipse.lsp4j.jsonrpc.Launcher
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
 class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
@@ -384,6 +386,67 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val result = future.get(5, TimeUnit.SECONDS)
         assertNotNull(result)
         assertEquals(9123, result.port)
+    }
+
+    fun testReanalyzeRequest() {
+        val future = bridgeServer.reanalyze()
+
+        val jsonObject = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" }) {
+            "An lsp.handle request should be sent to DAS"
+        }
+        assertEquals("123", jsonObject.get("id").asString)
+
+        val outerParams = jsonObject.getAsJsonObject("params")
+        val lspMessage = outerParams.getAsJsonObject("lspMessage")
+        assertEquals("123", lspMessage.get("id").asString)
+        assertEquals("dart/reanalyze", lspMessage.get("method").asString)
+        assertFalse("lspMessage should not have params when null is passed", lspMessage.has("params"))
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": null
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        assertNull(future.get(5, TimeUnit.SECONDS))
+    }
+
+    fun testReanalyzeRequestWithErrorResponse() {
+        val future = bridgeServer.reanalyze()
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32601,
+                    "message": "Method not found"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        try {
+            future.get(5, TimeUnit.SECONDS)
+            fail("Expected ExecutionException when server returns an error for dart/reanalyze")
+        } catch (e: ExecutionException) {
+            assertTrue(e.cause is ResponseErrorException)
+        }
     }
 
     fun testForwardNotification() {
@@ -882,6 +945,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertTrue("Experimental features list should contain 'code actions'", experimentalNames.contains("code actions"))
         assertTrue("Experimental features list should contain 'errors and warnings'", experimentalNames.contains("errors and warnings"))
         assertFalse("DOCUMENT_HIGHLIGHT should not be experimental", LspMethod.getExperimentalFeatures().contains(LspMethod.DOCUMENT_HIGHLIGHT))
+        assertFalse("REANALYZE should not be experimental", LspMethod.getExperimentalFeatures().contains(LspMethod.REANALYZE))
+        assertEquals(LspMethod.REANALYZE, LspMethod.fromMethod("dart/reanalyze"))
     }
 
     fun testBuildLspCapabilitiesIncludesCompletion() {
@@ -2132,6 +2197,20 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("3.0.0"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.19.0"))
         assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting("2.14.0"))
+    }
+
+    fun testIsDartSdkVersionSufficientForLspReanalyze() {
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("3.14.0-252.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("3.14.0-253.0.dev"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("3.14.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("3.15.0"))
+        assertTrue(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("4.0.0"))
+
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("3.14.0-251.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("3.14.0-65.0.dev"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("3.13.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("3.0.0"))
+        assertFalse(DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze("2.19.0"))
     }
 
     fun testIsLspHighlightingEnabled() {
