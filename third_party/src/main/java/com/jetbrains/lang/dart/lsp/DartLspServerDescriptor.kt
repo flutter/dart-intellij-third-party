@@ -12,8 +12,10 @@ import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.platform.dartlsp.api.Lsp4jClient
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
@@ -92,6 +94,9 @@ private const val DART_CONFIGURATION_SECTION = "dart"
 class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(project, "Dart (Bridge)") {
 
     override val lsp4jServerClass: Class<out Lsp4jServer> = DartLanguageServer::class.java
+
+    override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
+        DartLsp4jClient(project, handler)
 
     override val clientCapabilities: ClientCapabilities
         get() = super.clientCapabilities.apply {
@@ -336,6 +341,18 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             "source" -> DartSyntaxHighlighterColors.IDENTIFIER
             // Comments, numbers, plain strings, booleans, and operators are left to DartSyntaxHighlighter (lexer), matching legacy behavior.
             else -> null
+        }
+    }
+}
+
+open class DartLsp4jClient(
+    private val project: Project,
+    handler: LspServerNotificationsHandler,
+) : Lsp4jClient(handler), DartLanguageClient {
+
+    override fun publishClosingLabels(params: DartPublishClosingLabelsParams) {
+        if (params.uri != null) {
+            DartLspClosingLabelsService.getInstance(project).updateClosingLabels(params.uri, params.labels)
         }
     }
 }

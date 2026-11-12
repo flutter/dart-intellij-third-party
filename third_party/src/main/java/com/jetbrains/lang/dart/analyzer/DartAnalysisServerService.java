@@ -65,6 +65,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Ref;
@@ -100,6 +101,8 @@ import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
+import com.jetbrains.lang.dart.lsp.DartLspClosingLabel;
+import com.jetbrains.lang.dart.lsp.DartLspClosingLabelsService;
 import com.jetbrains.lang.dart.lsp.DartLspConfigurationSync;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
@@ -143,6 +146,8 @@ import org.dartlang.analysis.server.protocol.SourceChange;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.dartlang.analysis.server.protocol.SourceFileEdit;
 import org.dartlang.analysis.server.protocol.TypeHierarchyItem;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
@@ -326,8 +331,7 @@ public final class DartAnalysisServerService implements Disposable {
 
     @Override
     public void computedClosingLabels(@NotNull String filePathOrUri, @NotNull List<ClosingLabel> labels) {
-      DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathOrUri);
-      myServerData.computedClosingLabels(fileInfo, labels);
+      DartAnalysisServerService.this.computedClosingLabels(filePathOrUri, labels);
     }
 
     @Override
@@ -467,6 +471,40 @@ public final class DartAnalysisServerService implements Disposable {
       myServerData.textDocumentContentDidChange(fileUri);
     }
   };
+
+  @VisibleForTesting
+  public void computedClosingLabels(@NotNull String filePathOrUri, @NotNull List<ClosingLabel> labels) {
+    DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathOrUri);
+    myServerData.computedClosingLabels(fileInfo, labels);
+
+    // Backward-compatibility adapter for SDKs < 3.14.0-219.0.dev that emit legacy
+    // analysis.closingLabels instead of dart/textDocument/publishClosingLabels.
+    if (!isLspClosingLabelsEnabled(myProject)) {
+      VirtualFile file = fileInfo.findFile();
+      if (file == null && fileInfo instanceof DartLocalFileInfo localFileInfo) {
+        String path = FileUtil.toSystemIndependentName(localFileInfo.getFilePath());
+        file = VirtualFileManager.getInstance().findFileByUrl("temp://" + path);
+      }
+      if (file != null && file.isValid()) {
+        final VirtualFile vFile = file;
+        List<DartServerData.DartClosingLabel> convertedLabels = myServerData.getClosingLabels(vFile);
+        List<DartLspClosingLabel> lspLabels =
+          ApplicationManager.getApplication().runReadAction((Computable<List<DartLspClosingLabel>>)() -> {
+            Document document = FileDocumentManager.getInstance().getDocument(vFile);
+            if (document == null) return null;
+            return convertedLabels.stream().map(label -> {
+              int endOffset = Math.min(label.getOffset() + label.getLength(), document.getTextLength());
+              int endLine = document.getLineNumber(endOffset);
+              Position pos = new Position(endLine, 0);
+              return new DartLspClosingLabel(label.getLabel(), new Range(pos, pos));
+            }).toList();
+          });
+        if (lspLabels != null) {
+          DartLspClosingLabelsService.getInstance(myProject).updateClosingLabels(filePathOrUri, lspLabels);
+        }
+      }
+    }
+  }
 
   private static int ensureNotZero(int i) {
     return i == 0 ? Integer.MAX_VALUE : i;
@@ -766,9 +804,6 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public static boolean isLspClosingLabelsEnabled(final @NotNull Project project) {
-    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-      return false;
-    }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspClosingLabels(sdk.getVersion());
   }
