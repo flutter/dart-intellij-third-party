@@ -40,16 +40,16 @@ class DTDProcess {
 
   private val consumerMap: MutableMap<String, DartToolingDaemonConsumer> = ConcurrentHashMap()
 
-  private var processRunning = false
+  @Volatile private var processRunning = false
 
-  var uri: String? = null
+  @Volatile var uri: String? = null
     private set
-  private var secret: String? = null
+  @Volatile private var secret: String? = null
 
   private val nextRequestId = AtomicInteger()
 
   private lateinit var webSocket: WebSocket
-  var webSocketReady: Boolean = false
+  @Volatile var webSocketReady: Boolean = false
     private set
   private val servicesMap: MutableMap<String, DartToolingDaemonRequestHandler> = mutableMapOf()
 

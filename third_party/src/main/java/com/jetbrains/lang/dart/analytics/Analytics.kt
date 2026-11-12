@@ -32,7 +32,6 @@ import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.PrintingLogger
-import com.jetbrains.lang.dart.websocket.WebSocketException
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.annotations.VisibleForTesting
 import java.util.concurrent.CountDownLatch
@@ -116,33 +115,28 @@ private object UnifiedAnalytics {
     val params = JsonObject()
     params.addProperty(Property.TOOL, getToolName())
     var value: JsonElement? = null
-    try {
-      val latch = CountDownLatch(1)
-      val requestId = dtdProcess.sendRequest(
-        "$SERVICE_NAME.$name",
-        params,
-        true
-      ) { response ->
-        logger.debug("$SERVICE_NAME.$name.received: ")
-        val result = response[Property.RESULT]
-        if (result is JsonObject) {
-          value = result[Property.VALUE]
-        }
-        logger.debug("\t$response")
-        latch.countDown()
+    val latch = CountDownLatch(1)
+    val requestId = dtdProcess.sendRequest(
+      "$SERVICE_NAME.$name",
+      params,
+      true
+    ) { response ->
+      logger.debug("$SERVICE_NAME.$name.received: ")
+      val result = response[Property.RESULT]
+      if (result is JsonObject) {
+        value = result[Property.VALUE]
       }
-
-      val completed = latch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-      if (!completed) {
-        // Drop the pending consumer so it isn't retained for a response that may never come.
-        dtdProcess.cancelRequest(requestId)
-        throw TimeoutException("Call to $SERVICE_NAME.$name timed out after $timeout.")
-      }
-
-    } catch (e: WebSocketException) {
-      // Analytics failures must not surface as IDE internal errors.
-      logger.warn("Call to $SERVICE_NAME.$name failed: ${e.message}")
+      logger.debug("\t$response")
+      latch.countDown()
     }
+
+    val completed = latch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+    if (!completed) {
+      // Drop the pending consumer so it isn't retained for a response that may never come.
+      dtdProcess.cancelRequest(requestId)
+      throw TimeoutException("Call to $SERVICE_NAME.$name timed out after $timeout.")
+    }
+
     return value
   }
 
@@ -254,9 +248,10 @@ private object AnalyticsConfigurationManager {
             // Update global suppression state (note that the default is to suppress).
             Analytics.suppressAnalytics = data.suppressAnalytics
 
-            if (data.shouldShowMessage) {
+            val consentMessage = data.consentMessage
+            if (data.shouldShowMessage && !consentMessage.isNullOrBlank()) {
               // Process termination happens after the prompt.
-              scheduleConsentPromptNotification(project, dtdProcess, logger)
+              scheduleConsentPromptNotification(project, consentMessage, dtdProcess, logger)
             } else {
               dtdProcess.terminate()
             }
@@ -288,11 +283,16 @@ private object AnalyticsConfigurationManager {
     return data
   }
 
-  private fun scheduleConsentPromptNotification(project: Project, dtdProcess: DTDProcess, logger: Logger) {
+  private fun scheduleConsentPromptNotification(
+    project: Project,
+    consentMessage: String,
+    dtdProcess: DTDProcess,
+    logger: Logger
+  ) {
     ApplicationManager.getApplication().invokeLater {
       NotificationGroupManager.getInstance()
         .getNotificationGroup(DAS_NOTIFICATION_GROUP)
-        .createNotification(data.consentMessage!!, NotificationType.INFORMATION).also { notification ->
+        .createNotification(consentMessage, NotificationType.INFORMATION).also { notification ->
           notification.addAction(object : AnAction(CommonBundle.getOkButtonText()) {
             override fun actionPerformed(e: AnActionEvent) {
               try {
