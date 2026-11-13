@@ -529,6 +529,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     override fun reanalyze(): CompletableFuture<Any> {
+        DartAnalysisServerService.getInstance(project).scheduleClearAllErrors()
         return forwardRequest("dart/reanalyze", null, Any::class.java)
     }
 

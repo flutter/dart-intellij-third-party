@@ -32,16 +32,10 @@ public class ReanalyzeDartSourcesAction extends AnAction implements DumbAware {
         String sdkVersion = das.getSdkVersion();
         if (!sdkVersion.isEmpty() && DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze(sdkVersion)) {
           DartLspService.reanalyze(project)
-                  .thenAccept(succeeded -> {
-                    if (!project.isDisposed() && !Boolean.TRUE.equals(succeeded)) {
+                  .whenComplete((succeeded, ex) -> {
+                    if (!project.isDisposed() && (ex != null || !Boolean.TRUE.equals(succeeded))) {
                       das.analysis_reanalyze();
                     }
-                  })
-                  .exceptionally(ex ->{
-                    if (!project.isDisposed()) {
-                      das.analysis_reanalyze();
-                    }
-                    return null;
                   });
         } else {
           das.analysis_reanalyze();

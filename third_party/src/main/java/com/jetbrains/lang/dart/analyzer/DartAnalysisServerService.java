@@ -2274,7 +2274,10 @@ public final class DartAnalysisServerService implements Disposable {
     }
 
     server.analysis_reanalyze();
+    scheduleClearAllErrors();
+  }
 
+  public void scheduleClearAllErrors() {
     ApplicationManager.getApplication().invokeLater(this::clearAllErrors, ModalityState.nonModal(), myDisposedCondition);
   }
 
