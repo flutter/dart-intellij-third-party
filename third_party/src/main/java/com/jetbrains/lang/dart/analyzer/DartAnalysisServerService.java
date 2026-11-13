@@ -496,9 +496,10 @@ public final class DartAnalysisServerService implements Disposable {
         Document document = FileDocumentManager.getInstance().getCachedDocument(file);
         if (document != null) {
           List<DartServerData.DartClosingLabel> convertedLabels = myServerData.getClosingLabels(file);
+          CharSequence text = document.getImmutableCharSequence();
           List<DartLspClosingLabel> lspLabels = convertedLabels.stream().map(label -> {
-            int endOffset = Math.min(label.getOffset() + label.getLength(), document.getTextLength());
-            int endLine = document.getLineNumber(endOffset);
+            int endOffset = Math.min(label.getOffset() + label.getLength(), text.length());
+            int endLine = StringUtil.offsetToLineNumber(text, endOffset);
             Position pos = new Position(endLine, 0);
             return new DartLspClosingLabel(label.getLabel(), new Range(pos, pos));
           }).toList();
