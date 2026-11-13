@@ -97,12 +97,35 @@ object DartLspService {
                 }
                 connectedDtdUriByServer[server] = uri
             }
-            var result: Any? = null
-            ProgressManager.getInstance().executeNonCancelableSection {
-                result = server.sendRequestSync { (it as DartLanguageServer).connectToDtd(ConnectToDtdParams(uri)) }
+            var dispatched = false
+            try {
+                var result: Any? = null
+                ProgressManager.getInstance().executeNonCancelableSection {
+                    result = server.sendRequestSync { lspServer ->
+                        val future = (lspServer as DartLanguageServer).connectToDtd(ConnectToDtdParams(uri))
+                            .whenComplete { _, error ->
+                                if (error != null) {
+                                    evictConnectedDtdUri(server, uri)
+                                }
+                            }
+                        dispatched = true
+                        future
+                    }
+                }
+                result
+            } catch (t: Throwable) {
+                evictConnectedDtdUri(server, uri)
+                throw t
+            } finally {
+                if (!dispatched) {
+                    evictConnectedDtdUri(server, uri)
+                }
             }
-            result
         }, AppExecutorUtil.getAppExecutorService())
+    }
+
+    private fun evictConnectedDtdUri(server: LspServer, uri: String) {
+        connectedDtdUriByServer.remove(server, uri)
     }
 
     @JvmStatic
