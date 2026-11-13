@@ -101,6 +101,7 @@ object DartLspService {
             try {
                 var result: Any? = null
                 ProgressManager.getInstance().executeNonCancelableSection {
+                    var requestStarted = false
                     result = server.sendRequestSync { lspServer ->
                         val future = (lspServer as DartLanguageServer).connectToDtd(ConnectToDtdParams(uri))
                             .whenComplete { _, error ->
@@ -108,14 +109,12 @@ object DartLspService {
                                     evictConnectedDtdUri(server, uri)
                                 }
                             }
-                        dispatched = true
+                        requestStarted = true
                         future
                     }
+                    dispatched = requestStarted
                 }
                 result
-            } catch (t: Throwable) {
-                evictConnectedDtdUri(server, uri)
-                throw t
             } finally {
                 if (!dispatched) {
                     evictConnectedDtdUri(server, uri)

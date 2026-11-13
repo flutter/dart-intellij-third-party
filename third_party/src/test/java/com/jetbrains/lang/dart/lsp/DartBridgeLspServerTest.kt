@@ -97,7 +97,9 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
@@ -517,7 +519,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         try {
             otherErrorFuture.get(5, TimeUnit.SECONDS)
             fail("Expected non--32015 error to complete connectToDtd exceptionally")
-        } catch (expected: java.util.concurrent.ExecutionException) {
+        } catch (expected: ExecutionException) {
             assertTrue(expected.cause?.message?.contains("Failed to connect to DTD") == true)
         }
     }
@@ -531,6 +533,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val originalVersion = sdk.version
 
         val requestSentLatch = CountDownLatch(1)
+        val skipSendRequest = AtomicBoolean(false)
         val mockLspServer = Proxy.newProxyInstance(
             LspServer::class.java.classLoader,
             arrayOf(LspServer::class.java)
@@ -538,10 +541,12 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             when (method.name) {
                 "getState" -> LspServerState.Running
                 "sendRequestSync" -> {
-                    @Suppress("UNCHECKED_CAST")
-                    val sender = args.last() as (Lsp4jServer) -> CompletableFuture<Any?>
-                    sender(bridgeServer)
-                    requestSentLatch.countDown()
+                    if (!skipSendRequest.get()) {
+                        @Suppress("UNCHECKED_CAST")
+                        val sender = args.last() as (Lsp4jServer) -> CompletableFuture<Any?>
+                        sender(bridgeServer)
+                        requestSentLatch.countDown()
+                    }
                     null
                 }
                 "hashCode" -> System.identityHashCode(proxy)
@@ -572,6 +577,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         try {
             versionField.set(sdk, "3.8.0")
             uriField.set(dtdService, dtdUri)
+
+            // If sendRequestSync returns null without invoking the sender lambda, the cached URI must be evicted.
+            skipSendRequest.set(true)
+            DartLspService.connectToDtd(mockProject, dtdUri).get(5, TimeUnit.SECONDS)
+            skipSendRequest.set(false)
 
             val descriptor = DartLspServerDescriptor(mockProject)
             descriptor.lspServerListener.serverInitialized(InitializeResult())
