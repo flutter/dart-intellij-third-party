@@ -268,32 +268,6 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
         override val codeLensCustomizer = LspCodeLensDisabled
         override val renameCustomizer = LspRenameDisabled
     }
-
-    override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient {
-        return DartLsp4jClient(project, handler)
-    }
-}
-
-/**
- * Custom [Lsp4jClient] that intercepts standard `textDocument/publishDiagnostics` notifications
- * to update the Dart Analysis tool window (`DartProblemsView`) identically in both Bridge mode and Full LSP,
- * while delegating to [super.publishDiagnostics] for editor highlightings and squiggles.
- */
-open class DartLsp4jClient(
-    private val project: Project,
-    handler: LspServerNotificationsHandler
-) : Lsp4jClient(handler) {
-
-    override fun publishDiagnostics(params: PublishDiagnosticsParams) {
-        if (project.isDisposed) return
-        super.publishDiagnostics(params)
-        val diagnostics = params.diagnostics ?: emptyList()
-        val errors = DartLspDiagnosticConverter.convertDiagnostics(project, params.uri, diagnostics)
-            .filter { it.type != "TODO" }
-        val fileInfo = getDartFileInfo(project, params.uri)
-        val filePath = if (fileInfo is DartLocalFileInfo) fileInfo.filePath else params.uri
-        DartProblemsView.getInstance(project).updateErrorsForFile(filePath, errors)
-    }
 }
 
 object DartLspCompletionSupport : LspCompletionSupport() {
@@ -396,10 +370,27 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
     }
 }
 
+/**
+ * Custom [Lsp4jClient] that intercepts standard `textDocument/publishDiagnostics` notifications
+ * to update the Dart Analysis tool window (`DartProblemsView`) identically in both Bridge mode and Full LSP
+ * (while delegating to [super.publishDiagnostics] for editor highlightings and squiggles), and handles
+ * custom `dart/textDocument/publishClosingLabels` notifications via [DartLanguageClient].
+ */
 open class DartLsp4jClient(
     private val project: Project,
     handler: LspServerNotificationsHandler,
 ) : Lsp4jClient(handler), DartLanguageClient {
+
+    override fun publishDiagnostics(params: PublishDiagnosticsParams) {
+        if (project.isDisposed) return
+        super.publishDiagnostics(params)
+        val diagnostics = params.diagnostics ?: emptyList()
+        val errors = DartLspDiagnosticConverter.convertDiagnostics(project, params.uri, diagnostics)
+            .filter { it.type != "TODO" }
+        val fileInfo = getDartFileInfo(project, params.uri)
+        val filePath = if (fileInfo is DartLocalFileInfo) fileInfo.filePath else params.uri
+        DartProblemsView.getInstance(project).updateErrorsForFile(filePath, errors)
+    }
 
     override fun publishClosingLabels(params: DartPublishClosingLabelsParams) {
         if (params.uri != null) {
