@@ -28,6 +28,11 @@ import java.util.concurrent.atomic.AtomicReference
  * have to apply the edit themselves, such as [com.jetbrains.lang.dart.ide.imports.DartLspImportOptimizer] inside the
  * write command of Optimize Imports, [start] a capture for the file before they run the command and [Capture.finish]
  * it afterwards. [DartLspServerNotificationsHandler] offers every `workspace/applyEdit` to [offer] first.
+ *
+ * The platform's LSP client does the same since IntelliJ 2026.3: its `LspImportOptimizer` uses
+ * `executeCommandExpectingWorkspaceEdit()` ([IJPL-235332](https://youtrack.jetbrains.com/issue/IJPL-235332)). This
+ * plugin still supports older platform versions and uses its own copy of the older client, so it needs this class.
+ * Remove it once the plugin uses the platform's LSP client.
  */
 @Service(Service.Level.PROJECT)
 class DartLspApplyEditCapture(private val project: Project) {
