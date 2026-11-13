@@ -59,7 +59,9 @@ import com.intellij.platform.dartlsp.api.customization.LspSelectionRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensSupport
+import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
+import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
 import com.intellij.psi.PsiFile
@@ -223,7 +225,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 // The default implementation only serves plain-text/TextMate files.
                 override fun shouldAskServerForDocumentHighlights(psiFile: PsiFile): Boolean = true
             }
-        override val signatureHelpCustomizer = LspSignatureHelpDisabled
+        override val signatureHelpCustomizer: LspSignatureHelpCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                LspSignatureHelpSupport()
+            } else {
+                LspSignatureHelpDisabled
+            }
         override val documentSymbolCustomizer: LspDocumentSymbolCustomizer
             get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
                 LspDocumentSymbolSupport()
