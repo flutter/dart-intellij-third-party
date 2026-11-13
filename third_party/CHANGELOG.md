@@ -2,6 +2,7 @@
 
 ### Added
 - Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
+- Renaming Dart symbols via LSP with IntelliJ's standard rename UI, in the editor or in a dialog as set in Settings | Editor | Code Editing (experimental feature; requires Dart SDK 3.14.0-252.0.dev or newer) (#765)
 
 ### Changed
 - Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)

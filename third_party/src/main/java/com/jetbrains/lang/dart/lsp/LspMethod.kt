@@ -24,7 +24,9 @@ enum class LspMethod(
     SEMANTIC_TOKENS_FULL("textDocument/semanticTokens/full", isExperimental = true, presentableName = "syntax highlighting"),
     SHUTDOWN("shutdown"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
+    PREPARE_RENAME("textDocument/prepareRename", isExperimental = true),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
+    RENAME("textDocument/rename", isExperimental = true, presentableName = "rename"),
     DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols");
 
     companion object {

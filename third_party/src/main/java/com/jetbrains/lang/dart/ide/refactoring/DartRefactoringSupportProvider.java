@@ -14,6 +14,9 @@ import org.jetbrains.annotations.Nullable;
 public final class DartRefactoringSupportProvider extends RefactoringSupportProvider {
   @Override
   public boolean isInplaceRenameAvailable(@NotNull PsiElement element, PsiElement context) {
+    // VariableInplaceRenamer keeps its own text edits and never asks the rename processor, so with LSP rename all Dart
+    // symbols, local variables included, use DartLspInplaceRenameHandler.
+    if (DartLspRename.INSTANCE.isEnabled(element.getProject())) return false;
     return element instanceof DartNamedElement &&
            element.getUseScope() instanceof LocalSearchScope;
   }
