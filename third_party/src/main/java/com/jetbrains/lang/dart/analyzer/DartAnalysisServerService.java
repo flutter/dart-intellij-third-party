@@ -66,7 +66,6 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Ref;
@@ -482,28 +481,29 @@ public final class DartAnalysisServerService implements Disposable {
 
     // Backward-compatibility adapter for SDKs < 3.14.0-219.0.dev that emit legacy
     // analysis.closingLabels instead of dart/textDocument/publishClosingLabels.
-    if (!isLspClosingLabelsEnabled(myProject)) {
+    // Note: this method is invoked on the Analysis Server reader thread, which must never call
+    // runReadAction synchronously (otherwise it deadlocks if the EDT holds the write lock while
+    // awaiting an Analysis Server response, e.g. during MoveFileRefactoring).
+    boolean lspClosingLabelsEnabled = !mySdkVersion.isEmpty() &&
+                                      isDartSdkVersionSufficientForLspClosingLabels(mySdkVersion);
+    if (!lspClosingLabelsEnabled) {
       VirtualFile file = fileInfo.findFile();
       if (file == null && fileInfo instanceof DartLocalFileInfo localFileInfo) {
         String path = FileUtil.toSystemIndependentName(localFileInfo.getFilePath());
         file = VirtualFileManager.getInstance().findFileByUrl("temp://" + path);
       }
       if (file != null && file.isValid()) {
-        final VirtualFile vFile = file;
-        List<DartServerData.DartClosingLabel> convertedLabels = myServerData.getClosingLabels(vFile);
-        List<DartLspClosingLabel> lspLabels =
-          ApplicationManager.getApplication().runReadAction((Computable<List<DartLspClosingLabel>>)() -> {
-            Document document = FileDocumentManager.getInstance().getDocument(vFile);
-            if (document == null) return null;
-            return convertedLabels.stream().map(label -> {
-              int endOffset = Math.min(label.getOffset() + label.getLength(), document.getTextLength());
-              int endLine = document.getLineNumber(endOffset);
-              Position pos = new Position(endLine, 0);
-              return new DartLspClosingLabel(label.getLabel(), new Range(pos, pos));
-            }).toList();
-          });
-        if (lspLabels != null) {
-          DartLspClosingLabelsService.getInstance(myProject).updateClosingLabels(filePathOrUri, lspLabels);
+        Document document = FileDocumentManager.getInstance().getCachedDocument(file);
+        if (document != null) {
+          List<DartServerData.DartClosingLabel> convertedLabels = myServerData.getClosingLabels(file);
+          CharSequence text = document.getImmutableCharSequence();
+          List<DartLspClosingLabel> lspLabels = convertedLabels.stream().map(label -> {
+            int endOffset = Math.min(label.getOffset() + label.getLength(), text.length());
+            int endLine = StringUtil.offsetToLineNumber(text, endOffset);
+            Position pos = new Position(endLine, 0);
+            return new DartLspClosingLabel(label.getLabel(), new Range(pos, pos));
+          }).toList();
+          DartLspClosingLabelsService.getInstance(myProject).updateClosingLabels(file, lspLabels);
         }
       }
     }
