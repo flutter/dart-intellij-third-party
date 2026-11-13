@@ -83,3 +83,6 @@ Here are the details of the changes made by the patch script:
    - Keep `CurrentActionHolder` in `LspImplicitReferenceProvider.kt` `internal` (instead of `private`) so `DartTargetElementEvaluatorTest` can set `currentActionClass` in tests.
 12. **Guard `StickyLineInfo` Range in `LspFileBreadcrumbsCollector` (`#734` / `IJPL-260061`, `patch.py` step `#14`)**:
    - Add `// Dart patch: skip incomplete declarations (#734 / IJPL-260061)` and `if (textOffset >= endOffset) return@mapNotNull null` before constructing `StickyLineInfo(textOffset, endOffset, null)` in `LspFileBreadcrumbsCollector.computeStickyLineInfos` so incomplete declarations (where `selectionRange.start == range.end`) do not throw `IllegalArgumentException`. (This patch can be dropped once `IJPL-260061` is fixed in the `intellij-community` sync source.)
+13. **Make `Lsp4jClient.publishDiagnostics` Open (`flutter/flutter-intellij#9239`, `patch.py` step `#15`)**:
+   - Remove `final` modifier from `publishDiagnostics(params: PublishDiagnosticsParams)` in `Lsp4jClient.kt` so subclasses (such as `DartLsp4jClient` in `DartLspServerDescriptor.kt`) can override it to forward diagnostics to `DartProblemsView` (tracked in https://github.com/flutter/flutter-intellij/issues/9239).
+
