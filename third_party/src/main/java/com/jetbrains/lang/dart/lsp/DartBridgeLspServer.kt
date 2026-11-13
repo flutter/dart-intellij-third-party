@@ -238,7 +238,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             // Parse and forward notifications/requests to the LSP client proxy using lsp4j.
             when (method) {
                 "textDocument/publishDiagnostics" -> handlePublishDiagnostics(client, msgObj)
-                "dart/textDocument/publishClosingLabels" -> handlePublishClosingLabels(msgObj)
+                "dart/textDocument/publishClosingLabels" -> handlePublishClosingLabels(client, msgObj)
                 "workspace/applyEdit" -> handleApplyEdit(client, dasRequestId, msgObj)
                 else -> logger.debug("Ignored notification/request from DAS: $method")
             }
@@ -257,11 +257,11 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         das.onLspDiagnosticsUpdated(params.uri, errors)
     }
 
-    private fun handlePublishClosingLabels(msgObj: JsonObject) {
+    private fun handlePublishClosingLabels(client: LanguageClient, msgObj: JsonObject) {
         val paramsObj = msgObj.get("params")
-        val params = GSON.fromJson(paramsObj, DartPublishClosingLabelsParams::class.java)
-        if (params?.uri != null) {
-            DartLspClosingLabelsService.getInstance(project).updateClosingLabels(params.uri, params.labels)
+        val params = GSON.fromJson(paramsObj, DartPublishClosingLabelsParams::class.java) ?: return
+        if (client is DartLanguageClient) {
+            client.publishClosingLabels(params)
         }
     }
 

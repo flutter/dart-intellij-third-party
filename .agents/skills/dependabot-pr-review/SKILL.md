@@ -1,6 +1,6 @@
 ---
 name: dependabot-pr-review
-description: Reviews open automated dependency pull requests in the Dart (flutter/dart-intellij-third-party) and Flutter (flutter/flutter-intellij) IntelliJ plugin repositories. Covers Dependabot version bumps and bot-authored Flutter SDK rolls. Lists each PR with its build status, asks the user which ones to approve, then approves them and applies the "autosubmit" label. When Kokoro is the only failing build, offers to re-run it with the "kokoro:run" label.
+description: Reviews open automated dependency pull requests in the Dart (flutter/dart-intellij-third-party) and Flutter (flutter/flutter-intellij) IntelliJ plugin repositories. Covers Dependabot version bumps and bot-authored Flutter SDK rolls. Lists each PR with its build status, asks the user which ones to approve, then approves them and applies the "autosubmit" label. When Kokoro is the only failing build, offers to re-run it with the "kokoro:run" label, first updating an out-of-date branch (so a fix on main is picked up) and clearing a stuck label, and can queue the PR for auto-submit in the same pass.
 ---
 
 # Dependabot PR Review Skill
@@ -72,8 +72,16 @@ intermittent failure, works differently in each repository:
 
 | Repository | Kokoro reads the label when... | To re-run |
 | --- | --- | --- |
-| `flutter/flutter-intellij` | it is added | Add `kokoro:run`. |
+| `flutter/flutter-intellij` | it is added, or a commit is pushed while it is present | Update the branch if it's behind, then add `kokoro:run`. |
 | `flutter/dart-intellij-third-party` | a commit is pushed | Add `kokoro:run`, then comment `@dependabot recreate`. |
+
+> [!IMPORTANT]
+> In `flutter-intellij`, don't just re-add the label on a branch that is
+> behind `main`. Kokoro's build setup lives in the repository
+> (`tool/kokoro/`), so a re-run on an old branch rebuilds the old setup and
+> fails the same way, even after a fix has landed on `main`. The branch has to
+> be updated first. When `main`'s own Kokoro status is green and the PR's is
+> red, a fix on `main` is the likely explanation.
 
 The difference comes from each repository's Kokoro job configuration, which
 lives outside these repositories. In the Dart repository, a label added to an
@@ -82,13 +90,28 @@ and Kokoro reads the label at that point. Recreating takes about a minute,
 re-runs every check, and discards any manual edits to the branch, which is
 fine for a bot PR. It only works on Dependabot PRs, not SDK rolls.
 
-In `flutter-intellij`, a `kokoro:run` label that is still present means a run
-is queued. In the Dart repository it means nothing: it may be left over from an
-earlier attempt.
+In `flutter-intellij`, a `kokoro:run` label that is still present usually
+means a run is queued, since Kokoro removes it when it starts. But a label
+added while a build is already running is ignored and stays put. If it has sat
+there for more than 15 minutes with no new Kokoro status, it's stuck: remove it
+and add it again. In the Dart repository a present label means nothing: it may
+be left over from an earlier attempt.
 
-A re-run doesn't approve anything, and the PR can't be approved in the same
-pass: the auto-submit bot strips `autosubmit` from a PR with a failed check.
-Approve it on a later pass, once the new build passes. Stale approvals aren't
+**Updating a Dependabot branch.** `@dependabot rebase` keeps Dependabot
+managing the PR, but Dependabot refuses it once anyone else has committed to
+the branch (for example, a manual "Update branch" merge). Then the choices are
+`@dependabot recreate`, which can take a long time to act or not act at all,
+or `gh pr update-branch`, which works at once and keeps existing approvals but
+means Dependabot stops managing the PR. The scripts use the rebase comment
+when the branch has only Dependabot commits, and `gh pr update-branch`
+otherwise.
+
+A plain re-run doesn't approve anything, and a PR re-run on the same commit
+can't be approved in the same pass: the auto-submit bot strips `autosubmit`
+from a PR with a failed check. After a branch update or recreate, the failed
+status is no longer on the head, so the PR *can* be queued in the same pass
+(`--queue`). Whether the bot strips the label while the new build is still
+pending is unverified, so warn that it may bounce. Stale approvals aren't
 dismissed in either repository, so a PR approved earlier stays approved after a
 recreate.
 
@@ -158,10 +181,22 @@ Call out anything that needs judgement before presenting the approval question:
 
 - PRs with `FAIL` checks, including the names of the failing checks.
 - PRs where Kokoro is the only failing build. The script's footnote marks
-  these `only Kokoro failed`. They can be re-run with `kokoro:run` rather than
-  needing a fix. If the same bump passed in the other repository, say so: it
-  points to an intermittent failure. Other checks on these PRs may still be
-  pending, so mention any that are.
+  these `only Kokoro failed` and explains why, using `kokoroAction` from the
+  JSON payload:
+  - `updateBranch`: the branch is N commits behind its base. Say whether the
+    base's own Kokoro status is green (`kokoro.baseKokoroState`), since that
+    points to a fix that landed after the PR branched.
+  - `relabel`: `kokoro:run` is stuck (`kokoroLabelStuck`).
+  - `rerun`: an up-to-date branch with no label; likely an intermittent
+    failure. If the same bump passed in the other repository, say so.
+  - `wait`: Kokoro is already running on the head, or a fresh label is queued.
+  - `recreate`: the Dart repository's usual re-run.
+
+  Also mention `hasNonBotCommits`, because it decides how the branch gets
+  updated (see [How the kokoro:run Label Works](#how-the-kokororun-label-works)).
+  Other checks on these PRs may still be pending, so mention any that are.
+- A `kokoro:run` label stuck on a PR that isn't failing (footnote: `looks
+  stuck`).
 - PRs that are still `PENDING`.
 - PRs that are drafts, are not `MERGEABLE`, or already carry the `autosubmit`
   label (these usually need no further action).
@@ -190,6 +225,8 @@ naming the dependency, for example:
 - `Approve and label dart-intellij-third-party#665 — org.jetbrains.kotlin.jvm 2.4.10 -> 2.4.20 (build PASSING)`
 - `Approve and label flutter-intellij#9131 — Flutter SDK -> 3.47.5 (sdk-roll, build PASSING)`
 - `Re-run Kokoro on dart-intellij-third-party#725 — gradle-wrapper 9.7.1 -> 9.8.0 (only kokoro-mac failing; approve on a later pass)`
+- `Update branch and re-run Kokoro on flutter-intellij#9213 — gson 2.14.0 -> 2.15.0 (kokoro-mac failing; branch 5 behind main, whose Kokoro is green)`
+- `Update branch, re-run Kokoro, and queue flutter-intellij#9213 — gson 2.14.0 -> 2.15.0 (approve + autosubmit now; label bounces if Kokoro fails again)`
 - `Approve and label flutter-intellij#8123 — actions/checkout 4 -> 5 (build FAILING: verify-plugin, label will likely bounce)`
 
 Guidelines for the question:
@@ -212,9 +249,15 @@ Guidelines for the question:
   and note that the bot will strip the label from a failing PR.
 - For each PR where `checks.onlyKokoroFailing` is true, offer a **Re-run
   Kokoro** option naming the failing Kokoro checks, in place of its approve
-  option. Never include re-runs in a bulk option. In `flutter-intellij`, skip
-  the re-run when `hasKokoroRunLabel` is true and say one is already queued. In
-  the Dart repository, offer it regardless, but only for Dependabot PRs.
+  option, worded after `kokoroAction` (`Update branch and re-run…`, `Re-add
+  stuck label on…`, `Re-run Kokoro on…`). Skip it when `kokoroAction` is
+  `wait`, and say a run is already underway. In the Dart repository, offer it
+  only for Dependabot PRs.
+- When `kokoroAction` is `updateBranch` or `recreate`, also offer a **…and
+  queue** variant that approves and adds `autosubmit` in the same pass. Don't
+  offer it for `rerun` or `relabel`: on the same commit, the bot would strip
+  the label straight away.
+- Never include re-runs in a bulk option.
 - Exclude PRs that already have the `autosubmit` label, and mention in your
   message that they were skipped because they are already queued.
 - If the user asks to be prompted one at a time instead, ask a separate
@@ -233,7 +276,8 @@ For the selected PRs only, run:
 dart run .agents/skills/dependabot-pr-review/scripts/approve_and_label.dart \
   --pr flutter/dart-intellij-third-party#665 \
   --pr flutter/flutter-intellij#8123 \
-  --rerun-kokoro flutter/dart-intellij-third-party#725
+  --rerun-kokoro flutter/dart-intellij-third-party#725 \
+  --rerun-kokoro flutter/flutter-intellij#9213 --queue
 ```
 
 The script approves each `--pr` PR with `gh pr review --approve` and then
@@ -245,8 +289,17 @@ each PR, so its preview matches what a real run would do.
 
 Each `--rerun-kokoro` PR gets `kokoro:run`, plus a `@dependabot recreate`
 comment in the Dart repository, as described in
-[How the kokoro:run Label Works](#how-the-kokororun-label-works). It isn't
-approved. The script refuses a PR passed to both flags, and in the Dart
+[How the kokoro:run Label Works](#how-the-kokororun-label-works). In
+`flutter-intellij`, an out-of-date branch is updated first: the script posts
+`@dependabot rebase` or runs `gh pr update-branch`, waits up to 10 minutes for
+the new head, and adds the label only if the push didn't start Kokoro by
+itself. A stuck label is removed and re-added. The script refuses PRs that
+are already merged or closed.
+
+A re-run PR isn't approved unless `--queue` is passed, which approves it (if
+needed) and adds `autosubmit` after the re-run starts. Only pass `--queue`
+for the PRs the user chose a "…and queue" option for. It applies to every
+`--rerun-kokoro` PR in the command, so run those separately. The script refuses a PR passed to both flags, and in the Dart
 repository it refuses any PR not opened by Dependabot. If the comment fails
 after the label was added, running the same command again posts only the
 comment.
@@ -295,8 +348,12 @@ show up as a passing PR.
   `recreateRepos` in `approve_and_label.dart`. Remove the Dart repository from
   it if its Kokoro job starts honoring labels added later.
 - A check counts as Kokoro when its name starts with `kokoro`, ignoring case.
-  The JSON payload exposes `checks.onlyKokoroFailing` and `hasKokoroRunLabel`
-  for each PR.
+  The JSON payload exposes `checks.onlyKokoroFailing`, `hasKokoroRunLabel`,
+  `kokoroLabelStuck`, `hasNonBotCommits` and `kokoroAction` for each PR, plus
+  a `kokoro` object (`behindBy`, `baseKokoroState`, `headKokoroPending`, and
+  timestamps). The `kokoro` object is fetched only for PRs where Kokoro is the
+  only failure or `kokoro:run` is present, since it costs a few extra API
+  calls each.
 - Both scripts support `--help`.
 
 ## Bundled Resources
