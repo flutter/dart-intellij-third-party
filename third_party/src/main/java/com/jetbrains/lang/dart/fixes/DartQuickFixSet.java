@@ -6,10 +6,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.Consumer;
-import com.jetbrains.lang.dart.analytics.Analytics;
-import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
-import com.jetbrains.lang.dart.analytics.AnalyticsData;
-import com.jetbrains.lang.dart.analytics.FixData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.annotator.DartProblemGroup;
 import com.jetbrains.lang.dart.sdk.DartSdk;
@@ -76,15 +72,7 @@ public class DartQuickFixSet {
       fix.setSourceChange(null);
     }
 
-    long startTime = System.nanoTime();
-
     final Consumer<List<AnalysisErrorFixes>> consumer = fixes -> {
-      long durationMs = (System.nanoTime() - startTime) / 1_000_000;
-
-      FixData fixData = AnalyticsData.forFix("dart.legacy_fix", myPsiManager.getProject());
-      fixData.add(AnalyticsConstants.DURATION_MS, (int) durationMs);
-      Analytics.report(fixData);
-
       final long psiModCountWhenReceivedFixes = myPsiManager.getModificationTracker().getModificationCount();
       final long vfsModCountWhenReceivedFixes = VirtualFileManager.getInstance().getModificationCount();
 

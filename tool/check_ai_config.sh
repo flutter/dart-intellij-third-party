@@ -114,8 +114,26 @@ for norm in "${gemini_norms[@]}"; do
   fi
 done
 
+# 5. Verify every workspace rule declares an activation trigger.
+# Agents (e.g. Antigravity) silently skip rule files without a `trigger:` in
+# their YAML frontmatter, so a missing trigger means the rule is never loaded.
+RULES_DIR=".agents/rules"
+if [[ -d "$RULES_DIR" ]]; then
+  for rule in "$RULES_DIR"/*.md; do
+    [[ -f "$rule" ]] || continue
+    if ! awk '{ sub(/\r$/, "") }
+              NR == 1 { if ($0 != "---") exit; in_fm = 1; next }
+              in_fm && $0 == "---" { closed = 1; exit }
+              in_fm && /^trigger:[[:space:]]*[^[:space:]]/ { found = 1 }
+              END { exit !(closed && found) }' "$rule"; then
+      echo "Error: Rule '$rule' is missing a 'trigger:' in its YAML frontmatter (e.g. 'trigger: always_on'), so agents will not load it." >&2
+      exit_code=1
+    fi
+  done
+fi
+
 if [[ $exit_code -eq 0 ]]; then
-  echo "Success: $AIEXCLUDE_FILE and $GEMINI_CONFIG are synchronized and contain no stale references."
+  echo "Success: $AIEXCLUDE_FILE and $GEMINI_CONFIG are synchronized and contain no stale references, and all rules in $RULES_DIR declare a trigger."
 else
   echo "Error: AI configuration check failed. See errors above." >&2
 fi

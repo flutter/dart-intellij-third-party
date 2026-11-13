@@ -13,6 +13,65 @@ import junit.framework.TestCase
 
 class VmServiceDriverElementTest : TestCase() {
 
+  fun testFunctionGetterAndSetterFlags() {
+    val getterJson = JsonObject().apply {
+      addProperty("isGetter", true)
+      addProperty("isSetter", false)
+    }
+    val setterJson = JsonObject().apply {
+      addProperty("isGetter", false)
+      addProperty("isSetter", true)
+    }
+    val emptyJson = JsonObject()
+
+    assertTrue(FuncRef(getterJson).isGetter)
+    assertFalse(FuncRef(getterJson).isSetter)
+    assertFalse(FuncRef(setterJson).isGetter)
+    assertTrue(FuncRef(setterJson).isSetter)
+    assertFalse(FuncRef(emptyJson).isGetter)
+    assertFalse(FuncRef(emptyJson).isSetter)
+
+    assertTrue(Func(getterJson).isGetter)
+    assertFalse(Func(getterJson).isSetter)
+    assertFalse(Func(setterJson).isGetter)
+    assertTrue(Func(setterJson).isSetter)
+    assertFalse(Func(emptyJson).isGetter)
+    assertFalse(Func(emptyJson).isSetter)
+  }
+
+  fun testTypeParametersAreObjects() {
+    val json = JsonObject().apply {
+      addProperty("type", "TypeParameters")
+      addProperty("id", "objects/type-parameters")
+      addProperty("fixedId", true)
+      addProperty("size", 48)
+      add("names", JsonObject().apply {
+        addProperty("type", "@Instance")
+        addProperty("id", "objects/names")
+        addProperty("kind", "List")
+      })
+    }
+
+    val typeParameters = TypeParameters(json)
+    assertEquals("objects/type-parameters", typeParameters.id)
+    assertTrue(typeParameters.fixedId)
+    assertEquals(48, typeParameters.size)
+    assertEquals("objects/names", typeParameters.names.id)
+    assertEquals(InstanceKind.List, typeParameters.names.kind)
+  }
+
+  fun testTypeParametersReferenceIsAnObjectReference() {
+    val json = JsonObject().apply {
+      addProperty("type", "@TypeParameters")
+      addProperty("id", "objects/type-parameters")
+      addProperty("fixedId", true)
+    }
+
+    val typeParametersRef = TypeParametersRef(json)
+    assertEquals("objects/type-parameters", typeParametersRef.id)
+    assertTrue(typeParametersRef.fixedId)
+  }
+
   fun testDeprecatedTypeRefKindRemainsDecodable() {
     val json = JsonObject().apply {
       addProperty("kind", "TypeRef")

@@ -49,6 +49,10 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
     internal val bridgeServer: DartBridgeLspServer?
         get() = activeConnection?.bridgeServer
 
+    fun isClientConnected(): Boolean = bridgeServer?.isClientConnected == true
+    val isSemanticTokensAdvertised: Boolean
+        get() = bridgeServer?.isSemanticTokensAdvertised == true
+
 
     fun startBridgeServer() {
         if (serverSocket != null) {
@@ -113,7 +117,7 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
         var bridgeServer: DartBridgeLspServer? = null
         try {
             bridgeServer = DartBridgeLspServer(project)
-            val launcher = Launcher.createLauncher(bridgeServer, LanguageClient::class.java, socket.getInputStream(), socket.getOutputStream())
+            val launcher = Launcher.createLauncher(bridgeServer, DartLanguageClient::class.java, socket.getInputStream(), socket.getOutputStream())
             
             bridgeServer.connect(launcher.remoteProxy)
             val startListeningFuture = launcher.startListening()

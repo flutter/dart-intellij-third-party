@@ -12,6 +12,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.project.Project
+import com.intellij.platform.dartlsp.api.LspServerManager
+import com.intellij.platform.dartlsp.api.LspServerState
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
 import com.intellij.psi.PsiManager
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -58,20 +60,37 @@ class DartLspConfigurationSync(private val project: Project) {
      * been notified and has not read them again yet.
      */
     fun pushConfigurationIfChanged() {
-        if (!DartAnalysisServerService.getInstance(project).isLspConfigurationNotificationSupported) return
-        if (!state.beginPush(DartLspInlayHintsConfiguration.buildDartSection())) return
-
-        // There is no bridge while no LSP client is connected, and then there are no inlay hints to
-        // get wrong either, so the next request cycle can try again.
         val bridgeServer = project.serviceIfCreated<DartBridgeLspServerManager>()?.bridgeServer
-        if (bridgeServer == null) {
-            state.pushFailed()
+        if (bridgeServer != null) {
+            if (!DartAnalysisServerService.getInstance(project).isLspConfigurationNotificationSupported) return
+            if (!state.beginPush(DartLspInlayHintsConfiguration.buildDartSection())) return
+
+            // The settings stay empty: the server ignores them and pulls workspace/configuration.
+            val sent = bridgeServer.forwardNotification(DID_CHANGE_CONFIGURATION, DidChangeConfigurationParams(JsonObject()))
+            if (!sent) state.pushFailed()
             return
         }
 
-        // The settings stay empty: the server ignores them and pulls workspace/configuration.
-        val sent = bridgeServer.forwardNotification(DID_CHANGE_CONFIGURATION, DidChangeConfigurationParams(JsonObject()))
-        if (!sent) state.pushFailed()
+        val runningServers = project.serviceIfCreated<LspServerManager>()
+            ?.getServersForProvider(DartLspServerSupportProvider::class.java)
+            ?.filter { it.state == LspServerState.Running }
+            .orEmpty()
+        if (runningServers.isNotEmpty()) {
+            if (!state.beginPush(DartLspInlayHintsConfiguration.buildDartSection())) return
+
+            for (server in runningServers) {
+                server.sendNotification {
+                    it.workspaceService.didChangeConfiguration(DidChangeConfigurationParams(JsonObject()))
+                }
+            }
+            return
+        }
+
+        // There is no server while no LSP client is connected, and then there are no inlay hints to
+        // get wrong either, so the next request cycle can try again.
+        if (!DartAnalysisServerService.getInstance(project).isLspConfigurationNotificationSupported) return
+        if (!state.beginPush(DartLspInlayHintsConfiguration.buildDartSection())) return
+        state.pushFailed()
     }
 
     /**
