@@ -6,6 +6,7 @@
 
 ### Changed
 - Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
+- Local PSI and live stack-frame expression completion in debugger Evaluate Expression, Watches, and breakpoint conditions, replacing legacy `execution.getSuggestions` (#818)
 
 ### Removed
 - Per-request `dart.legacy_assist` and `dart.legacy_fix` analytics latency events, which fired on every legacy quick assist and quick fix availability check (caret moves, edits, selection changes) rather than when one was applied. Applied assists and fixes are still reported (#793)

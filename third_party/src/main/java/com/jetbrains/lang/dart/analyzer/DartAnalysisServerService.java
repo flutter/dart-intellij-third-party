@@ -17,7 +17,6 @@ import com.google.dart.server.GetImportedElementsConsumer;
 import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
 import com.google.dart.server.GetRefactoringConsumer;
-import com.google.dart.server.GetRuntimeCompletionConsumer;
 import com.google.dart.server.GetServerPortConsumer;
 import com.google.dart.server.GetStatementCompletionConsumer;
 import com.google.dart.server.GetSuggestionDetailsConsumer;
@@ -139,8 +138,6 @@ import org.dartlang.analysis.server.protocol.RefactoringOptions;
 import org.dartlang.analysis.server.protocol.RemoveContentOverlay;
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.dartlang.analysis.server.protocol.RequestErrorCode;
-import org.dartlang.analysis.server.protocol.RuntimeCompletionExpression;
-import org.dartlang.analysis.server.protocol.RuntimeCompletionVariable;
 import org.dartlang.analysis.server.protocol.SearchResult;
 import org.dartlang.analysis.server.protocol.ServerService;
 import org.dartlang.analysis.server.protocol.SourceChange;
@@ -2384,48 +2381,6 @@ public final class DartAnalysisServerService implements Disposable {
     if (server != null) {
       server.execution_deleteContext(contextId);
     }
-  }
-
-  public @Nullable Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>> execution_getSuggestions(@NotNull String code,
-                                                                                                                int offset,
-                                                                                                                @NotNull VirtualFile contextFile,
-                                                                                                                int contextOffset,
-                                                                                                                @NotNull List<RuntimeCompletionVariable> variables,
-                                                                                                                @NotNull List<RuntimeCompletionExpression> expressions) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return new Pair<>(new SmartList<>(), new SmartList<>());
-    }
-
-    final String contextFileUri = getFileUri(contextFile);
-    final CountDownLatch latch = new CountDownLatch(1);
-    final Ref<Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>>> refResult = Ref.create();
-    server.execution_getSuggestions(
-      code, offset,
-      contextFileUri, contextOffset,
-      variables, expressions,
-      new GetRuntimeCompletionConsumer() {
-        @Override
-        public void computedResult(List<CompletionSuggestion> suggestions, List<RuntimeCompletionExpression> expressions) {
-          refResult.set(new Pair<>(suggestions, expressions));
-          latch.countDown();
-        }
-
-        @Override
-        public void onError(RequestError error) {
-          latch.countDown();
-          if (!RequestErrorCode.UNKNOWN_REQUEST.equals(error.getCode())) {
-            logError("execution_getSuggestions()", contextFileUri, error);
-          }
-        }
-      });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_SUGGESTIONS_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("execution_getSuggestions", GET_SUGGESTIONS_TIMEOUT, contextFileUri);
-    }
-    return refResult.get();
   }
 
   public @Nullable String execution_mapUri(@NotNull String _id, @NotNull VirtualFile _file) {
