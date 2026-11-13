@@ -25,7 +25,9 @@ enum class LspMethod(
     SHUTDOWN("shutdown"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
-    DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols");
+    DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols"),
+    // Not gated by the experimental LSP flag because it is an internal server lifecycle command.
+    REANALYZE("dart/reanalyze", isExperimental = false);
 
     companion object {
         fun fromMethod(method: String): LspMethod? = entries.find { it.method == method }

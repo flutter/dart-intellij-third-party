@@ -7,9 +7,12 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.platform.dartlsp.api.LspServerManager;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider;
+import com.jetbrains.lang.dart.lsp.DartLspService;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,10 +29,21 @@ public class ReanalyzeDartSourcesAction extends AnAction implements DumbAware {
     if (isApplicable(project)) {
       DartAnalysisServerService das = DartAnalysisServerService.getInstance(project);
       if (das.isServerProcessActive()) {
-        das.analysis_reanalyze();
+        String sdkVersion = das.getSdkVersion();
+        if (!sdkVersion.isEmpty() && DartAnalysisServerService.isDartSdkVersionSufficientForLspReanalyze(sdkVersion)) {
+          DartLspService.reanalyze(project)
+                  .whenComplete((succeeded, ex) -> {
+                    if (!project.isDisposed() && (ex != null || !Boolean.TRUE.equals(succeeded))) {
+                      das.analysis_reanalyze();
+                    }
+                  });
+        } else {
+          das.analysis_reanalyze();
+        }
       }
       else {
         // Ensure the server is properly stopped.
+        LspServerManager.getInstance(project).stopAndRestartIfNeeded(DartLspServerSupportProvider.class);
         das.restartServer();
       }
     }

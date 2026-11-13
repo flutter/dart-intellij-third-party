@@ -5,6 +5,9 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.SystemInfoRt
 import com.jetbrains.lang.dart.DartBundle
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.platform.dartlsp.api.LspServerManager
+import com.intellij.platform.dartlsp.api.stopServers
+import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
 import java.io.File
 
 /**
@@ -22,6 +25,7 @@ private class DASSCacheInvalidator : CachesInvalidator() {
     override fun invalidateCaches() {
         val projects = ProjectManager.getInstance().openProjects
         for (project in projects) {
+            LspServerManager.getInstance(project).stopServers<DartLspServerSupportProvider>()
             val serverService = DartAnalysisServerService.getInstance(project)
             serverService.stopServer()
         }
