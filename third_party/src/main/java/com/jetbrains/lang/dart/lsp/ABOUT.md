@@ -25,6 +25,8 @@ on the existing [analyzer](../analyzer/ABOUT.md) connection.
   `dart` configuration in sync with the Dart inlay-hint settings.
 - `DartLspInlayHintsConfiguration`: maps Dart inlay-hint checkboxes to the `dart` configuration section.
 - `DartLspInlayHintSupport`: `LspInlayHintSupport` that filters server hints by kind.
+- `DartLspApplyEditCapture`: project service that hands the `workspace/applyEdit` of a running command, such as
+  organize imports, to the caller instead of the client, so the caller can apply it in its own write command.
 - `LspMethod`: enum of supported LSP methods and their experimental flags.
 
 ## Invariants

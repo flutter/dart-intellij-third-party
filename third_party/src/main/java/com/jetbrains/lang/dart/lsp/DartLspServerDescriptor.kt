@@ -95,8 +95,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
 
     override val lsp4jServerClass: Class<out Lsp4jServer> = DartLanguageServer::class.java
 
+    /**
+     * Lets [DartLspApplyEditCapture] take `workspace/applyEdit` edits that plugin code applies itself, such as the
+     * one of Optimize Imports ([com.jetbrains.lang.dart.ide.imports.DartLspImportOptimizer]).
+     */
     override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
-        DartLsp4jClient(project, handler)
+        DartLsp4jClient(project, DartLspServerNotificationsHandler(handler, DartLspApplyEditCapture.getInstance(project)))
 
     override val clientCapabilities: ClientCapabilities
         get() = super.clientCapabilities.apply {
