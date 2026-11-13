@@ -97,7 +97,9 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
@@ -493,6 +495,33 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         capturedListener.onResponse(responseJson)
 
         assertNull(future.get(5, TimeUnit.SECONDS))
+
+        // Other LSP error codes (e.g. -32603 InternalError) must still complete exceptionally.
+        val otherErrorFuture = bridgeServer.connectToDtd(ConnectToDtdParams(dtdUri))
+        val otherErrorJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32603,
+                    "message": "Failed to connect to DTD"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(otherErrorJson)
+
+        try {
+            otherErrorFuture.get(5, TimeUnit.SECONDS)
+            fail("Expected non--32015 error to complete connectToDtd exceptionally")
+        } catch (expected: ExecutionException) {
+            assertTrue(expected.cause?.message?.contains("Failed to connect to DTD") == true)
+        }
     }
 
     fun testDescriptorLspServerListenerConnectsWhenDtdIsRunning() {
@@ -504,6 +533,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val originalVersion = sdk.version
 
         val requestSentLatch = CountDownLatch(1)
+        val skipSendRequest = AtomicBoolean(false)
         val mockLspServer = Proxy.newProxyInstance(
             LspServer::class.java.classLoader,
             arrayOf(LspServer::class.java)
@@ -511,10 +541,12 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             when (method.name) {
                 "getState" -> LspServerState.Running
                 "sendRequestSync" -> {
-                    @Suppress("UNCHECKED_CAST")
-                    val sender = args.last() as (Lsp4jServer) -> CompletableFuture<Any?>
-                    sender(bridgeServer)
-                    requestSentLatch.countDown()
+                    if (!skipSendRequest.get()) {
+                        @Suppress("UNCHECKED_CAST")
+                        val sender = args.last() as (Lsp4jServer) -> CompletableFuture<Any?>
+                        sender(bridgeServer)
+                        requestSentLatch.countDown()
+                    }
                     null
                 }
                 "hashCode" -> System.identityHashCode(proxy)
@@ -546,6 +578,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             versionField.set(sdk, "3.8.0")
             uriField.set(dtdService, dtdUri)
 
+            // If sendRequestSync returns null without invoking the sender lambda, the cached URI must be evicted.
+            skipSendRequest.set(true)
+            DartLspService.connectToDtd(mockProject, dtdUri).get(5, TimeUnit.SECONDS)
+            skipSendRequest.set(false)
+
             val descriptor = DartLspServerDescriptor(mockProject)
             descriptor.lspServerListener.serverInitialized(InitializeResult())
 
@@ -567,6 +604,32 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
                     it.getAsJsonObject("params")?.getAsJsonObject("lspMessage")?.get("method")?.asString == "dart/connectToDtd"
             }
             assertEquals(1, connectRequestsAfterDuplicate.size)
+
+            // If the in-flight request fails with a non--32015 error, the cached URI must be evicted so a retry succeeds.
+            val requestId = connectRequests[0].get("id").asString
+            capturedListener.onResponse(
+                """
+                {
+                  "id": "$requestId",
+                  "result": {
+                    "lspResponse": {
+                      "jsonrpc": "2.0",
+                      "id": "$requestId",
+                      "error": {
+                        "code": -32603,
+                        "message": "Transient DTD error"
+                      }
+                    }
+                  }
+                }
+                """.trimIndent()
+            )
+            DartLspService.connectToDtd(mockProject, dtdUri).get(5, TimeUnit.SECONDS)
+            val connectRequestsAfterRetry = capturedRequests.filter {
+                it.get("method")?.asString == "lsp.handle" &&
+                    it.getAsJsonObject("params")?.getAsJsonObject("lspMessage")?.get("method")?.asString == "dart/connectToDtd"
+            }
+            assertEquals(2, connectRequestsAfterRetry.size)
         } finally {
             uriField.set(dtdService, null)
             versionField.set(sdk, originalVersion)
