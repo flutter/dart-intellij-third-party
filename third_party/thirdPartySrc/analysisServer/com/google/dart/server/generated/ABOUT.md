@@ -8,7 +8,7 @@ AnalysisServer client interface (AnalysisServer) for Dart Analysis Server API. O
 - com.google.dart.server.generated.AnalysisServer
 
 ## Invariants
-- Declares the DAS request methods (e.g. analysis_setAnalysisRoots, completion_getSuggestions2) plus hand-written LSP-over-legacy methods (lsp_connectToDtd, lsp_workspaceApplyEdit, lsp_workspaceConfiguration).
+- Declares the DAS request methods (e.g. analysis_setAnalysisRoots, completion_getSuggestions2) plus hand-written LSP-over-legacy methods (lsp_connectToDtd, lsp_workspaceApplyEdit).
 - Must not be regenerated from the Dart SDK; edit it by hand together with RemoteAnalysisServerImpl (see the comment at the top of AnalysisServer.java).
 
 ## Side Effects

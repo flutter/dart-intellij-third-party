@@ -38,6 +38,8 @@ To receive development builds of the Dart plugin in IntelliJ IDEA:
    ./gradlew runIde
     ```
 
+The commands below assume you are in the `third_party` directory. The repository root also has `gradlew` / `gradlew.bat` wrappers that forward to `third_party/gradlew`, so `./gradlew <task>` works from the root as well (path arguments are still resolved relative to `third_party`).
+
 ### Gradle tasks
 
 This project is built with the [IntelliJ Platform Gradle Plugin](https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
@@ -81,8 +83,8 @@ To run **all** tests execute
 ```
 
 However, in the project tests are split between the unit tests under
-`src/main/test/java/com/jetbrains/lang/dart` and the Dart Analysis Server tests under
-`src/main/test/java/com/jetbrains/dart/analysisServer`.
+`third_party/src/test/java/com/jetbrains/lang/dart` and the Dart Analysis Server tests under
+`third_party/src/test/java/com/jetbrains/dart/analysisServer`.
 
 To run the **unit tests** on the command line run:
 ```shell
@@ -95,9 +97,11 @@ To run the **Dart Analysis Server tests**, first set a `DART_HOME` (configured a
 ./gradlew test --tests "com.jetbrains.dart.analysisServer.*"
 ```
 
+To get the same pinned Dart SDK that CI uses, run `../tool/provision_dart.sh` from the `third_party` directory. It downloads the SDK into `dart-sdk/` at the repository root (skipped if already present); then set `DART_HOME` to that directory. The pinned version is bumped weekly by `.github/workflows/update_dart.yaml`.
+
 These test suites can be configured as Gradle run configurations for running and debugging the tests from the IDE.
 
-Each of these test suites are run on GitHub presubmits, configured in `.github/workflows/presubmit.yaml`.
+On GitHub, the presubmit workflow (`.github/workflows/presubmit.yaml`) runs the unit tests (`com.jetbrains.lang.dart.*`). The integration tests workflow (`.github/workflows/integration_tests.yaml`) runs `com.jetbrains.dart.*`, which includes the Dart Analysis Server tests, against the provisioned SDK.
 
 ### IntelliJ Plugin Verifier
 
@@ -108,7 +112,9 @@ To run the verifier run:
 ./gradlew verifyPlugin
 ```
 
-The plugin verification is run on GitHub presubmits, configured in `.github/workflows/presubmit.yaml`.
+The plugin verification is run on GitHub presubmits, configured in `.github/workflows/presubmit.yaml`. Presubmit also runs `verifyPluginProjectConfiguration`, `verifyPluginSignature`, and `verifyPluginStructure`.
+
+Known verifier issues are recorded per IDE branch in `third_party/tool/baseline/<branch>/verifier-baseline.txt`. Presubmit runs `third_party/tool/check_verifier_baselines.sh check`, which reports and fails on any issue not in the baseline. To refresh the baselines after an intended change, run `./third_party/tool/update_baselines.sh` (or `third_party\tool\update_baselines.bat` on Windows) from the repository root.
 
 ## Project and repository history
 
@@ -142,6 +148,13 @@ These skills are located in the [.agents/skills/](.agents/skills/) directory. Th
 
 ### How to use:
 Tell your AI assistant to run the desired skill (e.g. by typing `/code-review` or asking *"Run the code-review skill on my changes"*). The agent will automatically find, load, and follow the instructions in the corresponding `SKILL.md` file.
+
+### Repository tooling
+
+Presubmit runs these checks from the repository root:
+* `./tool/check_agent_skills.sh`: verifies that the skill list above matches the directories in `.agents/skills/`. Update this list when adding or removing a skill.
+* `./tool/validate_skills.sh`: lints the skills with `skills_lint`.
+* `./tool/check_ai_config.sh`: verifies that `.aiexclude` and `.gemini/config.yaml` `ignore_patterns` match and that every `.agents/rules/*.md` declares a `trigger:`.
 
 ## Contributing to this plugin
 

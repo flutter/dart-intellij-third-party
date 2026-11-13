@@ -1,14 +1,19 @@
-<!--* freshness: { reviewed: '2026-08-04' } *-->
+<!--* freshness: { reviewed: '2026-10-25' } *-->
 # processor
 
 ## Overview
 Notification and response processors for parsing incoming Analysis Server JSON responses.
 
 ## Interface
-- com.google.dart.server.internal.remote.processor.*Processor (55 notification/result processors e.g. AnalysisErrorsProcessor, AssistsProcessor, HoverProcessor, NavigationProcessor)
+- `JsonProcessor` - Abstract base with JSON-to-model conversion helpers.
+- `NotificationProcessor` - Abstract base for notification handlers that call `AnalysisServerListener` methods (e.g. `NotificationAnalysisErrorsProcessor`, `NotificationAnalysisNavigationProcessor`, `NotificationServerStatusProcessor`).
+- `ResultProcessor` - Base for request-response handlers that deliver results to per-request `Consumer` callbacks (e.g. `AssistsProcessor`, `FixesProcessor`, `HoverProcessor`, `GetNavigationProcessor`).
+- `NotificationLspProcessor` - Handles LSP notifications tunnelled over the legacy protocol.
+- `DartLspTextDocumentContentProcessor` - Result processor for the LSP-over-legacy text document content request.
 
 ## Invariants
-- Parses JSON response objects and dispatches typed data to registered AnalysisServerListener callbacks.
+- `NotificationProcessor` subclasses dispatch typed data to registered `AnalysisServerListener` callbacks.
+- `ResultProcessor` subclasses dispatch typed data to the `Consumer` supplied with the originating request.
 
 ## Side Effects
-- Invokes listener callback methods on IDE threads.
+- Invokes listener/consumer callbacks synchronously on the thread that reads server responses; no marshalling to IDE/EDT threads.

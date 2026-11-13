@@ -177,6 +177,21 @@ class DartNavigationAnalyticsTest : BasePlatformTestCase() {
     assertEmpty(events)
   }
 
+  fun testBeforeActionPerformedWithoutReadAccess() {
+    myFixture.configureByText("source.dart", "class Source {}")
+    val context = SimpleDataContext.builder()
+      .add(CommonDataKeys.PROJECT, project)
+      .add(CommonDataKeys.PSI_ELEMENT, myFixture.file.firstChild)
+      .add(CommonDataKeys.PSI_FILE, myFixture.file)
+      .add(CommonDataKeys.EDITOR, myFixture.editor)
+      .build()
+    val events = ApplicationManager.getApplication().executeOnPooledThread<List<AnalyticsData>> {
+      assertFalse(ApplicationManager.getApplication().isReadAccessAllowed)
+      record(ids.first(), context)
+    }.get()
+    assertEquals(1, events.size)
+  }
+
   private fun listener(): AnActionListener = ApplicationManager.getApplication().messageBus.syncPublisher(AnActionListener.TOPIC)
 
   private fun context(): DataContext = SimpleDataContext.builder()

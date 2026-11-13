@@ -7,7 +7,9 @@ package com.jetbrains.lang.dart.lsp
 
 import com.google.dart.server.ResponseListener
 import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
+import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
@@ -30,6 +32,7 @@ import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.CodeAction
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
+import org.eclipse.lsp4j.ConfigurationParams
 import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
@@ -57,6 +60,10 @@ import org.eclipse.lsp4j.InlayHintParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.SemanticTokens
+import org.eclipse.lsp4j.SemanticTokensLegend
+import org.eclipse.lsp4j.SemanticTokensParams
+import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.ServerCapabilities
@@ -79,6 +86,7 @@ import org.eclipse.lsp4j.services.WorkspaceService
 import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 /**
  * DartBridgeLspServer acts as a lightweight translation bridge between the JetBrains LSP client
@@ -121,8 +129,16 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         private val GSON: Gson = JSON_HANDLER.gson
     }
 
+    @Volatile
     private var client: LanguageClient? = null
+    @Volatile
+    private var initialized: Boolean = false
+    internal val isClientConnected: Boolean
+        get() = client != null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
+    @Volatile
+    var isSemanticTokensAdvertised: Boolean = false
+        private set
     private var dasMessageListener: ResponseListener? = null
 
     private val das: DartAnalysisServerService
@@ -213,12 +229,16 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     private fun forwardServerMessageToClient(dasRequestId: String?, method: String, msgObj: JsonObject) {
-        val client = this.client ?: return
         try {
+            if (method == "workspace/configuration") {
+                handleWorkspaceConfiguration(this.client, dasRequestId, msgObj)
+                return
+            }
+            val client = this.client ?: return
             // Parse and forward notifications/requests to the LSP client proxy using lsp4j.
             when (method) {
                 "textDocument/publishDiagnostics" -> handlePublishDiagnostics(client, msgObj)
-                "dart/textDocument/publishClosingLabels" -> handlePublishClosingLabels(msgObj)
+                "dart/textDocument/publishClosingLabels" -> handlePublishClosingLabels(client, msgObj)
                 "workspace/applyEdit" -> handleApplyEdit(client, dasRequestId, msgObj)
                 else -> logger.debug("Ignored notification/request from DAS: $method")
             }
@@ -237,11 +257,11 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         das.onLspDiagnosticsUpdated(params.uri, errors)
     }
 
-    private fun handlePublishClosingLabels(msgObj: JsonObject) {
+    private fun handlePublishClosingLabels(client: LanguageClient, msgObj: JsonObject) {
         val paramsObj = msgObj.get("params")
-        val params = GSON.fromJson(paramsObj, DartPublishClosingLabelsParams::class.java)
-        if (params?.uri != null) {
-            DartLspClosingLabelsService.getInstance(project).updateClosingLabels(params.uri, params.labels)
+        val params = GSON.fromJson(paramsObj, DartPublishClosingLabelsParams::class.java) ?: return
+        if (client is DartLanguageClient) {
+            client.publishClosingLabels(params)
         }
     }
 
@@ -281,40 +301,135 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
+    private fun handleWorkspaceConfiguration(client: LanguageClient?, dasRequestId: String?, msgObj: JsonObject) {
+        val paramsObj = msgObj.get("params")?.takeIf { it.isJsonObject }?.asJsonObject
+        val rawItemsCount = paramsObj?.get("items")?.takeIf { it.isJsonArray }?.asJsonArray?.size() ?: 0
+        val parsedParams = if (paramsObj != null) {
+            try {
+                GSON.fromJson(paramsObj, ConfigurationParams::class.java)
+            } catch (e: Exception) {
+                logger.warn("Failed to parse workspace/configuration params; falling back to null entries", e)
+                null
+            }
+        } else {
+            null
+        }
+        val items = parsedParams?.items
+        val itemCount = items?.size ?: rawItemsCount
+        val lspId = msgObj.get("id")
+        val future = if (client != null && parsedParams != null) {
+            parsedParams.items = items ?: emptyList()
+            try {
+                client.configuration(parsedParams)
+            } catch (e: Throwable) {
+                CompletableFuture.failedFuture(e)
+            }
+        } else {
+            CompletableFuture.completedFuture(null)
+        }
+        future.whenComplete { response, error ->
+            if (dasRequestId != null) {
+                if (error != null) {
+                    logger.warn("Error computing workspace/configuration; falling back to null entries", error)
+                }
+                // The server blocks its initialization until it gets an answer, and the LSP protocol
+                // expects one result per requested section in the same order (null for unknown sections).
+                val resultArray = JsonArray()
+                for (i in 0 until itemCount) {
+                    val itemConfig = if (error == null && response != null && i < response.size) response[i] else null
+                    resultArray.add(if (itemConfig != null) GSON.toJsonTree(itemConfig) else JsonNull.INSTANCE)
+                }
+                val lspResponse = JsonObject().apply {
+                    addProperty("jsonrpc", JSONRPC_VERSION)
+                    if (lspId != null) {
+                        add("id", lspId)
+                    }
+                    add("result", resultArray)
+                }
+                val legacyResponse = JsonObject().apply {
+                    addProperty("id", dasRequestId)
+                    add("result", JsonObject().apply {
+                        add(LSP_RESPONSE_KEY, lspResponse)
+                    })
+                }
+                try {
+                    das.sendResponse(legacyResponse)
+                } catch (e: Exception) {
+                    logger.error("Failed to send workspace/configuration response to DAS", e)
+                }
+            }
+        }
+    }
+
     fun stop() {
-        dasMessageListener?.let { das.removeResponseListener(it) }
+        client = null
+        dasMessageListener?.let {
+            das.removeResponseListener(it)
+            dasMessageListener = null
+        }
         pendingRequests.forEach { (_, pending) ->
             pending.future.cancel(true)
         }
         pendingRequests.clear()
+        if (initialized) {
+            initialized = false
+            das.updateClientCapabilities(false)
+        }
+        isSemanticTokensAdvertised = false
+        das.setSemanticTokensAdvertised(false)
     }
 
     // --- LanguageServer Implementation ---
 
+    // Overridable in tests.
+    internal var isLspHighlightingEnabled: () -> Boolean = { DartAnalysisServerService.isLspHighlightingEnabled(project) }
+
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
-        val capabilities = ServerCapabilities().apply {
-            setHoverProvider(true)
-            setDefinitionProvider(true)
-            setTypeDefinitionProvider(true)
-            setDocumentHighlightProvider(true)
-            setInlayHintProvider(true)
-            setTypeHierarchyProvider(true)
-            setCallHierarchyProvider(true)
-            setReferencesProvider(true)
-            setDocumentSymbolProvider(true)
-            setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
-            val fileOperationsCaps = FileOperationsServerCapabilities().apply {
-                willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
-            }
-            workspace = WorkspaceServerCapabilities().apply {
-                fileOperations = fileOperationsCaps
-            }
-            setCodeActionProvider(true)
-            setExecuteCommandProvider(ExecuteCommandOptions())
-            // Add other capabilities as we support them.
+        initialized = true
+        das.updateClientCapabilities(true)
+        val legendFuture = das.semanticTokensLegendFuture
+        val legendCompletableFuture = when {
+            !isLspHighlightingEnabled() -> CompletableFuture.completedFuture(null)
+            legendFuture.isDone -> CompletableFuture.completedFuture(das.semanticTokensLegend)
+            das.isServerProcessActive -> legendFuture.copy().completeOnTimeout(null, 3, TimeUnit.SECONDS)
+            else -> CompletableFuture.completedFuture(null)
         }
-        return CompletableFuture.completedFuture(InitializeResult(capabilities))
+
+        return legendCompletableFuture.thenApply { serverLegend ->
+            val capabilities = ServerCapabilities().apply {
+                setHoverProvider(true)
+                setDefinitionProvider(true)
+                setTypeDefinitionProvider(true)
+                setDocumentHighlightProvider(true)
+                setInlayHintProvider(true)
+                setTypeHierarchyProvider(true)
+                setCallHierarchyProvider(true)
+                setReferencesProvider(true)
+                setDocumentSymbolProvider(true)
+                setCompletionProvider(CompletionOptions(true, listOf(".", "=", "'", "\"", "/", "@", ":")))
+                if (serverLegend != null) {
+                    setSemanticTokensProvider(SemanticTokensWithRegistrationOptions().apply {
+                        legend = serverLegend
+                        setFull(true)
+                        setRange(false)
+                    })
+                }
+                val fileOperationsCaps = FileOperationsServerCapabilities().apply {
+                    willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
+                }
+                workspace = WorkspaceServerCapabilities().apply {
+                    fileOperations = fileOperationsCaps
+                }
+                setCodeActionProvider(true)
+                setExecuteCommandProvider(ExecuteCommandOptions())
+                // Add other capabilities as we support them.
+            }
+            val advertised = serverLegend != null
+            isSemanticTokensAdvertised = advertised
+            das.setSemanticTokensAdvertised(advertised)
+            InitializeResult(capabilities)
+        }
     }
 
     override fun initialized(params: InitializedParams) {
@@ -400,6 +515,13 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                     hints ?: emptyList()
                 }
             }
+    }
+
+    override fun semanticTokensFull(params: SemanticTokensParams): CompletableFuture<SemanticTokens> {
+        return forwardRequest("textDocument/semanticTokens/full", params, SemanticTokens::class.java).exceptionally { e ->
+            logger.debug("textDocument/semanticTokens/full failed: ${e.message}")
+            null
+        }
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
