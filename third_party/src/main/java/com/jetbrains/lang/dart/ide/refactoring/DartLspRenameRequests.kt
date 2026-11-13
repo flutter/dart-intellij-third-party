@@ -5,12 +5,13 @@
  */
 package com.jetbrains.lang.dart.ide.refactoring
 
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.NlsContexts
+import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.Lsp4jServer
@@ -123,6 +124,9 @@ class DartLspRenameRequestsImpl(private val project: Project) : DartLspRenameReq
     }
 
     private fun findDocument(file: VirtualFile): Document? = runReadAction { FileDocumentManager.getInstance().getDocument(file) }
+
+    /** The Kotlin `runReadAction` helper is deprecated from 2026.1 on; this API isn't deprecated in any supported version. */
+    private fun <T> runReadAction(action: () -> T): T = ApplicationManager.getApplication().runReadAction(Computable(action))
 
     /** Sends a request and turns an error answer into [DartLspRenameResult.Failure] instead of `null`. */
     private fun <T> send(
