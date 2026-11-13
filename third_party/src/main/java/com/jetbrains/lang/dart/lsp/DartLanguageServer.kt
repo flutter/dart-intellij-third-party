@@ -8,7 +8,9 @@ package com.jetbrains.lang.dart.lsp
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.platform.dartlsp.api.Lsp4jServer
+import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.LspServerManager
+import com.intellij.platform.dartlsp.api.LspServerState
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.sdk.DartSdk
@@ -17,6 +19,8 @@ import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.services.JsonNotification
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest
 import org.eclipse.lsp4j.services.LanguageClient
+import java.util.Collections
+import java.util.WeakHashMap
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -53,6 +57,9 @@ data class ConnectToDtdParams(
 )
 
 object DartLspService {
+    private val connectedDtdUriByServer: MutableMap<LspServer, String> =
+        Collections.synchronizedMap(WeakHashMap())
+
     @JvmStatic
     fun getDiagnosticServerPort(project: Project): CompletableFuture<Int?> {
         return CompletableFuture.supplyAsync({
@@ -81,6 +88,15 @@ object DartLspService {
             val server = LspServerManager.getInstance(project)
                 .getServersForProvider(DartLspServerSupportProvider::class.java)
                 .firstOrNull() ?: return@supplyAsync null
+            if (server.state != LspServerState.Running) {
+                return@supplyAsync null
+            }
+            synchronized(connectedDtdUriByServer) {
+                if (connectedDtdUriByServer[server] == uri) {
+                    return@supplyAsync null
+                }
+                connectedDtdUriByServer[server] = uri
+            }
             var result: Any? = null
             ProgressManager.getInstance().executeNonCancelableSection {
                 result = server.sendRequestSync { (it as DartLanguageServer).connectToDtd(ConnectToDtdParams(uri)) }

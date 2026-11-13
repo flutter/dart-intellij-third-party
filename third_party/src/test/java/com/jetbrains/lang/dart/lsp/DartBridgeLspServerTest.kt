@@ -25,6 +25,10 @@ import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
+import com.intellij.platform.dartlsp.api.Lsp4jServer
+import com.intellij.platform.dartlsp.api.LspServer
+import com.intellij.platform.dartlsp.api.LspServerManager
+import com.intellij.platform.dartlsp.api.LspServerState
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
@@ -32,6 +36,7 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.sdk.DartSdk
 import java.lang.reflect.Proxy
+import java.util.concurrent.CountDownLatch
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
 import org.dartlang.analysis.server.protocol.RequestError
@@ -463,6 +468,109 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             "serverInitialized should not eagerly instantiate DartToolingDaemonService via getService",
             getServiceCalled
         )
+    }
+
+    fun testConnectToDtdIgnoresAlreadyConnectedStateError() {
+        val dtdUri = "ws://127.0.0.1:9124/secret"
+        val future = bridgeServer.connectToDtd(ConnectToDtdParams(dtdUri))
+
+        val responseJson = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "error": {
+                    "code": -32015,
+                    "message": "Server is already connected to DTD"
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        capturedListener.onResponse(responseJson)
+
+        assertNull(future.get(5, TimeUnit.SECONDS))
+    }
+
+    fun testDescriptorLspServerListenerConnectsWhenDtdIsRunning() {
+        val dtdUri = "ws://127.0.0.1:9125/secret"
+        val dtdService = DartToolingDaemonService.getInstance(project)
+        val uriField = DartToolingDaemonService::class.java.getDeclaredField("uri").apply { isAccessible = true }
+        val sdk = DartSdk.getDartSdk(project)!!
+        val versionField = DartSdk::class.java.getDeclaredField("myVersion").apply { isAccessible = true }
+        val originalVersion = sdk.version
+
+        val requestSentLatch = CountDownLatch(1)
+        val mockLspServer = Proxy.newProxyInstance(
+            LspServer::class.java.classLoader,
+            arrayOf(LspServer::class.java)
+        ) { proxy, method, args ->
+            when (method.name) {
+                "getState" -> LspServerState.Running
+                "sendRequestSync" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val sender = args.last() as (Lsp4jServer) -> CompletableFuture<Any?>
+                    sender(bridgeServer)
+                    requestSentLatch.countDown()
+                    null
+                }
+                "hashCode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
+                else -> null
+            }
+        } as LspServer
+
+        val mockLspServerManager = Proxy.newProxyInstance(
+            LspServerManager::class.java.classLoader,
+            arrayOf(LspServerManager::class.java)
+        ) { _, method, _ ->
+            if (method.name == "getServersForProvider") listOf(mockLspServer) else null
+        } as LspServerManager
+
+        val mockProject = Proxy.newProxyInstance(
+            Project::class.java.classLoader,
+            arrayOf(Project::class.java)
+        ) { _, method, args ->
+            when {
+                args?.firstOrNull() == DartToolingDaemonService::class.java && method.name == "getServiceIfCreated" -> dtdService
+                args?.firstOrNull() == LspServerManager::class.java && method.name == "getService" -> mockLspServerManager
+                args == null -> method.invoke(project)
+                else -> method.invoke(project, *args)
+            }
+        } as Project
+
+        try {
+            versionField.set(sdk, "3.8.0")
+            uriField.set(dtdService, dtdUri)
+
+            val descriptor = DartLspServerDescriptor(mockProject)
+            descriptor.lspServerListener.serverInitialized(InitializeResult())
+
+            assertTrue("Expected dart/connectToDtd request to be sent", requestSentLatch.await(5, TimeUnit.SECONDS))
+            val connectRequests = capturedRequests.filter {
+                it.get("method")?.asString == "lsp.handle" &&
+                    it.getAsJsonObject("params")?.getAsJsonObject("lspMessage")?.get("method")?.asString == "dart/connectToDtd"
+            }
+            assertEquals(1, connectRequests.size)
+            assertEquals(
+                dtdUri,
+                connectRequests[0].getAsJsonObject("params").getAsJsonObject("lspMessage").getAsJsonObject("params").get("uri").asString
+            )
+
+            // Calling connectToDtd again for the same running LspServer and URI must not send a duplicate request.
+            DartLspService.connectToDtd(mockProject, dtdUri).get(5, TimeUnit.SECONDS)
+            val connectRequestsAfterDuplicate = capturedRequests.filter {
+                it.get("method")?.asString == "lsp.handle" &&
+                    it.getAsJsonObject("params")?.getAsJsonObject("lspMessage")?.get("method")?.asString == "dart/connectToDtd"
+            }
+            assertEquals(1, connectRequestsAfterDuplicate.size)
+        } finally {
+            uriField.set(dtdService, null)
+            versionField.set(sdk, originalVersion)
+        }
     }
 
     fun testForwardNotification() {
