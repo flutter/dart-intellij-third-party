@@ -11,6 +11,7 @@ import com.intellij.openapi.command.undo.UndoManager
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.ui.TestDialog
 import com.intellij.openapi.ui.TestDialogManager
+import com.intellij.openapi.ui.TestInputDialog
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.TextRange
@@ -40,6 +41,7 @@ class DartLspSymbolRenameProcessorTest : DartCodeInsightFixtureTestCase() {
         try {
             DartLspRename.enabledInTests = null
             TestDialogManager.setTestDialog(TestDialog.DEFAULT)
+            TestDialogManager.setTestInputDialog(TestInputDialog.DEFAULT)
         }
         catch (e: Throwable) {
             addSuppressedException(e)
@@ -197,6 +199,40 @@ class DartLspSymbolRenameProcessorTest : DartCodeInsightFixtureTestCase() {
 
         assertSame(element, DartLspSymbolRenameProcessor().substituteElementToRename(element, null))
         assertEquals(a.text.indexOf("greet"), fake.prepareCalls.single().offset)
+    }
+
+    fun testRenameStartedAtAConstructorCallAsksAtTheCaret() {
+        // IntelliJ resolves `Greeter()` to the unnamed constructor, the server renames the class there.
+        val a = myFixture.addFileToProject("lib/a.dart", "class Greeter {\n  Greeter();\n}\n")
+        val b = myFixture.configureByText("b.dart", "import 'a.dart';\n\nvoid f() => Gree<caret>ter();\n")
+        val caretOffset = myFixture.caretOffset
+        val constructor = componentNameAt(a, "Greeter()")
+        fake.prepareResult = DartLspRenameResult.Success(DartLspRenameTarget(wordRange(b.text, "Greeter"), "Greeter"))
+        val processor = DartLspSymbolRenameProcessor()
+
+        assertSame(constructor, processor.substituteElementToRename(constructor, myFixture.editor))
+        processor.prepareRenaming(constructor, "Welcomer", mutableMapOf(), constructor.useScope)
+
+        assertEquals(Call(b.virtualFile, caretOffset, null), fake.prepareCalls.single())
+        assertEquals(Call(b.virtualFile, caretOffset, "Welcomer"), fake.renameCalls.single())
+    }
+
+    fun testEmptyPlaceholderAsksForTheNameWithAnInputDialog() {
+        // The server marks `Greeter` at an unnamed constructor's declaration, but renames the constructor: its placeholder is empty.
+        val file = myFixture.configureByText("a.dart", "class Greeter {\n  Gree<caret>ter();\n}\n")
+        val caretOffset = myFixture.caretOffset
+        val constructor = componentNameAt(file, "Greeter()")
+        val constructorEnd = file.text.indexOf("()")
+        fake.prepareResult = DartLspRenameResult.Success(DartLspRenameTarget(TextRange(constructorEnd - "Greeter".length, constructorEnd), ""))
+        fake.renameResult = { _, _, newName ->
+            DartLspRenameResult.Success(listOf(DartLspFileTextEdit(file.virtualFile, TextRange(constructorEnd, constructorEnd), ".$newName")))
+        }
+        TestDialogManager.setTestInputDialog { "named" }
+
+        assertNull(DartLspSymbolRenameProcessor().substituteElementToRename(constructor, myFixture.editor))
+
+        assertEquals("class Greeter {\n  Greeter.named();\n}\n", text(file))
+        assertEquals(Call(file.virtualFile, caretOffset, "named"), fake.renameCalls.single())
     }
 
     fun testCanProcessElement() {

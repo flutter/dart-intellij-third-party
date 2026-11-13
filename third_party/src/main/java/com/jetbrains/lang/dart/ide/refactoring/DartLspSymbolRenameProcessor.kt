@@ -7,6 +7,7 @@ package com.jetbrains.lang.dart.ide.refactoring
 
 import com.intellij.CommonBundle
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -48,8 +49,12 @@ private val LOG = PluginLogger.createLogger(DartLspSymbolRenameProcessor::class.
  *
  * IntelliJ chooses the element and runs the UI; this processor only replaces the logic:
  * - [substituteElementToRename] asks the server with `textDocument/prepareRename` whether the element can be renamed and
- *   shows the server's message otherwise, before any UI appears.
- * - [prepareRenaming] sends `textDocument/rename` for the new name. It runs on the EDT before the usage search, so the
+ *   shows the server's message otherwise, before any UI appears. It asks at the caret where the rename started, because
+ *   the server and IntelliJ's PSI don't always agree on the element: at `Greeter()`, IntelliJ resolves to the unnamed
+ *   constructor while the server renames the class. If the server's placeholder differs from the text it marks (an
+ *   unnamed constructor has an empty one), IntelliJ's UI would offer the wrong old name, so [renameWithInputDialog]
+ *   asks for the new name instead.
+ * - [prepareRenaming] sends `textDocument/rename` for the new name, at the same position. It runs on the EDT before the usage search, so the
  *   request runs under a modal progress of its own without a read lock: while it runs, the server may ask the user
  *   *Rename Anyway* / *Cancel* (see `DartAnalysisServerImpl.server_showMessageRequest`).
  * - [findCollisions] turns every edit of the answer into a [DartLspRenameUsageInfo], so the preview shows them and single
@@ -65,6 +70,9 @@ class DartLspSymbolRenameProcessor : RenamePsiElementProcessor(), DumbAware {
     /** The server's answer per element, from [prepareRenaming] to [findCollisions] of the same rename. */
     private val pendingRenames: MutableMap<PsiElement, PendingRename> = ContainerUtil.createConcurrentWeakMap()
 
+    /** Where [substituteElementToRename] asked the server, from there to [findCollisions] of the same rename. */
+    private val renameTargets: MutableMap<PsiElement, Pair<VirtualFile, Int>> = ContainerUtil.createConcurrentWeakMap()
+
     override fun canProcessElement(element: PsiElement): Boolean =
         element is PsiNamedElement &&
         element !is PsiFileSystemItem &&
@@ -76,7 +84,15 @@ class DartLspSymbolRenameProcessor : RenamePsiElementProcessor(), DumbAware {
         val (file, offset) = prepareTarget(element, editor) ?: return element
         val result = runRenameRequestUnderProgress(project) { DartLspRenameRequests.getInstance(project).prepareRename(file, offset) }
         val message = when (result) {
-            is DartLspRenameResult.Success -> return element
+            is DartLspRenameResult.Success -> {
+                val target = result.value
+                if (target.placeholder != textAt(file, target.range)) {
+                    renameWithInputDialog(project, file, offset, target.placeholder)
+                    return null
+                }
+                renameTargets[element] = file to offset
+                return element
+            }
             is DartLspRenameResult.Failure -> result.message
             DartLspRenameResult.NoServer -> DartBundle.message("rename.lsp.server.not.ready")
             null -> return null
@@ -94,7 +110,7 @@ class DartLspSymbolRenameProcessor : RenamePsiElementProcessor(), DumbAware {
         // MemberInplaceRenamer calls this with an empty name when its template starts.
         if (newName.isBlank()) return
         val project = element.project
-        val (file, offset) = nameTarget(element) ?: return
+        val (file, offset) = renameTargets[element] ?: nameTarget(element) ?: return
         val result = runRenameRequestUnderProgress(project) { DartLspRenameRequests.getInstance(project).rename(file, offset, newName) }
             // Cancelling the progress renames nothing.
             ?: DartLspRenameResult.Success(emptyList())
@@ -113,6 +129,7 @@ class DartLspSymbolRenameProcessor : RenamePsiElementProcessor(), DumbAware {
         allRenames: MutableMap<out PsiElement, String>,
         result: MutableList<UsageInfo>,
     ) {
+        renameTargets.remove(element)
         val pending = pendingRenames.remove(element)
         if (pending == null || pending.newName != newName) {
             LOG.warn("No LSP rename result for '$newName'")
@@ -185,17 +202,28 @@ class DartLspSymbolRenameProcessor : RenamePsiElementProcessor(), DumbAware {
     ): RenameDialog = DartLspRenameDialog(project, element, nameSuggestionContext, editor)
 
     /**
-     * Where to ask `textDocument/prepareRename`: at the element's name if it is declared in the project. Otherwise (SDK,
-     * packages) at the caret, where the user started the rename, so the server reports why it can't rename it.
+     * Where to ask `textDocument/prepareRename`: at the caret if the rename started on the element's name there. Otherwise
+     * at the element's name if it is declared in the project. Otherwise (SDK, packages) at the caret, so the server reports
+     * why it can't rename it.
      */
     private fun prepareTarget(element: PsiElement, editor: Editor?): Pair<VirtualFile, Int>? {
+        val psiFile = editor?.let { PsiDocumentManager.getInstance(element.project).getPsiFile(it.document) }
+        val virtualFile = psiFile?.let { DartResolveUtil.getRealVirtualFile(it) }
+        val caretTarget = if (editor != null && virtualFile != null) virtualFile to editor.caretModel.offset else null
+        if (psiFile != null && caretTarget != null && isOnName(psiFile, caretTarget.second, element)) return caretTarget
         val nameTarget = nameTarget(element)
         if (nameTarget != null && ProjectFileIndex.getInstance(element.project).isInContent(nameTarget.first)) return nameTarget
-        editor ?: return nameTarget
-        val editorFile = PsiDocumentManager.getInstance(element.project).getPsiFile(editor.document) ?: return nameTarget
-        val file = DartResolveUtil.getRealVirtualFile(editorFile) ?: return nameTarget
-        return file to editor.caretModel.offset
+        return caretTarget ?: nameTarget
     }
+
+    /** Whether the token at [offset], or right before it at the end of a name, is the element's name. */
+    private fun isOnName(file: PsiFile, offset: Int, element: PsiElement): Boolean {
+        val name = (element as? PsiNamedElement)?.name ?: return false
+        return file.findElementAt(offset)?.text == name || (offset > 0 && file.findElementAt(offset - 1)?.text == name)
+    }
+
+    private fun textAt(file: VirtualFile, range: TextRange): String? =
+        FileDocumentManager.getInstance().getDocument(file)?.takeIf { range.endOffset <= it.textLength }?.getText(range)
 
     /** The position of the element's name in its file. */
     private fun nameTarget(element: PsiElement): Pair<VirtualFile, Int>? {
