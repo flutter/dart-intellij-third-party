@@ -15,9 +15,14 @@ on the existing [analyzer](../analyzer/ABOUT.md) connection.
   `LspCommunicationChannel.Socket(port, startProcess = false)`. Also defines `DartLspCompletionSupport`,
   `DartLspSemanticTokensSupport`, and `DartLsp4jClient`.
 - `DartLspServerSupportProvider`: provider registered in plugin.xml.
-- `DartLanguageServer`: custom protocol extensions (`dart/diagnosticServer`, `dart/connectToDtd`),
-  `DartLanguageClient` (`dart/textDocument/publishClosingLabels`), `DiagnosticServerResult`,
-  `ConnectToDtdParams`, and the `DartLspService` object.
+- `DartLanguageServer`: custom protocol extensions (`dart/diagnosticServer`, `dart/connectToDtd`,
+  `command/resolve`), `DartLanguageClient` (`dart/textDocument/publishClosingLabels`),
+  `DiagnosticServerResult`, `ConnectToDtdParams`, interactive form protocol models
+  (`InteractiveExecuteCommandParams`, `FormField`, `FormFieldType`, `RegexValidator`, `FormAnswer`),
+  and the `DartLspService` object.
+- `DartInteractiveFormDialog` (with `DartLspCommandsSupport`): resolves interactive LSP commands via
+  `command/resolve` and renders a modal Swing form with client-side (`RegexValidator`, file/number)
+  and multi-turn server-side validation before dispatching `workspace/executeCommand`.
 - `DartLspDiagnosticConverter`: converts LSP diagnostics into legacy `AnalysisError`s for the
   Dart Analysis tool window and Project View.
 - `DartLspClosingLabelsService` (with `DartPublishClosingLabelsParams`, `DartLspClosingLabel`):

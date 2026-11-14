@@ -81,6 +81,7 @@ public class DartLspExperimentalFeaturesTest extends CodeInsightFixtureTestCase 
   }
 
   public void testLspMethodsExperimentalStatus() {
+    assertFalse(LspMethod.COMMAND_RESOLVE.isExperimental());
     assertFalse(LspMethod.CONNECT_TO_DTD.isExperimental());
     assertFalse(LspMethod.DIAGNOSTIC_SERVER.isExperimental());
     assertFalse(LspMethod.DOCUMENT_HIGHLIGHT.isExperimental());
@@ -93,6 +94,7 @@ public class DartLspExperimentalFeaturesTest extends CodeInsightFixtureTestCase 
     assertTrue(LspMethod.DOCUMENT_SYMBOL.isExperimental());
     assertTrue(LspMethod.SIGNATURE_HELP.isExperimental());
 
+    assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.COMMAND_RESOLVE));
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.CONNECT_TO_DTD));
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.DIAGNOSTIC_SERVER));
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.DOCUMENT_HIGHLIGHT));

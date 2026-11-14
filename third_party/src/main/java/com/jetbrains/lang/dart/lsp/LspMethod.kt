@@ -11,7 +11,10 @@ enum class LspMethod(
     val presentableName: String? = null
 ) {
     CODE_ACTION("textDocument/codeAction", isExperimental = true, presentableName = "code actions"),
+    // Not a standalone experimental feature; gated alongside CODE_ACTION.
+    COMMAND_RESOLVE("command/resolve", isExperimental = false),
     COMPLETION("textDocument/completion", isExperimental = true, presentableName = "completion"),
+    // Not a standalone experimental feature; gated alongside COMPLETION.
     COMPLETION_RESOLVE("completionItem/resolve", isExperimental = false),
     // Not gated by the experimental LSP flag because there is no fallback in legacy mode.
     CONNECT_TO_DTD("dart/connectToDtd", isExperimental = false),
