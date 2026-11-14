@@ -5,6 +5,7 @@
  */
 package com.jetbrains.lang.dart.lsp
 
+import com.google.gson.annotations.SerializedName
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.platform.dartlsp.api.Lsp4jServer
@@ -38,6 +39,12 @@ interface DartLanguageServer : Lsp4jServer {
      */
     @JsonRequest("dart/connectToDtd")
     fun connectToDtd(params: ConnectToDtdParams): CompletableFuture<Any>
+
+    /**
+     * Resolves an interactive command by returning form fields requiring user input or updated command arguments.
+     */
+    @JsonRequest("command/resolve")
+    fun resolveCommand(params: InteractiveExecuteCommandParams): CompletableFuture<InteractiveExecuteCommandParams>
 }
 
 /**
@@ -55,6 +62,66 @@ data class DiagnosticServerResult(
 data class ConnectToDtdParams(
     val uri: String
 )
+
+data class InteractiveExecuteCommandParams(
+    val command: String,
+    val arguments: List<Any?>? = null,
+    val data: Any? = null,
+    val formAnswers: List<FormAnswer>? = null,
+    val formFields: List<FormField>? = null,
+)
+
+data class FormAnswer(
+    val id: String,
+    val value: Any,
+)
+
+data class FormField(
+    val id: String,
+    val description: String,
+    val type: FormFieldType,
+    val required: Boolean,
+    @SerializedName("default")
+    val defaultValue: Any? = null,
+    val error: String? = null,
+)
+
+data class FormFieldType(
+    val kind: String,
+    val validators: List<RegexValidator>? = null,
+    val existence: Int? = null,
+    val filters: List<String>? = null,
+    val type: Int? = null,
+) {
+    companion object {
+        const val KIND_STRING = "string"
+        const val KIND_FILE = "file"
+        const val KIND_BOOL = "bool"
+        const val KIND_NUMBER = "number"
+        @JvmField
+        val SUPPORTED_KINDS: List<String> = listOf(KIND_STRING, KIND_FILE, KIND_BOOL, KIND_NUMBER)
+
+        const val FILE_EXISTENCE_NEW = 1
+        const val FILE_EXISTENCE_EXISTING = 2
+
+        const val FILE_TYPE_REGULAR = 1
+        const val FILE_TYPE_DIRECTORY = 2
+    }
+}
+
+data class RegexValidator(
+    val kind: String = "regex",
+    val pattern: String,
+    val matchIsValid: Boolean,
+    val message: String,
+    val severity: Int,
+) {
+    companion object {
+        const val SEVERITY_INFO = 1
+        const val SEVERITY_WARNING = 2
+        const val SEVERITY_ERROR = 3
+    }
+}
 
 object DartLspService {
     private val connectedDtdUriByServer: MutableMap<LspServer, String> =

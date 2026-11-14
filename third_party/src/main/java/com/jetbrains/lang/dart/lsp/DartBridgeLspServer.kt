@@ -531,7 +531,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     override fun connectToDtd(params: ConnectToDtdParams): CompletableFuture<Any> {
-        return forwardRequest("dart/connectToDtd", params, Any::class.java).exceptionally { e ->
+        return forwardRequest(LspMethod.CONNECT_TO_DTD.method, params, Any::class.java).exceptionally { e ->
             val cause = e.cause ?: e
             // Ignore ServerErrorCodes.stateError (-32015: "Server is already connected to DTD"),
             // which can occur if the LSP bridge restarts while the underlying DAS process stays alive.
@@ -542,6 +542,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 throw if (e is RuntimeException) e else RuntimeException(e)
             }
         }
+    }
+
+    override fun resolveCommand(params: InteractiveExecuteCommandParams): CompletableFuture<InteractiveExecuteCommandParams> {
+        return forwardRequest(LspMethod.COMMAND_RESOLVE.method, params, InteractiveExecuteCommandParams::class.java)
     }
 
     // Note: We advertise codeActionLiteralSupport in server.setClientCapabilities (see DartAnalysisServerService.buildLspCapabilities)

@@ -103,6 +103,7 @@ import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
 import com.jetbrains.lang.dart.lsp.DartLspClosingLabel;
 import com.jetbrains.lang.dart.lsp.DartLspClosingLabelsService;
 import com.jetbrains.lang.dart.lsp.DartLspConfigurationSync;
+import com.jetbrains.lang.dart.lsp.FormFieldType;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkUpdateChecker;
@@ -640,6 +641,9 @@ public final class DartAnalysisServerService implements Disposable {
 
       JsonObject workspaceEdit = new JsonObject();
       workspaceEdit.addProperty("documentChanges", true);
+      JsonArray resourceOperations = new JsonArray();
+      resourceOperations.add("create");
+      workspaceEdit.add("resourceOperations", resourceOperations);
       workspace.add("workspaceEdit", workspaceEdit);
 
       JsonObject fileOperations = new JsonObject();
@@ -719,9 +723,27 @@ public final class DartAnalysisServerService implements Disposable {
       codeAction.addProperty("dataSupport", true);
 
       textDocument.add("codeAction", codeAction);
+
+      JsonObject experimental = lspCapabilities.has("experimental")
+                                ? lspCapabilities.getAsJsonObject("experimental")
+                                : new JsonObject();
+      JsonObject interactiveResolve = new JsonObject();
+      JsonArray inputTypes = new JsonArray();
+      for (String kind : FormFieldType.SUPPORTED_KINDS) {
+        inputTypes.add(kind);
+      }
+      interactiveResolve.add("inputTypes", inputTypes);
+      experimental.add("interactiveResolve", interactiveResolve);
+      lspCapabilities.add("experimental", experimental);
     }
 
     lspCapabilities.add("textDocument", textDocument);
+
+    JsonObject general = new JsonObject();
+    JsonObject regularExpressions = new JsonObject();
+    regularExpressions.addProperty("engine", "ECMAScript");
+    general.add("regularExpressions", regularExpressions);
+    lspCapabilities.add("general", general);
 
     return lspCapabilities;
   }

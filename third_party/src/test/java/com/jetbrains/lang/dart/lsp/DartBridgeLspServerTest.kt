@@ -25,15 +25,19 @@ import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.LspServerManager
 import com.intellij.platform.dartlsp.api.LspServerState
+import com.intellij.platform.dartlsp.api.customization.LspCommandsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
+import com.intellij.ui.components.JBTextField
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
+import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdk
 import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
@@ -56,6 +60,7 @@ import org.eclipse.lsp4j.CompletionParams
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.ConfigurationParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
+import org.eclipse.lsp4j.DidChangeWatchedFilesParams
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.DocumentSymbolParams
@@ -91,6 +96,7 @@ import org.eclipse.lsp4j.TypeHierarchySupertypesParams
 import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
+import org.eclipse.lsp4j.services.WorkspaceService
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import java.io.ByteArrayInputStream
@@ -2493,6 +2499,518 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             assertSame(LspSignatureHelpDisabled, descriptor.lspCustomization.signatureHelpCustomizer)
         } finally {
             properties.unsetValue("dart.lsp.experimental.enabled")
+        }
+    }
+
+    fun testBuildLspCapabilitiesIncludesInteractiveFormsAndRegexAndResourceOperations() {
+        val enabledCaps = DartAnalysisServerService.buildLspCapabilities("3.14.0", true, true, true)
+        val workspaceEdit = enabledCaps.getAsJsonObject("workspace").getAsJsonObject("workspaceEdit")
+        assertTrue(workspaceEdit.get("documentChanges").asBoolean)
+        val resourceOperations = workspaceEdit.getAsJsonArray("resourceOperations").map { it.asString }
+        assertEquals(listOf("create"), resourceOperations)
+
+        val general = enabledCaps.getAsJsonObject("general")
+        assertNotNull("general capabilities must be present", general)
+        assertEquals("ECMAScript", general.getAsJsonObject("regularExpressions").get("engine").asString)
+
+        val experimental = enabledCaps.getAsJsonObject("experimental")
+        assertNotNull("experimental capabilities must be present", experimental)
+        assertTrue("closingLabels should be preserved in experimental", experimental.has("closingLabels"))
+        val interactiveResolve = experimental.getAsJsonObject("interactiveResolve")
+        assertNotNull("interactiveResolve must be present when supportsLspCodeActions is true", interactiveResolve)
+        val inputTypes = interactiveResolve.getAsJsonArray("inputTypes").map { it.asString }
+        assertEquals(listOf("string", "file", "bool", "number"), inputTypes)
+
+        val disabledCaps = DartAnalysisServerService.buildLspCapabilities("3.14.0", true, true, false)
+        val disabledExperimental = disabledCaps.getAsJsonObject("experimental")
+        assertNotNull(disabledExperimental)
+        assertFalse("interactiveResolve must not be present when supportsLspCodeActions is false", disabledExperimental.has("interactiveResolve"))
+    }
+
+    fun testDescriptorClientCapabilitiesAndCommandsCustomizerForInteractiveForms() {
+        val properties = PropertiesComponent.getInstance(project)
+        val sdk = requireNotNull(DartSdk.getDartSdk(project))
+        val versionField = DartSdk::class.java.getDeclaredField("myVersion").apply { isAccessible = true }
+        val originalVersion = sdk.version
+        val descriptor = DartLspServerDescriptor(project)
+        try {
+            properties.setValue("dart.lsp.experimental.enabled", true, true)
+            versionField.set(sdk, "3.14.0")
+            assertTrue(DartConfigurable.isLspCodeActionsEnabled(project))
+
+            val capsEnabled = descriptor.clientCapabilities
+            assertEquals("ECMAScript", capsEnabled.general?.regularExpressions?.engine)
+            @Suppress("UNCHECKED_CAST")
+            val expEnabled = capsEnabled.experimental as? Map<String, Any?>
+            assertNotNull(expEnabled)
+            @Suppress("UNCHECKED_CAST")
+            val interactiveResolve = expEnabled?.get("interactiveResolve") as? Map<String, Any?>
+            assertNotNull("interactiveResolve must be advertised on SDK 3.14.0+", interactiveResolve)
+            assertEquals(listOf("string", "file", "bool", "number"), interactiveResolve?.get("inputTypes"))
+            assertTrue(descriptor.lspCustomization.commandsCustomizer is DartLspCommandsSupport)
+
+            // Older SDK (3.13.0 < 3.14.0-137.0.dev) -> disabled
+            versionField.set(sdk, "3.13.0")
+            assertFalse(DartConfigurable.isLspCodeActionsEnabled(project))
+            @Suppress("UNCHECKED_CAST")
+            val expOlderSdk = descriptor.clientCapabilities.experimental as? Map<String, Any?>
+            assertNull(expOlderSdk?.get("interactiveResolve"))
+            assertSame(LspCommandsDisabled, descriptor.lspCustomization.commandsCustomizer)
+
+            // Experimental setting disabled on SDK 3.14.0 -> disabled
+            versionField.set(sdk, "3.14.0")
+            properties.setValue("dart.lsp.experimental.enabled", false, true)
+            val capsDisabled = descriptor.clientCapabilities
+            assertEquals("ECMAScript", capsDisabled.general?.regularExpressions?.engine)
+            @Suppress("UNCHECKED_CAST")
+            val expDisabled = capsDisabled.experimental as? Map<String, Any?>
+            assertNotNull(expDisabled)
+            assertNull(expDisabled?.get("interactiveResolve"))
+            assertSame(
+                LspCommandsDisabled,
+                descriptor.lspCustomization.commandsCustomizer,
+            )
+        } finally {
+            properties.unsetValue("dart.lsp.experimental.enabled")
+            versionField.set(sdk, originalVersion)
+        }
+    }
+
+    fun testResolveCommandSerializationAndMultiTurnResponse() {
+        // Turn 1: initial command/resolve with null formAnswers/formFields
+        val initialParams = InteractiveExecuteCommandParams(
+            command = "refactor.perform",
+            arguments = listOf(mapOf("kind" to "extract_method", "file" to "/test/a.dart")),
+        )
+        val future1 = bridgeServer.resolveCommand(initialParams)
+
+        val req1 = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" })
+        val lspMsg1 = req1.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals("command/resolve", lspMsg1.get("method").asString)
+        val wireParams1 = lspMsg1.getAsJsonObject("params")
+        assertEquals("refactor.perform", wireParams1.get("command").asString)
+        // Null optional fields must be omitted (not serialized as JSON null) because DAS uses allowsUndefined: true, allowsNull: false
+        assertFalse("formAnswers must be omitted when null", wireParams1.has("formAnswers"))
+        assertFalse("formFields must be omitted when null", wireParams1.has("formFields"))
+        assertFalse("data must be omitted when null", wireParams1.has("data"))
+
+        val response1Json = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "command": "refactor.perform",
+                    "arguments": [
+                      { "kind": "extract_method", "file": "/test/a.dart" }
+                    ],
+                    "formFields": [
+                      {
+                        "id": "name",
+                        "description": "Method name",
+                        "required": true,
+                        "default": "newMethod",
+                        "type": {
+                          "kind": "string",
+                          "validators": [
+                            {
+                              "kind": "regex",
+                              "pattern": "^[a-zA-Z_${'$'}][a-zA-Z0-9_${'$'}]*${'$'}",
+                              "matchIsValid": true,
+                              "message": "Method name must be a valid identifier.",
+                              "severity": 3
+                            },
+                            {
+                              "kind": "regex",
+                              "pattern": "^_*[a-z][a-zA-Z0-9_${'$'}]*${'$'}",
+                              "matchIsValid": true,
+                              "message": "Name should start with a lowercase letter.",
+                              "severity": 2
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "id": "destination",
+                        "description": "Move to file",
+                        "required": true,
+                        "default": "file:///test/new_file.dart",
+                        "type": {
+                          "kind": "file",
+                          "existence": 3,
+                          "type": 1,
+                          "filters": ["dart"]
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        capturedListener.onResponse(response1Json)
+
+        val resolved1 = future1.get(5, TimeUnit.SECONDS)
+        assertNotNull(resolved1)
+        assertEquals("refactor.perform", resolved1.command)
+        val fields = requireNotNull(resolved1.formFields)
+        assertEquals(2, fields.size)
+        val nameField = fields[0]
+        assertEquals("name", nameField.id)
+        assertEquals("Method name", nameField.description)
+        assertTrue(nameField.required)
+        assertEquals("newMethod", nameField.defaultValue)
+        assertEquals("string", nameField.type.kind)
+        val validators = requireNotNull(nameField.type.validators)
+        assertEquals(2, validators.size)
+        assertEquals(RegexValidator.SEVERITY_ERROR, validators[0].severity)
+        assertEquals(RegexValidator.SEVERITY_WARNING, validators[1].severity)
+
+        val fileField = fields[1]
+        assertEquals("destination", fileField.id)
+        assertEquals("file:///test/new_file.dart", fileField.defaultValue)
+        assertEquals("file", fileField.type.kind)
+        assertEquals(3, fileField.type.existence)
+        assertEquals(FormFieldType.FILE_TYPE_REGULAR, fileField.type.type)
+        assertEquals(listOf("dart"), fileField.type.filters)
+
+        // Turn 2: submit formAnswers and receive resolved command with formFields omitted
+        capturedRequests.clear()
+        val submitParams = resolved1.copy(
+            formAnswers = listOf(
+                FormAnswer("name", "extractedHelper"),
+                FormAnswer("destination", "file:///test/extracted.dart"),
+            ),
+        )
+        val future2 = bridgeServer.resolveCommand(submitParams)
+        val req2 = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" })
+        val wireParams2 = req2.getAsJsonObject("params").getAsJsonObject("lspMessage").getAsJsonObject("params")
+        val wireAnswers = wireParams2.getAsJsonArray("formAnswers")
+        assertEquals(2, wireAnswers.size())
+        assertEquals("name", wireAnswers[0].asJsonObject.get("id").asString)
+        assertEquals("extractedHelper", wireAnswers[0].asJsonObject.get("value").asString)
+
+        val response2Json = """
+            {
+              "id": "123",
+              "result": {
+                "lspResponse": {
+                  "jsonrpc": "2.0",
+                  "id": "123",
+                  "result": {
+                    "command": "refactor.perform",
+                    "arguments": [
+                      {
+                        "kind": "extract_method",
+                        "file": "/test/a.dart",
+                        "options": { "name": "extractedHelper" }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+        capturedListener.onResponse(response2Json)
+
+        val resolved2 = future2.get(5, TimeUnit.SECONDS)
+        assertNotNull(resolved2)
+        assertTrue("formFields should be null/empty when fully resolved", resolved2.formFields.isNullOrEmpty())
+    }
+
+    fun testInteractiveFormValidationRulesAndConversions() {
+        val stringField = FormField(
+            id = "name",
+            description = "Method name",
+            required = true,
+            defaultValue = "newMethod",
+            type = FormFieldType(
+                kind = FormFieldType.KIND_STRING,
+                validators = listOf(
+                    RegexValidator(
+                        pattern = "^[a-zA-Z_${'$'}][a-zA-Z0-9_${'$'}]*${'$'}",
+                        matchIsValid = true,
+                        message = "Method name must be a valid identifier.",
+                        severity = RegexValidator.SEVERITY_ERROR,
+                    ),
+                    RegexValidator(
+                        pattern = "^(await|yield|class)${'$'}",
+                        matchIsValid = false,
+                        message = "Method name must not be a reserved keyword.",
+                        severity = RegexValidator.SEVERITY_ERROR,
+                    ),
+                    RegexValidator(
+                        pattern = "^.{3,}",
+                        matchIsValid = true,
+                        message = "Name is very short.",
+                        severity = RegexValidator.SEVERITY_INFO,
+                    ),
+                    RegexValidator(
+                        pattern = "^_*[a-z][a-zA-Z0-9_${'$'}]*${'$'}",
+                        matchIsValid = true,
+                        message = "Name should start with a lowercase letter.",
+                        severity = RegexValidator.SEVERITY_WARNING,
+                    ),
+                ),
+            ),
+        )
+
+        // 1. Valid lowerCamelCase identifier -> no ValidationInfo
+        assertNull(DartLspCommandsSupport.validateFieldInput(stringField, "myHelper"))
+
+        // 2. Empty required field -> blocking error
+        val emptyValidation = requireNotNull(DartLspCommandsSupport.validateFieldInput(stringField, ""))
+        assertFalse(emptyValidation.warning)
+
+        // 3. Invalid identifier (starts with digit) -> blocking error (SEVERITY_ERROR)
+        val invalidIdValidation = requireNotNull(DartLspCommandsSupport.validateFieldInput(stringField, "123bad"))
+        assertFalse("SEVERITY_ERROR must produce blocking ValidationInfo", invalidIdValidation.warning)
+        assertEquals("Method name must be a valid identifier.", invalidIdValidation.message)
+
+        // 4. Reserved keyword (matchIsValid = false) -> blocking error
+        val keywordValidation = requireNotNull(DartLspCommandsSupport.validateFieldInput(stringField, "class"))
+        assertFalse(keywordValidation.warning)
+        assertEquals("Method name must not be a reserved keyword.", keywordValidation.message)
+
+        // 5. UpperCamelCase 2-letter identifier ("Ab") fails both INFO (<3 chars) and WARNING (uppercase);
+        // SEVERITY_WARNING (2) must take precedence over SEVERITY_INFO (1)
+        val warningValidation = requireNotNull(DartLspCommandsSupport.validateFieldInput(stringField, "Ab"))
+        assertTrue("SEVERITY_WARNING must produce warning ValidationInfo", warningValidation.warning)
+        assertTrue("Warning ValidationInfo must keep OK enabled", warningValidation.okEnabled)
+        assertEquals("Name should start with a lowercase letter.", warningValidation.message)
+
+        // 6. Active server-side error takes precedence and blocks until cleared
+        val serverErrValidation = requireNotNull(
+            DartLspCommandsSupport.validateFieldInput(
+                stringField,
+                "myHelper",
+                activeServerError = "A method with name 'myHelper' already exists.",
+            ),
+        )
+        assertFalse(serverErrValidation.warning)
+        assertEquals("A method with name 'myHelper' already exists.", serverErrValidation.message)
+
+        // 7. Number field validation and parsing (including NaN / Infinity rejection)
+        val numberField = FormField(
+            id = "count",
+            description = "Count",
+            required = true,
+            type = FormFieldType(kind = FormFieldType.KIND_NUMBER),
+        )
+        assertNull(DartLspCommandsSupport.validateFieldInput(numberField, "42"))
+        assertNull(DartLspCommandsSupport.validateFieldInput(numberField, "3.14"))
+        val badNumber = requireNotNull(DartLspCommandsSupport.validateFieldInput(numberField, "notANumber"))
+        assertFalse(badNumber.warning)
+        assertNotNull("NaN must be rejected", DartLspCommandsSupport.validateFieldInput(numberField, "NaN"))
+        assertNotNull("Infinity must be rejected", DartLspCommandsSupport.validateFieldInput(numberField, "Infinity"))
+        assertNotNull("-Infinity must be rejected", DartLspCommandsSupport.validateFieldInput(numberField, "-Infinity"))
+        assertEquals(42L, DartLspCommandsSupport.parseNumberAnswer("42"))
+        assertEquals(3.14, DartLspCommandsSupport.parseNumberAnswer("3.14"))
+        assertNull(DartLspCommandsSupport.parseNumberAnswer("NaN"))
+        assertNull(DartLspCommandsSupport.parseNumberAnswer("Infinity"))
+
+        // 8. File field extension filter, relative path resolution, and URI <-> path conversion
+        val fileField = FormField(
+            id = "file",
+            description = "Destination file",
+            required = true,
+            type = FormFieldType(
+                kind = FormFieldType.KIND_FILE,
+                filters = listOf("dart"),
+            ),
+        )
+        assertNull(DartLspCommandsSupport.validateFieldInput(fileField, "/tmp/moved_widget.dart"))
+        val badExt = requireNotNull(DartLspCommandsSupport.validateFieldInput(fileField, "/tmp/moved_widget.txt"))
+        assertFalse(badExt.warning)
+        assertTrue(badExt.message.contains(".dart"))
+
+        val uriStr = DartLspCommandsSupport.filePathToUriString("lib/new_nonexistent_file.dart", "/workspace/my_app")
+        assertEquals("file:///workspace/my_app/lib/new_nonexistent_file.dart", uriStr)
+        val roundTripPath = DartLspCommandsSupport.uriStringToFilePath(uriStr)
+        assertTrue(roundTripPath.endsWith("new_nonexistent_file.dart"))
+
+        // 9. collectFormAnswers omits optional blank fields and converts types properly
+        val optionalStringField = stringField.copy(id = "optionalPrefix", required = false, type = FormFieldType(FormFieldType.KIND_STRING))
+        val boolField = FormField(id = "extractAll", description = "Extract all", required = true, defaultValue = true, type = FormFieldType(FormFieldType.KIND_BOOL))
+        val answers = DartLspCommandsSupport.collectFormAnswers(
+            listOf(stringField, optionalStringField, numberField, boolField, fileField),
+            mapOf(
+                "name" to "validName",
+                "optionalPrefix" to "",
+                "count" to "7",
+                "extractAll" to false,
+                "file" to "/tmp/target.dart",
+            ),
+        )
+        assertEquals(4, answers.size)
+        val answersById = answers.associate { it.id to it.value }
+        assertEquals("validName", answersById["name"])
+        assertFalse("Blank optional field must be omitted from formAnswers", answersById.containsKey("optionalPrefix"))
+        assertEquals(7L, answersById["count"])
+        assertEquals(false, answersById["extractAll"])
+        assertTrue((answersById["file"] as String).startsWith("file:///"))
+    }
+
+    fun testDartLspCommandsSupportImmediateExecutionWhenNoFormFields() {
+        var resolvedRequestParams: InteractiveExecuteCommandParams? = null
+        var executedCommandParams: ExecuteCommandParams? = null
+
+        val fakeWorkspaceService = object : WorkspaceService {
+            override fun executeCommand(params: ExecuteCommandParams): CompletableFuture<Any> {
+                executedCommandParams = params
+                return CompletableFuture.completedFuture(null)
+            }
+            override fun didChangeConfiguration(params: DidChangeConfigurationParams) {}
+            override fun didChangeWatchedFiles(params: DidChangeWatchedFilesParams) {}
+        }
+
+        val fakeDartServer = Proxy.newProxyInstance(
+            DartLanguageServer::class.java.classLoader,
+            arrayOf(DartLanguageServer::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "resolveCommand" -> {
+                    val req = args[0] as InteractiveExecuteCommandParams
+                    resolvedRequestParams = req
+                    // Simulate server returning resolved arguments and null formFields
+                    CompletableFuture.completedFuture(
+                        InteractiveExecuteCommandParams(
+                            command = req.command,
+                            arguments = listOf(mapOf("kind" to "inline_method", "resolved" to true)),
+                            formFields = null,
+                        ),
+                    )
+                }
+                "getWorkspaceService" -> fakeWorkspaceService
+                else -> null
+            }
+        } as DartLanguageServer
+
+        val fakeLspServer = Proxy.newProxyInstance(
+            LspServer::class.java.classLoader,
+            arrayOf(LspServer::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "sendRequestSync" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val fn = args.first { it is Function1<*, *> } as (Lsp4jServer) -> CompletableFuture<*>
+                    fn(fakeDartServer).get(5, TimeUnit.SECONDS)
+                }
+                "sendNotification" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val fn = args[0] as (Lsp4jServer) -> Unit
+                    fn(fakeDartServer)
+                    Unit
+                }
+                else -> null
+            }
+        } as LspServer
+
+        val dummyFile = myFixture.configureByText("test.dart", "void main() {}").virtualFile
+        val support = DartLspCommandsSupport(project)
+        support.executeCommand(fakeLspServer, dummyFile, Command("Inline Method", "refactor.perform", listOf("initial")))
+
+        assertNotNull("command/resolve must be called first", resolvedRequestParams)
+        assertEquals("refactor.perform", resolvedRequestParams?.command)
+        assertEquals(listOf("initial"), resolvedRequestParams?.arguments)
+
+        assertNotNull("workspace/executeCommand must be called with resolved arguments when formFields is null", executedCommandParams)
+        assertEquals("refactor.perform", executedCommandParams?.command)
+        assertEquals(listOf(mapOf("kind" to "inline_method", "resolved" to true)), executedCommandParams?.arguments)
+    }
+
+    fun testDartInteractiveFormDialogMultiTurnServerValidationAndSuccess() {
+        var turnCount = 0
+        val capturedResolveRequests = mutableListOf<InteractiveExecuteCommandParams>()
+
+        val nameField = FormField(
+            id = "name",
+            description = "Method name",
+            required = true,
+            defaultValue = "existingMethod",
+            type = FormFieldType(kind = FormFieldType.KIND_STRING),
+        )
+        val initialResolved = InteractiveExecuteCommandParams(
+            command = "refactor.perform",
+            arguments = listOf(mapOf("kind" to "extract_method")),
+            formFields = listOf(nameField),
+        )
+
+        val fakeDartServer = Proxy.newProxyInstance(
+            DartLanguageServer::class.java.classLoader,
+            arrayOf(DartLanguageServer::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "resolveCommand" -> {
+                    turnCount++
+                    val req = args[0] as InteractiveExecuteCommandParams
+                    capturedResolveRequests.add(req)
+                    if (turnCount == 1) {
+                        // Turn 1: Server rejects "existingMethod" with a field-level server error
+                        CompletableFuture.completedFuture(
+                            req.copy(
+                                formFields = listOf(
+                                    nameField.copy(error = "A method with name 'existingMethod' already exists."),
+                                ),
+                            ),
+                        )
+                    } else {
+                        // Turn 2: Server accepts "freshMethod" and returns null formFields
+                        CompletableFuture.completedFuture(
+                            InteractiveExecuteCommandParams(
+                                command = req.command,
+                                arguments = listOf(mapOf("kind" to "extract_method", "name" to "freshMethod")),
+                                formFields = null,
+                            ),
+                        )
+                    }
+                }
+                else -> null
+            }
+        } as DartLanguageServer
+
+        val fakeLspServer = Proxy.newProxyInstance(
+            LspServer::class.java.classLoader,
+            arrayOf(LspServer::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "sendRequestSync" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val fn = args.first { it is Function1<*, *> } as (Lsp4jServer) -> CompletableFuture<*>
+                    fn(fakeDartServer).get(5, TimeUnit.SECONDS)
+                }
+                else -> null
+            }
+        } as LspServer
+
+        val dialog = DartInteractiveFormDialog(project, fakeLspServer, "Extract Method", initialResolved)
+        try {
+            assertEquals(mapOf("name" to "existingMethod"), dialog.collectRawValues())
+            assertTrue(dialog.doValidateAll().isEmpty())
+
+            // Submit 1: server returns field error -> dialog stays open with activeServerErrors populated
+            dialog.doOKAction()
+            assertNull("Dialog must not finalize when server returns formFields with error", dialog.finalResolvedParams)
+            assertEquals("A method with name 'existingMethod' already exists.", dialog.activeServerErrors["name"])
+            val validationsAfterTurn1 = dialog.doValidateAll()
+            assertEquals(1, validationsAfterTurn1.size)
+            assertEquals("A method with name 'existingMethod' already exists.", validationsAfterTurn1[0].message)
+
+            // User edits the text field -> activeServerErrors for "name" is cleared automatically
+            val textField = dialog.fieldComponents["name"] as JBTextField
+            textField.text = "freshMethod"
+            assertNull("Editing the field must clear its activeServerError", dialog.activeServerErrors["name"])
+            assertTrue(dialog.doValidateAll().isEmpty())
+
+            // Submit 2: server returns null formFields -> dialog stores finalResolvedParams
+            dialog.doOKAction()
+            assertNotNull("Dialog must store finalResolvedParams when server returns null formFields", dialog.finalResolvedParams)
+            assertEquals(2, capturedResolveRequests.size)
+            assertEquals(listOf(FormAnswer("name", "freshMethod")), capturedResolveRequests[1].formAnswers)
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE)
         }
     }
 

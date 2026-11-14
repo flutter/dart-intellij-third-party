@@ -1,6 +1,7 @@
 ## Unreleased
 
 ### Added
+- Support interactive forms (`command/resolve`) dialog for LSP code actions and refactorings (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#832)
 - Parameter info (signature help) implemented with JetBrains LSP (experimental feature) (#819)
 - Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 

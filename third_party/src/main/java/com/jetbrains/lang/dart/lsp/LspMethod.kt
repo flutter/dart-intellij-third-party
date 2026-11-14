@@ -11,8 +11,13 @@ enum class LspMethod(
     val presentableName: String? = null
 ) {
     CODE_ACTION("textDocument/codeAction", isExperimental = true, presentableName = "code actions"),
+    // Not a standalone experimental feature; gated alongside CODE_ACTION.
+    COMMAND_RESOLVE("command/resolve", isExperimental = false),
     COMPLETION("textDocument/completion", isExperimental = true, presentableName = "completion"),
+    // Not a standalone experimental feature; gated alongside COMPLETION.
     COMPLETION_RESOLVE("completionItem/resolve", isExperimental = false),
+    // Not gated by the experimental LSP flag because there is no legacy fallback for DTD-over-LSP connection.
+    CONNECT_TO_DTD("dart/connectToDtd", isExperimental = false),
     DEFINITION("textDocument/definition", isExperimental = true, presentableName = "navigation"),
     DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = false),
     DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = false),
