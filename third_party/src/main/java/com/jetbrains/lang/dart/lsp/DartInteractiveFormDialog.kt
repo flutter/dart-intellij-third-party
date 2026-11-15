@@ -29,7 +29,7 @@ import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
 import java.net.URI
 import java.nio.file.Paths
-import java.util.regex.PatternSyntaxException
+import java.util.concurrent.ConcurrentHashMap
 import javax.swing.JComponent
 import javax.swing.event.DocumentEvent
 
@@ -72,6 +72,15 @@ class DartLspCommandsSupport(private val project: Project) : LspCommandsSupport(
     )
 
     companion object {
+        private val regexCache = ConcurrentHashMap<String, Result<Regex>>()
+
+        @VisibleForTesting
+        internal fun getCompiledRegex(pattern: String): Regex? {
+            return regexCache.computeIfAbsent(pattern) { pat ->
+                runCatching { Regex(pat) }
+            }.getOrNull()
+        }
+
         @VisibleForTesting
         internal fun sendExecuteCommand(server: LspServer, resolved: InteractiveExecuteCommandParams) {
             server.sendNotification {
@@ -183,11 +192,8 @@ class DartLspCommandsSupport(private val project: Project) : LspCommandsSupport(
                     var highestNonErrorValidation: ValidationInfo? = null
                     for (validator in field.type.validators.orEmpty()) {
                         if (validator.kind != "regex") continue
-                        val matches = try {
-                            Regex(validator.pattern).containsMatchIn(text)
-                        } catch (_: PatternSyntaxException) {
-                            continue
-                        }
+                        val regex = getCompiledRegex(validator.pattern) ?: continue
+                        val matches = regex.containsMatchIn(text)
                         if (matches != validator.matchIsValid) {
                             if (validator.severity >= RegexValidator.SEVERITY_ERROR) {
                                 return ValidationInfo(validator.message, component)
@@ -409,7 +415,7 @@ class DartInteractiveFormDialog(
                 }
 
                 else -> {
-                    val defaultText = (field.defaultValue as? String).orEmpty()
+                    val defaultText = field.defaultValue?.toString().orEmpty()
                     val textField = JBTextField(defaultText, 25)
                     textField.document.addDocumentListener(object : DocumentAdapter() {
                         override fun textChanged(e: DocumentEvent) {

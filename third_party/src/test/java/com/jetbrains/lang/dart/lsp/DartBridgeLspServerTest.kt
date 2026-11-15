@@ -3526,6 +3526,34 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         } finally {
             dialog.close(DialogWrapper.CANCEL_EXIT_CODE)
         }
+
+        // Verify regexCache reuses compiled Regex instances and handles malformed patterns without throwing
+        val validRegex1 = DartLspCommandsSupport.getCompiledRegex("^[a-z]+$")
+        val validRegex2 = DartLspCommandsSupport.getCompiledRegex("^[a-z]+$")
+        assertNotNull(validRegex1)
+        assertSame("regexCache must return the same compiled Regex instance", validRegex1, validRegex2)
+        assertNull("Malformed regex pattern must return null without throwing", DartLspCommandsSupport.getCompiledRegex("[unclosed"))
+        assertNull("Cached malformed regex pattern must continue returning null", DartLspCommandsSupport.getCompiledRegex("[unclosed"))
+
+        // Verify non-string defaultValue on a string field is converted via toString() in DartInteractiveFormDialog
+        val nonStringDefaultParams = InteractiveExecuteCommandParams(
+            command = "refactor.perform",
+            formFields = listOf(
+                FormField(
+                    id = "label",
+                    description = "Label",
+                    required = true,
+                    defaultValue = 12345,
+                    type = FormFieldType(kind = FormFieldType.KIND_STRING),
+                ),
+            ),
+        )
+        val nonStringDialog = DartInteractiveFormDialog(project, fakeLspServer, "Test", nonStringDefaultParams)
+        try {
+            assertEquals(mapOf("label" to "12345"), nonStringDialog.collectRawValues())
+        } finally {
+            nonStringDialog.close(DialogWrapper.CANCEL_EXIT_CODE)
+        }
     }
 
     private class MockLanguageClient : DartLanguageClient {
