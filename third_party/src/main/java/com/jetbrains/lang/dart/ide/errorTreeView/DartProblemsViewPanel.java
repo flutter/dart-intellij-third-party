@@ -1,6 +1,7 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.lang.dart.ide.errorTreeView;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.ide.CopyProvider;
@@ -79,8 +80,9 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
 
   private final @NotNull DartProblemsPresentationHelper myPresentationHelper;
 
-  DartProblemsViewPanel(@NotNull Project project,
-                        @NotNull DartProblemsPresentationHelper presentationHelper) {
+  @VisibleForTesting
+  public DartProblemsViewPanel(@NotNull Project project,
+                               @NotNull DartProblemsPresentationHelper presentationHelper) {
     super(false, true);
     myProject = project;
     myPresentationHelper = presentationHelper;
@@ -433,6 +435,11 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
   void clearAll() {
     ((DartProblemsTableModel)myTable.getModel()).removeAll();
     updateStatusDescription();
+  }
+
+  @VisibleForTesting
+  public int getRowCount() {
+    return myTable.getRowCount();
   }
 
   private class FilterProblemsAction extends DumbAwareAction implements Toggleable {

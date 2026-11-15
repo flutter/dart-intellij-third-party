@@ -1,15 +1,19 @@
 ## Unreleased
 
 ### Added
+- Parameter info (signature help) implemented with JetBrains LSP (experimental feature) (#819)
 - Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Changed
+- Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
 - Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
 
 ### Removed
 - Per-request `dart.legacy_assist` and `dart.legacy_fix` analytics latency events, which fired on every legacy quick assist and quick fix availability check (caret moves, edits, selection changes) rather than when one was applied. Applied assists and fixes are still reported (#793)
 
 ### Fixed
+- Avoid `IllegalStateException` in `DartNamedElementImpl.getId()` on `new` constructor declarations (#815)
+- Prevent DartProblemsView from dropping diagnostics when the tool window has not been opened yet, and decouple problem tracking from DartAnalysisServerService (#785)
 - Avoid empty code completion lists when a third-party `DartCompletionExtension` throws an error (#814)
 - Support icon for typedef and type alias in Structure View and code completion (#660)
 - Avoid read-access error when invoking Type Hierarchy, Method Hierarchy, Go to Super Method, or Go to Implementation(s) in IntelliJ 2026.1+ (#780)

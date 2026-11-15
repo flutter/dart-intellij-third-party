@@ -1,11 +1,13 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.errorTreeView;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.intellij.execution.runners.ExecutionUtil;
 import com.intellij.ide.projectView.ProjectView;
 import com.intellij.ide.projectView.impl.ProjectViewPane;
 import com.intellij.notification.*;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.*;
@@ -17,17 +19,19 @@ import com.intellij.openapi.util.NlsContexts.TabTitle;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.psi.search.SearchScope;
 import com.intellij.ui.content.Content;
 import com.intellij.util.Alarm;
 import com.intellij.util.ModalityUiUtil;
+import com.intellij.util.PathUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.concurrency.ThreadingAssertions;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerMessages;
-import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import icons.DartIcons;
 import org.dartlang.analysis.server.protocol.AnalysisError;
 import org.jetbrains.annotations.NonNls;
@@ -38,8 +42,10 @@ import javax.swing.*;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service(Service.Level.PROJECT)
 @State(
@@ -54,8 +60,11 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
   private final Project myProject;
   private final DartProblemsPresentationHelper myPresentationHelper;
 
-  private final Object myLock = new Object(); // use this lock to access myScheduledFilePathToErrors and myAlarm
+  private final Object myLock = new Object(); // use this lock to access myScheduledFilePathToErrors, myCurrentFilePathToErrors, and myAlarm
   private final Map<String, List<? extends AnalysisError>> myScheduledFilePathToErrors = new HashMap<>();
+  private final Map<String, List<? extends AnalysisError>> myCurrentFilePathToErrors = new HashMap<>();
+  private final Set<String> myFilePathsWithErrors = new HashSet<>();
+  private final Map<String, Integer> myFolderPathsWithErrors = new HashMap<>();
   private final Alarm myAlarm;
 
   private @NotNull Icon myCurrentIcon = DartIcons.Dart_13;
@@ -69,12 +78,23 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
     @Override
     public void run() {
       if (ProjectViewPane.ID.equals(ProjectView.getInstance(myProject).getCurrentViewId())) {
-        final int hash = DartAnalysisServerService.getInstance(myProject).getFilePathsWithErrorsHash();
+        final int hash = getFilePathsWithErrorsHash();
         if (myFilesWithErrorsHash != hash) {
           // refresh red squiggles managed by com.jetbrains.lang.dart.projectView.DartNodeDecorator
           myFilesWithErrorsHash = hash;
           ProjectView.getInstance(myProject).refresh();
         }
+      }
+
+      DartProblemsViewPanel panel = getProblemsViewPanel();
+      if (panel == null) {
+        // Panel not yet created (tool window not opened yet).
+        // Errors are preserved in myCurrentFilePathToErrors and will be populated
+        // via panelCreated() when the tool window content is created.
+        synchronized (myLock) {
+          myScheduledFilePathToErrors.clear();
+        }
+        return;
       }
 
       final Map<String, List<? extends AnalysisError>> filePathToErrors;
@@ -83,33 +103,41 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
         myScheduledFilePathToErrors.clear();
       }
 
-      DartProblemsViewPanel panel = getProblemsViewPanel();
-      if (panel == null) {
-        return;
-      }
-
-      ReadAction.nonBlocking(() -> {
-          Map<String, List<DartProblem>> filePathToDartProblems = new HashMap<>();
-
-          for (Map.Entry<String, List<? extends AnalysisError>> entry : filePathToErrors.entrySet()) {
-            String filePath = entry.getKey();
-            List<? extends AnalysisError> analysisErrors = entry.getValue();
-
-            VirtualFile vFile = LocalFileSystem.getInstance().findFileByPath(filePath);
-            boolean fileOk = vFile != null && ProjectFileIndex.getInstance(myProject).isInContent(vFile);
-            List<DartProblem> dartProblems = fileOk
-                                             ? ContainerUtil.map(analysisErrors, analysisError -> new DartProblem(myProject, analysisError))
-                                             : Collections.emptyList();
-            filePathToDartProblems.put(filePath, dartProblems);
-          }
-
-          return filePathToDartProblems;
-        })
-        .expireWith(getInstance(myProject))
-        .finishOnUiThread(ModalityState.nonModal(), panel::setErrors)
-        .submit(AppExecutorUtil.getAppExecutorService());
+      populatePanel(panel, filePathToErrors);
     }
   };
+
+  private void populatePanel(final @NotNull DartProblemsViewPanel panel,
+                             final @NotNull Map<String, List<? extends AnalysisError>> filePathToErrors) {
+    ReadAction.nonBlocking(() -> {
+        Map<String, List<DartProblem>> filePathToDartProblems = new HashMap<>();
+
+        for (Map.Entry<String, List<? extends AnalysisError>> entry : filePathToErrors.entrySet()) {
+          String filePath = entry.getKey();
+          List<? extends AnalysisError> analysisErrors = entry.getValue();
+
+          VirtualFile vFile = findVirtualFile(filePath);
+          boolean fileOk = vFile != null && ProjectFileIndex.getInstance(myProject).isInContent(vFile);
+          List<DartProblem> dartProblems = fileOk
+                                           ? ContainerUtil.map(analysisErrors, analysisError -> new DartProblem(myProject, analysisError))
+                                           : Collections.emptyList();
+          filePathToDartProblems.put(filePath, dartProblems);
+        }
+
+        return filePathToDartProblems;
+      })
+      .expireWith(getInstance(myProject))
+      .finishOnUiThread(ModalityState.nonModal(), panel::setErrors)
+      .submit(AppExecutorUtil.getAppExecutorService());
+  }
+
+  private static @Nullable VirtualFile findVirtualFile(final @NotNull String filePath) {
+    VirtualFile vFile = LocalFileSystem.getInstance().findFileByPath(filePath);
+    if (vFile == null && ApplicationManager.getApplication().isUnitTestMode()) {
+      vFile = VirtualFileManager.getInstance().findFileByUrl("temp://" + filePath);
+    }
+    return vFile;
+  }
 
   public DartProblemsView(@NotNull Project project) {
     myProject = project;
@@ -133,13 +161,22 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
     );
   }
 
-  DartProblemsPresentationHelper getPresentationHelper() {
-
+  @VisibleForTesting
+  public @NotNull DartProblemsPresentationHelper getPresentationHelper() {
     return myPresentationHelper;
   }
 
   private @Nullable ToolWindow getDartAnalysisToolWindow() {
-    return ToolWindowManager.getInstance(myProject).getToolWindow(TOOLWINDOW_ID);
+    ToolWindow toolWindow = ToolWindowManager.getInstance(myProject).getToolWindow(TOOLWINDOW_ID);
+    if (toolWindow != null && !toolWindow.isAvailable()) {
+      ModalityUiUtil.invokeLaterIfNeeded(ModalityState.nonModal(), myProject.getDisposed(), () -> {
+        ToolWindow tw = ToolWindowManager.getInstance(myProject).getToolWindow(TOOLWINDOW_ID);
+        if (tw != null && !tw.isAvailable()) {
+          tw.setAvailable(true);
+        }
+      });
+    }
+    return toolWindow;
   }
 
   private @Nullable DartProblemsViewPanel getProblemsViewPanel() {
@@ -308,11 +345,104 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
 
   public void updateErrorsForFile(final @NotNull String filePath, @NotNull List<? extends AnalysisError> errors) {
     synchronized (myLock) {
+      if (errors.isEmpty()) {
+        myCurrentFilePathToErrors.remove(filePath);
+      }
+      else {
+        myCurrentFilePathToErrors.put(filePath, errors);
+      }
+
+      boolean hasSevereProblems = false;
+      for (AnalysisError error : errors) {
+        if ("ERROR".equals(error.getSeverity())) {
+          hasSevereProblems = true;
+          break;
+        }
+      }
+
+      if (hasSevereProblems) {
+        if (myFilePathsWithErrors.add(filePath)) {
+          String parentPath = PathUtil.getParentPath(filePath);
+          while (!parentPath.isEmpty()) {
+            int count = myFolderPathsWithErrors.getOrDefault(parentPath, 0);
+            myFolderPathsWithErrors.put(parentPath, count + 1);
+            parentPath = PathUtil.getParentPath(parentPath);
+          }
+        }
+      }
+      else {
+        if (myFilePathsWithErrors.remove(filePath)) {
+          String parentPath = PathUtil.getParentPath(filePath);
+          while (!parentPath.isEmpty()) {
+            Integer count = myFolderPathsWithErrors.get(parentPath);
+            if (count != null) {
+              if (count > 1) {
+                myFolderPathsWithErrors.put(parentPath, count - 1);
+              }
+              else {
+                myFolderPathsWithErrors.remove(parentPath);
+              }
+            }
+            parentPath = PathUtil.getParentPath(parentPath);
+          }
+        }
+      }
+
       if (myScheduledFilePathToErrors.isEmpty()) {
         myAlarm.addRequest(myUpdateRunnable, TABLE_REFRESH_PERIOD, ModalityState.nonModal());
       }
 
       myScheduledFilePathToErrors.put(filePath, errors);
+    }
+  }
+
+  public void panelCreated(final @NotNull DartProblemsViewPanel panel) {
+    final Map<String, List<? extends AnalysisError>> snapshot;
+    synchronized (myLock) {
+      myAlarm.cancelAllRequests();
+      myScheduledFilePathToErrors.clear();
+      if (myCurrentFilePathToErrors.isEmpty()) {
+        return;
+      }
+      snapshot = new HashMap<>(myCurrentFilePathToErrors);
+    }
+    populatePanel(panel, snapshot);
+  }
+
+  public @NotNull Map<String, List<? extends AnalysisError>> getCurrentFilePathToErrors() {
+    synchronized (myLock) {
+      return new HashMap<>(myCurrentFilePathToErrors);
+    }
+  }
+
+  public boolean hasErrorsInScope(final @NotNull SearchScope scope) {
+    final Set<String> filePaths;
+    synchronized (myLock) {
+      if (myFilePathsWithErrors.isEmpty()) {
+        return false;
+      }
+      filePaths = new HashSet<>(myFilePathsWithErrors);
+    }
+    for (String filePath : filePaths) {
+      VirtualFile vFile = findVirtualFile(filePath);
+      if (vFile != null && scope.contains(vFile)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public boolean isFileWithErrors(final @NotNull VirtualFile file) {
+    synchronized (myLock) {
+      return file.isDirectory()
+             ? myFolderPathsWithErrors.getOrDefault(file.getPath(), 0) > 0
+             : myFilePathsWithErrors.contains(file.getPath());
+    }
+  }
+
+  public int getFilePathsWithErrorsHash() {
+    synchronized (myLock) {
+      return myFilePathsWithErrors.hashCode();
     }
   }
 
@@ -324,6 +454,9 @@ public final class DartProblemsView implements PersistentStateComponent<DartProb
     synchronized (myLock) {
       myAlarm.cancelAllRequests();
       myScheduledFilePathToErrors.clear();
+      myCurrentFilePathToErrors.clear();
+      myFilePathsWithErrors.clear();
+      myFolderPathsWithErrors.clear();
     }
 
     DartProblemsViewPanel panel = getProblemsViewPanel();

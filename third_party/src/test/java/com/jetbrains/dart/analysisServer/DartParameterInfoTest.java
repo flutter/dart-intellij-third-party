@@ -12,6 +12,7 @@ import com.intellij.testFramework.utils.parameterInfo.MockUpdateParameterInfoCon
 import com.jetbrains.lang.dart.DartFileType;
 import com.jetbrains.lang.dart.ide.info.DartFunctionDescription;
 import com.jetbrains.lang.dart.ide.info.DartParameterInfoHandler;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 
 public class DartParameterInfoTest extends CodeInsightFixtureTestCase<ModuleFixtureBuilder<ModuleFixture>> {
@@ -180,5 +181,20 @@ public class DartParameterInfoTest extends CodeInsightFixtureTestCase<ModuleFixt
 
   public void testAnnotation() {
     doTest("String itemA, int itemB", 0);
+  }
+
+  public void testDisabledWhenExperimentalLspEnabled() {
+    myFixture.configureByText("test.dart", "void f(int a) {} void main() { f(<caret>); }");
+    final DartParameterInfoHandler handler = new DartParameterInfoHandler();
+
+    assertNotNull(handler.findElementForParameterInfo(new MockCreateParameterInfoContext(getEditor(), getFile())));
+
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    try {
+      assertNull(handler.findElementForParameterInfo(new MockCreateParameterInfoContext(getEditor(), getFile())));
+    }
+    finally {
+      DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), false);
+    }
   }
 }
