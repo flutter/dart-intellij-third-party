@@ -43,8 +43,9 @@ Actions → *Assign reviewers* → *Run workflow*. Set `only_pr` to a PR number,
 3. After the `CODEOWNERS` line is removed, also revert that PR.
 
 ## Run the tests
+The presubmit job `assign-reviewers-tests` runs these on every PR. To run them locally:
 ```
-node --test .github/scripts/
+node --test .github/scripts/*.test.js
 ```
 
 ## Failures
