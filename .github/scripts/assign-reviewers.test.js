@@ -12,22 +12,23 @@ const {classify, pickReviewer, decide, loadConfig} = run;
 
 // Mirrors .github/assign-reviewers.yml, so the tests don't depend on a YAML parser.
 // A separate test (below) checks the real file when `yq` is installed.
-const config = loadConfig({
+const RAW_CONFIG = {
   lanes: {lsp: ['helin24', 'jwren'], build: ['pq'], default: ['pq', 'helin24']},
   substitutes: {build: ['helin24']},
   fallback: ['pq', 'helin24', 'jwren'],
   codeowners: ['pq', 'helin24'],
-  lspAuthors: ['ranbeuer', 'juan-mora-google'],
+  lspAuthors: [],
   buildBotAuthors: ['dependabot[bot]', 'flutteractionsbot'],
   lspPaths: ['/lsp/', 'platform-lsp', '/dartlsp/', '/DartLsp[^/]*$'],
   buildPaths: [
     '(^|/)(build\\.gradle(\\.kts)?|settings\\.gradle(\\.kts)?|gradle\\.properties|gradlew(\\.bat)?|libs\\.versions\\.toml)$',
     '^(gradle|kokoro|\\.github|third_party/gradle)/',
-    '^tool/(?!baseline/)',
+    '^(third_party/)?tool/(?!baseline/)',
   ],
   skipLabels: ['blocked', 'waiting for customer response'],
   maxWritesPerRun: 5,
-});
+};
+const config = loadConfig(RAW_CONFIG);
 
 // A minimal pull request, as returned by the GitHub REST API. Override fields per test.
 const pr = (overrides = {}) => ({
@@ -50,7 +51,11 @@ test('classify: LSP signals', () => {
   assert.equal(classify(pr({labels: [{name: 'lsp'}]}), [], config), 'lsp');
   assert.equal(classify(pr({title: 'feat(lsp): migrate Outline'}), [], config), 'lsp');
   assert.equal(classify(pr({title: '[LSP] Remove legacy calls'}), [], config), 'lsp');
-  assert.equal(classify(pr({user: {login: 'ranbeuer'}}), ['third_party/src/Foo.java'], config), 'lsp');
+  // lspAuthors is empty today, so a contractor's non-LSP PR stays in default...
+  assert.equal(classify(pr({user: {login: 'ranbeuer'}}), ['third_party/src/Foo.java'], config), 'default');
+  // ...but listing an author still routes their PRs to lsp.
+  const withAuthor = loadConfig({...RAW_CONFIG, lspAuthors: ['ranbeuer']});
+  assert.equal(classify(pr({user: {login: 'ranbeuer'}}), ['third_party/src/Foo.java'], withAuthor), 'lsp');
   assert.equal(
     classify(pr(), ['third_party/src/main/java/com/jetbrains/lang/dart/ide/refactoring/DartLspRenameHandler.kt'], config),
     'lsp',
@@ -63,10 +68,13 @@ test('classify: build lane', () => {
   assert.equal(classify(pr({user: {login: 'flutteractionsbot'}}), ['README.md'], config), 'build');
   assert.equal(classify(pr(), ['.github/workflows/presubmit.yaml', 'gradle.properties'], config), 'build');
   assert.equal(classify(pr(), ['.github/scripts/assign-reviewers.js'], config), 'build');
+  assert.equal(classify(pr(), ['third_party/tool/kokoro/build.sh', 'third_party/tool/check_verifier_baselines.sh'], config), 'build');
+  assert.equal(classify(pr(), ['tool/check_ai_config.sh'], config), 'build');
 });
 
 test('classify: default', () => {
   assert.equal(classify(pr(), ['tool/baseline/261/verifier-baseline.txt'], config), 'default');
+  assert.equal(classify(pr(), ['third_party/tool/baseline/253/verifier-baseline.txt'], config), 'default');
   assert.equal(classify(pr(), ['build.gradle.kts', 'third_party/src/Foo.java'], config), 'default');
   assert.equal(classify(pr({user: {login: 'reidbaker-agent'}}), ['skills_lint.yaml'], config), 'default');
   assert.equal(classify(pr({title: 'Fix lspci detection'}), [], config), 'default'); // word boundary

@@ -9,8 +9,8 @@
 
 | Lane | Matches | Reviewers |
 |---|---|---|
-| `lsp` | `lsp` label; "lsp" in the title; LSP paths; authors in `lspAuthors` | helin24, jwren |
-| `build` | `dependabot` and `flutteractionsbot` PRs; PRs that only touch build files (Gradle, `gradle/`, `kokoro/`, `tool/` except baselines, `.github/`) | pq (helin24 substitutes) |
+| `lsp` | `lsp` label; "lsp" in the title; LSP paths; authors in `lspAuthors` (none today) | helin24, jwren |
+| `build` | `dependabot` and `flutteractionsbot` PRs; PRs that only touch build files (Gradle, `gradle/`, `kokoro/`, `tool/` and `third_party/tool/` except baselines, `.github/`) | pq (helin24 substitutes) |
 | `default` | Everything else, including other bot or agent authors | pq, helin24 |
 
 Within a lane, the pick rotates on PR number (`pool[number % pool.length]`), after removing the author and anyone away. If the lane is empty, the pick falls back to the lane's substitutes, then to {pq, helin24, jwren}.
