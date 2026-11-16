@@ -259,7 +259,14 @@ function parseAway(value, core, config) {
 
 /** Reads the workflow settings from environment variables. */
 function readSettings(env, core, config) {
-  const onlyPr = env.ONLY_PR ? Number(env.ONLY_PR) : null;
+  let onlyPr = null;
+  if (env.ONLY_PR) {
+    // Fail loudly rather than quietly falling back to a full run.
+    if (!/^\d+$/.test(env.ONLY_PR.trim())) {
+      throw new Error(`only_pr must be a PR number, got "${env.ONLY_PR}"`);
+    }
+    onlyPr = Number(env.ONLY_PR);
+  }
   // Fail closed: only an explicit 'false' turns off dry run.
   const live = env.ASSIGN_DRY_RUN === 'false';
   const canaryWrite = onlyPr !== null && env.FORCE_WRITE === 'true';
@@ -294,13 +301,16 @@ async function loadDetails(github, repoRef, number) {
 
 /**
  * Applies a decision. Re-reads the PR first and does nothing if its reviewers
- * changed in the meantime. Adds before removing, so the PR always has a reviewer.
+ * (or team requests) changed in the meantime. Adds before removing, so the PR always has a reviewer.
  * Returns true if anything was changed.
  */
 async function apply(github, repoRef, pr, d) {
   const {data: fresh} = await github.rest.pulls.get({...repoRef, pull_number: pr.number});
   const unchanged =
-    fresh.state === 'open' && !fresh.draft && sameMembers(loginsOf(pr.requested_reviewers), loginsOf(fresh.requested_reviewers));
+    fresh.state === 'open' &&
+    !fresh.draft &&
+    (fresh.requested_teams || []).length === 0 &&
+    sameMembers(loginsOf(pr.requested_reviewers), loginsOf(fresh.requested_reviewers));
   if (!unchanged) return false;
 
   if (d.add.length > 0) {

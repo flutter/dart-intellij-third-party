@@ -148,15 +148,20 @@ test('decide: drive-by reviews and the bot\'s own removals do not block', () => 
 
 // --- run(): fail-closed and write behavior, with a fake GitHub client ---
 
-function fakeGitHub(prs) {
-  const calls = {request: [], remove: []};
+// `freshChanges` simulates edits made between the first read and the re-check
+// right before writing: {prNumber: {field: value}}.
+function fakeGitHub(prs, freshChanges = {}) {
+  const calls = {request: [], remove: [], get: 0};
   const byNumber = Object.fromEntries(prs.map((p) => [p.number, p]));
   const rest = {
     pulls: {
       list: 'list',
       listFiles: 'files',
       listReviews: 'reviews',
-      get: async ({pull_number}) => ({data: byNumber[pull_number]}),
+      get: async ({pull_number}) => {
+        calls.get++;
+        return {data: {...byNumber[pull_number], ...freshChanges[pull_number]}};
+      },
       requestReviewers: async (a) => calls.request.push(a),
       removeRequestedReviewers: async (a) => calls.remove.push(a),
     },
@@ -201,6 +206,26 @@ test('run: only_pr with write works in dry run (canary)', async () => {
   const {github, calls} = fakeGitHub([pr({number: 11})]);
   await run({github, context, core: fakeCore(), config, env: {ONLY_PR: '11', FORCE_WRITE: 'true'}});
   assert.equal(calls.request.length, 1);
+});
+
+test('run: only_pr that is not a number fails and writes nothing', async () => {
+  const {github, calls} = fakeGitHub([pr({number: 11})]);
+  let message = '';
+  try {
+    await run({github, context, core: fakeCore(), config, env: {ONLY_PR: 'abc', FORCE_WRITE: 'true'}});
+  } catch (e) {
+    message = e.message;
+  }
+  assert.match(message, /only_pr must be a PR number/);
+  assert.equal(calls.request.length, 0);
+  assert.equal(calls.get, 0);
+});
+
+test('run: does not write if a team was requested since the first read', async () => {
+  const {github, calls} = fakeGitHub([pr({number: 11})], {11: {requested_teams: [{slug: 'reviewers'}]}});
+  const out = await run({github, context, core: fakeCore(), config, env: {ASSIGN_DRY_RUN: 'false', ASSIGN_SINCE: '2026-11-01T00:00:00Z'}});
+  assert.equal(calls.request.length, 0);
+  assert.equal(out.rows[0].applied, false);
 });
 
 test('run: write cap stops after maxWritesPerRun', async () => {
