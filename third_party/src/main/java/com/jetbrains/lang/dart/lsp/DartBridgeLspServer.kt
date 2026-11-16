@@ -71,6 +71,7 @@ import org.eclipse.lsp4j.SignatureHelp
 import org.eclipse.lsp4j.SignatureHelpOptions
 import org.eclipse.lsp4j.SignatureHelpParams
 import org.eclipse.lsp4j.SymbolInformation
+import org.eclipse.lsp4j.TextDocumentPositionParams
 import org.eclipse.lsp4j.TypeDefinitionParams
 import org.eclipse.lsp4j.TypeHierarchyItem
 import org.eclipse.lsp4j.TypeHierarchyPrepareParams
@@ -524,6 +525,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
             logger.debug("textDocument/semanticTokens/full failed: ${e.message}")
             null
         }
+    }
+
+    override fun getSuper(params: TextDocumentPositionParams): CompletableFuture<Location?> {
+        return forwardRequest("dart/textDocument/super", params, Location::class.java as Type)
     }
 
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
