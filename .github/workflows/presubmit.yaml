@@ -188,3 +188,20 @@ jobs:
       - name: Check baselines
         if: ${{ !cancelled() }}
         run: ./third_party/tool/check_verifier_baselines.sh check
+
+  # Job 4: Reviewer assignment script tests (.github/scripts/)
+  assign-reviewers-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Node and yq are preinstalled on GitHub's Ubuntu runners; with yq present,
+      # the test that loads .github/assign-reviewers.yml runs instead of skipping.
+      - name: Run tests
+        run: |
+          node --version
+          yq --version
+          node --test .github/scripts/*.test.js
