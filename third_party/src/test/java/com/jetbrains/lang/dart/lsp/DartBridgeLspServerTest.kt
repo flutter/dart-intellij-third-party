@@ -3099,6 +3099,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val future1 = bridgeServer.resolveCommand(initialParams)
 
         val req1 = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" })
+        val req1Id = req1.get("id").asString
         val lspMsg1 = req1.getAsJsonObject("params").getAsJsonObject("lspMessage")
         assertEquals("command/resolve", lspMsg1.get("method").asString)
         val wireParams1 = lspMsg1.getAsJsonObject("params")
@@ -3110,11 +3111,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
         val response1Json = """
             {
-              "id": "123",
+              "id": "$req1Id",
               "result": {
                 "lspResponse": {
                   "jsonrpc": "2.0",
-                  "id": "123",
+                  "id": "$req1Id",
                   "result": {
                     "command": "refactor.perform",
                     "arguments": [
@@ -3200,6 +3201,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         )
         val future2 = bridgeServer.resolveCommand(submitParams)
         val req2 = requireNotNull(capturedRequests.find { it.get("method")?.asString == "lsp.handle" })
+        val req2Id = req2.get("id").asString
         val wireParams2 = req2.getAsJsonObject("params").getAsJsonObject("lspMessage").getAsJsonObject("params")
         val wireAnswers = wireParams2.getAsJsonArray("formAnswers")
         assertEquals(2, wireAnswers.size())
@@ -3208,11 +3210,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
         val response2Json = """
             {
-              "id": "123",
+              "id": "$req2Id",
               "result": {
                 "lspResponse": {
                   "jsonrpc": "2.0",
-                  "id": "123",
+                  "id": "$req2Id",
                   "result": {
                     "command": "refactor.perform",
                     "arguments": [

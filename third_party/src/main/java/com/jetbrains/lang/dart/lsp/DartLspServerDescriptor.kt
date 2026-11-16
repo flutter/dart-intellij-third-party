@@ -169,13 +169,17 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
      * to duplicate analysis errors and sticky markers (see dart-lang/sdk#63819).
      */
     override fun getFileUri(file: VirtualFile): String {
-        val escapedPath = URLUtil.encodePath(getFilePath(file))
-        val url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath)
-        val uri = VfsUtil.toUri(url)?.toString() ?: url
-        return normalizeWindowsDriveInFileUri(uri)
+        return filePathToFileUri(getFilePath(file))
     }
 
     companion object {
+        internal fun filePathToFileUri(filePath: String): String {
+            val escapedPath = URLUtil.encodePath(filePath)
+            val url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath)
+            val uri = VfsUtil.toUri(url)?.toString() ?: url
+            return normalizeWindowsDriveInFileUri(uri)
+        }
+
         internal fun normalizeWindowsDriveInFileUri(uri: String): String {
             val prefix = "file:///"
             if (uri.startsWith(prefix) && OSAgnosticPathUtil.startsWithWindowsDrive(uri.substring(prefix.length))) {

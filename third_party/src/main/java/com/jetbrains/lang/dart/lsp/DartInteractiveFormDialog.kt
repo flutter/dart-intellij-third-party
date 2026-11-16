@@ -14,7 +14,6 @@ import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.customization.LspCommandsSupport
@@ -29,6 +28,7 @@ import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
 import java.net.URI
 import java.nio.file.Paths
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import javax.swing.JComponent
 import javax.swing.event.DocumentEvent
@@ -98,7 +98,10 @@ class DartLspCommandsSupport(private val project: Project) : LspCommandsSupport(
             var resolved: InteractiveExecuteCommandParams? = null
             val completed = ProgressManager.getInstance().runProcessWithProgressSynchronously(
                 {
-                    resolved = server.sendRequestSync { (it as DartLanguageServer).resolveCommand(params) }
+                    resolved = server.sendRequestSync { lspServer ->
+                        (lspServer as? DartLanguageServer)?.resolveCommand(params)
+                            ?: CompletableFuture.completedFuture(params)
+                    }
                 },
                 progressTitle,
                 true,
@@ -149,8 +152,7 @@ class DartLspCommandsSupport(private val project: Project) : LspCommandsSupport(
                 return DartLspServerDescriptor.normalizeWindowsDriveInFileUri(trimmed)
             }
             val normalizedPath = resolveLocalFilePath(trimmed, basePath)
-            val rawUri = VfsUtil.toUri(File(normalizedPath))?.toString() ?: return trimmed
-            return DartLspServerDescriptor.normalizeWindowsDriveInFileUri(rawUri)
+            return DartLspServerDescriptor.filePathToFileUri(normalizedPath)
         }
 
         @VisibleForTesting
@@ -255,7 +257,7 @@ class DartLspCommandsSupport(private val project: Project) : LspCommandsSupport(
                                 return ValidationInfo(DartBundle.message("dart.refactoring.interactive.form.file.already.exists"), component)
                             }
                         }
-                        if (exists && vFile != null && fileType != null) {
+                        if (exists && fileType != null) {
                             val allowsRegular = (fileType and FormFieldType.FILE_TYPE_REGULAR) != 0
                             val allowsDirectory = (fileType and FormFieldType.FILE_TYPE_DIRECTORY) != 0
                             if (allowsRegular && !allowsDirectory && vFile.isDirectory) {
