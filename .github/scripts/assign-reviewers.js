@@ -5,8 +5,9 @@
 /**
  * Assigns one reviewer to each open pull request.
  *
- * Runs from .github/workflows/assign-reviewers.yaml. See README.md in this
- * directory for the lanes, settings, and kill switch.
+ * Runs from .github/workflows/assign-reviewers.yaml. Lanes and other settings
+ * live in .github/assign-reviewers.yml. See README.md in this directory for
+ * the settings and kill switch.
  *
  * Overview:
  *   1. Pick a lane for the PR (lsp, build, or default).
@@ -19,54 +20,60 @@
 'use strict';
 
 // ---------------------------------------------------------------------------
-// Configuration
+// Configuration (lives in .github/assign-reviewers.yml)
 // ---------------------------------------------------------------------------
 
-const CONFIG = {
-  // Reviewers for each lane.
-  lanes: {
-    lsp: ['helin24', 'jwren'],
-    build: ['pq'],
-    default: ['pq', 'helin24'],
-  },
+const REQUIRED_LANES = ['lsp', 'build', 'default'];
 
-  // Who covers a lane when nobody in it is available (author or away).
-  substitutes: {
-    build: ['helin24'],
-  },
+/**
+ * Turns the parsed .github/assign-reviewers.yml into the config object the
+ * rest of this file uses: path lists become regular expressions, and anything
+ * missing or malformed throws a clear error.
+ */
+function loadConfig(raw) {
+  raw = raw || {};
+  const problems = [];
+  const listOfStrings = (value, name) => {
+    const ok = Array.isArray(value) && value.every((item) => typeof item === 'string');
+    if (!ok) problems.push(`${name} must be a list of strings`);
+    return ok ? value : [];
+  };
 
-  // Last resort when a lane and its substitutes are all unavailable.
-  fallback: ['pq', 'helin24', 'jwren'],
+  const lanes = {};
+  for (const lane of REQUIRED_LANES) {
+    lanes[lane] = listOfStrings(raw.lanes && raw.lanes[lane], `lanes.${lane}`);
+  }
+  const substitutes = {};
+  for (const [lane, logins] of Object.entries(raw.substitutes || {})) {
+    substitutes[lane] = listOfStrings(logins, `substitutes.${lane}`);
+  }
+  const config = {
+    lanes,
+    substitutes,
+    fallback: listOfStrings(raw.fallback, 'fallback'),
+    codeowners: listOfStrings(raw.codeowners, 'codeowners'),
+    lspAuthors: listOfStrings(raw.lspAuthors, 'lspAuthors'),
+    buildBotAuthors: listOfStrings(raw.buildBotAuthors, 'buildBotAuthors'),
+    lspPathPattern: new RegExp(listOfStrings(raw.lspPaths, 'lspPaths').join('|') || '(?!)', 'i'),
+    buildPathPattern: new RegExp(listOfStrings(raw.buildPaths, 'buildPaths').join('|') || '(?!)'),
+    skipLabels: listOfStrings(raw.skipLabels, 'skipLabels').map((label) => label.toLowerCase()),
+    maxWritesPerRun: raw.maxWritesPerRun,
+  };
+  if (!Number.isInteger(config.maxWritesPerRun) || config.maxWritesPerRun < 1) {
+    problems.push('maxWritesPerRun must be a positive whole number');
+  }
+  if (problems.length > 0) {
+    throw new Error(`Invalid .github/assign-reviewers.yml: ${problems.join('; ')}`);
+  }
+  return config;
+}
 
-  // Who CODEOWNERS (`* @helin24 @pq`) requests today. Used to recognize those
-  // requests so they can be trimmed down to one.
-  codeowners: ['pq', 'helin24'],
-
-  // PRs from these authors are always LSP work.
-  lspAuthors: ['ranbeuer', 'juan-mora-google'],
-
-  // PRs from these bots always go to the build lane.
-  buildBotAuthors: ['dependabot[bot]', 'flutteractionsbot'],
-
-  // A file under an LSP directory, or a DartLsp* source file.
-  lspPathPattern: /(\/lsp\/|platform-lsp|\/dartlsp\/|\/DartLsp[^/]*$)/i,
-
-  // Build files: Gradle files and directories, kokoro, tool/ (except
-  // verifier baselines), and everything under .github/.
-  buildPathPattern: new RegExp(
-    [
-      '(^|/)(build\\.gradle(\\.kts)?|settings\\.gradle(\\.kts)?|gradle\\.properties|gradlew(\\.bat)?|libs\\.versions\\.toml)$',
-      '^(gradle|kokoro|\\.github|third_party/gradle)/',
-      '^tool/(?!baseline/)',
-    ].join('|'),
-  ),
-
-  // PRs with any of these labels are left alone.
-  skipLabels: ['waiting for customer response', 'blocked'],
-
-  // Safety cap: the most PRs a single run may change.
-  maxWritesPerRun: 5,
-};
+/** Reads the JSON that the workflow converts from the YAML config. */
+function loadConfigFile(path) {
+  if (!path) throw new Error('ASSIGN_CONFIG_JSON is not set');
+  const fs = require('fs');
+  return loadConfig(JSON.parse(fs.readFileSync(path, 'utf8')));
+}
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -90,7 +97,7 @@ function sameMembers(a, b) {
 }
 
 /** Everyone who can be picked by this workflow. */
-function allReviewers(config = CONFIG) {
+function allReviewers(config) {
   const everyone = [
     ...Object.values(config.lanes).flat(),
     ...Object.values(config.substitutes).flat(),
@@ -109,7 +116,7 @@ function allReviewers(config = CONFIG) {
  * @param {object} pr A pull request from the GitHub REST API.
  * @param {string[]} files Paths of the files the PR changes.
  */
-function classify(pr, files, config = CONFIG) {
+function classify(pr, files, config) {
   const author = normalize(pr.user && pr.user.login);
 
   if (config.buildBotAuthors.map(normalize).includes(author)) return 'build';
@@ -137,7 +144,7 @@ function classify(pr, files, config = CONFIG) {
  * Tries the lane first, then its substitutes, then the fallback list. The PR
  * author and anyone away are never picked. Returns null if nobody is available.
  */
-function pickReviewer(lane, prNumber, author, away, config = CONFIG) {
+function pickReviewer(lane, prNumber, author, away, config) {
   const isAvailable = (login) => normalize(login) !== normalize(author) && !away.includes(normalize(login));
   const candidateLists = [config.lanes[lane] || [], config.substitutes[lane] || [], config.fallback];
 
@@ -203,7 +210,7 @@ function reasonToSkip(pr, reviews, timeline, config) {
  * @param {object[]} args.timeline Timeline events for the PR.
  * @param {string[]} args.away Lower-case logins of people who are away.
  */
-function decide({pr, files, reviews, timeline, away, config = CONFIG}) {
+function decide({pr, files, reviews, timeline, away, config}) {
   const skipReason = reasonToSkip(pr, reviews, timeline, config);
   if (skipReason) return decision('skip', skipReason);
 
@@ -239,7 +246,7 @@ function decide({pr, files, reviews, timeline, away, config = CONFIG}) {
 // ---------------------------------------------------------------------------
 
 /** Reads REVIEWERS_AWAY ("pq, helin24") and warns about unknown logins. */
-function parseAway(value, core, config = CONFIG) {
+function parseAway(value, core, config) {
   const away = (value || '').split(/[\s,]+/).map(normalize).filter(Boolean);
   const known = allReviewers(config);
   for (const login of away) {
@@ -330,7 +337,7 @@ async function report(core, rows, settings) {
 }
 
 /** Entry point, called from the workflow via actions/github-script. */
-async function run({github, context, core, env = process.env, config = CONFIG}) {
+async function run({github, context, core, env = process.env, config = loadConfigFile(env.ASSIGN_CONFIG_JSON)}) {
   const repoRef = context.repo; // {owner, repo}
   const settings = readSettings(env, core, config);
 
@@ -375,7 +382,7 @@ async function run({github, context, core, env = process.env, config = CONFIG}) 
 }
 
 module.exports = run;
-module.exports.CONFIG = CONFIG;
+module.exports.loadConfig = loadConfig;
 module.exports.classify = classify;
 module.exports.pickReviewer = pickReviewer;
 module.exports.decide = decide;

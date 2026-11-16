@@ -1,8 +1,11 @@
 # Reviewer assignment
 
-`.github/workflows/assign-reviewers.yaml` runs every 20 minutes. It requests **one** reviewer per open PR, and trims the double requests that `CODEOWNERS` makes today. The logic lives in `assign-reviewers.js`, and the tests are in `assign-reviewers.test.js`.
+`.github/workflows/assign-reviewers.yaml` runs every 20 minutes. It requests **one** reviewer per open PR, and trims the double requests that `CODEOWNERS` makes today.
 
-## Lanes
+- **Who reviews what** (lanes, substitutes, paths, bot authors) is in **`.github/assign-reviewers.yml`**. Edit that file to change assignments; the code doesn't need to change.
+- The logic is in `assign-reviewers.js`, and the tests are in `assign-reviewers.test.js`.
+
+## Lanes (defaults in `.github/assign-reviewers.yml`)
 
 | Lane | Matches | Reviewers |
 |---|---|---|
@@ -20,6 +23,9 @@ The workflow leaves a PR alone when any of these is true:
 - a maintainer has already reviewed it;
 - a person removed a review request;
 - its reviewers were picked by hand (anything other than the `CODEOWNERS` pair).
+
+## Changing the config
+Edit `.github/assign-reviewers.yml` in a PR; it's in the build lane, so pq reviews it. If the file is malformed, the run fails with a message naming the bad key. The workflow converts it to JSON with `yq`, which is preinstalled on GitHub's Ubuntu runners. The test suite also checks the real file when `yq` is installed locally.
 
 ## Settings (repo variables)
 | Variable | Meaning |

@@ -8,7 +8,26 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const run = require('./assign-reviewers.js');
-const {classify, pickReviewer, decide} = run;
+const {classify, pickReviewer, decide, loadConfig} = run;
+
+// Mirrors .github/assign-reviewers.yml, so the tests don't depend on a YAML parser.
+// A separate test (below) checks the real file when `yq` is installed.
+const config = loadConfig({
+  lanes: {lsp: ['helin24', 'jwren'], build: ['pq'], default: ['pq', 'helin24']},
+  substitutes: {build: ['helin24']},
+  fallback: ['pq', 'helin24', 'jwren'],
+  codeowners: ['pq', 'helin24'],
+  lspAuthors: ['ranbeuer', 'juan-mora-google'],
+  buildBotAuthors: ['dependabot[bot]', 'flutteractionsbot'],
+  lspPaths: ['/lsp/', 'platform-lsp', '/dartlsp/', '/DartLsp[^/]*$'],
+  buildPaths: [
+    '(^|/)(build\\.gradle(\\.kts)?|settings\\.gradle(\\.kts)?|gradle\\.properties|gradlew(\\.bat)?|libs\\.versions\\.toml)$',
+    '^(gradle|kokoro|\\.github|third_party/gradle)/',
+    '^tool/(?!baseline/)',
+  ],
+  skipLabels: ['blocked', 'waiting for customer response'],
+  maxWritesPerRun: 5,
+});
 
 // A minimal pull request, as returned by the GitHub REST API. Override fields per test.
 const pr = (overrides = {}) => ({
@@ -28,49 +47,49 @@ const pr = (overrides = {}) => ({
 const users = (...logins) => logins.map((login) => ({login}));
 
 test('classify: LSP signals', () => {
-  assert.equal(classify(pr({labels: [{name: 'lsp'}]}), []), 'lsp');
-  assert.equal(classify(pr({title: 'feat(lsp): migrate Outline'}), []), 'lsp');
-  assert.equal(classify(pr({title: '[LSP] Remove legacy calls'}), []), 'lsp');
-  assert.equal(classify(pr({user: {login: 'ranbeuer'}}), ['third_party/src/Foo.java']), 'lsp');
+  assert.equal(classify(pr({labels: [{name: 'lsp'}]}), [], config), 'lsp');
+  assert.equal(classify(pr({title: 'feat(lsp): migrate Outline'}), [], config), 'lsp');
+  assert.equal(classify(pr({title: '[LSP] Remove legacy calls'}), [], config), 'lsp');
+  assert.equal(classify(pr({user: {login: 'ranbeuer'}}), ['third_party/src/Foo.java'], config), 'lsp');
   assert.equal(
-    classify(pr(), ['third_party/src/main/java/com/jetbrains/lang/dart/ide/refactoring/DartLspRenameHandler.kt']),
+    classify(pr(), ['third_party/src/main/java/com/jetbrains/lang/dart/ide/refactoring/DartLspRenameHandler.kt'], config),
     'lsp',
   );
-  assert.equal(classify(pr(), ['third_party/src/main/java/com/jetbrains/lang/dart/lsp/Foo.java']), 'lsp');
+  assert.equal(classify(pr(), ['third_party/src/main/java/com/jetbrains/lang/dart/lsp/Foo.java'], config), 'lsp');
 });
 
 test('classify: build lane', () => {
-  assert.equal(classify(pr({user: {login: 'dependabot[bot]'}, title: 'Bump lsp4j'}), ['third_party/build.gradle.kts']), 'build');
-  assert.equal(classify(pr({user: {login: 'flutteractionsbot'}}), ['README.md']), 'build');
-  assert.equal(classify(pr(), ['.github/workflows/presubmit.yaml', 'gradle.properties']), 'build');
-  assert.equal(classify(pr(), ['.github/scripts/assign-reviewers.js']), 'build');
+  assert.equal(classify(pr({user: {login: 'dependabot[bot]'}, title: 'Bump lsp4j'}), ['third_party/build.gradle.kts'], config), 'build');
+  assert.equal(classify(pr({user: {login: 'flutteractionsbot'}}), ['README.md'], config), 'build');
+  assert.equal(classify(pr(), ['.github/workflows/presubmit.yaml', 'gradle.properties'], config), 'build');
+  assert.equal(classify(pr(), ['.github/scripts/assign-reviewers.js'], config), 'build');
 });
 
 test('classify: default', () => {
-  assert.equal(classify(pr(), ['tool/baseline/261/verifier-baseline.txt']), 'default');
-  assert.equal(classify(pr(), ['build.gradle.kts', 'third_party/src/Foo.java']), 'default');
-  assert.equal(classify(pr({user: {login: 'reidbaker-agent'}}), ['skills_lint.yaml']), 'default');
-  assert.equal(classify(pr({title: 'Fix lspci detection'}), []), 'default'); // word boundary
+  assert.equal(classify(pr(), ['tool/baseline/261/verifier-baseline.txt'], config), 'default');
+  assert.equal(classify(pr(), ['build.gradle.kts', 'third_party/src/Foo.java'], config), 'default');
+  assert.equal(classify(pr({user: {login: 'reidbaker-agent'}}), ['skills_lint.yaml'], config), 'default');
+  assert.equal(classify(pr({title: 'Fix lspci detection'}), [], config), 'default'); // word boundary
 });
 
 test('pickReviewer: rotates on PR number', () => {
-  assert.equal(pickReviewer('default', 10, 'someone', []), 'pq');
-  assert.equal(pickReviewer('default', 11, 'someone', []), 'helin24');
-  assert.equal(pickReviewer('lsp', 10, 'someone', []), 'helin24');
-  assert.equal(pickReviewer('lsp', 11, 'someone', []), 'jwren');
+  assert.equal(pickReviewer('default', 10, 'someone', [], config), 'pq');
+  assert.equal(pickReviewer('default', 11, 'someone', [], config), 'helin24');
+  assert.equal(pickReviewer('lsp', 10, 'someone', [], config), 'helin24');
+  assert.equal(pickReviewer('lsp', 11, 'someone', [], config), 'jwren');
 });
 
 test('pickReviewer: excludes author and away, then substitutes, then fallback', () => {
-  assert.equal(pickReviewer('default', 10, 'pq', []), 'helin24');
-  assert.equal(pickReviewer('lsp', 10, 'helin24', []), 'jwren');
-  assert.equal(pickReviewer('default', 10, 'someone', ['pq']), 'helin24');
-  assert.equal(pickReviewer('build', 10, 'pq', []), 'helin24');
-  assert.equal(pickReviewer('build', 10, 'someone', ['pq']), 'helin24');
-  assert.equal(pickReviewer('default', 10, 'someone', ['pq', 'helin24']), 'jwren');
-  assert.equal(pickReviewer('default', 10, 'jwren', ['pq', 'helin24']), null);
+  assert.equal(pickReviewer('default', 10, 'pq', [], config), 'helin24');
+  assert.equal(pickReviewer('lsp', 10, 'helin24', [], config), 'jwren');
+  assert.equal(pickReviewer('default', 10, 'someone', ['pq'], config), 'helin24');
+  assert.equal(pickReviewer('build', 10, 'pq', [], config), 'helin24');
+  assert.equal(pickReviewer('build', 10, 'someone', ['pq'], config), 'helin24');
+  assert.equal(pickReviewer('default', 10, 'someone', ['pq', 'helin24'], config), 'jwren');
+  assert.equal(pickReviewer('default', 10, 'jwren', ['pq', 'helin24'], config), null);
 });
 
-const base = {files: [], reviews: [], timeline: [], away: []};
+const base = {files: [], reviews: [], timeline: [], away: [], config};
 
 test('decide: requests one reviewer when none is requested', () => {
   const d = decide({...base, pr: pr({number: 11})});
@@ -156,14 +175,14 @@ const context = {repo: {owner: 'flutter', repo: 'dart-intellij-third-party'}};
 
 test('run: unset ASSIGN_DRY_RUN means dry run (no writes)', async () => {
   const {github, calls} = fakeGitHub([pr({number: 11})]);
-  await run({github, context, core: fakeCore(), env: {ASSIGN_SINCE: '2026-11-01T00:00:00Z'}});
+  await run({github, context, core: fakeCore(), config, env: {ASSIGN_SINCE: '2026-11-01T00:00:00Z'}});
   assert.equal(calls.request.length, 0);
   assert.equal(calls.remove.length, 0);
 });
 
 test('run: no ASSIGN_SINCE means nothing happens', async () => {
   const {github, calls} = fakeGitHub([pr({number: 11})]);
-  const out = await run({github, context, core: fakeCore(), env: {ASSIGN_DRY_RUN: 'false'}});
+  const out = await run({github, context, core: fakeCore(), config, env: {ASSIGN_DRY_RUN: 'false'}});
   assert.equal(out.rows.length, 0);
   assert.equal(calls.request.length, 0);
 });
@@ -173,14 +192,14 @@ test('run: live mode adds first, then removes; ignores PRs before ASSIGN_SINCE',
     pr({number: 11, title: '[lsp] x', requested_reviewers: users('pq', 'helin24')}),
     pr({number: 12, created_at: '2026-10-01T00:00:00Z'}),
   ]);
-  await run({github, context, core: fakeCore(), env: {ASSIGN_DRY_RUN: 'false', ASSIGN_SINCE: '2026-11-01T00:00:00Z'}});
+  await run({github, context, core: fakeCore(), config, env: {ASSIGN_DRY_RUN: 'false', ASSIGN_SINCE: '2026-11-01T00:00:00Z'}});
   assert.deepEqual(calls.request.map((c) => [c.pull_number, c.reviewers]), [[11, ['jwren']]]);
   assert.deepEqual(calls.remove.map((c) => c.pull_number), [11]);
 });
 
 test('run: only_pr with write works in dry run (canary)', async () => {
   const {github, calls} = fakeGitHub([pr({number: 11})]);
-  await run({github, context, core: fakeCore(), env: {ONLY_PR: '11', FORCE_WRITE: 'true'}});
+  await run({github, context, core: fakeCore(), config, env: {ONLY_PR: '11', FORCE_WRITE: 'true'}});
   assert.equal(calls.request.length, 1);
 });
 
@@ -188,7 +207,38 @@ test('run: write cap stops after maxWritesPerRun', async () => {
   const many = Array.from({length: 8}, (_, i) => pr({number: 20 + i}));
   const {github, calls} = fakeGitHub(many);
   const core = fakeCore();
-  await run({github, context, core, env: {ASSIGN_DRY_RUN: 'false', ASSIGN_SINCE: '2026-11-01T00:00:00Z'}});
-  assert.equal(calls.request.length, run.CONFIG.maxWritesPerRun);
+  await run({github, context, core, config, env: {ASSIGN_DRY_RUN: 'false', ASSIGN_SINCE: '2026-11-01T00:00:00Z'}});
+  assert.equal(calls.request.length, config.maxWritesPerRun);
   assert.match(core.failed, /write cap/);
+});
+
+// --- config file ---
+
+test('loadConfig rejects a malformed config with a clear message', () => {
+  let message = '';
+  try {
+    loadConfig({lanes: {lsp: ['helin24']}, maxWritesPerRun: 0});
+  } catch (e) {
+    message = e.message;
+  }
+  assert.match(message, /lanes\.build must be a list of strings/);
+  assert.match(message, /maxWritesPerRun/);
+});
+
+test('the checked-in .github/assign-reviewers.yml loads and matches the test config', (t) => {
+  let json;
+  try {
+    const {execFileSync} = require('node:child_process');
+    const path = require('node:path');
+    const file = path.join(__dirname, '..', 'assign-reviewers.yml');
+    json = execFileSync('yq', ['-o=json', '.', file], {encoding: 'utf8'});
+  } catch (e) {
+    t.skip('yq is not installed');
+    return;
+  }
+  const fromFile = loadConfig(JSON.parse(json));
+  assert.deepEqual(fromFile.lanes, config.lanes);
+  assert.deepEqual(fromFile.substitutes, config.substitutes);
+  assert.equal(fromFile.lspPathPattern.source, config.lspPathPattern.source);
+  assert.equal(fromFile.buildPathPattern.source, config.buildPathPattern.source);
 });

@@ -1,0 +1,49 @@
+# Who reviews what. Read by .github/workflows/assign-reviewers.yaml.
+# Docs: .github/scripts/README.md
+#
+# Logins are GitHub usernames (case-insensitive). Paths are regular
+# expressions matched against each changed file's path from the repo root.
+
+# Reviewers for each lane. Within a lane the pick rotates on PR number,
+# skipping the PR author and anyone in the REVIEWERS_AWAY repo variable.
+lanes:
+  lsp: [helin24, jwren]
+  build: [pq]
+  default: [pq, helin24]
+
+# Who covers a lane when nobody in it is available.
+substitutes:
+  build: [helin24]
+
+# Last resort when a lane and its substitutes are all unavailable.
+fallback: [pq, helin24, jwren]
+
+# Who CODEOWNERS (`* @helin24 @pq`) requests today. Used to recognize those
+# requests so they can be trimmed down to one reviewer.
+codeowners: [pq, helin24]
+
+# PRs from these authors always go to the lsp lane.
+lspAuthors: [ranbeuer, juan-mora-google]
+
+# PRs from these bots always go to the build lane.
+buildBotAuthors: ['dependabot[bot]', flutteractionsbot]
+
+# A PR is LSP work if it has the `lsp` label, "lsp" in its title, or touches
+# any of these paths (matched case-insensitively).
+lspPaths:
+  - '/lsp/'
+  - 'platform-lsp'
+  - '/dartlsp/'
+  - '/DartLsp[^/]*$'
+
+# A PR goes to the build lane if *every* file it touches matches one of these.
+buildPaths:
+  - '(^|/)(build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.properties|gradlew(\.bat)?|libs\.versions\.toml)$'
+  - '^(gradle|kokoro|\.github|third_party/gradle)/'
+  - '^tool/(?!baseline/)'
+
+# PRs with any of these labels are left alone.
+skipLabels: [blocked, waiting for customer response]
+
+# Safety cap: the most PRs a single run may change.
+maxWritesPerRun: 5

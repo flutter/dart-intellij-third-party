@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 # Requests one reviewer per PR, by lane, and trims CODEOWNERS double requests.
+# Lanes and other settings: .github/assign-reviewers.yml
 # Logic and docs: .github/scripts/assign-reviewers.js and .github/scripts/README.md
 #
 # Repo variables:
@@ -44,10 +45,14 @@ jobs:
       # Checks out the default branch only; no PR code is ever checked out or run.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          sparse-checkout: .github/scripts
+          sparse-checkout: .github
           persist-credentials: false
+      # github-script has no YAML parser; yq is preinstalled on GitHub's Ubuntu runners.
+      - name: Read config
+        run: yq -o=json '.' .github/assign-reviewers.yml > "$RUNNER_TEMP/assign-reviewers.json"
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
+          ASSIGN_CONFIG_JSON: ${{ runner.temp }}/assign-reviewers.json
           ASSIGN_DRY_RUN: ${{ vars.ASSIGN_DRY_RUN }}
           ASSIGN_SINCE: ${{ vars.ASSIGN_SINCE }}
           REVIEWERS_AWAY: ${{ vars.REVIEWERS_AWAY }}
