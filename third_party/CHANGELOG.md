@@ -2,6 +2,7 @@
 
 ### Added
 - Parameter info (signature help) implemented with JetBrains LSP (experimental feature) (#819)
+- Whole-document and selection formatting via JetBrains LSP (experimental feature) (#689)
 - Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
 
 ### Changed
