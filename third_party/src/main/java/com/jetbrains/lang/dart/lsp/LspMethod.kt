@@ -27,7 +27,9 @@ enum class LspMethod(
     SHUTDOWN("shutdown"),
     SUPER("dart/textDocument/super", isExperimental = true, presentableName = "super navigation"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
+    PREPARE_RENAME("textDocument/prepareRename", isExperimental = true),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
+    RENAME("textDocument/rename", isExperimental = true, presentableName = "rename"),
     DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols"),
     SIGNATURE_HELP("textDocument/signatureHelp", isExperimental = true, presentableName = "signature help");
 
