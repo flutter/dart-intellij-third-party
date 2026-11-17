@@ -23,7 +23,6 @@ import com.intellij.platform.dartlsp.util.getOffsetInDocument
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
-import com.jetbrains.lang.dart.analyzer.getDartFileInfo
 import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
 import org.eclipse.lsp4j.PrepareRenameParams
 import org.eclipse.lsp4j.RenameParams
@@ -115,7 +114,7 @@ class DartLspRenameRequestsImpl(private val project: Project) : DartLspRenameReq
         val response = send(server, RENAME_REQUEST_TIMEOUT_MS) { it.textDocumentService.rename(params) }
         if (response !is DartLspRenameResult.Success) return response.mapFailure()
         val edit = response.value ?: return DartLspRenameResult.Success(emptyList())
-        return runReadAction { toFileTextEdits(edit) { uri -> getDartFileInfo(project, uri).findFile() } }
+        return runReadAction { toFileTextEdits(edit, server.descriptor::findFileByUri) }
     }
 
     /** The running Dart LSP server, if any. Replaced in tests. */
