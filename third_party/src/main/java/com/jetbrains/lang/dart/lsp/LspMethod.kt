@@ -13,6 +13,8 @@ enum class LspMethod(
     CODE_ACTION("textDocument/codeAction", isExperimental = true, presentableName = "code actions"),
     COMPLETION("textDocument/completion", isExperimental = true, presentableName = "completion"),
     COMPLETION_RESOLVE("completionItem/resolve", isExperimental = false),
+    // Not gated by the experimental LSP flag because there is no fallback in legacy mode.
+    CONNECT_TO_DTD("dart/connectToDtd", isExperimental = false),
     DEFINITION("textDocument/definition", isExperimental = true, presentableName = "navigation"),
     DIAGNOSTIC_SERVER("dart/diagnosticServer", isExperimental = false),
     DOCUMENT_HIGHLIGHT("textDocument/documentHighlight", isExperimental = false),
@@ -23,9 +25,11 @@ enum class LspMethod(
     INLAY_HINT("textDocument/inlayHint", isExperimental = false),
     SEMANTIC_TOKENS_FULL("textDocument/semanticTokens/full", isExperimental = true, presentableName = "syntax highlighting"),
     SHUTDOWN("shutdown"),
+    SUPER("dart/textDocument/super", isExperimental = true, presentableName = "super navigation"),
     TYPE_DEFINITION("textDocument/typeDefinition", isExperimental = false),
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
     DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols"),
+    SIGNATURE_HELP("textDocument/signatureHelp", isExperimental = true, presentableName = "signature help"),
     // Not gated by the experimental LSP flag because it is an internal server lifecycle command.
     REANALYZE("dart/reanalyze", isExperimental = false);
 

@@ -4,11 +4,9 @@ package com.jetbrains.lang.dart.analyzer;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
-import com.intellij.codeInsight.hints.declarative.impl.DeclarativeInlayHintsPassFactory;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
@@ -108,11 +106,6 @@ public final class DartServerData {
     }
 
     myClosingLabelData.put(fileInfo, newClosingLabels);
-    if (file != null) {
-      Arrays.stream(EditorFactory.getInstance().getAllEditors())
-        .filter(editor -> file.equals(editor.getVirtualFile()))
-        .forEach(editor -> DeclarativeInlayHintsPassFactory.Companion.scheduleRecompute(editor, myService.getProject()));
-    }
   }
 
   void computedHighlights(@NotNull DartFileInfo fileInfo, @NotNull List<? extends HighlightRegion> regions) {

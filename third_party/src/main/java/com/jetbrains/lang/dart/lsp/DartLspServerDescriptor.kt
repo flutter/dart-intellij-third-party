@@ -15,8 +15,12 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.Lsp4jClient
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.LspServerListener
 import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
+import com.jetbrains.lang.dart.analyzer.DartLocalFileInfo
+import com.jetbrains.lang.dart.analyzer.getDartFileInfo
+import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchySupport
@@ -59,7 +63,9 @@ import com.intellij.platform.dartlsp.api.customization.LspSelectionRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensSupport
+import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
+import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
 import com.intellij.psi.PsiFile
@@ -67,13 +73,16 @@ import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.DartFileType
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
+import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
+import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.PublishDiagnosticsCapabilities
+import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.SemanticTokenModifiers
 import org.eclipse.lsp4j.SemanticTokenTypes
 import org.eclipse.lsp4j.TextDocumentClientCapabilities
@@ -97,6 +106,17 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
 
     override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
         DartLsp4jClient(project, handler)
+
+    override val lspServerListener: LspServerListener = object : LspServerListener {
+        override fun serverInitialized(params: InitializeResult) {
+            // If the Dart Tooling Daemon (DTD) started before the LSP server (or if the LSP server was
+            // restarted), connect the newly initialized LSP server to the running DTD instance.
+            val dtdUri = project.getServiceIfCreated(DartToolingDaemonService::class.java)?.uri
+            if (dtdUri != null) {
+                DartLspService.connectToDtd(project, dtdUri)
+            }
+        }
+    }
 
     override val clientCapabilities: ClientCapabilities
         get() = super.clientCapabilities.apply {
@@ -223,7 +243,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 // The default implementation only serves plain-text/TextMate files.
                 override fun shouldAskServerForDocumentHighlights(psiFile: PsiFile): Boolean = true
             }
-        override val signatureHelpCustomizer = LspSignatureHelpDisabled
+        override val signatureHelpCustomizer: LspSignatureHelpCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                LspSignatureHelpSupport()
+            } else {
+                LspSignatureHelpDisabled
+            }
         override val documentSymbolCustomizer: LspDocumentSymbolCustomizer
             get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
                 LspDocumentSymbolSupport()
@@ -345,10 +370,27 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
     }
 }
 
+/**
+ * Custom [Lsp4jClient] that intercepts standard `textDocument/publishDiagnostics` notifications
+ * to update the Dart Analysis tool window (`DartProblemsView`) identically in both Bridge mode and Full LSP
+ * (while delegating to [super.publishDiagnostics] for editor highlightings and squiggles), and handles
+ * custom `dart/textDocument/publishClosingLabels` notifications via [DartLanguageClient].
+ */
 open class DartLsp4jClient(
     private val project: Project,
     handler: LspServerNotificationsHandler,
 ) : Lsp4jClient(handler), DartLanguageClient {
+
+    override fun publishDiagnostics(params: PublishDiagnosticsParams) {
+        if (project.isDisposed) return
+        super.publishDiagnostics(params)
+        val diagnostics = params.diagnostics ?: emptyList()
+        val errors = DartLspDiagnosticConverter.convertDiagnostics(project, params.uri, diagnostics)
+            .filter { it.type != "TODO" }
+        val fileInfo = getDartFileInfo(project, params.uri)
+        val filePath = if (fileInfo is DartLocalFileInfo) fileInfo.filePath else params.uri
+        DartProblemsView.getInstance(project).updateErrorsForFile(filePath, errors)
+    }
 
     override fun publishClosingLabels(params: DartPublishClosingLabelsParams) {
         if (params.uri != null) {

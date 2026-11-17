@@ -5,15 +5,19 @@ import com.intellij.codeInsight.hints.declarative.EndOfLinePosition
 import com.intellij.codeInsight.hints.declarative.InlayPosition
 import com.intellij.codeInsight.hints.declarative.InlayTreeSink
 import com.intellij.codeInsight.hints.declarative.OwnBypassCollector
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.hints.DartClosingLabelsInlayHintsProvider
+import org.dartlang.analysis.server.protocol.ClosingLabel
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints
 import java.lang.reflect.Proxy
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
 class DartLspClosingLabelsServiceTest: DartCodeInsightFixtureTestCase() {
     fun testUpdateAndGetClosingLabels() {
@@ -194,13 +198,52 @@ class DartLspClosingLabelsServiceTest: DartCodeInsightFixtureTestCase() {
 
         val startOffset = code.indexOf("MyWidget(")
         val endOffset = code.indexOf("),\n  );") + 2
-        val legacyLabel = org.dartlang.analysis.server.protocol.ClosingLabel(
+        val legacyLabel = ClosingLabel(
             startOffset,
             endOffset - startOffset,
             "MyWidget"
         )
 
         DartAnalysisServerService.getInstance(project).computedClosingLabels(fileUri, listOf(legacyLabel))
+
+        val stored = DartLspClosingLabelsService.getInstance(project).getClosingLabels(testFile.virtualFile)
+        assertEquals(1, stored.size)
+        assertEquals("MyWidget", stored[0].label)
+        assertEquals(4, stored[0].range?.end?.line)
+    }
+
+    fun testLegacyComputedClosingLabelsDoesNotDeadlockDuringWriteAction() {
+        val code = """
+            void main() {
+              runApp(
+                MyWidget(
+                  child: Text('Hello'),
+                ),
+              );
+            }
+        """.trimIndent()
+        val testFile = myFixture.configureByText("test_legacy_write_lock.dart", code)
+        val fileUri = "file://${testFile.virtualFile.path}"
+
+        assertFalse(DartAnalysisServerService.isLspClosingLabelsEnabled(project))
+
+        val startOffset = code.indexOf("MyWidget(")
+        val endOffset = code.indexOf("),\n  );") + 2
+        val legacyLabel = ClosingLabel(
+            startOffset,
+            endOffset - startOffset,
+            "MyWidget"
+        )
+
+        // Simulate the EDT holding the write lock (e.g. during MoveFileRefactoring) while the
+        // Analysis Server reader thread processes an analysis.closingLabels notification.
+        ApplicationManager.getApplication().runWriteAction {
+            val future = CompletableFuture.runAsync(
+                { DartAnalysisServerService.getInstance(project).computedClosingLabels(fileUri, listOf(legacyLabel)) },
+                AppExecutorUtil.getAppExecutorService()
+            )
+            future.get(5, TimeUnit.SECONDS)
+        }
 
         val stored = DartLspClosingLabelsService.getInstance(project).getClosingLabels(testFile.virtualFile)
         assertEquals(1, stored.size)
