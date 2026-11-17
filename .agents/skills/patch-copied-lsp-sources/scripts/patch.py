@@ -483,18 +483,62 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
         with open(lsp_server_impl_path, "w", encoding="utf-8") as f:
             f.write(server_content)
 
-    # 12. Make LspStructureViewFactory public so DartStructureViewFactory (Java) can delegate to it
+    # 12. Make LspStructureViewFactory public so DartStructureViewFactory (Java) can delegate to it,
+    # and load/cache documentSymbols in LspStructureViewRoot.getChildren() off the EDT.
     structure_view_factory_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/structureView/LspStructureViewFactory.kt")
     if os.path.exists(structure_view_factory_path):
         with open(structure_view_factory_path, "r", encoding="utf-8") as f:
             factory_content = f.read()
-        if "internal class LspStructureViewFactory" in factory_content:
+        app_manager_import = "import com.intellij.openapi.application.ApplicationManager"
+        if app_manager_import not in factory_content:
             factory_content = factory_content.replace(
-                "internal class LspStructureViewFactory",
-                "class LspStructureViewFactory"
+                "import com.intellij.navigation.ItemPresentation\n",
+                f"import com.intellij.navigation.ItemPresentation\n{app_manager_import}\n"
             )
-            with open(structure_view_factory_path, "w", encoding="utf-8") as f:
-                f.write(factory_content)
+        factory_content = factory_content.replace(
+            "internal class LspStructureViewFactory",
+            "class LspStructureViewFactory"
+        )
+        factory_content = factory_content.replace(
+            "root = LspStructureViewRoot(support, psiFile, support.getDocumentSymbols())",
+            "root = LspStructureViewRoot(support, psiFile)"
+        )
+        old_root_block = """private class LspStructureViewRoot(
+  private val support: LspStructureViewSupport,
+  private val psiFile: PsiFile,
+  private val documentSymbols: List<DocumentSymbol>,
+) : StructureViewTreeElement {
+  override fun getValue(): PsiFile = psiFile
+
+  override fun getChildren(): Array<LspDocumentSymbolTreeElement> {
+    return documentSymbols.map { LspDocumentSymbolTreeElement(support, it) }.toTypedArray()
+  }"""
+        new_root_block = """private class LspStructureViewRoot(
+  private val support: LspStructureViewSupport,
+  private val psiFile: PsiFile,
+) : StructureViewTreeElement {
+  @Volatile
+  private var cachedChildren: Array<LspDocumentSymbolTreeElement>? = null
+
+  override fun getValue(): PsiFile = psiFile
+
+  override fun getChildren(): Array<LspDocumentSymbolTreeElement> {
+    cachedChildren?.let { return it }
+    if (ApplicationManager.getApplication().isDispatchThread) {
+      return emptyArray()
+    }
+
+    val symbols = support.getDocumentSymbols()
+    val children = symbols.map { LspDocumentSymbolTreeElement(support, it) }.toTypedArray()
+    if (symbols.isNotEmpty()) {
+      cachedChildren = children
+    }
+    return children
+  }"""
+        if old_root_block in factory_content:
+            factory_content = factory_content.replace(old_root_block, new_root_block)
+        with open(structure_view_factory_path, "w", encoding="utf-8") as f:
+            f.write(factory_content)
     # 13. Make CurrentActionHolder internal in LspImplicitReferenceProvider.kt for tests
     implicit_ref_path = os.path.join(base_dir, "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/navigation/LspImplicitReferenceProvider.kt")
     if os.path.exists(implicit_ref_path):
