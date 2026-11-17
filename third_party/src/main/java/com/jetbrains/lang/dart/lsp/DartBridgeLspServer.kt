@@ -73,7 +73,11 @@ import org.eclipse.lsp4j.RenameFilesParams
 import org.eclipse.lsp4j.RenameOptions
 import org.eclipse.lsp4j.RenameParams
 import org.eclipse.lsp4j.ServerCapabilities
+import org.eclipse.lsp4j.SignatureHelp
+import org.eclipse.lsp4j.SignatureHelpOptions
+import org.eclipse.lsp4j.SignatureHelpParams
 import org.eclipse.lsp4j.SymbolInformation
+import org.eclipse.lsp4j.TextDocumentPositionParams
 import org.eclipse.lsp4j.TypeDefinitionParams
 import org.eclipse.lsp4j.TypeHierarchyItem
 import org.eclipse.lsp4j.TypeHierarchyPrepareParams
@@ -258,10 +262,6 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val paramsObj = msgObj.get("params")
         val params = GSON.fromJson(paramsObj, PublishDiagnosticsParams::class.java)
         client.publishDiagnostics(params)
-        val errors = params.diagnostics?.map {
-            DartLspDiagnosticConverter.convertDiagnosticToAnalysisError(project, das, params.uri, it)
-        } ?: emptyList()
-        das.onLspDiagnosticsUpdated(params.uri, errors)
     }
 
     private fun handlePublishClosingLabels(client: LanguageClient, msgObj: JsonObject) {
@@ -431,6 +431,9 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 setCodeActionProvider(true)
                 setRenameProvider(RenameOptions(true))
                 setExecuteCommandProvider(ExecuteCommandOptions())
+                // Include "," in triggerCharacters (not only retriggerCharacters) because
+                // LspServerImpl.getSignatureHelpTriggerCharacters only inspects triggerCharacters.
+                signatureHelpProvider = SignatureHelpOptions(listOf("(", ","), listOf(","))
                 // Add other capabilities as we support them.
             }
             val advertised = serverLegend != null
@@ -532,8 +535,26 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
+    override fun getSuper(params: TextDocumentPositionParams): CompletableFuture<Location?> {
+        return forwardRequest("dart/textDocument/super", params, Location::class.java as Type)
+    }
+
     override fun diagnosticServer(): CompletableFuture<DiagnosticServerResult> {
         return forwardRequest("dart/diagnosticServer", null, DiagnosticServerResult::class.java)
+    }
+
+    override fun connectToDtd(params: ConnectToDtdParams): CompletableFuture<Any> {
+        return forwardRequest("dart/connectToDtd", params, Any::class.java).exceptionally { e ->
+            val cause = e.cause ?: e
+            // Ignore ServerErrorCodes.stateError (-32015: "Server is already connected to DTD"),
+            // which can occur if the LSP bridge restarts while the underlying DAS process stays alive.
+            if (cause is ResponseErrorException && cause.responseError?.code == -32015) {
+                logger.debug("DAS is already connected to DTD: ${cause.responseError.message}")
+                null
+            } else {
+                throw if (e is RuntimeException) e else RuntimeException(e)
+            }
+        }
     }
 
     // Note: We advertise codeActionLiteralSupport in server.setClientCapabilities (see DartAnalysisServerService.buildLspCapabilities)
@@ -552,6 +573,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         return forwardRequest<List<DocumentSymbol>>("textDocument/documentSymbol", params, type).thenApply { symbols ->
             symbols?.map { Either.forRight<SymbolInformation, DocumentSymbol>(it) } ?: emptyList()
         }
+    }
+
+    override fun signatureHelp(params: SignatureHelpParams): CompletableFuture<SignatureHelp> {
+        return forwardRequest("textDocument/signatureHelp", params, SignatureHelp::class.java)
     }
 
     // Implement other TextDocumentService methods as needed, returning unsupported or forwarding.
