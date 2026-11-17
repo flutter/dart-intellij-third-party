@@ -55,7 +55,7 @@ wrapper this package must use).
 
 - Spawns and kills a `dart tooling-daemon` process.
 - On start, triggers `DartDevToolsService.startService(uri)` and
-  `DartAnalysisServerService.connectToDtd(uri)`.
+  `DartLspService.connectToDtd(project, uri)`.
 - Opens one WebSocket per service start.
 - Navigates editors on the EDT for `navigateToCode`.
 - Registers editor and message-bus listeners for the project lifetime.

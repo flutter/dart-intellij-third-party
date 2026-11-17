@@ -15,6 +15,14 @@ import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.io.BaseOutputReader
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.VmService
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.GetIsolateConsumer
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.SuccessConsumer
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.VMConsumer
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Isolate
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.RPCError
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Sentinel
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Success
+import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.VM
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.util.DartTestUtils
 import java.nio.charset.StandardCharsets
@@ -26,6 +34,7 @@ abstract class VmServiceIntegrationTestBase : BasePlatformTestCase() {
 
   private companion object {
     const val CONNECT_TIMEOUT_SECONDS = 5
+    const val RESPONSE_TIMEOUT_SECONDS = 5
   }
 
   private var processHandler: KillableProcessHandler? = null
@@ -55,6 +64,65 @@ abstract class VmServiceIntegrationTestBase : BasePlatformTestCase() {
     val service = VmService.connect(launchDartProcessAndGetWsUri(scriptName, vmOptions))
     vmService = service
     return service
+  }
+
+  protected fun awaitVM(service: VmService): VM {
+    val latch = CountDownLatch(1)
+    val result = AtomicReference<VM>()
+    val failure = AtomicReference<String>()
+    service.getVM(object : VMConsumer {
+      override fun received(response: VM) {
+        result.set(response)
+        latch.countDown()
+      }
+
+      override fun onError(error: RPCError) {
+        failure.set("getVM failed: ${error.message}")
+        latch.countDown()
+      }
+    })
+    waitForLatch("getVM should respond", latch, RESPONSE_TIMEOUT_SECONDS)
+    return requireNotNull(result.get()) { failure.get() ?: "getVM returned no result" }
+  }
+
+  protected fun awaitIsolate(service: VmService, isolateId: String): Isolate {
+    val latch = CountDownLatch(1)
+    val result = AtomicReference<Isolate>()
+    val failure = AtomicReference<String>()
+    service.getIsolate(isolateId, object : GetIsolateConsumer {
+      override fun received(response: Isolate) {
+        result.set(response)
+        latch.countDown()
+      }
+
+      override fun received(response: Sentinel) {
+        failure.set("getIsolate returned sentinel ${response.kind}")
+        latch.countDown()
+      }
+
+      override fun onError(error: RPCError) {
+        failure.set("getIsolate failed: ${error.message}")
+        latch.countDown()
+      }
+    })
+    waitForLatch("getIsolate should respond", latch, RESPONSE_TIMEOUT_SECONDS)
+    return requireNotNull(result.get()) { failure.get() ?: "getIsolate returned no result" }
+  }
+
+  protected fun awaitDebugStreamSubscription(service: VmService) {
+    val latch = CountDownLatch(1)
+    val failure = AtomicReference<String>()
+    service.streamListen(VmService.DEBUG_STREAM_ID, object : SuccessConsumer {
+      override fun received(response: Success) = latch.countDown()
+
+      override fun onError(error: RPCError) {
+        failure.set("streamListen(Debug) failed: ${error.message}")
+        latch.countDown()
+      }
+    })
+    waitForLatch("streamListen(Debug) should respond", latch, RESPONSE_TIMEOUT_SECONDS)
+    val error = failure.get()
+    if (error != null) fail(error)
   }
 
   protected fun waitForLatch(message: String, latch: CountDownLatch, timeoutSeconds: Int) {

@@ -8,11 +8,9 @@ package com.jetbrains.dart.vmService
 
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.VmService
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.SuccessConsumer
-import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.VMConsumer
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.VersionConsumer
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.RPCError
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Success
-import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.VM
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Version
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
@@ -67,23 +65,5 @@ class VmServiceWebsocketTest : VmServiceIntegrationTestBase() {
       RESPONSE_TIMEOUT_SECONDS
     )
     return requireNotNull(result.get()) { "getVersion returned an error" }
-  }
-
-  private fun awaitVM(service: VmService): VM {
-    val latch = CountDownLatch(1)
-    val result = AtomicReference<VM>()
-    service.getVM(object : VMConsumer {
-      override fun received(response: VM) {
-        result.set(response)
-        latch.countDown()
-      }
-      override fun onError(error: RPCError?) = latch.countDown()
-    })
-    waitForLatch(
-      "getVM should respond within ${RESPONSE_TIMEOUT_SECONDS}s",
-      latch,
-      RESPONSE_TIMEOUT_SECONDS
-    )
-    return requireNotNull(result.get()) { "getVM returned an error" }
   }
 }

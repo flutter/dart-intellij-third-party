@@ -11,7 +11,7 @@ Declarative inlay hint providers for Dart. One provider renders closing labels a
 
 ## Invariants
 - All three implement the IntelliJ declarative `InlayHintsProvider` and are registered in `third_party/src/main/resources/META-INF/plugin.xml`.
-- Closing labels: when `DartAnalysisServerService.isLspClosingLabelsEnabled(project)` is true, labels come from `lsp.DartLspClosingLabelsService.getClosingLabels()` (LSP ranges, placed on the range's end line). Otherwise they come from the legacy `DartAnalysisServerService.getClosingLabels()` (offset/length).
+- Closing labels come from `lsp.DartLspClosingLabelsService.getClosingLabels()` (LSP ranges, placed on the range's end line).
 - The enabled state of the parameter-name and type providers is read by `com.jetbrains.lang.dart.lsp.DartLspInlayHintSupport` to decide which hints to request from the server and display.
 
 ## Side Effects

@@ -8,19 +8,14 @@ package com.jetbrains.dart.vmService
 
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.VmService
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.VmServiceListener
-import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.GetIsolateConsumer
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.GetPerfettoCpuSamplesConsumer
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.ResumeConsumer
-import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.SuccessConsumer
-import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.consumer.VMConsumer
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Event
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.EventKind
-import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Isolate
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.PerfettoCpuSamples
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.RPCError
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Sentinel
 import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.Success
-import com.jetbrains.lang.dart.ide.runner.server.vmService.vmServiceDrivers.service.element.VM
 import java.util.Base64
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
@@ -106,26 +101,6 @@ class VmServicePerfettoCpuSamplesTest : VmServiceIntegrationTestBase() {
     }
   }
 
-  private fun awaitDebugStreamSubscription(service: VmService) {
-    val latch = CountDownLatch(1)
-    val failure = AtomicReference<String>()
-    service.streamListen(VmService.DEBUG_STREAM_ID, object : SuccessConsumer {
-      override fun received(response: Success?) = latch.countDown()
-
-      override fun onError(error: RPCError?) {
-        failure.set("streamListen(Debug) failed: ${error?.message ?: "unknown error"}")
-        latch.countDown()
-      }
-    })
-    waitForLatch(
-      "streamListen(Debug) should respond within ${RESPONSE_TIMEOUT_SECONDS}s",
-      latch,
-      RESPONSE_TIMEOUT_SECONDS
-    )
-    val error = failure.get()
-    if (error != null) fail(error)
-  }
-
   private fun resumeIsolate(service: VmService, isolateId: String) {
     val latch = CountDownLatch(1)
     val failure = AtomicReference<String>()
@@ -161,53 +136,6 @@ class VmServicePerfettoCpuSamplesTest : VmServiceIntegrationTestBase() {
       pauseStart,
       WORKLOAD_TIMEOUT_SECONDS
     )
-  }
-
-  private fun awaitIsolate(service: VmService, isolateId: String): Isolate {
-    val latch = CountDownLatch(1)
-    val result = AtomicReference<Isolate>()
-    val failure = AtomicReference<String>()
-    service.getIsolate(isolateId, object : GetIsolateConsumer {
-      override fun received(response: Isolate) {
-        result.set(response)
-        latch.countDown()
-      }
-
-      override fun received(response: Sentinel) {
-        failure.set("getIsolate returned sentinel ${response.kind}")
-        latch.countDown()
-      }
-
-      override fun onError(error: RPCError) {
-        failure.set("getIsolate failed: ${error.message}")
-        latch.countDown()
-      }
-    })
-    waitForLatch(
-      "getIsolate should respond within ${RESPONSE_TIMEOUT_SECONDS}s",
-      latch,
-      RESPONSE_TIMEOUT_SECONDS
-    )
-    return requireNotNull(result.get()) { failure.get() ?: "getIsolate returned no result" }
-  }
-
-  private fun awaitVM(service: VmService): VM {
-    val latch = CountDownLatch(1)
-    val result = AtomicReference<VM>()
-    service.getVM(object : VMConsumer {
-      override fun received(response: VM) {
-        result.set(response)
-        latch.countDown()
-      }
-
-      override fun onError(error: RPCError?) = latch.countDown()
-    })
-    waitForLatch(
-      "getVM should respond within ${RESPONSE_TIMEOUT_SECONDS}s",
-      latch,
-      RESPONSE_TIMEOUT_SECONDS
-    )
-    return requireNotNull(result.get()) { "getVM returned an error" }
   }
 
   private fun awaitPerfettoCpuSamples(service: VmService, isolateId: String): PerfettoCpuSamples {
