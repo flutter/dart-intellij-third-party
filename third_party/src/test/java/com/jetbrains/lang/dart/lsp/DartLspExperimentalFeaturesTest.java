@@ -4,6 +4,9 @@
 package com.jetbrains.lang.dart.lsp;
 
 import com.intellij.ide.util.PropertiesComponent;
+import com.intellij.platform.dartlsp.api.customization.LspFormattingDisabled;
+import com.intellij.platform.dartlsp.api.customization.LspFormattingSupport;
+import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 
@@ -32,6 +35,49 @@ public class DartLspExperimentalFeaturesTest extends CodeInsightFixtureTestCase 
 
     PropertiesComponent.getInstance(getProject()).setValue("dart.lsp.experimental.enabled", true, true);
     assertTrue(DartConfigurable.isExperimentalLspFeaturesEnabled(getProject()));
+  }
+
+  public void testFormattingMethodsHaveOneSettingsLabel() {
+    final var formatting = LspMethod.valueOf("FORMATTING");
+    final var rangeFormatting = LspMethod.valueOf("RANGE_FORMATTING");
+    assertTrue(formatting.isExperimental());
+    assertTrue(rangeFormatting.isExperimental());
+    assertEquals("formatting", formatting.getPresentableName());
+    assertNull(rangeFormatting.getPresentableName());
+    assertTrue(LspMethod.Companion.getExperimentalFeatures().contains(formatting));
+    assertTrue(LspMethod.Companion.getExperimentalFeatures().contains(rangeFormatting));
+  }
+
+  public void testFormattingDescriptorFollowsFlagTransitions() {
+    final var descriptor = new DartLspServerDescriptor(getProject());
+    final var enabledCustomizer = descriptor.getLspCustomization().getFormattingCustomizer();
+    for (boolean enabled : new boolean[]{true, false, true}) {
+      PropertiesComponent.getInstance(getProject()).setValue("dart.lsp.experimental.enabled", enabled, true);
+      final var customizer = descriptor.getLspCustomization().getFormattingCustomizer();
+      if (enabled) {
+        assertTrue(customizer instanceof LspFormattingSupport);
+        assertSame(enabledCustomizer, customizer);
+      } else {
+        assertSame(LspFormattingDisabled.INSTANCE, customizer);
+      }
+    }
+  }
+
+  public void testFormattingDescriptorAcceptsOnlyLocalDartFiles() {
+    final var customizer = new DartLspServerDescriptor(getProject()).getLspCustomization().getFormattingCustomizer();
+    final var support = (LspFormattingSupport)customizer;
+    for (String name : new String[]{"format.dart", "format.DART"}) {
+      final var file = myFixture.getTempDirFixture().createFile(name);
+      assertTrue(file.isInLocalFileSystem());
+      assertTrue(support.shouldFormatThisFileExclusivelyByServer(file, true, false));
+      assertTrue(support.shouldFormatThisFileExclusivelyByServer(file, false, true));
+    }
+    for (String name : new String[]{"pubspec.yaml", "page.html", "README", "format.dart.txt"}) {
+      assertFalse(name, support.shouldFormatThisFileExclusivelyByServer(
+        myFixture.getTempDirFixture().createFile(name), true, true));
+    }
+    assertFalse(support.shouldFormatThisFileExclusivelyByServer(
+      new LightVirtualFile("injected.dart", ""), false, true));
   }
 
   public void testLspMethodsExperimentalStatus() {

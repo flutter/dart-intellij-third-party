@@ -21,6 +21,9 @@ import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import com.intellij.icons.AllIcons
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
@@ -39,6 +42,7 @@ import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
+import com.jetbrains.lang.dart.ide.actions.DartStyleAction
 import com.jetbrains.lang.dart.sdk.DartSdk
 import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
@@ -61,6 +65,9 @@ import org.eclipse.lsp4j.CompletionParams
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.ConfigurationParams
 import org.eclipse.lsp4j.DidChangeConfigurationParams
+import org.eclipse.lsp4j.DocumentFormattingParams
+import org.eclipse.lsp4j.DocumentRangeFormattingParams
+import org.eclipse.lsp4j.FormattingOptions
 import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.DocumentSymbolParams
@@ -97,6 +104,7 @@ import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -128,6 +136,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     @Volatile private var requestObserver: ((JsonObject) -> Unit)? = null
     private var legacyHierarchyRequests = 0
     private val legacyHierarchyArguments = CopyOnWriteArrayList<Triple<String, Int, Boolean>>()
+    private var nextRequestId = 123
 
     override fun setUp() {
         super.setUp()
@@ -158,7 +167,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
                 consumer.computedHierarchy(emptyList())
             }
 
-            override fun generateUniqueId(): String = "123"
+            override fun generateUniqueId(): String = (nextRequestId++).toString()
 
             override fun isSocketOpen(): Boolean = true
 
@@ -234,6 +243,159 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             override fun start() {}
             override fun stop() {}
         }
+    }
+
+    fun testLegacyStyleActionYieldsOnlyWhenExperimentalLspIsEnabled() {
+        myFixture.configureByText("action.dart", "void main() {}")
+        val action = DartStyleAction()
+        val context = SimpleDataContext.builder()
+            .add(CommonDataKeys.PROJECT, project)
+            .add(CommonDataKeys.EDITOR, myFixture.editor)
+            .build()
+        val event = AnActionEvent.createFromAnAction(action, null, "test", context)
+        val properties = PropertiesComponent.getInstance(project)
+        try {
+            properties.setValue("dart.lsp.experimental.enabled", false, true)
+            action.update(event)
+            assertTrue(event.presentation.isVisible)
+            assertTrue(event.presentation.isEnabled)
+            properties.setValue("dart.lsp.experimental.enabled", true, true)
+            action.update(event)
+            assertFalse(event.presentation.isVisible)
+            assertFalse(event.presentation.isEnabled)
+            action.actionPerformed(event)
+            assertTrue("The guarded action must not contact DAS", capturedRequests.isEmpty())
+        } finally {
+            properties.unsetValue("dart.lsp.experimental.enabled")
+        }
+    }
+
+    fun testFormattingCapabilities() {
+        val capabilities = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS).capabilities
+        assertEquals(true, capabilities.documentFormattingProvider?.left)
+        assertEquals(true, capabilities.documentRangeFormattingProvider?.left)
+    }
+
+    fun testFormattingTransportReturnsEditsWithoutChangingTheDocument() {
+        val file = myFixture.configureByText("format.dart", "void main(){}").virtualFile
+        val uri = DartLspServerDescriptor(project).getFileUri(file)
+        val future = bridgeServer.formatting(formattingParams(uri))
+        val params = formattingRequestParams("textDocument/formatting")
+        assertEquals(uri, params.getAsJsonObject("textDocument").get("uri").asString)
+        assertEquals(2, params.getAsJsonObject("options").size())
+        assertEquals(2, params.getAsJsonObject("options").get("tabSize").asInt)
+        assertTrue(params.getAsJsonObject("options").get("insertSpaces").asBoolean)
+
+        respondToFormatting("""[{"range":{"start":{"line":0,"character":11},"end":{"line":0,"character":11}},"newText":" "}]""")
+        val edits = future.get(5, TimeUnit.SECONDS)
+        assertEquals(1, edits.size)
+        assertEquals(Range(Position(0, 11), Position(0, 11)), edits.single().range)
+        assertEquals(" ", edits.single().newText)
+        // This is the bridge boundary, not an IDE edit-application test.
+        assertEquals("void main(){}", myFixture.editor.document.text)
+    }
+
+    fun testRangeFormattingTransportPreservesSelectionAndOptions() {
+        val selection = Range(Position(1, 2), Position(3, 4))
+        val future = bridgeServer.rangeFormatting(DocumentRangeFormattingParams().apply {
+            textDocument = TextDocumentIdentifier("file:///range.dart")
+            options = FormattingOptions(4, false)
+            range = selection
+        })
+        val params = formattingRequestParams("textDocument/rangeFormatting")
+        assertEquals("file:///range.dart", params.getAsJsonObject("textDocument").get("uri").asString)
+        assertEquals(JsonParser.parseString("""{"start":{"line":1,"character":2},"end":{"line":3,"character":4}}"""), params.get("range"))
+        val options = params.getAsJsonObject("options")
+        assertEquals(2, options.size())
+        assertEquals(4, options.get("tabSize").asInt)
+        assertFalse(options.get("insertSpaces").asBoolean)
+        respondToFormatting("[]")
+        assertTrue(future.get(5, TimeUnit.SECONDS).isEmpty())
+    }
+
+    fun testFormattingNullResponseMeansNoEdits() {
+        val future = bridgeServer.formatting(formattingParams())
+        respondToFormatting("null")
+        assertNull(future.get(5, TimeUnit.SECONDS))
+    }
+
+    fun testRangeFormattingReportsServerError() {
+        val future = bridgeServer.rangeFormatting(DocumentRangeFormattingParams().apply {
+            textDocument = TextDocumentIdentifier("file:///range.dart")
+            options = FormattingOptions(2, true)
+            range = Range(Position(0, 0), Position(1, 0))
+        })
+        capturedListener.onResponse("""{"id":"123","result":{"lspResponse":{"id":"123","error":{"code":-32603,"message":"format failed"}}}}""")
+        try {
+            future.get(5, TimeUnit.SECONDS)
+            fail("Server errors must reach the formatting caller")
+        } catch (error: java.util.concurrent.ExecutionException) {
+            val cause = error.cause as ResponseErrorException
+            assertEquals(-32603, cause.responseError.code)
+            assertEquals("format failed", cause.responseError.message)
+        }
+    }
+
+    fun testRetiredFormattingIgnoresLatePayloadWithoutDroppingAnActiveRequest() {
+        for (cancel in listOf(true, false)) {
+            val retired = bridgeServer.formatting(formattingParams())
+            val retiredId = capturedRequests.last().get("id").asString
+            val active = bridgeServer.formatting(formattingParams())
+            val activeId = capturedRequests.last().get("id").asString
+            assertFalse(retiredId == activeId)
+            val timeout = java.util.concurrent.TimeoutException("format timed out")
+            if (cancel) assertTrue(retired.cancel(true))
+            else assertTrue(retired.completeExceptionally(timeout))
+
+            // A retired response must be ignored before decoding its invalid error payload.
+            // Without completion cleanup this reaches the parser and raises a logged error.
+            capturedListener.onResponse(
+                """{"id":"$retiredId","result":{"lspResponse":{"error":{"code":{},"message":"stale response"}}}}"""
+            )
+            capturedListener.onResponse(
+                """{"id":"$activeId","result":{"lspResponse":{"result":[]}}}"""
+            )
+            assertTrue("Retiring one request must not discard another", active.get(5, TimeUnit.SECONDS).isEmpty())
+            if (cancel) assertTrue(retired.isCancelled)
+            else {
+                try {
+                    retired.get(5, TimeUnit.SECONDS)
+                    fail("A stale response must not replace the caller's timeout")
+                } catch (error: java.util.concurrent.ExecutionException) {
+                    assertSame(timeout, error.cause)
+                }
+            }
+        }
+    }
+
+    fun testShutdownRetainsOwnershipOfFormattingAndOtherPendingRequests() {
+        val hover = bridgeServer.hover(HoverParams(TextDocumentIdentifier("file:///test.dart"), Position(0, 0)))
+        val formatting = bridgeServer.formatting(formattingParams())
+        val requests = capturedRequests.filter { it.get("method")?.asString == "lsp.handle" }
+        assertEquals(2, requests.size)
+        assertFalse(requests[0].get("id") == requests[1].get("id"))
+
+        bridgeServer.shutdown().get(5, TimeUnit.SECONDS)
+
+        assertTrue(hover.isCancelled)
+        assertTrue(formatting.isCancelled)
+    }
+
+    private fun formattingParams(uri: String = "file:///test.dart") = DocumentFormattingParams().apply {
+        textDocument = TextDocumentIdentifier(uri)
+        options = FormattingOptions(2, true)
+    }
+
+    private fun formattingRequestParams(method: String): JsonObject {
+        val request = capturedRequests.single { it.get("method")?.asString == "lsp.handle" }
+        val message = request.getAsJsonObject("params").getAsJsonObject("lspMessage")
+        assertEquals(request.get("id"), message.get("id"))
+        assertEquals(method, message.get("method").asString)
+        return message.getAsJsonObject("params")
+    }
+
+    private fun respondToFormatting(result: String) {
+        capturedListener.onResponse("""{"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123","result":$result}}}""")
     }
 
     fun testForwardRequest() {
@@ -500,14 +662,17 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     fun testConnectToDtdIgnoresAlreadyConnectedStateError() {
         val dtdUri = "ws://127.0.0.1:9124/secret"
         val future = bridgeServer.connectToDtd(ConnectToDtdParams(dtdUri))
+        val request = capturedRequests.last { it.lspMethod() == "dart/connectToDtd" }
+        val requestId = request.get("id").asString
+        val lspId = request.getAsJsonObject("params").getAsJsonObject("lspMessage").get("id").asString
 
         val responseJson = """
             {
-              "id": "123",
+              "id": "$requestId",
               "result": {
                 "lspResponse": {
                   "jsonrpc": "2.0",
-                  "id": "123",
+                  "id": "$lspId",
                   "error": {
                     "code": -32015,
                     "message": "Server is already connected to DTD"
@@ -523,13 +688,16 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
         // Other LSP error codes (e.g. -32603 InternalError) must still complete exceptionally.
         val otherErrorFuture = bridgeServer.connectToDtd(ConnectToDtdParams(dtdUri))
+        val otherRequest = capturedRequests.last { it.lspMethod() == "dart/connectToDtd" }
+        val otherRequestId = otherRequest.get("id").asString
+        val otherLspId = otherRequest.getAsJsonObject("params").getAsJsonObject("lspMessage").get("id").asString
         val otherErrorJson = """
             {
-              "id": "123",
+              "id": "$otherRequestId",
               "result": {
                 "lspResponse": {
                   "jsonrpc": "2.0",
-                  "id": "123",
+                  "id": "$otherLspId",
                   "error": {
                     "code": -32603,
                     "message": "Failed to connect to DTD"
@@ -1841,8 +2009,11 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     fun testSuperUnsupportedAndErrorResponsesDoNotRequestLegacyHierarchy() {
         for (code in listOf(-32601, -32603)) {
             val future = bridgeServer.getSuper(org.eclipse.lsp4j.TextDocumentPositionParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 0)))
+            val request = capturedRequests.last { it.lspMethod() == "dart/textDocument/super" }
+            val requestId = request.get("id").asString
+            val lspId = request.getAsJsonObject("params").getAsJsonObject("lspMessage").get("id").asString
             capturedListener.onResponse("""
-                {"id":"123","result":{"lspResponse":{"jsonrpc":"2.0","id":"123",
+                {"id":"$requestId","result":{"lspResponse":{"jsonrpc":"2.0","id":"$lspId",
                 "error":{"code":$code,"message":"Unavailable"}}}}
             """.trimIndent())
             try {
