@@ -57,7 +57,9 @@ import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionSupp
 import com.intellij.platform.dartlsp.api.customization.LspHoverSupport
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintDisabled
+import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
+import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsSupport
 import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSelectionRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensCustomizer
@@ -228,7 +230,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             } else {
                 LspFindReferencesDisabled
             }
-        override val optimizeImportsCustomizer = LspOptimizeImportsDisabled
+        override val optimizeImportsCustomizer: LspOptimizeImportsCustomizer
+            get() = if (DartConfigurable.isLspCodeActionsEnabled(project)) {
+                LspOptimizeImportsSupport()
+            } else {
+                LspOptimizeImportsDisabled
+            }
         override val documentColorCustomizer = LspDocumentColorDisabled
         override val documentLinkCustomizer = LspDocumentLinkDisabled
         override val foldingRangeCustomizer = LspFoldingRangeDisabled

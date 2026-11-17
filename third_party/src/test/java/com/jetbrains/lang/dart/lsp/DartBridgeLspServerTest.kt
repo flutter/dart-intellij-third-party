@@ -1149,7 +1149,16 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val initResult = bridgeServer.initialize(org.eclipse.lsp4j.InitializeParams()).get(5, TimeUnit.SECONDS)
         val caProvider = initResult.capabilities.codeActionProvider
         assertNotNull("codeActionProvider capability must be set", caProvider)
-        assertTrue("codeActionProvider should be Either.forLeft(true)", caProvider.isLeft && caProvider.left == true)
+        assertTrue("codeActionProvider should be CodeActionOptions", caProvider.isRight)
+        assertEquals(
+            listOf(
+                org.eclipse.lsp4j.CodeActionKind.QuickFix,
+                org.eclipse.lsp4j.CodeActionKind.Refactor,
+                org.eclipse.lsp4j.CodeActionKind.Source,
+                org.eclipse.lsp4j.CodeActionKind.SourceOrganizeImports,
+            ),
+            caProvider.right.codeActionKinds,
+        )
     }
 
     fun testLspMethodExperimentalFeatures() {

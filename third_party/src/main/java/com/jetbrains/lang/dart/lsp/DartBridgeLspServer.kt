@@ -30,6 +30,8 @@ import org.eclipse.lsp4j.CallHierarchyOutgoingCall
 import org.eclipse.lsp4j.CallHierarchyOutgoingCallsParams
 import org.eclipse.lsp4j.CallHierarchyPrepareParams
 import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionKind
+import org.eclipse.lsp4j.CodeActionOptions
 import org.eclipse.lsp4j.CodeActionParams
 import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.ConfigurationParams
@@ -421,7 +423,16 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 workspace = WorkspaceServerCapabilities().apply {
                     fileOperations = fileOperationsCaps
                 }
-                setCodeActionProvider(true)
+                setCodeActionProvider(
+                    CodeActionOptions(
+                        listOf(
+                            CodeActionKind.QuickFix,
+                            CodeActionKind.Refactor,
+                            CodeActionKind.Source,
+                            CodeActionKind.SourceOrganizeImports,
+                        )
+                    )
+                )
                 setExecuteCommandProvider(ExecuteCommandOptions())
                 // Include "," in triggerCharacters (not only retriggerCharacters) because
                 // LspServerImpl.getSignatureHelpTriggerCharacters only inspects triggerCharacters.

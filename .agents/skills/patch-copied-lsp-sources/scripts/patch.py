@@ -586,6 +586,281 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             with open(lsp4j_client_path, "w", encoding="utf-8") as f:
                 f.write(lsp4j_client_content)
 
+    # 16. Backport IJPL-235332 (47bd3c0a) so LspImportOptimizer supports command-based source.organizeImports
+    # 16a. LspServerImpl.kt
+    if os.path.exists(lsp_server_impl_path):
+        with open(lsp_server_impl_path, "r", encoding="utf-8") as f:
+            server_content = f.read()
+        ijpl_235332_imports = [
+            "import com.intellij.openapi.progress.ProgressManager",
+            "import com.intellij.openapi.progress.util.ProgressIndicatorUtils",
+            "import com.intellij.util.concurrency.Semaphore",
+            "import kotlinx.coroutines.launch",
+            "import org.eclipse.lsp4j.Command",
+            "import org.eclipse.lsp4j.ExecuteCommandParams",
+            "import org.eclipse.lsp4j.WorkspaceEdit",
+        ]
+        for imp in ijpl_235332_imports:
+            if imp not in server_content:
+                server_content = server_content.replace(
+                    "import com.intellij.openapi.project.Project\n",
+                    f"import com.intellij.openapi.project.Project\n{imp}\n"
+                )
+        server_content = server_content.replace(
+            "internal val serverNotificationsHandler: LspServerNotificationsHandler = LspServerNotificationsHandlerImpl(this)",
+            "internal val serverNotificationsHandler: LspServerNotificationsHandlerImpl = LspServerNotificationsHandlerImpl(this)"
+        )
+        old_is_supported = """    return descriptor.isSupportedFile(file)
+      .also { if (!it) unsupportedFilePaths.add(file.path) }
+  }"""
+        new_is_supported = """    return descriptor.isSupportedFile(file)
+      .also { if (!it) unsupportedFilePaths.add(file.path) }
+  }
+
+  /**
+   * Sends a [workspace/executeCommand](https://microsoft.github.io/language-server-protocol/specification/#workspace_executeCommand)
+   * request to the server and waits for whichever comes first:
+   *  - a `workspace/applyEdit` request from the server - in this case this function returns the corresponding [WorkspaceEdit],
+   *  and it is up to the caller to apply it;
+   *  - a response to the `executeCommand` request (any response, including an error) - in this case this function returns `null`.
+   *
+   * Waiting is cancellable, so this function is safe to call inside a cancellable read action.
+   *
+   * Backported from IJPL-235332 (commit 47bd3c0a).
+   */
+  @RequiresBackgroundThread
+  internal fun executeCommandExpectingWorkspaceEdit(command: Command): WorkspaceEdit? {
+    // Released as soon as either the server sends a `workspace/applyEdit` request or the `executeCommand` request gets a response.
+    val semaphore = Semaphore(1)
+    var workspaceEdit: WorkspaceEdit? = null
+
+    try {
+      serverNotificationsHandler.nextApplyEditHandler = { edit ->
+        workspaceEdit = edit
+        semaphore.up()
+      }
+
+      LspServerManagerImpl.getInstanceImpl(project).cs.launch {
+        try {
+          sendRequest { it.workspaceService.executeCommand(ExecuteCommandParams(command.command, command.arguments)) }
+        }
+        finally {
+          semaphore.up()
+        }
+      }
+
+      @Suppress("UsagesOfObsoleteApi")
+      ProgressIndicatorUtils.awaitWithCheckCanceled(semaphore, ProgressManager.getInstance().progressIndicator)
+    }
+    finally {
+      serverNotificationsHandler.nextApplyEditHandler = null
+    }
+
+    return workspaceEdit
+  }"""
+        if "executeCommandExpectingWorkspaceEdit" not in server_content and old_is_supported in server_content:
+            server_content = server_content.replace(old_is_supported, new_is_supported)
+        with open(lsp_server_impl_path, "w", encoding="utf-8") as f:
+            f.write(server_content)
+
+    # 16b. LspServerNotificationsHandlerImpl.kt
+    if os.path.exists(handler_path):
+        with open(handler_path, "r", encoding="utf-8") as f:
+            handler_content = f.read()
+        if "import org.eclipse.lsp4j.WorkspaceEdit\n" not in handler_content:
+            handler_content = handler_content.replace(
+                "import org.eclipse.lsp4j.WorkspaceFolder\n",
+                "import org.eclipse.lsp4j.WorkspaceEdit\nimport org.eclipse.lsp4j.WorkspaceFolder\n"
+            )
+        old_apply_edit = """  private val ansiDecoder = AnsiEscapeDecoder()
+
+  override fun applyEdit(params: ApplyWorkspaceEditParams): CompletableFuture<ApplyWorkspaceEditResponse> {
+    val future = CompletableFuture<ApplyWorkspaceEditResponse>()"""
+        new_apply_edit = """  private val ansiDecoder = AnsiEscapeDecoder()
+
+  /**
+   * When set (by [LspServerImpl.executeCommandExpectingWorkspaceEdit]), incoming `workspace/applyEdit` requests are handled by
+   * this handler instead of being applied in the usual way. Written and read on different threads, hence `@Volatile`.
+   *
+   * Backported from IJPL-235332 (commit 47bd3c0a).
+   */
+  @Volatile
+  internal var nextApplyEditHandler: ((WorkspaceEdit) -> Unit)? = null
+
+  override fun applyEdit(params: ApplyWorkspaceEditParams): CompletableFuture<ApplyWorkspaceEditResponse> {
+    nextApplyEditHandler?.let { handler ->
+      nextApplyEditHandler = null
+      handler(params.edit)
+      // a bit of cheating here: at this moment the edit is not yet applied; there are no known issues because of that
+      return completedFuture(ApplyWorkspaceEditResponse(true))
+    }
+
+    val future = CompletableFuture<ApplyWorkspaceEditResponse>()"""
+        if "nextApplyEditHandler" not in handler_content and old_apply_edit in handler_content:
+            handler_content = handler_content.replace(old_apply_edit, new_apply_edit)
+        with open(handler_path, "w", encoding="utf-8") as f:
+            f.write(handler_content)
+
+    # 16c. LspImportOptimizer.kt
+    import_optimizer_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/formatter/LspImportOptimizer.kt"
+    )
+    if os.path.exists(import_optimizer_path):
+        with open(import_optimizer_path, "r", encoding="utf-8") as f:
+            optimizer_content = f.read()
+        optimizer_imports = [
+            "import com.intellij.platform.dartlsp.impl.LspServerImpl",
+            "import com.intellij.platform.dartlsp.impl.features.intention.toCodeAction",
+            "import com.intellij.platform.dartlsp.impl.util.LspWorkspaceEditApplier",
+            "import org.eclipse.lsp4j.WorkspaceEdit",
+        ]
+        for imp in optimizer_imports:
+            if imp not in optimizer_content:
+                optimizer_content = optimizer_content.replace(
+                    "import com.intellij.psi.PsiFile\n",
+                    f"{imp}\nimport com.intellij.psi.PsiFile\n"
+                )
+        old_optimizer_body = """    val codeAction = requestCodeAction(lspServer, virtualFile) ?: return noResult
+    val intentionAction = LspIntentionAction(lspServer, codeAction)
+    if (!intentionAction.isAvailable { isReasonableOrganizeImportsAction(lspServer, virtualFile, it) }) return noResult
+
+    return Runnable {
+      intentionAction.invoke(virtualFile)
+    }
+  }
+
+  private fun requestCodeAction(lspServer: LspServer, virtualFile: VirtualFile): CodeAction? {
+    val codeActionContext = CodeActionContext().apply {
+      diagnostics = emptyList()
+      triggerKind = CodeActionTriggerKind.Invoked
+      only = listOf(SourceOrganizeImports)
+    }
+
+    // Send code action request per document (cell). For regular files, there's one document.
+    val results = lspServer.documentMapping.getDocumentsInFileSync(virtualFile).mapNotNull { lspDocument ->
+      val params = CodeActionParams(
+        lspDocument.id,
+        Range(Position(0, 0), Position(0, 0)), // doesn't matter
+        codeActionContext,
+      )
+
+      // Only one code action supported as UI does not suppose selection of the one import
+      // option from the list (like it is processed in VS Code)
+      lspServer.sendRequestSync { it.textDocumentService.codeAction(params) }?.singleOrNull()?.right
+    }
+
+    return results.firstOrNull()
+  }
+
+  private fun isReasonableOrganizeImportsAction(lspServer: LspServer, virtualFile: VirtualFile, codeAction: CodeAction): Boolean {
+    val currentFileUri = lspServer.descriptor.getFileUri(virtualFile)
+    if (codeAction.kind != SourceOrganizeImports) return false
+    if (codeAction.command != null) return false // not expected for the Optimize Imports action
+    val edit = codeAction.edit ?: return false
+    if (edit.changes != null && edit.documentChanges != null) return false
+    if (edit.changes.isNullOrEmpty() && edit.documentChanges.isNullOrEmpty()) return false
+    if (edit.changes?.any { it.key != currentFileUri } == true) return false // other files editing is not expected
+    if (edit.documentChanges?.any { it.isRight } == true) return false // ResourceOperation is not expected
+    if (edit.documentChanges?.any { it.left?.textDocument?.uri != currentFileUri } == true) return false // other files editing is not expected
+    return true
+  }"""
+        new_optimizer_body = """    val codeAction = requestCodeAction(lspServer, virtualFile) ?: return noResult
+
+    val intentionAction = LspIntentionAction(lspServer, codeAction)
+    if (!intentionAction.isAvailable()) return noResult
+
+    val command = codeAction.command
+    // If codeAction.edit is null or effectively a no-op, handle Command in a synchronous way (see IJPL-235332)
+    if ((codeAction.edit == null || codeAction.edit == WorkspaceEdit()) && command != null) {
+      val edit = (lspServer as LspServerImpl).executeCommandExpectingWorkspaceEdit(command) ?: return noResult
+      val applier = LspWorkspaceEditApplier.create(lspServer, edit) ?: return noResult
+      return Runnable {
+        applier.applyWorkspaceEdit()
+      }
+    }
+
+    return Runnable {
+      intentionAction.invoke(virtualFile)
+    }
+  }
+
+  private fun requestCodeAction(lspServer: LspServer, virtualFile: VirtualFile): CodeAction? {
+    val codeActionContext = CodeActionContext().apply {
+      diagnostics = emptyList()
+      triggerKind = CodeActionTriggerKind.Invoked
+      only = listOf(SourceOrganizeImports)
+    }
+
+    // Send code action request per document (cell). For regular files, there's one document.
+    val results = lspServer.documentMapping.getDocumentsInFileSync(virtualFile).mapNotNull { lspDocument ->
+      val params = CodeActionParams(
+        lspDocument.id,
+        Range(Position(0, 0), Position(0, 0)), // doesn't matter
+        codeActionContext,
+      )
+
+      // Only one code action supported as UI does not suppose selection of the one import
+      // option from the list (like it is processed in VS Code)
+      lspServer.sendRequestSync { it.textDocumentService.codeAction(params) }?.singleOrNull()?.toCodeAction()
+    }
+
+    return results.firstOrNull()
+  }"""
+        if old_optimizer_body in optimizer_content:
+            optimizer_content = optimizer_content.replace(old_optimizer_body, new_optimizer_body)
+        with open(import_optimizer_path, "w", encoding="utf-8") as f:
+            f.write(optimizer_content)
+
+    # 16d. LspIntentionAction.kt
+    intention_action_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/api/customization/LspIntentionAction.kt"
+    )
+    if os.path.exists(intention_action_path):
+        with open(intention_action_path, "r", encoding="utf-8") as f:
+            intention_content = f.read()
+        old_is_available = """  @RequiresReadLock
+  fun isAvailable(): Boolean = isAvailable { true }
+
+  @RequiresReadLock
+  fun isAvailable(codeActionValidator: (CodeAction) -> Boolean): Boolean {
+    codeAction.disabled?.let { return false }
+
+    resolveCodeAction()
+
+    val workspaceEdit = codeAction.edit
+    if (!uriToDocumentMapInitialized) {
+      uriToDocumentMap = if (workspaceEdit != null) getUriToDocumentMap(workspaceEdit) else emptyMap()
+      uriToDocumentMapInitialized = true
+    }
+
+    return uriToDocumentMap != null &&
+           (workspaceEdit != null || codeAction.command != null) &&
+           codeActionValidator(codeAction)
+  }"""
+        new_is_available = """  @RequiresReadLock
+  fun isAvailable(): Boolean {
+    codeAction.disabled?.let { return false }
+
+    resolveCodeAction()
+
+    val workspaceEdit = codeAction.edit
+    if (workspaceEdit?.changes?.isNotEmpty() == true && workspaceEdit.documentChanges?.isNotEmpty() == true) return false
+
+    if (!uriToDocumentMapInitialized) {
+      uriToDocumentMap = if (workspaceEdit != null) getUriToDocumentMap(workspaceEdit) else emptyMap()
+      uriToDocumentMapInitialized = true
+    }
+
+    return uriToDocumentMap != null &&
+           (workspaceEdit != null || codeAction.command != null)
+  }"""
+        if old_is_available in intention_content:
+            intention_content = intention_content.replace(old_is_available, new_is_available)
+            with open(intention_action_path, "w", encoding="utf-8") as f:
+                f.write(intention_content)
+
     print("Patch applied successfully!")
 
 if __name__ == "__main__":
