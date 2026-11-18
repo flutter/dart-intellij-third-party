@@ -15,6 +15,7 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.platform.dartlsp.api.Lsp4jClient
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.LspServerListener
 import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
@@ -59,6 +60,7 @@ import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionSupp
 import com.intellij.platform.dartlsp.api.customization.LspHoverSupport
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintDisabled
+import com.intellij.platform.dartlsp.api.customization.LspIntentionAction
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsSupport
@@ -80,6 +82,8 @@ import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.eclipse.lsp4j.ClientCapabilities
+import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionKind
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.ConfigurationItem
@@ -215,7 +219,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             }
         override val codeActionsCustomizer: LspCodeActionsCustomizer
             get() = if (DartConfigurable.isLspCodeActionsEnabled(project)) {
-                LspCodeActionsSupport()
+                DartLspCodeActionsSupport
             } else {
                 LspCodeActionsDisabled
             }
@@ -290,6 +294,29 @@ private object DartLspFormattingSupport : LspFormattingSupport() {
         ideCanFormatThisFileItself: Boolean,
         serverExplicitlyWantsToFormatThisFile: Boolean
     ): Boolean = file.isInLocalFileSystem && file.extension.equals("dart", ignoreCase = true)
+}
+
+object DartLspCodeActionsSupport : LspCodeActionsSupport() {
+    /**
+     * Excludes whole-file LSP `Source` code actions (`source` and `source.*`, such as
+     * `source.sortMembers`, `source.organizeImports`, and `source.fixAll`) from the `Alt+Enter`
+     * intention menu (dart-lang/sdk#64939).
+     *
+     * JetBrains' `LspIntentionActionService` requests `textDocument/codeAction` with `only = null`
+     * and only filters out `quickfix*`, so whole-file `Source` actions otherwise crowd cursor-specific
+     * assists/refactorings and consume slots in the fixed `LspIntention0..14` pool. Whole-file Organize
+     * Imports and Sort Members have dedicated IDE actions under the **Code** menu, and per-diagnostic
+     * quick fixes (including "Fix all '<lint>' in file", which uses `quickfix.*`) go through
+     * [createQuickFix] and remain untouched.
+     */
+    override fun createIntentionAction(lspServer: LspServer, codeAction: CodeAction): LspIntentionAction? {
+        if (codeAction.kind == CodeActionKind.Source ||
+            codeAction.kind?.startsWith("${CodeActionKind.Source}.") == true
+        ) {
+            return null
+        }
+        return super.createIntentionAction(lspServer, codeAction)
+    }
 }
 
 object DartLspCompletionSupport : LspCompletionSupport() {
