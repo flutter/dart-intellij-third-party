@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-11-18' } *-->
 # actions
 
 ## Overview
@@ -6,7 +6,7 @@ Dart IDE actions (Pub commands, Reformat with Dart Style, Sort Members, Create D
 
 ## Interface
 - `AbstractDartFileProcessingAction` - abstract `AnAction` (DumbAware) that runs over the current editor or over selected files/dirs once the Analysis Server is ready.
-- `DartStyleAction` - Reformat with Dart Style; formats via `DartAnalysisServerService.edit_format`.
+- `DartStyleAction` - Reformat with Dart Style; redirects to IntelliJ's standard `ReformatCode` action (LSP formatting) when experimental LSP features are enabled, and formats via `DartAnalysisServerService.edit_format` in legacy mode.
 - `DartSortMembersAction` - Sort Members; applies `DartAnalysisServerService.edit_sortMembers` edits.
 - `DartFixAction` - experimental stub (empty bodies), not registered in `plugin.xml`.
 - `DartPubActionBase` (Kotlin) - abstract `AnAction, DumbAware` base that runs a `pub` command for a `pubspec.yaml` in the console; uses private `DartPubActionsService` coroutine scope.
@@ -28,4 +28,4 @@ Dart IDE actions (Pub commands, Reformat with Dart Style, Sort Members, Create D
 - Shows editor notification banners.
 
 ## Verification
-- No unit tests under `third_party/src/test/java/.../ide/actions`; verify manually via the Pub banner/actions on a `pubspec.yaml` and Code > Reformat with Dart Style / Sort Members.
+- Unit tests under `third_party/src/test/java/com/jetbrains/lang/dart/ide/actions/` (`ActionUpdateThreadTest`, `DartStyleActionTest`); verify manually via the Pub banner/actions on a `pubspec.yaml` and Code > Reformat Code with 'dart format' / Sort Members.

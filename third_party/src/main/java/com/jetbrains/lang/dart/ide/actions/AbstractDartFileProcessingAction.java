@@ -162,7 +162,7 @@ public abstract class AbstractDartFileProcessingAction extends AnAction implemen
     return result;
   }
 
-  private static boolean isApplicableFile(final @NotNull Project project, final @Nullable VirtualFile file) {
+  protected static boolean isApplicableFile(final @NotNull Project project, final @Nullable VirtualFile file) {
     if (file == null || !FileTypeRegistry.getInstance().isFileOfType(file, DartFileType.INSTANCE)) return false;
     if (!ProjectFileIndex.getInstance(project).isInContent(file)) return false;
 

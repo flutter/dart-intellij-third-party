@@ -22,6 +22,8 @@ import com.google.gson.reflect.TypeToken
 import com.intellij.icons.AllIcons
 import com.intellij.ide.hierarchy.LanguageCallHierarchy
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
@@ -248,14 +250,21 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         }
     }
 
-    fun testLegacyStyleActionYieldsOnlyWhenExperimentalLspIsEnabled() {
+    fun testStyleActionRedirectsWithoutContactingLegacyDasWhenExperimentalLspIsEnabled() {
         myFixture.configureByText("action.dart", "void main() {}")
         val action = DartStyleAction()
         val context = SimpleDataContext.builder()
             .add(CommonDataKeys.PROJECT, project)
             .add(CommonDataKeys.EDITOR, myFixture.editor)
             .build()
-        val event = AnActionEvent.createFromAnAction(action, null, "test", context)
+        val event = AnActionEvent.createEvent(
+            action,
+            context,
+            null,
+            ActionPlaces.MAIN_MENU,
+            ActionUiKind.NONE,
+            null,
+        )
         val properties = PropertiesComponent.getInstance(project)
         try {
             properties.setValue("dart.lsp.experimental.enabled", false, true)
@@ -264,10 +273,10 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             assertTrue(event.presentation.isEnabled)
             properties.setValue("dart.lsp.experimental.enabled", true, true)
             action.update(event)
-            assertFalse(event.presentation.isVisible)
-            assertFalse(event.presentation.isEnabled)
+            assertTrue("Dart.DartStyle must remain visible in MainMenu", event.presentation.isVisible)
+            assertTrue("Dart.DartStyle must remain enabled when redirecting to ReformatCode", event.presentation.isEnabled)
             action.actionPerformed(event)
-            assertTrue("The guarded action must not contact DAS", capturedRequests.isEmpty())
+            assertTrue("The redirected action must not send legacy edit.format to DAS", capturedRequests.isEmpty())
         } finally {
             properties.unsetValue("dart.lsp.experimental.enabled")
         }

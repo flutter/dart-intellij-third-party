@@ -3,7 +3,12 @@ package com.jetbrains.lang.dart.ide.actions;
 
 import com.intellij.CommonBundle;
 import com.intellij.application.options.CodeStyle;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.IdeActions;
+import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.application.ApplicationManager;
 
 import com.intellij.openapi.command.CommandProcessor;
@@ -19,6 +24,7 @@ import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.io.FileUtil;
@@ -29,11 +35,15 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartLanguage;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import java.util.HashMap;
 import java.util.List;
@@ -46,8 +56,27 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
 
   @Override
   public void update(@NotNull AnActionEvent event) {
-    if (event.getProject() != null && DartConfigurable.isExperimentalLspFeaturesEnabled(event.getProject())) {
-      event.getPresentation().setEnabledAndVisible(false);
+    final Project project = event.getProject();
+    if (project != null && DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      final AnAction reformatAction = getStandardReformatAction();
+      if (reformatAction == null) {
+        event.getPresentation().setEnabledAndVisible(false);
+        return;
+      }
+
+      super.update(event);
+      if (!event.getPresentation().isEnabled()) return;
+
+      final AnActionEvent reformatEvent = createReformatEvent(reformatAction, event);
+      ActionUtil.updateAction(reformatAction, reformatEvent);
+      if (!reformatEvent.getPresentation().isEnabled()) {
+        if (event.getData(CommonDataKeys.EDITOR) == null) {
+          event.getPresentation().setEnabledAndVisible(false);
+        }
+        else {
+          event.getPresentation().setEnabled(false);
+        }
+      }
       return;
     }
     super.update(event);
@@ -55,8 +84,56 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
 
   @Override
   public void actionPerformed(@NotNull AnActionEvent event) {
-    if (event.getProject() != null && DartConfigurable.isExperimentalLspFeaturesEnabled(event.getProject())) return;
+    final Project project = event.getProject();
+    if (project != null && DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      final AnAction reformatAction = getStandardReformatAction();
+      if (reformatAction == null || !isApplicableForRedirect(project, event)) return;
+
+      // Redirect to standard Reformat Code (which routes through LSP formatting) while preserving
+      // the Dart.DartStyle menu entry, keymap bindings, and action analytics.
+      Analytics.report(AnalyticsData.forAction(this, event));
+      ActionUtil.performAction(reformatAction, createReformatEvent(reformatAction, event));
+      return;
+    }
     super.actionPerformed(event);
+  }
+
+  @VisibleForTesting
+  @Nullable AnAction getStandardReformatAction() {
+    return ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_REFORMAT);
+  }
+
+  private static @NotNull AnActionEvent createReformatEvent(@NotNull AnAction reformatAction, @NotNull AnActionEvent event) {
+    return AnActionEvent.createEvent(
+      reformatAction,
+      event.getDataContext(),
+      null,
+      event.getPlace(),
+      event.getUiKind(),
+      event.getInputEvent()
+    );
+  }
+
+  private static boolean isApplicableForRedirect(@NotNull Project project, @NotNull AnActionEvent event) {
+    final DartSdk sdk = DartSdk.getDartSdk(project);
+    if (sdk == null || !DartAnalysisServerService.isDartSdkVersionSufficient(sdk)) return false;
+
+    final Editor editor = event.getData(CommonDataKeys.EDITOR);
+    if (editor != null) {
+      final PsiFile psiFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
+      return psiFile != null && isApplicableFile(project, psiFile.getVirtualFile());
+    }
+
+    final VirtualFile[] filesAndDirs = event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY);
+    if (filesAndDirs == null || filesAndDirs.length == 0) return false;
+
+    final ProjectFileIndex fileIndex = ProjectFileIndex.getInstance(project);
+    for (VirtualFile fileOrDir : filesAndDirs) {
+      if (fileOrDir.isDirectory() ? fileIndex.isInContent(fileOrDir) : isApplicableFile(project, fileOrDir)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
