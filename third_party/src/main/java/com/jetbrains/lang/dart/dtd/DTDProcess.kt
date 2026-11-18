@@ -210,9 +210,9 @@ class DTDProcess {
     logger.debug("--> $requestString")
     try {
       webSocket.send(requestString)
-    } catch (e: WebSocketException) {
+    } catch (t: Throwable) {
       consumerMap.remove(id)
-      throw e
+      throw t
     }
     return id
   }

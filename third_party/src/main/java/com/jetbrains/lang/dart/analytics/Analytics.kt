@@ -18,6 +18,7 @@ import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationInfo
@@ -37,6 +38,7 @@ import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.util.PrintingLogger
+import com.jetbrains.lang.dart.websocket.WebSocketException
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.annotations.VisibleForTesting
 import java.lang.ref.WeakReference
@@ -55,10 +57,12 @@ private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 
 private val DEFAULT_RESPONSE_TIMEOUT = 1.seconds
 
-/// DTD can be slow to respond right after it starts (e.g. on IDE startup while
-/// indexing), so the startup configuration calls get a longer timeout. They run
-/// on a background thread, so this never blocks the UI.
-/// See https://github.com/flutter/dart-intellij-third-party/issues/704.
+/**
+ * DTD can be slow to respond right after it starts (e.g. on IDE startup while
+ * indexing), so the startup configuration calls get a longer timeout. They run
+ * on a background thread, so this never blocks the UI.
+ * See https://github.com/flutter/dart-intellij-third-party/issues/704.
+ */
 private val STARTUP_RESPONSE_TIMEOUT = 3.seconds
 
 private object UnifiedAnalytics {
@@ -400,6 +404,8 @@ private object AnalyticsConfigurationManager {
         .getNotificationGroup(DAS_NOTIFICATION_GROUP)
         .createNotification(consentMessage, NotificationType.INFORMATION).also { notification ->
           notification.addAction(object : AnAction(CommonBundle.getOkButtonText()) {
+            override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
             override fun actionPerformed(e: AnActionEvent) {
               try {
                 notification.expire()
