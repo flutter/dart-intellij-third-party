@@ -20,6 +20,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import com.intellij.icons.AllIcons
+import com.intellij.ide.hierarchy.LanguageCallHierarchy
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
@@ -30,10 +31,12 @@ import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspServer
 import com.intellij.platform.dartlsp.api.LspServerManager
 import com.intellij.platform.dartlsp.api.LspServerState
+import com.intellij.platform.dartlsp.api.customization.LspCallHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
 import com.intellij.psi.search.searches.DefinitionsScopedSearch
 import com.intellij.psi.util.PsiTreeUtil
+import com.jetbrains.lang.dart.DartLanguage
 import com.jetbrains.lang.dart.psi.DartClass
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
@@ -2838,6 +2841,33 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         } finally {
             properties.unsetValue("dart.lsp.experimental.enabled")
         }
+    }
+
+    fun testDescriptorCallHierarchyCustomizerAlwaysEnabled() {
+        val properties = PropertiesComponent.getInstance(project)
+        val descriptor = DartLspServerDescriptor(project)
+        try {
+            properties.setValue("dart.lsp.experimental.enabled", true, true)
+            assertTrue(descriptor.lspCustomization.callHierarchyCustomizer is LspCallHierarchySupport)
+
+            properties.setValue("dart.lsp.experimental.enabled", false, true)
+            assertTrue(descriptor.lspCustomization.callHierarchyCustomizer is LspCallHierarchySupport)
+        } finally {
+            properties.unsetValue("dart.lsp.experimental.enabled")
+        }
+    }
+
+    fun testCallHierarchyProviderResolvesToLsp() {
+        assertEmpty(
+            "Legacy Dart-specific callHierarchyProvider should no longer be registered",
+            LanguageCallHierarchy.INSTANCE.allForLanguage(DartLanguage.INSTANCE)
+        )
+        val providerClassNames = LanguageCallHierarchy.INSTANCE.allForLanguageOrAny(DartLanguage.INSTANCE)
+            .map { it.javaClass.name }
+        assertTrue(
+            "Expected LspCallHierarchyProvider for Dart, got: $providerClassNames",
+            providerClassNames.contains("com.intellij.platform.dartlsp.impl.features.hierarchy.call.LspCallHierarchyProvider")
+        )
     }
 
     private class MockLanguageClient : DartLanguageClient {
