@@ -694,6 +694,8 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     // TODO (pq): temporary
     // print(params.toString())
 
+    // The project may have started disposing since process() checked it.
+    if (project.isDisposed) return
     try {
       DartToolingDaemonService.getInstance(project)
         .sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
