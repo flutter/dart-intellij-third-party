@@ -22,8 +22,6 @@ import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
 import com.jetbrains.lang.dart.analyzer.DartLocalFileInfo
 import com.jetbrains.lang.dart.analyzer.getDartFileInfo
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView
-import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
-import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspCodeActionsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCodeActionsDisabled
@@ -274,12 +272,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 LspDocumentSymbolDisabled
             }
         override val workspaceSymbolCustomizer = LspWorkspaceSymbolDisabled
-        override val callHierarchyCustomizer: LspCallHierarchyCustomizer
-            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-                LspCallHierarchySupport()
-            } else {
-                LspCallHierarchyDisabled
-            }
+        override val callHierarchyCustomizer = LspCallHierarchySupport()
         override val typeHierarchyCustomizer = LspTypeHierarchySupport()
 
         override val selectionRangeCustomizer = LspSelectionRangeDisabled
