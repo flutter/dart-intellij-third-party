@@ -27,6 +27,7 @@
 - Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
 - Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
 - Auto-selecting the current editor element in the Structure view when navigating across files (#800)
+- Avoid IDE internal errors from analytics delivery when the Dart Tooling Daemon connection closes or a project is closing, and bound the requests queued for a Dart Tooling Daemon that never connects (#848)
 
 ## 511.0.0
 

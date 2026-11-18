@@ -37,6 +37,7 @@ import com.jetbrains.lang.dart.websocket.WebSocketEventHandler
 import com.jetbrains.lang.dart.websocket.WebSocketException
 import com.jetbrains.lang.dart.websocket.WebSocketMessage
 import kotlinx.coroutines.CoroutineScope
+import org.jetbrains.annotations.TestOnly
 import java.net.URI
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -71,6 +72,11 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   private var lastSentRootUris: List<String> = emptyList()
 
   private val pendingRequests = ConcurrentLinkedQueue<PendingRequest>()
+  private val droppedRequestCount = AtomicInteger()
+
+  @get:TestOnly
+  internal val pendingRequestCount: Int
+    get() = pendingRequests.size
 
   private val nextRequestId = AtomicInteger()
   private val consumerMap: MutableMap<Int, DartToolingDaemonConsumer> = mutableMapOf()
@@ -184,6 +190,16 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   @Throws(WebSocketException::class)
   fun sendRequest(method: String, params: JsonObject, includeSecret: Boolean, consumer: DartToolingDaemonConsumer) {
     if (!webSocketReady || !pendingRequests.isEmpty()) {
+      // Bound the queue: a DTD that never connects, or that dies mid-session, never drains it. Drop new requests
+      // rather than old ones, so the early settings event survives, and never drop service registrations
+      // (DtdEditorService registers before onOpen). size() is O(n), but n stays near the cap.
+      if (!webSocketReady && method != "registerService" && pendingRequests.size >= MAX_PENDING_REQUESTS) {
+        val dropped = droppedRequestCount.incrementAndGet()
+        if (dropped == 1 || dropped % MAX_PENDING_REQUESTS == 0) {
+          logger.debug("sendRequest(\"$method\") dropped because the queue is full ($dropped dropped so far)")
+        }
+        return
+      }
       logger.debug("sendRequest(\"$method\") queued because the socket is not ready or there are pending requests")
       pendingRequests.add(PendingRequest(method, params, includeSecret, consumer))
       if (webSocketReady) {
@@ -451,6 +467,12 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     fun getInstance(project: Project): DartToolingDaemonService = project.service()
 
     private const val MIN_SDK_VERSION: String = "3.4"
+
+    /**
+     * About how many requests are queued while the socket isn't ready; more are dropped (except service
+     * registrations). Keep it well above (at least 2x) any buffer that flushes into a starting DTD's queue.
+     */
+    internal const val MAX_PENDING_REQUESTS: Int = 100
     private val logger = PluginLogger.createLogger(DartToolingDaemonService::class.java)
   }
 }
