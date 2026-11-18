@@ -51,6 +51,7 @@ class DartLspNavigationTest : DartCodeInsightFixtureTestCase() {
             val endpoint = object : DartLanguageServer, TextDocumentService, WorkspaceService {
                 override fun diagnosticServer() = CompletableFuture.completedFuture(DiagnosticServerResult(0))
                 override fun connectToDtd(params: ConnectToDtdParams) = CompletableFuture.completedFuture<Any>(null)
+                override fun resolveCommand(params: InteractiveExecuteCommandParams) = CompletableFuture.completedFuture(params)
                 override fun getSuper(params: org.eclipse.lsp4j.TextDocumentPositionParams): CompletableFuture<Location?> {
                     superRequests.add(params)
                     return superResponse.get()

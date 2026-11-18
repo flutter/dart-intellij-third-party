@@ -21,8 +21,10 @@ import com.jetbrains.lang.dart.DartBundle
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.ide.refactoring.extract.DartServerExtractMethodHandler
 import com.jetbrains.lang.dart.ide.refactoring.introduce.DartServerExtractLocalVariableHandler
+import com.jetbrains.lang.dart.lsp.DartLanguageServer
 import com.jetbrains.lang.dart.lsp.DartLspServerDescriptor
 import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
+import com.jetbrains.lang.dart.lsp.InteractiveExecuteCommandParams
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdkUtil
 import com.jetbrains.lang.dart.util.DartTestUtils
@@ -332,15 +334,16 @@ class DartLspRefactoringHelperTest : DartCodeInsightFixtureTestCase() {
         } as WorkspaceService
 
         val lsp4jServer = Proxy.newProxyInstance(
-            Lsp4jServer::class.java.classLoader,
-            arrayOf(Lsp4jServer::class.java),
-        ) { _, method, _ ->
+            DartLanguageServer::class.java.classLoader,
+            arrayOf(DartLanguageServer::class.java),
+        ) { _, method, args ->
             when (method.name) {
                 "getTextDocumentService" -> textDocumentService
                 "getWorkspaceService" -> workspaceService
+                "resolveCommand" -> CompletableFuture.completedFuture(args[0] as InteractiveExecuteCommandParams)
                 else -> null
             }
-        } as Lsp4jServer
+        } as DartLanguageServer
 
         val serverDescriptor = DartLspServerDescriptor(project)
 

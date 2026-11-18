@@ -84,9 +84,11 @@ import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
+import org.eclipse.lsp4j.GeneralClientCapabilities
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.PublishDiagnosticsCapabilities
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.RegularExpressionsCapabilities
 import org.eclipse.lsp4j.SemanticTokenModifiers
 import org.eclipse.lsp4j.SemanticTokenTypes
 import org.eclipse.lsp4j.TextDocumentClientCapabilities
@@ -132,7 +134,13 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             val pd = td.publishDiagnostics ?: PublishDiagnosticsCapabilities().also { td.publishDiagnostics = it }
             pd.relatedInformation = true
             pd.codeDescriptionSupport = true
-            experimental = mapOf("closingLabels" to emptyMap<String, Any>())
+            val gen = general ?: GeneralClientCapabilities().also { general = it }
+            gen.regularExpressions = RegularExpressionsCapabilities("ECMAScript")
+            val experimentalMap = mutableMapOf<String, Any>("closingLabels" to emptyMap<String, Any>())
+            if (DartConfigurable.isLspCodeActionsEnabled(project)) {
+                experimentalMap["interactiveResolve"] = mapOf("inputTypes" to FormFieldType.SUPPORTED_KINDS)
+            }
+            experimental = experimentalMap
         }
 
     override fun createInitializationOptions(): Any = mapOf("closingLabels" to true)
@@ -161,14 +169,24 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
      * to duplicate analysis errors and sticky markers (see dart-lang/sdk#63819).
      */
     override fun getFileUri(file: VirtualFile): String {
-        val escapedPath = URLUtil.encodePath(getFilePath(file))
-        val url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath)
-        val uri = VfsUtil.toUri(url)?.toString() ?: url
-        val prefix = "file:///"
-        if (uri.startsWith(prefix) && OSAgnosticPathUtil.startsWithWindowsDrive(uri.substring(prefix.length))) {
-            return prefix + uri[prefix.length].uppercase() + uri.substring(prefix.length + 1)
+        return filePathToFileUri(getFilePath(file))
+    }
+
+    companion object {
+        internal fun filePathToFileUri(filePath: String): String {
+            val escapedPath = URLUtil.encodePath(filePath)
+            val url = VirtualFileManager.constructUrl(URLUtil.FILE_PROTOCOL, escapedPath)
+            val uri = VfsUtil.toUri(url)?.toString() ?: url
+            return normalizeWindowsDriveInFileUri(uri)
         }
-        return uri
+
+        internal fun normalizeWindowsDriveInFileUri(uri: String): String {
+            val prefix = "file:///"
+            if (uri.startsWith(prefix) && OSAgnosticPathUtil.startsWithWindowsDrive(uri.substring(prefix.length))) {
+                return prefix + uri[prefix.length].uppercase() + uri.substring(prefix.length + 1)
+            }
+            return uri
+        }
     }
 
     override val lspCommunicationChannel: LspCommunicationChannel
@@ -221,7 +239,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             }
         override val commandsCustomizer: LspCommandsCustomizer
             get() = if (DartConfigurable.isLspCodeActionsEnabled(project)) {
-                LspCommandsSupport()
+                DartLspCommandsSupport(project)
             } else {
                 LspCommandsDisabled
             }
