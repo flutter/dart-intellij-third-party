@@ -3,14 +3,24 @@ package com.jetbrains.dart.analysisServer;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.platform.dartlsp.api.LspServer;
+import com.intellij.platform.dartlsp.api.LspServerManager;
+import com.intellij.platform.dartlsp.api.LspServerManagerListener;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.intellij.util.containers.ContainerUtil;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
+import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class DartServerIntentionsTest extends CodeInsightFixtureTestCase {
   @Override
@@ -100,5 +110,59 @@ public class DartServerIntentionsTest extends CodeInsightFixtureTestCase {
                    main ( )  {
                     var foo = Foo
                       }""", myFixture.getIntentionPreviewText(action));
+  }
+
+  public void testLspSourceActionsExcludedFromIntentions() {
+    final DartSdk sdk = DartSdk.getDartSdk(getProject());
+    assertNotNull(sdk);
+    assertTrue(
+      "Expected Dart SDK >= " + DartAnalysisServerService.MIN_LSP_CODE_ACTIONS_SDK_VERSION + " (got " + sdk.getVersion() + ")",
+      DartAnalysisServerService.isDartSdkVersionSufficientForLspCodeActions(sdk.getVersion())
+    );
+
+    final VirtualFile file = myFixture.configureByText("foo.dart", """
+      import 'dart:math';
+      import 'dart:async';
+
+      void b() {}
+      void a() {
+        <selection><caret>var x = 3;</selection>
+      }
+      """).getVirtualFile();
+
+    final AtomicBoolean fileOpenedOnLspServer = new AtomicBoolean(false);
+    LspServerManager.getInstance(getProject()).addLspServerManagerListener(new LspServerManagerListener() {
+      @Override
+      public void fileOpened(@NotNull LspServer lspServer, @NotNull VirtualFile openedFile) {
+        if (lspServer.getProviderClass() == DartLspServerSupportProvider.class && file.equals(openedFile)) {
+          fileOpenedOnLspServer.set(true);
+        }
+      }
+    }, getTestRootDisposable(), false);
+
+    final DartAnalysisServerService das = DartAnalysisServerService.getInstance(getProject());
+    final DartBridgeLspServerManager bridgeManager = getProject().getService(DartBridgeLspServerManager.class);
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    try {
+      assertTrue(DartConfigurable.isLspCodeActionsEnabled(getProject()));
+      das.updateClientCapabilities();
+      bridgeManager.startBridgeServer();
+
+      PlatformTestUtil.waitWithEventsDispatching(
+        "Timed out waiting for Dart LSP server to open " + file.getName(),
+        fileOpenedOnLspServer::get,
+        15
+      );
+      myFixture.doHighlighting();
+
+      final List<String> intentions = ContainerUtil.map(myFixture.getAvailableIntentions(), IntentionAction::getText);
+      assertContainsElements(intentions, "Surround with block");
+      assertDoesntContain(intentions, "Sort Members", "Organize Imports", "Fix All");
+    }
+    finally {
+      bridgeManager.stopBridgeServer();
+      DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), false);
+      das.updateClientCapabilities();
+    }
   }
 }
