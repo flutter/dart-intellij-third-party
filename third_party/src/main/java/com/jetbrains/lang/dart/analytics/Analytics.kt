@@ -652,8 +652,11 @@ internal object NoOpReporter : AnalyticsReporter() {
 internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
   const val IDE_EVENT = "ide_event"
 
+  private val logger: Logger = PluginLogger.createLogger(UnifiedAnalyticsReporter::class.java)
+
   override fun process(data: AnalyticsData) {
-    val project = data.project ?: return
+    // Skip disposed and default projects: looking up the DTD service there can create it and fail.
+    val project = data.project?.takeUnless { it.isDisposed || it.isDefault } ?: return
 
     ApplicationManager.getApplication().executeOnPooledThread {
       sendAnalyticsEvent(project, data.data)
@@ -691,11 +694,18 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     // TODO (pq): temporary
     // print(params.toString())
 
-    DartToolingDaemonService.getInstance(project)
-      .sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
-        // TODO (pq): temporary
-        // print(response)
-      }
+    try {
+      DartToolingDaemonService.getInstance(project)
+        .sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
+          // TODO (pq): temporary
+          // print(response)
+        }
+    }
+    catch (e: WebSocketException) {
+      // The socket closed mid-send (e.g. while the project closes). Telemetry is best effort: don't let this
+      // reach the pooled thread's uncaught handler, which logs it as an IDE error.
+      logger.debug("Dropped analytics event: ${e.message}")
+    }
   }
 }
 
