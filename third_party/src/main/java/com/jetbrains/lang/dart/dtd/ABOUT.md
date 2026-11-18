@@ -11,7 +11,8 @@ editor services is `ide/toolingDaemon/DartToolingDaemonService.kt`
 
 ## Interface
 - `DTDProcess`: `start(sdk)`, `sendRequest(method, params, includeSecret, consumer)`,
-  `terminate()`, the `webSocketReady` flag, and the `listener` property.
+  `cancelRequest(id)`, `terminate()`, the `webSocketReady` flag, and the `listener` property.
+  `sendRequest` returns the request ID; it throws `WebSocketException` if the socket is not ready.
 - `DTDProcessListener`: callbacks `onProcessStarted(uri)`, `onWebSocketOpen()`,
   `onWebSocketMessage(text)`, and `onWebSocketClose()`.
 

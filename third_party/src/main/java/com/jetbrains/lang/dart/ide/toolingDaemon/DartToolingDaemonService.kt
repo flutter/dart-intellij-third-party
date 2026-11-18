@@ -300,9 +300,6 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     stopService()
   }
 
-  private fun isDartSdkVersionSufficient(sdk: DartSdk): Boolean =
-    StringUtil.compareVersionNumbers(sdk.version, MIN_SDK_VERSION) >= 0
-
   fun getFileUri(file: VirtualFile): String = getLocalFileUri(file.path)
 
   /**
@@ -451,6 +448,14 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     fun getInstance(project: Project): DartToolingDaemonService = project.service()
 
     private const val MIN_SDK_VERSION: String = "3.4"
+
+    /** Whether the given SDK version ships the `dart tooling-daemon` command. */
+    @JvmStatic
+    fun isDartSdkVersionSufficient(sdkVersion: String): Boolean =
+      StringUtil.compareVersionNumbers(sdkVersion, MIN_SDK_VERSION) >= 0
+
+    @JvmStatic
+    fun isDartSdkVersionSufficient(sdk: DartSdk): Boolean = isDartSdkVersionSufficient(sdk.version)
     private val logger = PluginLogger.createLogger(DartToolingDaemonService::class.java)
   }
 }
