@@ -101,27 +101,34 @@ import org.eclipse.lsp4j.TypeHierarchyPrepareParams
 import org.eclipse.lsp4j.TypeHierarchySubtypesParams
 import org.eclipse.lsp4j.TypeHierarchySupertypesParams
 import org.eclipse.lsp4j.WorkspaceEdit
-import org.eclipse.lsp4j.jsonrpc.messages.Either
-import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer
+import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
+import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage
+import org.eclipse.lsp4j.services.LanguageClient
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import org.eclipse.lsp4j.jsonrpc.MessageConsumer
-import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage
-import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage
-import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.util.concurrent.Executors
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutionException
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.logging.Filter
+import java.util.logging.Level
+import java.util.logging.LogRecord
+import java.util.logging.Logger as JulLogger
 
 class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
@@ -3008,6 +3015,192 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             assertSame(LspSignatureHelpDisabled, descriptor.lspCustomization.signatureHelpCustomizer)
         } finally {
             properties.unsetValue("dart.lsp.experimental.enabled")
+        }
+    }
+
+    fun testStopIsIdempotentAndDoesNotResetSubsequentDasState() {
+        val das = DartAnalysisServerService.getInstance(project)
+        try {
+            bridgeServer.isLspHighlightingEnabled = { false }
+            bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+
+            bridgeServer.stop()
+            assertTrue(bridgeServer.isStopped)
+
+            // Simulate a newly started bridge advertising semantic tokens on DAS.
+            das.setSemanticTokensAdvertised(true)
+            capturedRequests.clear()
+
+            // A late shutdown() on the already-stopped bridge must be a no-op on DAS state.
+            assertNull(bridgeServer.shutdown().get(5, TimeUnit.SECONDS))
+            assertTrue(das.isSemanticTokensAdvertised)
+            assertTrue(capturedRequests.none { it.get("method")?.asString == "server.setClientCapabilities" })
+        } finally {
+            das.setSemanticTokensAdvertised(false)
+        }
+    }
+
+    fun testStoppedBridgeRejectsRequestsAndNotifications() {
+        bridgeServer.stop()
+        capturedRequests.clear()
+        capturedNotifications.clear()
+
+        assertFailsWithRequestCancelled(bridgeServer.hover(HoverParams(TextDocumentIdentifier("file:///test.dart"), Position(0, 0))))
+        assertFailsWithRequestCancelled(bridgeServer.initialize(InitializeParams()))
+        assertFalse(bridgeServer.forwardNotification("workspace/didChangeConfiguration", DidChangeConfigurationParams(emptyMap<String, Any>())))
+        assertEmpty(capturedRequests)
+        assertEmpty(capturedNotifications)
+    }
+
+    fun testStopBridgeServerDrainsClientHandshakeWithoutSevereSocketClosedError() {
+        val hoverForwarded = CompletableFuture<JsonObject>()
+        var hoverClientFuture: CompletableFuture<*>? = null
+        requestObserver = { req ->
+            if (req.lspMethod() == "textDocument/hover") {
+                hoverForwarded.complete(req)
+            }
+        }
+        try {
+            // Use a generous timeout so socket closure can only come from the client's disconnect.
+            withConnectedBridgeClient(gracefulCloseTimeoutMs = 30_000L) { ctx ->
+                hoverClientFuture = ctx.clientLauncher.remoteProxy.textDocumentService.hover(
+                    HoverParams(TextDocumentIdentifier("file:///source.dart"), Position(0, 0))
+                )
+                hoverForwarded.get(5, TimeUnit.SECONDS)
+
+                ctx.manager.stopBridgeServer()
+                assertFalse("Server-side socket should remain open for handshake", ctx.serverSideSocket.isClosed)
+
+                val shutdownFuture = ctx.executor.submit<Any?> {
+                    val result = ctx.clientLauncher.remoteProxy.shutdown().get(5, TimeUnit.SECONDS)
+                    ctx.clientLauncher.remoteProxy.exit()
+                    ctx.clientSocket.close()
+                    result
+                }
+                assertNull(shutdownFuture.get(5, TimeUnit.SECONDS))
+                waitUntil("Server-side socket should close after client disconnects") { ctx.serverSideSocket.isClosed }
+                assertEmpty(ctx.severeRecords)
+            }
+        } finally {
+            hoverClientFuture?.completeExceptionally(CancellationException("Test cleanup"))
+            requestObserver = null
+        }
+    }
+
+    fun testStopBridgeServerForceClosesHungClientAndSuppressesPostCloseResponseWrite() {
+        val das = DartAnalysisServerService.getInstance(project)
+        var initClientFuture: CompletableFuture<*>? = null
+        try {
+            das.setSemanticTokensLegend(null)
+            val legendFuture = das.semanticTokensLegendFuture
+
+            withConnectedBridgeClient(gracefulCloseTimeoutMs = 50L) { ctx ->
+                requireNotNull(ctx.manager.bridgeServer).isLspHighlightingEnabled = { true }
+                initClientFuture = ctx.clientLauncher.remoteProxy.initialize(InitializeParams())
+                waitUntil("initialize() should await semanticTokensLegendFuture") { legendFuture.numberOfDependents > 0 }
+
+                // Hung client never sends shutdown/exit or closes its socket; stopBridgeServer() must
+                // force-close the server-side socket once gracefulCloseTimeoutMs elapses.
+                ctx.manager.stopBridgeServer()
+                waitUntil("Hung client socket must be force-closed after timeout") { ctx.serverSideSocket.isClosed }
+
+                // Completing legendFuture after the socket is already closed forces RemoteEndpoint to
+                // write the RequestCancelled response onto the closed socket; wrapMessages must suppress it.
+                legendFuture.complete(null)
+                assertEmpty(ctx.severeRecords)
+            }
+        } finally {
+            initClientFuture?.completeExceptionally(CancellationException("Test cleanup"))
+            das.setSemanticTokensLegend(null)
+        }
+    }
+
+    private fun assertFailsWithRequestCancelled(future: CompletableFuture<*>) {
+        try {
+            future.get(5, TimeUnit.SECONDS)
+            fail("Expected RequestCancelled error")
+        } catch (e: ExecutionException) {
+            val rpcError = requireNotNull(e.cause as? ResponseErrorException) {
+                "Expected ResponseErrorException, got ${e.cause}"
+            }
+            assertEquals(ResponseErrorCode.RequestCancelled.value, rpcError.responseError.code)
+        }
+    }
+
+    private fun waitUntil(message: String, timeoutMs: Long = 5_000L, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (!condition() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10)
+        }
+        assertTrue(message, condition())
+    }
+
+    private class BridgeClientTestContext(
+        val manager: DartBridgeLspServerManager,
+        val clientSocket: Socket,
+        val serverSideSocket: Socket,
+        val clientLauncher: Launcher<DartLanguageServer>,
+        val executor: ExecutorService,
+        val severeRecords: List<LogRecord>,
+    )
+
+    private fun withConnectedBridgeClient(gracefulCloseTimeoutMs: Long, block: (BridgeClientTestContext) -> Unit) {
+        // Detach the standalone setUp() bridge so only manager's bridge interacts with DAS.
+        bridgeServer.stop()
+        val manager = project.getService(DartBridgeLspServerManager::class.java)
+        val previousTimeout = manager.gracefulCloseTimeoutMs
+        val executor = Executors.newCachedThreadPool()
+        val severeRecords = CopyOnWriteArrayList<LogRecord>()
+        val remoteEndpointLogger = JulLogger.getLogger(RemoteEndpoint::class.java.name)
+        val previousFilter = remoteEndpointLogger.filter
+        var serverSideSocket: Socket? = null
+
+        remoteEndpointLogger.filter = Filter { record ->
+            if (record.level.intValue() >= Level.SEVERE.intValue()) {
+                severeRecords.add(record)
+                false
+            } else {
+                previousFilter?.isLoggable(record) ?: true
+            }
+        }
+
+        try {
+            manager.gracefulCloseTimeoutMs = gracefulCloseTimeoutMs
+            assertTrue(manager.bindAndListenForConnections())
+            Socket().use { clientSocket ->
+                clientSocket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), manager.port), 5000)
+                val clientLauncher = Launcher.Builder<DartLanguageServer>()
+                    .setLocalService(mockClient)
+                    .setRemoteInterface(DartLanguageServer::class.java)
+                    .setExecutorService(executor)
+                    .setInput(clientSocket.getInputStream())
+                    .setOutput(clientSocket.getOutputStream())
+                    .create()
+                clientLauncher.startListening()
+
+                waitUntil("Bridge manager should accept client connection") { manager.isClientConnected() }
+                val acceptedSocket = requireNotNull(manager.activeClientSocket) { "Expected active client socket" }
+                serverSideSocket = acceptedSocket
+                block(BridgeClientTestContext(manager, clientSocket, acceptedSocket, clientLauncher, executor, severeRecords))
+            }
+        } finally {
+            try {
+                manager.gracefulCloseTimeoutMs = previousTimeout
+                manager.stopBridgeServer()
+                serverSideSocket?.let { socket ->
+                    val deadline = System.currentTimeMillis() + 5_000L
+                    while (!socket.isClosed && System.currentTimeMillis() < deadline) {
+                        Thread.sleep(10)
+                    }
+                }
+            } finally {
+                executor.shutdownNow()
+                try {
+                    assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS))
+                } finally {
+                    remoteEndpointLogger.filter = previousFilter
+                }
+            }
         }
     }
 

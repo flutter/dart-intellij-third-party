@@ -8,17 +8,24 @@ package com.jetbrains.lang.dart.lsp
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.serviceIfCreated
 import com.intellij.openapi.project.Project
 import com.intellij.platform.dartlsp.api.LspServerManager
 import com.intellij.platform.dartlsp.api.ensureServerStarted
 import com.intellij.platform.dartlsp.api.stopServers
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.jetbrains.lang.dart.logging.PluginLogger
+import org.eclipse.lsp4j.jsonrpc.JsonRpcException
 import org.eclipse.lsp4j.jsonrpc.Launcher
-import org.eclipse.lsp4j.services.LanguageClient
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage
+import org.jetbrains.annotations.VisibleForTesting
 import java.io.IOException
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 
 /**
  * Project-level service that manages the lifecycle of the LSP bridge server.
@@ -33,21 +40,27 @@ import java.util.concurrent.Future
 class DartBridgeLspServerManager(private val project: Project) : Disposable {
     companion object {
         private val logger = PluginLogger.createLogger(DartBridgeLspServerManager::class.java)
+        private const val GRACEFUL_CLOSE_TIMEOUT_MS = 2_000L
     }
 
+    @VisibleForTesting
+    internal var gracefulCloseTimeoutMs: Long = GRACEFUL_CLOSE_TIMEOUT_MS
+
+    private val stateLock = Any()
     private var serverSocket: ServerSocket? = null
     private var listenFuture: Future<*>? = null
-    // Written on the thread that accepts the client connections and read from the threads that
-    // talk to the server, e.g. the one that pushes the configuration.
-    @Volatile
     private var activeConnection: ActiveConnection? = null
 
     val port: Int
-        get() = serverSocket?.localPort ?: -1
+        get() = synchronized(stateLock) { serverSocket?.localPort ?: -1 }
 
     /** The bridge of the connected LSP client, or `null` while no client is connected. */
     internal val bridgeServer: DartBridgeLspServer?
-        get() = activeConnection?.bridgeServer
+        get() = synchronized(stateLock) { activeConnection?.bridgeServer }
+
+    @get:VisibleForTesting
+    internal val activeClientSocket: Socket?
+        get() = synchronized(stateLock) { activeConnection?.socket }
 
     fun isClientConnected(): Boolean = bridgeServer?.isClientConnected == true
     val isSemanticTokensAdvertised: Boolean
@@ -55,88 +68,179 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
 
 
     fun startBridgeServer() {
-        if (serverSocket != null) {
-            logger.warn("Bridge LSP Server is already running")
+        if (!bindAndListenForConnections()) {
             return
         }
-        try {
-            // Bind to a random free port on localhost. The OS will assign an available port.
-            // This port is then queried by DartLspServerDescriptor to tell the JetBrains LSP client where to connect.
-            serverSocket = ServerSocket(0, 50, java.net.InetAddress.getLoopbackAddress())
-            logger.info("Bridge LSP Server socket listening on port $port")
-            startListening()
-            
-            // Manually trigger the JetBrains LSP client to connect to our bridge.
-            // This replaces the automatic file-opened trigger.
-            LspServerManager.getInstance(project).ensureServerStarted<DartLspServerSupportProvider>(DartLspServerDescriptor(project))
-            logger.info("Triggered LSP client start via ensureServerStarted")
-        } catch (e: IOException) {
-            logger.error("Failed to start Bridge ServerSocket", e)
+        // Manually trigger the JetBrains LSP client to connect to our bridge.
+        // This replaces the automatic file-opened trigger.
+        LspServerManager.getInstance(project).ensureServerStarted<DartLspServerSupportProvider>(DartLspServerDescriptor(project))
+        logger.info("Triggered LSP client start via ensureServerStarted")
+    }
+
+    @VisibleForTesting
+    internal fun bindAndListenForConnections(): Boolean {
+        val boundSocket = synchronized(stateLock) {
+            if (serverSocket != null) {
+                logger.warn("Bridge LSP Server is already running")
+                return false
+            }
+            try {
+                // Bind to a random free port on localhost. The OS will assign an available port.
+                // This port is then queried by DartLspServerDescriptor to tell the JetBrains LSP client where to connect.
+                ServerSocket(0, 50, InetAddress.getLoopbackAddress()).also { serverSocket = it }
+            } catch (e: IOException) {
+                logger.error("Failed to start Bridge ServerSocket", e)
+                return false
+            }
         }
+        logger.info("Bridge LSP Server socket listening on port ${boundSocket.localPort}")
+        startListening(boundSocket)
+        return true
     }
 
     fun stopBridgeServer() {
         logger.info("Stopping Bridge LSP Server")
-        // Disconnect the JetBrains LSP client.
-        LspServerManager.getInstance(project).stopServers<DartLspServerSupportProvider>()
-        
-        serverSocket?.close()
-        serverSocket = null
-        
-        listenFuture?.cancel(true)
-        listenFuture = null
-        
-        activeConnection?.close()
-        activeConnection = null
+        val socketToClose: ServerSocket?
+        val futureToCancel: Future<*>?
+        val connectionToClose: ActiveConnection?
+        synchronized(stateLock) {
+            socketToClose = serverSocket
+            serverSocket = null
+            futureToCancel = listenFuture
+            listenFuture = null
+            connectionToClose = activeConnection
+            activeConnection = null
+        }
+
+        socketToClose.closeQuietly()
+        futureToCancel?.cancel(true)
+
+        // Detach the old bridge from DAS immediately (before a new bridge can start),
+        // while keeping the socket open until the LSP client finishes shutdown -> exit -> disconnect.
+        connectionToClose?.bridgeServer?.stop()
+
+        // Disconnect the JetBrains LSP client if initialized.
+        try {
+            if (!project.isDisposed) {
+                project.serviceIfCreated<LspServerManager>()?.stopServers<DartLspServerSupportProvider>()
+            }
+        } finally {
+            connectionToClose?.closeGracefully(gracefulCloseTimeoutMs)
+        }
     }
 
-    private fun startListening() {
+    private fun startListening(currentServerSocket: ServerSocket) {
         // Start a background thread to listen for incoming connections from the JetBrains LSP client.
-        listenFuture = ApplicationManager.getApplication().executeOnPooledThread {
-            while (serverSocket?.isClosed == false) {
+        val future = ApplicationManager.getApplication().executeOnPooledThread {
+            while (!currentServerSocket.isClosed) {
                 try {
                     // accept() is a blocking call. The thread suspends here and consumes no CPU
                     // until the JetBrains LSP client initiates a connection.
-                    val socket = serverSocket?.accept() ?: continue
+                    val socket = currentServerSocket.accept()
                     logger.info("Accepted connection from client: ${socket.remoteSocketAddress}")
-                    handleClientConnection(socket)
+                    handleClientConnection(currentServerSocket, socket)
                 } catch (e: IOException) {
-                    if (serverSocket?.isClosed == false) {
+                    if (!currentServerSocket.isClosed) {
                         logger.error("Error accepting connection", e)
                     }
                 }
             }
         }
-    }
-
-
-    private fun handleClientConnection(socket: Socket) {
-        // Close existing connection if any.
-        activeConnection?.close()
-
-        var bridgeServer: DartBridgeLspServer? = null
-        try {
-            bridgeServer = DartBridgeLspServer(project)
-            val launcher = Launcher.createLauncher(bridgeServer, DartLanguageClient::class.java, socket.getInputStream(), socket.getOutputStream())
-            
-            bridgeServer.connect(launcher.remoteProxy)
-            val startListeningFuture = launcher.startListening()
-
-            activeConnection = ActiveConnection(socket, bridgeServer, startListeningFuture)
-        } catch (e: Exception) {
-            logger.error("Failed to handle client connection", e)
-            bridgeServer?.stop()
-            try {
-                socket.close()
-            } catch (ex: IOException) {
-                // Ignore
+        synchronized(stateLock) {
+            if (serverSocket === currentServerSocket) {
+                listenFuture = future
+            } else {
+                future.cancel(true)
             }
         }
     }
 
+
+    private fun handleClientConnection(currentServerSocket: ServerSocket, socket: Socket) {
+        val (previousConnection, acceptedOnActiveServer) = synchronized(stateLock) {
+            if (currentServerSocket.isClosed || serverSocket !== currentServerSocket) {
+                null to false
+            } else {
+                val previous = activeConnection
+                activeConnection = null
+                previous to true
+            }
+        }
+        if (!acceptedOnActiveServer) {
+            socket.closeQuietly()
+            return
+        }
+        previousConnection?.closeGracefully(gracefulCloseTimeoutMs)
+
+        var server: DartBridgeLspServer? = null
+        try {
+            val bridge = DartBridgeLspServer(project)
+            server = bridge
+            val launcher = createBridgeLauncher(bridge, socket)
+            bridge.connect(launcher.remoteProxy)
+            val newConnection = ActiveConnection(socket, bridge, launcher.startListening())
+            val installed = synchronized(stateLock) {
+                if (!currentServerSocket.isClosed && serverSocket === currentServerSocket) {
+                    activeConnection = newConnection
+                    true
+                } else {
+                    false
+                }
+            }
+            if (!installed) {
+                newConnection.close()
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to handle client connection", e)
+            server?.stop()
+            socket.closeQuietly()
+        }
+    }
+
+    private fun createBridgeLauncher(server: DartBridgeLspServer, socket: Socket): Launcher<DartLanguageClient> =
+        Launcher.Builder<DartLanguageClient>()
+            .setLocalService(server)
+            .setRemoteInterface(DartLanguageClient::class.java)
+            .setExecutorService(AppExecutorUtil.getAppExecutorService())
+            .setInput(socket.getInputStream())
+            .setOutput(socket.getOutputStream())
+            .wrapMessages { consumer ->
+                MessageConsumer { message ->
+                    try {
+                        consumer.consume(message)
+                    } catch (e: JsonRpcException) {
+                        // Suppress write failures only for outbound ResponseMessages once shutdown has started,
+                        // preventing RemoteEndpoint.handleRequest from logging a Level.SEVERE IDE Internal Error
+                        // on a closed socket while allowing server->client RequestMessages to fail fast.
+                        if (message is ResponseMessage && server.isStopped) {
+                            logger.debug("Ignoring response write on closing LSP bridge socket: ${e.message}")
+                        } else {
+                            throw e
+                        }
+                    }
+                }
+            }
+            .create()
+
     override fun dispose() {
         logger.info("Disposing DartBridgeLspServerManager")
         stopBridgeServer()
+    }
+
+    private fun ServerSocket?.closeQuietly() {
+        try {
+            this?.close()
+        } catch (_: IOException) {
+            // Ignore
+        }
+    }
+
+    private fun Socket?.closeQuietly() {
+        try {
+            this?.close()
+        } catch (_: IOException) {
+            // Ignore
+        }
     }
 
     private inner class ActiveConnection(
@@ -144,15 +248,29 @@ class DartBridgeLspServerManager(private val project: Project) : Disposable {
         val bridgeServer: DartBridgeLspServer,
         val listeningFuture: Future<*>
     ) {
+        fun closeGracefully(timeoutMs: Long) {
+            bridgeServer.stop()
+            if (listeningFuture.isDone) {
+                socket.closeQuietly()
+                return
+            }
+            ApplicationManager.getApplication().executeOnPooledThread {
+                try {
+                    listeningFuture.get(timeoutMs, TimeUnit.MILLISECONDS)
+                } catch (_: Exception) {
+                    // Timed out, cancelled, or failed — fall through to force-close.
+                } finally {
+                    listeningFuture.cancel(true)
+                    socket.closeQuietly()
+                }
+            }
+        }
+
         fun close() {
             logger.info("Closing active connection")
             bridgeServer.stop()
             listeningFuture.cancel(true)
-            try {
-                socket.close()
-            } catch (e: IOException) {
-                // Ignore
-            }
+            socket.closeQuietly()
         }
     }
 }
