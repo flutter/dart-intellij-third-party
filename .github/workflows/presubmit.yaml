@@ -68,6 +68,9 @@ jobs:
   # Job 2: Unit Tests
   unit-tests:
     needs: build-plugin
+    # Backstop for the whole job. The test step has a shorter timeout of its own, so a hang fails that step
+    # and the upload steps below still run.
+    timeout-minutes: 30
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -93,6 +96,8 @@ jobs:
         shell: bash
 
       - name: Unit Test Action
+        # This step normally takes 4-10 minutes. Without a timeout, a hung test runs until GitHub's 6-hour default.
+        timeout-minutes: 20
         run: |
           export DART_HOME="$GITHUB_WORKSPACE/dart-sdk"
           ./gradlew :test --tests "com.jetbrains.lang.dart.*"
@@ -107,6 +112,20 @@ jobs:
           path: |
             **/build/reports/
             **/build/test-results/
+          if-no-files-found: ignore
+
+      # The IDE test log and the thread dumps the platform writes when it detects a stall (e.g. "Cannot execute
+      # background write action in 10 seconds") are under the hidden .intellijPlatform sandbox, which isn't in the
+      # test results. Keep them when the tests fail, time out, or are cancelled.
+      - name: Upload IDE test logs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure() || cancelled()
+        with:
+          name: ide-test-logs-${{ matrix.os }}
+          path: |
+            third_party/.intellijPlatform/sandbox/*/*/log-test/
+            !third_party/.intellijPlatform/sandbox/*/*/log-test/**/open*telemetry*
+          include-hidden-files: true
           if-no-files-found: ignore
 
   # Job 3: Verify Plugin
