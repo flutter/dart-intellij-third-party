@@ -61,6 +61,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
   public static final String JUMP_TO_SOURCE_ACTION_ID = ID_PREFIX + ".jumpToSource";
   public static final String OPEN_DOCUMENTATION_ACTION_ID = ID_PREFIX + ".openDocumentation";
   public static final String OPEN_SERVER_SETTINGS_ACTION_ID = ID_PREFIX + ".openServerSettings";
+  public static final String APPLY_FIX_ACTION_ID = ID_PREFIX + ".applyFix";
 
   private static final LayeredIcon DART_ERRORS_ICON;
   private static final LayeredIcon DART_WARNINGS_ICON;
@@ -181,7 +182,8 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
           }
           catch (DartSourceEditException ignored) {/**/}
 
-          Analytics.report(AnalyticsData.forAction(this, event));
+          // This anonymous action isn't registered, so report it with an explicit id.
+          Analytics.report(AnalyticsData.forAction(APPLY_FIX_ACTION_ID, event));
         }
       });
     }
