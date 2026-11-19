@@ -93,7 +93,15 @@ class DartStartupActivity : ProjectActivity {
     if (Registry.`is`("dart.launch.dtd.and.devtools", false)) {
       // The DTD keeps the DASH__SUPPRESS_ANALYTICS it starts with. Started before the analytics config resolves, it
       // gets the provisional `true` and drops every IDE analytics event for the session, so wait (bounded) first.
-      runInterruptible(Dispatchers.IO) { Analytics.awaitConfigurationResolved(ANALYTICS_CONFIG_WAIT_MS) }
+      // serverReadyForRequest normally requests the config, but not if it saw no usable SDK and one appeared since,
+      // so request it here too (it returns at once if already resolved).
+      val sdk = DartSdk.getDartSdk(project)
+      if (sdk != null) {
+        runInterruptible(Dispatchers.IO) {
+          Analytics.getConfiguration(sdk, project)
+          Analytics.awaitConfigurationResolved(ANALYTICS_CONFIG_WAIT_MS)
+        }
+      }
       DartToolingDaemonService.getInstance(project).startService()
     }
   }
