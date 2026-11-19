@@ -6,6 +6,7 @@ import com.intellij.codeInsight.lookup.Lookup;
 import com.intellij.codeInsight.lookup.LookupElement;
 import com.intellij.codeInsight.lookup.LookupEx;
 import com.intellij.codeInsight.lookup.LookupManager;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.fixtures.CodeInsightFixtureTestCase;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.intellij.util.containers.ContainerUtil;
@@ -19,7 +20,12 @@ public class DartServerCompletionTest extends CodeInsightFixtureTestCase {
   public void setUp() throws Exception {
     super.setUp();
     DartTestUtils.configureDartSdk(myModule, myFixture.getTestRootDisposable(), true);
-    DartAnalysisServerService.getInstance(getProject()).serverReadyForRequest();
+    final DartAnalysisServerService das = DartAnalysisServerService.getInstance(getProject());
+    das.serverReadyForRequest();
+    // DartServerCompletionContributor picks completion.getSuggestions2 based on the version from server.connected. Without it,
+    // completion falls back to a request that current SDKs reject, and the lookup is empty (#857). Fail fast with a clear message.
+    PlatformTestUtil.waitWithEventsDispatching("Dart Analysis Server didn't report its version (server.connected)",
+                                               () -> !das.getServerVersion().isEmpty(), 30);
     myFixture.setTestDataPath(DartTestUtils.BASE_TEST_DATA_PATH + getBasePath());
     ((CodeInsightTestFixtureImpl)myFixture).canChangeDocumentDuringHighlighting(true);
   }
