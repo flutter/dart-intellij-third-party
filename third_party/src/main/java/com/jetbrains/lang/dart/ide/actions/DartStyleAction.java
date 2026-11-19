@@ -100,6 +100,10 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
     super.actionPerformed(event);
   }
 
+  /**
+   * Handles invocations when the cursor/focus is in an editor, redirecting to IntelliJ's standard
+   * Reformat Code action (which routes through LSP formatting).
+   */
   private void performEditorRedirect(@NotNull Project project, @NotNull Editor editor, @NotNull AnActionEvent event) {
     final AnAction reformatAction = getStandardReformatAction();
     if (reformatAction == null) return;
@@ -112,6 +116,10 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
     ActionUtil.performAction(reformatAction, createReformatEvent(reformatAction, event));
   }
 
+  /**
+   * Handles invocations when the cursor/focus is outside an editor (e.g. Project View file or
+   * directory selection), filtering strictly to applicable Dart files before reformatting via LSP.
+   */
   private void performFilesRedirect(@NotNull Project project, @NotNull AnActionEvent event) {
     final VirtualFile[] filesAndDirs = event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY);
     if (filesAndDirs == null || filesAndDirs.length == 0) return;
