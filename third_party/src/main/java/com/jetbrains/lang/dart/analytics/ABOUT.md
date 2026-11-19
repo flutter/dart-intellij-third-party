@@ -40,6 +40,8 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
 - In unit-test mode, `getConfiguration` returns a default, suppressed configuration without
   starting DTD.
 - Events are delivered with `DartToolingDaemonService.sendRequest("UnifiedAnalytics.send")`.
+  If the socket closes mid-send, the `WebSocketException` is caught and the event is dropped
+  with a debug log (never an IDE error).
 
 ## Side Effects
 - On first `getConfiguration`, starts a `DTDProcess` on a pooled thread and blocks the caller

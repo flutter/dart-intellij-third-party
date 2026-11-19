@@ -7,6 +7,7 @@
 - Optimizing imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
 
 ### Changed
+- Call Hierarchy navigation via LSP is now enabled for all users (#846)
 - Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
 - Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
 - Go to Super uses JetBrains LSP when experimental LSP features are enabled, navigating to the server's single effective target. Go to Implementation, gutter navigation and Method Hierarchy are unchanged (#821)
@@ -16,6 +17,7 @@
 
 ### Fixed
 - Avoid `SocketException: Socket closed` IDE internal error when stopping the LSP bridge or toggling experimental LSP features (#840)
+- Avoid showing whole-file LSP source actions (Sort Members, Organize Imports, Fix All) in the Alt+Enter intention menu (#838)
 - Avoid `IllegalStateException` in `DartNamedElementImpl.getId()` on `new` constructor declarations (#815)
 - Prevent DartProblemsView from dropping diagnostics when the tool window has not been opened yet, and decouple problem tracking from DartAnalysisServerService (#785)
 - Avoid empty code completion lists when a third-party `DartCompletionExtension` throws an error (#814)
@@ -26,6 +28,7 @@
 - Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
 - Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
 - Auto-selecting the current editor element in the Structure view when navigating across files (#800)
+- Avoid IDE internal errors from analytics delivery when the Dart Tooling Daemon connection closes or a project is closing, and bound the requests queued for a Dart Tooling Daemon that never connects (#848)
 
 ## 511.0.0
 

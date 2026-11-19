@@ -47,7 +47,11 @@ wrapper this package must use).
   `.agents/design-docs/websocket-design.md`).
 - This package owns JSON-RPC, request IDs, the trusted-client secret, and
   readiness (`webSocketReady`). The wrapper only handles transport.
-- Requests queue until `onOpen`. The queue is drained in FIFO order.
+- Requests queue until `onOpen`. The queue is drained in FIFO order. While the
+  socket isn't ready, about `MAX_PENDING_REQUESTS` (100) are queued; later
+  requests are dropped (service registrations never are), so a DTD that never
+  connects or has died can't grow the queue without bound. The first drop and
+  every 100th after it are logged at debug.
 - `onPing`/`onPong` are no-ops. The JDK sends the reply Pong automatically.
 - The trusted secret is added only when `includeSecret == true`.
 
