@@ -2996,11 +2996,20 @@ public final class DartAnalysisServerService implements Disposable {
 
   @VisibleForTesting
   public void setServer(@Nullable RemoteAnalysisServerImpl server) {
-    myServer = server;
-    if (server == null) {
-      mySemanticTokensLegend = null;
-      mySemanticTokensLegendFuture.set(new CompletableFuture<>());
-      setSemanticTokensAdvertised(false);
+    synchronized (myLock) {
+      if (myServer != null) {
+        myServer.removeAnalysisServerListener(myAnalysisServerListener);
+      }
+      myServer = server;
+      if (server != null) {
+        server.addAnalysisServerListener(myAnalysisServerListener);
+      }
+      else {
+        mySemanticTokensLegend = null;
+        mySemanticTokensLegendFuture.set(new CompletableFuture<>());
+        setSemanticTokensAdvertised(false);
+        myServerData.clearData();
+      }
     }
   }
 
