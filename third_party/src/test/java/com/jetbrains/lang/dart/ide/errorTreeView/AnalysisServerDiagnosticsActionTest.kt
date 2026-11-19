@@ -1,6 +1,7 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.errorTreeView
 
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.project.Project
@@ -8,6 +9,8 @@ import com.intellij.openapi.util.UserDataHolder
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.testFramework.TestActionEvent
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jetbrains.lang.dart.analytics.Analytics
+import com.jetbrains.lang.dart.analytics.AnalyticsData
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import java.lang.reflect.Proxy
 
@@ -71,5 +74,17 @@ class AnalysisServerDiagnosticsActionTest : BasePlatformTestCase() {
         action.run(mockProject, event)
 
         assertFalse(getServiceCalled)
+    }
+
+    fun testSettingsLinkReportsActionId() {
+        // The settings link runs an unregistered instance with no event; it must still report the registered id.
+        val events = mutableListOf<AnalyticsData>()
+        Analytics.withReportObserver({ events.add(it) }) { AnalysisServerDiagnosticsAction().run(createMockProject(), null) }
+
+        assertEquals(AnalysisServerDiagnosticsAction.ID, events.single().id)
+    }
+
+    fun testIdMatchesPluginXml() {
+        assertInstanceOf(ActionManager.getInstance().getAction(AnalysisServerDiagnosticsAction.ID), AnalysisServerDiagnosticsAction::class.java)
     }
 }
