@@ -1,7 +1,7 @@
 // Copyright 2026 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-package com.jetbrains.dart.analysisServer;
+package com.jetbrains.lang.dart.ide.refactoring;
 
 import com.google.dart.server.AnalysisServerSocket;
 import com.google.dart.server.DartLspWorkspaceApplyEditRequestConsumer;
@@ -17,7 +17,6 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.refactoring.ServerRenameRefactoring;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
 import com.jetbrains.lang.dart.sdk.DartSdk;
-import com.jetbrains.lang.dart.util.DartTestUtils;
 import org.dartlang.analysis.server.protocol.*;
 
 import java.util.ArrayList;
@@ -40,7 +39,6 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
   @Override
   protected void setUp() throws Exception {
     super.setUp();
-    DartTestUtils.configureDartSdk(getModule(), myFixture.getProjectDisposable(), false);
     DartAnalysisServerService service = DartAnalysisServerService.getInstance(getProject());
     DartSdk sdk = DartSdk.getDartSdk(getProject());
     assertNotNull(sdk);
@@ -77,6 +75,9 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
       onRequest = null;
       requests.clear();
       pendingStates.clear();
+    }
+    catch (Throwable e) {
+      addSuppressedException(e);
     }
     finally {
       super.tearDown();
