@@ -97,10 +97,12 @@ jobs:
 
       - name: Unit Test Action
         # This step normally takes 4-10 minutes. Without a timeout, a hung test runs until GitHub's 6-hour default.
-        timeout-minutes: 20
+        timeout-minutes: 14 # DO NOT MERGE: temporarily 14 (from 20) to verify the timeout path sooner.
         run: |
           export DART_HOME="$GITHUB_WORKSPACE/dart-sdk"
           ./gradlew :test --tests "com.jetbrains.lang.dart.*"
+          # DO NOT MERGE: simulate a hang after the tests have run, so the step times out with IDE logs on disk.
+          sleep 3600
         working-directory: third_party
         shell: bash
 
