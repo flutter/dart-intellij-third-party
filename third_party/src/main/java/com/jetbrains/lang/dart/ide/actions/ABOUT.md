@@ -6,7 +6,7 @@ Dart IDE actions (Pub commands, Reformat with Dart Style, Sort Members, Create D
 
 ## Interface
 - `AbstractDartFileProcessingAction` - abstract `AnAction` (DumbAware) that runs over the current editor or over selected files/dirs once the Analysis Server is ready.
-- `DartStyleAction` - Reformat with Dart Style; redirects to IntelliJ's standard `ReformatCode` action (LSP formatting) when experimental LSP features are enabled, and formats via `DartAnalysisServerService.edit_format` in legacy mode.
+- `DartStyleAction` - Reformat with Dart Style; when experimental LSP features are enabled, redirects editor invocations to IntelliJ's standard `ReformatCode` action and formats filtered `.dart` file/directory selections via `ReformatCodeProcessor` (routing through LSP formatting); formats via `DartAnalysisServerService.edit_format` in legacy mode.
 - `DartSortMembersAction` - Sort Members; applies `DartAnalysisServerService.edit_sortMembers` edits.
 - `DartFixAction` - experimental stub (empty bodies), not registered in `plugin.xml`.
 - `DartPubActionBase` (Kotlin) - abstract `AnAction, DumbAware` base that runs a `pub` command for a `pubspec.yaml` in the console; uses private `DartPubActionsService` coroutine scope.

@@ -22,7 +22,9 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.analytics.Analytics;
@@ -40,8 +42,11 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.Component;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
   private static final String INPUT = "void main(){bad();}";
@@ -138,17 +143,19 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
     }
   }
 
-  public void testVisibleAndEnabledForProjectViewFilesAndSingleDirectory() {
+  public void testVisibleAndEnabledForProjectViewFilesAndDirectories() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
-    final VirtualFile first = myFixture.addFileToProject("lib/a.dart", INPUT).getVirtualFile();
-    final VirtualFile second = myFixture.addFileToProject("lib/b.dart", INPUT).getVirtualFile();
-    final VirtualFile dir = first.getParent();
+    final VirtualFile first = myFixture.addFileToProject("dir_a/a.dart", INPUT).getVirtualFile();
+    final VirtualFile second = myFixture.addFileToProject("dir_b/b.dart", INPUT).getVirtualFile();
+    final VirtualFile dirA = first.getParent();
+    final VirtualFile dirB = second.getParent();
     final AnAction action = getRegisteredDartStyleAction();
 
     for (VirtualFile[] selection : List.of(
       new VirtualFile[]{first},
       new VirtualFile[]{first, second},
-      new VirtualFile[]{dir}
+      new VirtualFile[]{dirA},
+      new VirtualFile[]{dirA, dirB}
     )) {
       final DataContext context = SimpleDataContext.builder()
         .add(CommonDataKeys.PROJECT, getProject())
@@ -160,22 +167,6 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
       assertTrue(event.getPresentation().isEnabled());
       assertEquals(DartBundle.message("dart.style.action.name.ellipsis"), event.getPresentation().getText());
     }
-  }
-
-  public void testHiddenAndDisabledForMultipleDirectoriesUnsupportedByReformatCode() {
-    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
-    final VirtualFile dirA = myFixture.addFileToProject("dir_a/a.dart", INPUT).getVirtualFile().getParent();
-    final VirtualFile dirB = myFixture.addFileToProject("dir_b/b.dart", INPUT).getVirtualFile().getParent();
-    final AnAction action = getRegisteredDartStyleAction();
-    final DataContext context = SimpleDataContext.builder()
-      .add(CommonDataKeys.PROJECT, getProject())
-      .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{dirA, dirB})
-      .build();
-
-    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
-    action.update(event);
-    assertFalse(event.getPresentation().isVisible());
-    assertFalse(event.getPresentation().isEnabled());
   }
 
   public void testHiddenAndNoOpWhenReformatActionUnavailable() {
@@ -267,78 +258,158 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
     assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
   }
 
-  public void testProjectViewActionPerformedDelegatesToStandardReformatAction() {
+  public void testProjectViewDirectoryFormatsOnlyDartFilesViaReformatCodeProcessor() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
-    final VirtualFile first = myFixture.addFileToProject("lib/a.dart", INPUT).getVirtualFile();
-    final VirtualFile second = myFixture.addFileToProject("lib/b.dart", INPUT).getVirtualFile();
-    final List<AnActionEvent> delegatedEvents = new ArrayList<>();
-    final AnAction stubReformat = new AnAction() {
+    final VirtualFile dartA = myFixture.addFileToProject("mixed/a.dart", INPUT).getVirtualFile();
+    final VirtualFile dartB = myFixture.addFileToProject("mixed/sub/b.dart", INPUT).getVirtualFile();
+    myFixture.addFileToProject("mixed/Main.java", "class Main{}");
+    myFixture.addFileToProject("mixed/pubspec.yaml", "name: demo\n");
+    myFixture.addFileToProject("mixed/README.md", "# readme\n");
+    final VirtualFile mixedDir = dartA.getParent();
+
+    final List<Integer> confirmedCounts = new ArrayList<>();
+    final List<PsiFile[]> processedBatches = new ArrayList<>();
+    final DartStyleAction action = new DartStyleAction() {
       @Override
-      public @NotNull ActionUpdateThread getActionUpdateThread() {
-        return ActionUpdateThread.BGT;
+      boolean confirmRunOverFiles(@NotNull Project project, int fileCount) {
+        confirmedCounts.add(fileCount);
+        return true;
       }
 
       @Override
-      public void actionPerformed(@NotNull AnActionEvent e) {
-        delegatedEvents.add(e);
-      }
-    };
-    final DartStyleAction action = new DartStyleAction() {
-      @Override
-      @Nullable AnAction getStandardReformatAction() {
-        return stubReformat;
+      void runReformatCodeProcessor(@NotNull Project project, @NotNull PsiFile[] psiFiles) {
+        processedBatches.add(psiFiles);
       }
     };
 
     final DataContext context = SimpleDataContext.builder()
       .add(CommonDataKeys.PROJECT, getProject())
-      .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{first, second})
+      .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{mixedDir})
       .build();
     final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
     action.actionPerformed(event);
 
-    assertEquals(1, delegatedEvents.size());
-    final AnActionEvent delegated = delegatedEvents.getFirst();
-    assertEquals(ActionPlaces.PROJECT_VIEW_POPUP, delegated.getPlace());
-    assertSame(ActionUiKind.POPUP, delegated.getUiKind());
-    final VirtualFile[] delegatedFiles = delegated.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY);
-    assertNotNull(delegatedFiles);
-    assertEquals(2, delegatedFiles.length);
+    assertEquals(List.of(2), confirmedCounts);
+    assertEquals(1, processedBatches.size());
+    final Set<VirtualFile> formattedFiles = Arrays.stream(processedBatches.getFirst())
+      .map(PsiFile::getVirtualFile)
+      .collect(Collectors.toSet());
+    assertEquals(Set.of(dartA, dartB), formattedFiles);
     assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
   }
 
-  public void testNonDartProjectViewSelectionDoesNotDelegateOrReportAnalytics() {
+  public void testProjectViewMixedFilesAndMultipleDirectoriesFilterToDartFilesOnly() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    final VirtualFile dartA = myFixture.addFileToProject("dir_a/a.dart", INPUT).getVirtualFile();
+    myFixture.addFileToProject("dir_a/notes.txt", "notes");
+    final VirtualFile dartB = myFixture.addFileToProject("dir_b/b.dart", INPUT).getVirtualFile();
     final VirtualFile readme = myFixture.addFileToProject("README.md", "# hello").getVirtualFile();
-    final List<AnActionEvent> delegatedEvents = new ArrayList<>();
-    final AnAction stubReformat = new AnAction() {
-      @Override
-      public @NotNull ActionUpdateThread getActionUpdateThread() {
-        return ActionUpdateThread.BGT;
-      }
 
-      @Override
-      public void actionPerformed(@NotNull AnActionEvent e) {
-        delegatedEvents.add(e);
-      }
-    };
+    final List<PsiFile[]> processedBatches = new ArrayList<>();
     final DartStyleAction action = new DartStyleAction() {
       @Override
-      @Nullable AnAction getStandardReformatAction() {
-        return stubReformat;
+      boolean confirmRunOverFiles(@NotNull Project project, int fileCount) {
+        return true;
+      }
+
+      @Override
+      void runReformatCodeProcessor(@NotNull Project project, @NotNull PsiFile[] psiFiles) {
+        processedBatches.add(psiFiles);
       }
     };
+
     final DataContext context = SimpleDataContext.builder()
       .add(CommonDataKeys.PROJECT, getProject())
-      .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{readme})
+      .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{dartA.getParent(), dartB, readme})
       .build();
-    final List<AnalyticsData> reported = new ArrayList<>();
     final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+    action.actionPerformed(event);
 
-    Analytics.withReportObserver(reported::add, () -> action.actionPerformed(event));
-    assertTrue(delegatedEvents.isEmpty());
-    assertTrue(reported.isEmpty());
+    assertEquals(1, processedBatches.size());
+    final Set<VirtualFile> formattedFiles = Arrays.stream(processedBatches.getFirst())
+      .map(PsiFile::getVirtualFile)
+      .collect(Collectors.toSet());
+    assertEquals(Set.of(dartA, dartB), formattedFiles);
+    assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
+  }
+
+  public void testProjectViewCancelledDialogDoesNotReformat() {
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    final VirtualFile dartFile = myFixture.addFileToProject("lib/a.dart", INPUT).getVirtualFile();
+    final List<PsiFile[]> processedBatches = new ArrayList<>();
+    final DartStyleAction action = new DartStyleAction() {
+      @Override
+      boolean confirmRunOverFiles(@NotNull Project project, int fileCount) {
+        return false;
+      }
+
+      @Override
+      void runReformatCodeProcessor(@NotNull Project project, @NotNull PsiFile[] psiFiles) {
+        processedBatches.add(psiFiles);
+      }
+    };
+
+    final DataContext context = SimpleDataContext.builder()
+      .add(CommonDataKeys.PROJECT, getProject())
+      .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{dartFile})
+      .build();
+    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+    action.actionPerformed(event);
+
+    assertTrue(processedBatches.isEmpty());
     assertTrue(legacyFormatRequests.isEmpty());
+  }
+
+  public void testProjectViewRunsRealReformatCodeProcessorWithoutLegacyEditFormat() {
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    final VirtualFile dartFile = myFixture.addFileToProject("lib/real.dart", INPUT).getVirtualFile();
+    final DartStyleAction action = new DartStyleAction() {
+      @Override
+      boolean confirmRunOverFiles(@NotNull Project project, int fileCount) {
+        return true;
+      }
+    };
+
+    final DataContext context = SimpleDataContext.builder()
+      .add(CommonDataKeys.PROJECT, getProject())
+      .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{dartFile})
+      .build();
+    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+    action.actionPerformed(event);
+
+    assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
+  }
+
+  public void testNonDartProjectViewSelectionDoesNotReformatOrReportAnalytics() {
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    final VirtualFile readme = myFixture.addFileToProject("non_dart/README.md", "# hello").getVirtualFile();
+    final List<PsiFile[]> processedBatches = new ArrayList<>();
+    final DartStyleAction action = new DartStyleAction() {
+      @Override
+      boolean confirmRunOverFiles(@NotNull Project project, int fileCount) {
+        fail("Confirmation dialog must not appear when no Dart files are selected");
+        return false;
+      }
+
+      @Override
+      void runReformatCodeProcessor(@NotNull Project project, @NotNull PsiFile[] psiFiles) {
+        processedBatches.add(psiFiles);
+      }
+    };
+
+    for (VirtualFile[] selection : List.of(new VirtualFile[]{readme}, new VirtualFile[]{readme.getParent()})) {
+      final DataContext context = SimpleDataContext.builder()
+        .add(CommonDataKeys.PROJECT, getProject())
+        .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, selection)
+        .build();
+      final List<AnalyticsData> reported = new ArrayList<>();
+      final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+
+      Analytics.withReportObserver(reported::add, () -> action.actionPerformed(event));
+      assertTrue(processedBatches.isEmpty());
+      assertTrue(reported.isEmpty());
+      assertTrue(legacyFormatRequests.isEmpty());
+    }
   }
 
   public void testRegisteredActionReportsAnalyticsAndDoesNotCallLegacyFormatUnderLsp() {
