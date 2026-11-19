@@ -2,6 +2,7 @@
 package com.jetbrains.lang.dart.ide.errorTreeView
 
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.project.Project
@@ -78,10 +79,13 @@ class AnalysisServerDiagnosticsActionTest : BasePlatformTestCase() {
 
     fun testSettingsLinkReportsActionId() {
         // The settings link runs an unregistered instance with no event; it must still report the registered id.
+        // Uses the real light project: the async diagnostics-port lookup may notify on it after the test.
         val events = mutableListOf<AnalyticsData>()
-        Analytics.withReportObserver({ events.add(it) }) { AnalysisServerDiagnosticsAction().run(createMockProject(), null) }
+        Analytics.withReportObserver({ events.add(it) }) { AnalysisServerDiagnosticsAction().run(project, null) }
 
-        assertEquals(AnalysisServerDiagnosticsAction.ID, events.single().id)
+        val event = events.single()
+        assertEquals(AnalysisServerDiagnosticsAction.ID, event.id)
+        assertEquals(ActionPlaces.UNKNOWN, event.data["place"])
     }
 
     fun testIdMatchesPluginXml() {
