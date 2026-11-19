@@ -41,7 +41,16 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
   starting DTD.
 - Events are delivered with `DartToolingDaemonService.sendRequest("UnifiedAnalytics.send")`.
   If the socket closes mid-send, the `WebSocketException` is caught and the event is dropped
-  with a debug log (never an IDE error).
+  (never an IDE error).
+- Silent drops go through `Analytics.recordDrop(reason)`, which logs each one at debug under the
+  `com.jetbrains.lang.dart.analytics.Analytics` category (enable it in Help | Diagnostic Tools |
+  Debug Log Settings). The `Analytics.DropReason` values are: an event without an id (`no_id`),
+  without a project or with the default project (`no_project`), whose project was disposed
+  (`project_disposed`), a failed send (`send_failed`), a DTD error response (`dtd_error`, logged
+  with the error code only), and a field whose value isn't a `String`, `Boolean` or `Int`
+  (`unsupported_value`; the rest of the event is still sent). Tests observe them with
+  `setDropObserverForTests` (reasons only, never details). The DTD queue cap logs its own drops (see
+  [toolingDaemon](../ide/toolingDaemon/ABOUT.md)).
 
 ## Side Effects
 - On first `getConfiguration`, starts a `DTDProcess` on a pooled thread and blocks the caller
