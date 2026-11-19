@@ -26,6 +26,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.Disposer
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
@@ -230,6 +232,12 @@ private object AnalyticsConfigurationManager {
             initLatch.countDown()
           }
         }
+
+        // If the DTD exits before it starts (e.g. it crashes without printing anything), onProcessStarted never runs.
+        // Release the latch so waiters don't block for the rest of the session. A second countDown is a no-op.
+        override fun onProcessTerminated() {
+          initLatch.countDown()
+        }
       }
       ApplicationManager.getApplication().executeOnPooledThread {
         try {
@@ -249,6 +257,9 @@ private object AnalyticsConfigurationManager {
 
     return data
   }
+
+  /** See [Analytics.awaitConfigurationResolved]. */
+  fun awaitResolved(timeoutMs: Long): Boolean = isInitializing && initLatch.await(timeoutMs, TimeUnit.MILLISECONDS)
 
   private fun scheduleConsentPromptNotification(project: Project, dtdProcess: DTDProcess) {
     ApplicationManager.getApplication().invokeLater {
@@ -281,6 +292,7 @@ object Analytics {
       AnalyticsConfigurationManager.safeData
     )
 
+  @Volatile
   var suppressAnalytics: Boolean = true
     internal set
 
@@ -326,6 +338,22 @@ object Analytics {
   @JvmStatic
   fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
     AnalyticsConfigurationManager.getConfiguration(sdk, project, logger)
+
+  /**
+   * Blocks up to [timeoutMs] until the configuration requested by [getConfiguration] resolves or fails, and returns
+   * whether it did (`false` at once if it was never requested). Until then [suppressAnalytics] is the provisional
+   * `true`, which a process launched with [updateEnvironment] keeps for its lifetime. Throws [InterruptedException]
+   * if interrupted.
+   */
+  @RequiresBackgroundThread
+  @RequiresReadLockAbsence
+  internal fun awaitConfigurationResolved(timeoutMs: Long): Boolean {
+    val resolved = AnalyticsConfigurationManager.awaitResolved(timeoutMs)
+    if (!resolved) {
+      logger.info("Analytics configuration not resolved after $timeoutMs ms; continuing with analytics suppressed")
+    }
+    return resolved
+  }
 
   private val testObserver = ThreadLocal<Consumer<AnalyticsData>>()
 

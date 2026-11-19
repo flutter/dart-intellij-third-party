@@ -46,6 +46,12 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
 ## Side Effects
 - On first `getConfiguration`, starts a `DTDProcess` on a pooled thread and blocks the caller
   for up to 700 ms while consent and telemetry state are queried.
+- `DartStartupActivity` waits (off the read lock, up to 3 s) for that configuration to resolve
+  or fail, via the internal `awaitConfigurationResolved`, before starting the project DTD and
+  before deciding whether to send the settings event. A DTD started earlier would keep the
+  provisional `DASH__SUPPRESS_ANALYTICS=true` and drop every IDE event for the session.
+  Resolution slower than that still starts the DTD suppressed (logged at info). The consent DTD
+  exiting early also releases the wait.
 - When DTD says a consent message must be shown, posts a notification in the
   "Dart Analysis Server" group. Its OK action confirms with `clientShowedMessage` and then
   terminates the DTD process.
