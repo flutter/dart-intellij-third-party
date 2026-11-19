@@ -39,6 +39,12 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
   telemetry is enabled and no consent prompt is pending.
 - In unit-test mode, `getConfiguration` returns a default, suppressed configuration without
   starting DTD.
+- A failed resolution (the DTD fails to start, exits before it starts, or an RPC throws or times
+  out) isn't cached for the session. `ConfigRetryPolicy` schedules a retry after 1 min, then 5 min,
+  then gives up. Until a retry succeeds, analytics stay suppressed. A late success helps later
+  process starts (new projects, analysis-server restarts, later DTD and child-process starts) and a
+  pending consent prompt. Processes that already started (the analysis server, the project DTD)
+  keep the suppressed environment they started with.
 - Events are delivered with `DartToolingDaemonService.sendRequest("UnifiedAnalytics.send")`.
   If the socket closes mid-send, the `WebSocketException` is caught and the event is dropped
   (never an IDE error).
