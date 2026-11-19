@@ -13,7 +13,8 @@ editor services is `ide/toolingDaemon/DartToolingDaemonService.kt`
 - `DTDProcess`: `start(sdk)`, `sendRequest(method, params, includeSecret, consumer)`,
   `terminate()`, the `webSocketReady` flag, and the `listener` property.
 - `DTDProcessListener`: callbacks `onProcessStarted(uri)`, `onWebSocketOpen()`,
-  `onWebSocketMessage(text)`, and `onWebSocketClose()`.
+  `onWebSocketMessage(text)`, `onWebSocketClose()`, and `onProcessTerminated()` (all default
+  to no-ops).
 
 ## Invariants
 - Reads `tooling_daemon_details.uri` and `trusted_client_secret` from the process's stdout.
