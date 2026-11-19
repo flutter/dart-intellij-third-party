@@ -22,7 +22,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
@@ -354,7 +354,7 @@ private object AnalyticsConfigurationManager {
         val target = projectRef.get()?.takeUnless { it.isDisposed }
                      ?: ProjectManager.getInstance().openProjects.firstOrNull { !it.isDisposed }
                      ?: return@executeOnPooledThread
-        val currentSdk = runReadActionBlocking {
+        val currentSdk = runReadAction {
           if (target.isDisposed) null else DartSdk.getDartSdk(target)
         } ?: return@executeOnPooledThread
         getConfiguration(currentSdk, target, logger)
