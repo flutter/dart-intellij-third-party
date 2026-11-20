@@ -267,9 +267,13 @@ public abstract class ServerRefactoring {
 
   private void notifyListener() {
     if (listener != null) {
-      boolean hasPendingRequests = !pendingRequestIds.isEmpty();
-      RefactoringStatus status = optionsStatus != null ? optionsStatus : new RefactoringStatus();
-      listener.requestStateChanged(hasPendingRequests, status);
+      // Read the state and notify under the same lock that requestDone() holds, so that the set is read safely and a listener can't
+      // get a stale "pending" state after a newer "done" one. The only listener, ServerRefactoringDialog, just posts to the EDT.
+      synchronized (pendingRequestIds) {
+        boolean hasPendingRequests = !pendingRequestIds.isEmpty();
+        RefactoringStatus status = optionsStatus != null ? optionsStatus : new RefactoringStatus();
+        listener.requestStateChanged(hasPendingRequests, status);
+      }
     }
   }
 
