@@ -1,18 +1,25 @@
 // Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.lang.dart.workflow;
 
+import com.intellij.execution.ExecutionResult;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.roots.ContentEntry;
 import com.intellij.openapi.roots.ModifiableRootModel;
 import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.platform.backend.workspace.WorkspaceModel;
+import com.intellij.xdebugger.XDebugSession;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.DartStartupActivityKt;
+import com.jetbrains.lang.dart.ide.runner.server.vmService.DartVmServiceDebugProcess;
 import com.jetbrains.lang.dart.util.DartTestUtils;
 import com.jetbrains.lang.dart.util.DartUrlResolver;
+import java.io.File;
+import java.lang.reflect.Proxy;
 import java.util.Map;
 import java.util.Set;
 import kotlin.Unit;
@@ -240,5 +247,111 @@ public class DartWorkflowTest extends DartCodeInsightFixtureTestCase {
     assertNotNull(file);
     assertEquals(rootPath + "/pub/global/cache/SomePackage/lib/somepack.dart", file.getPath());
     assertEquals("package:SomePackage/somepack.dart", resolver.getDartUrlForFile(file));
+  }
+
+  public void testDebugProcessUriResolution() throws Exception {
+    final String rootPath = ModuleRootManager.getInstance(getModule()).getContentRoots()[0].getPath();
+    final String rootUrl = "file:///" + StringUtil.trimLeading(rootPath, '/');
+
+    myFixture.addFileToProject("pubspec.yaml", "name: workspace_root");
+    final VirtualFile rootLibFile = myFixture.addFileToProject("lib/root_lib.dart", "").getVirtualFile();
+    final VirtualFile gitDepFile = myFixture.addFileToProject("pub/git_cache/git_pkg-abc123/lib/git_lib.dart", "").getVirtualFile();
+
+    // Workspace member / nested pubspec without its own .dart_tool/package_config.json (inherits root config).
+    final VirtualFile memberPubspec = myFixture.addFileToProject("pkgs/app/pubspec.yaml", """
+      name: app
+      resolution: workspace""").getVirtualFile();
+    final VirtualFile memberBinFile = myFixture.addFileToProject("pkgs/app/bin/main.dart", "").getVirtualFile();
+    final VirtualFile memberLibFile = myFixture.addFileToProject("pkgs/app/lib/app.dart", "").getVirtualFile();
+
+    myFixture.saveText(myFixture.addFileToProject(".dart_tool/package_config.json", "").getVirtualFile(),
+        String.format("""
+            {
+              "configVersion": 2,
+              "packages": [
+                {
+                  "name": "workspace_root",
+                  "rootUri": "../",
+                  "packageUri": "lib/"
+                },
+                {
+                  "name": "app",
+                  "rootUri": "../pkgs/app",
+                  "packageUri": "lib/"
+                },
+                {
+                  "name": "git_pkg",
+                  "rootUri": "%s",
+                  "packageUri": "lib/"
+                }
+              ]
+            }""", rootUrl + "/pub/git_cache/git_pkg-abc123"));
+
+    final DartUrlResolver resolver = DartUrlResolver.getInstance(getProject(), memberBinFile);
+    final XDebugSession debugSession = (XDebugSession)Proxy.newProxyInstance(
+      XDebugSession.class.getClassLoader(),
+      new Class<?>[]{XDebugSession.class},
+      (proxy, method, args) -> {
+        if ("getProject".equals(method.getName())) return getProject();
+        if ("isStopped".equals(method.getName())) return false;
+        return null;
+      }
+    );
+    final ExecutionResult executionResult = (ExecutionResult)Proxy.newProxyInstance(
+      ExecutionResult.class.getClassLoader(),
+      new Class<?>[]{ExecutionResult.class},
+      (proxy, method, args) -> null
+    );
+    final DartVmServiceDebugProcess debugProcess = new DartVmServiceDebugProcess(
+      debugSession,
+      executionResult,
+      resolver,
+      DartVmServiceDebugProcess.DebugType.CLI,
+      5000,
+      memberPubspec.getParent()
+    );
+
+    // 1. In-package lib/ file resolves to both package: and file:/// URIs.
+    assertSameElements(
+      debugProcess.getUrisForFile(memberLibFile),
+      "package:app/app.dart",
+      threeSlashFileUri(memberLibFile)
+    );
+    assertEquals(memberLibFile, resolver.findFileByDartUrl("package:app/app.dart"));
+
+    // 2. Sibling/path dependency outside the sub-package resolves via workspace package_config.json.
+    assertSameElements(
+      debugProcess.getUrisForFile(rootLibFile),
+      "package:workspace_root/root_lib.dart",
+      threeSlashFileUri(rootLibFile)
+    );
+    assertEquals(rootLibFile, resolver.findFileByDartUrl("package:workspace_root/root_lib.dart"));
+
+    // 3. Git / hosted dependency via file:/// rootUri in package_config.json.
+    assertSameElements(
+      debugProcess.getUrisForFile(gitDepFile),
+      "package:git_pkg/git_lib.dart",
+      threeSlashFileUri(gitDepFile)
+    );
+    assertEquals(gitDepFile, resolver.findFileByDartUrl("package:git_pkg/git_lib.dart"));
+
+    // 4. Files outside any package lib/ (bin/main.dart and standalone LocalFileSystem file) resolve via file:/// URI.
+    assertSameElements(debugProcess.getUrisForFile(memberBinFile), threeSlashFileUri(memberBinFile));
+    final File tempStandaloneIoFile = FileUtil.createTempFile("standalone_script", ".dart", true);
+    final VirtualFile standaloneFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempStandaloneIoFile);
+    assertNotNull(standaloneFile);
+    final String standaloneFileUri = threeSlashFileUri(standaloneFile);
+    assertSameElements(debugProcess.getUrisForFile(standaloneFile), standaloneFileUri);
+    assertEquals(standaloneFile, resolver.findFileByDartUrl(standaloneFileUri));
+
+    // 5. SDK dart: library short-circuits to dart: URI.
+    final VirtualFile sdkCollectionFile = resolver.findFileByDartUrl("dart:collection");
+    assertNotNull(sdkCollectionFile);
+    assertSameElements(debugProcess.getUrisForFile(sdkCollectionFile), "dart:collection");
+  }
+
+  private static String threeSlashFileUri(final VirtualFile file) {
+    final String rawUri = new File(file.getPath()).toURI().toString();
+    return rawUri.startsWith("file:///") ? rawUri : "file:///" + StringUtil.trimLeading(rawUri.substring("file:".length()), '/');
   }
 }

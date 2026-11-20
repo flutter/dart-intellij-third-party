@@ -21,7 +21,6 @@ import com.intellij.xdebugger.XDebugProcessStarter
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebuggerManager
 import com.jetbrains.lang.dart.DartBundle
-import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.runner.base.DartRunConfigurationBase
 import com.jetbrains.lang.dart.ide.runner.server.DartCommandLineRunConfiguration
 import com.jetbrains.lang.dart.ide.runner.server.DartRemoteDebugConfiguration
@@ -53,21 +52,7 @@ class DartRunner : GenericProgramRunner<RunnerSettings>() {
     }
 
     try {
-      val runConfig = environment.runProfile
-      val project = environment.project
-      val analysisServer = DartAnalysisServerService.getInstance(project)
-      val dasExecutionContextId = if (
-        runConfig is DartRunConfigurationBase &&
-        analysisServer.serverReadyForRequest()
-      ) {
-        val path = checkNotNull(runConfig.runnerParameters.filePath)
-        analysisServer.execution_createContext(path)
-      } else {
-        // No context ID if remote debugging or can't start DAS.
-        null
-      }
-
-      return doExecuteDartDebug(state, environment, dasExecutionContextId)
+      return doExecuteDartDebug(state, environment)
     } catch (e: RuntimeConfigurationError) {
       throw ExecutionException(e)
     }
@@ -77,7 +62,6 @@ class DartRunner : GenericProgramRunner<RunnerSettings>() {
   private fun doExecuteDartDebug(
     state: RunProfileState,
     env: ExecutionEnvironment,
-    dasExecutionContextId: String?
   ): RunContentDescriptor? {
     val runConfiguration = env.runProfile
     val project = env.project
@@ -126,7 +110,6 @@ class DartRunner : GenericProgramRunner<RunnerSettings>() {
           session,
           executionInfo.executionResult,
           dartUrlResolver,
-          dasExecutionContextId,
           executionInfo.debugType,
           VM_SERVICE_TIMEOUT_IN_MS,
           executionInfo.currentWorkingDirectory
