@@ -41,12 +41,12 @@ public class DartServerRenameTest extends CodeInsightFixtureTestCase {
     // check initial conditions
     final RefactoringStatus initialConditions = refactoring.checkInitialConditions();
     assertNotNull(initialConditions);
-    assertTrue(initialConditions.isOK());
+    assertTrue(String.valueOf(initialConditions), initialConditions.isOK());
     // check final conditions
     refactoring.setNewName(newName);
     final RefactoringStatus finalConditions = refactoring.checkFinalConditions();
     assertNotNull(finalConditions);
-    assertTrue(finalConditions.isOK());
+    assertTrue(String.valueOf(finalConditions), finalConditions.isOK());
     // apply the SourceChange
     final SourceChange change = refactoring.getChange();
     assertNotNull(change);
@@ -76,12 +76,12 @@ public class DartServerRenameTest extends CodeInsightFixtureTestCase {
     // initial status OK
     final RefactoringStatus initialConditions = refactoring.checkInitialConditions();
     assertNotNull(initialConditions);
-    assertTrue(initialConditions.isOK());
+    assertTrue(String.valueOf(initialConditions), initialConditions.isOK());
     // final (actually options) status has a fatal error
     refactoring.setNewName("bad name");
     final RefactoringStatus finalConditions = refactoring.checkFinalConditions();
     assertNotNull(finalConditions);
-    assertTrue(finalConditions.hasFatalError());
+    assertTrue(String.valueOf(finalConditions), finalConditions.hasFatalError());
   }
 
   public void testCheckInitialConditionsCannotCreate() {

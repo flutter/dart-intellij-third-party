@@ -203,6 +203,12 @@ public abstract class ServerRefactoring {
                                          RefactoringFeedback feedback,
                                          SourceChange _change,
                                          List<String> _potentialEdits) {
+          if (isSuperseded(id)) {
+            // A newer request was sent; its response is the one that counts.
+            latch.countDown();
+            requestDone(id);
+            return;
+          }
           if (feedback != null) {
             setFeedback(feedback);
           }
@@ -220,6 +226,13 @@ public abstract class ServerRefactoring {
 
         @Override
         public void onError(RequestError requestError) {
+          if (isSuperseded(id)) {
+            // The server cancels a pending edit.getRefactoring request (REFACTORING_REQUEST_CANCELLED)
+            // when a newer one arrives. Don't let the stale error fail the newer request.
+            latch.countDown();
+            requestDone(id);
+            return;
+          }
           String message = "Server error: " + requestError.getMessage();
           serverErrorStatus = RefactoringStatus.createFatalErrorStatus(message);
           latch.countDown();
@@ -243,6 +256,12 @@ public abstract class ServerRefactoring {
       // so that we don't have to disable UI and re-enable it 2 milliseconds later.
       Uninterruptibles.awaitUninterruptibly(latch, 10, TimeUnit.MILLISECONDS);
       notifyListener();
+    }
+  }
+
+  private boolean isSuperseded(int id) {
+    synchronized (pendingRequestIds) {
+      return id != lastId;
     }
   }
 
