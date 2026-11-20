@@ -12,11 +12,16 @@ import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.platform.dartlsp.api.Lsp4jClient
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspCommunicationChannel
+import com.intellij.platform.dartlsp.api.LspServer
+import com.intellij.platform.dartlsp.api.LspServerListener
+import com.intellij.platform.dartlsp.api.LspServerNotificationsHandler
 import com.intellij.platform.dartlsp.api.ProjectWideLspServerDescriptor
-import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyCustomizer
-import com.intellij.platform.dartlsp.api.customization.LspCallHierarchyDisabled
+import com.jetbrains.lang.dart.analyzer.DartLocalFileInfo
+import com.jetbrains.lang.dart.analyzer.getDartFileInfo
+import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView
 import com.intellij.platform.dartlsp.api.customization.LspCallHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspCodeActionsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspCodeActionsDisabled
@@ -43,7 +48,9 @@ import com.intellij.platform.dartlsp.api.customization.LspFindReferencesCustomiz
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesDisabled
 import com.intellij.platform.dartlsp.api.customization.LspFindReferencesSupport
 import com.intellij.platform.dartlsp.api.customization.LspFoldingRangeDisabled
+import com.intellij.platform.dartlsp.api.customization.LspFormattingCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspFormattingDisabled
+import com.intellij.platform.dartlsp.api.customization.LspFormattingSupport
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionDisabled
 import com.intellij.platform.dartlsp.api.customization.LspGoToDefinitionSupport
@@ -51,13 +58,18 @@ import com.intellij.platform.dartlsp.api.customization.LspGoToTypeDefinitionSupp
 import com.intellij.platform.dartlsp.api.customization.LspHoverSupport
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspInlayHintDisabled
+import com.intellij.platform.dartlsp.api.customization.LspIntentionAction
+import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
+import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsSupport
 import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSelectionRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensSupport
+import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpDisabled
+import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
 import com.intellij.psi.PsiFile
@@ -65,13 +77,18 @@ import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.DartFileType
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
+import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.eclipse.lsp4j.ClientCapabilities
+import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionKind
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
+import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.PublishDiagnosticsCapabilities
+import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.SemanticTokenModifiers
 import org.eclipse.lsp4j.SemanticTokenTypes
 import org.eclipse.lsp4j.TextDocumentClientCapabilities
@@ -92,6 +109,20 @@ private const val DART_CONFIGURATION_SECTION = "dart"
 class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(project, "Dart (Bridge)") {
 
     override val lsp4jServerClass: Class<out Lsp4jServer> = DartLanguageServer::class.java
+
+    override fun createLsp4jClient(handler: LspServerNotificationsHandler): Lsp4jClient =
+        DartLsp4jClient(project, handler)
+
+    override val lspServerListener: LspServerListener = object : LspServerListener {
+        override fun serverInitialized(params: InitializeResult) {
+            // If the Dart Tooling Daemon (DTD) started before the LSP server (or if the LSP server was
+            // restarted), connect the newly initialized LSP server to the running DTD instance.
+            val dtdUri = project.getServiceIfCreated(DartToolingDaemonService::class.java)?.uri
+            if (dtdUri != null) {
+                DartLspService.connectToDtd(project, dtdUri)
+            }
+        }
+    }
 
     override val clientCapabilities: ClientCapabilities
         get() = super.clientCapabilities.apply {
@@ -186,7 +217,7 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             }
         override val codeActionsCustomizer: LspCodeActionsCustomizer
             get() = if (DartConfigurable.isLspCodeActionsEnabled(project)) {
-                LspCodeActionsSupport()
+                DartLspCodeActionsSupport
             } else {
                 LspCodeActionsDisabled
             }
@@ -196,14 +227,24 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
             } else {
                 LspCommandsDisabled
             }
-        override val formattingCustomizer = LspFormattingDisabled
+        override val formattingCustomizer: LspFormattingCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                DartLspFormattingSupport
+            } else {
+                LspFormattingDisabled
+            }
         override val findReferencesCustomizer: LspFindReferencesCustomizer
             get() = if (DartAnalysisServerService.isLspReferencesEnabled(project)) {
                 LspFindReferencesSupport()
             } else {
                 LspFindReferencesDisabled
             }
-        override val optimizeImportsCustomizer = LspOptimizeImportsDisabled
+        override val optimizeImportsCustomizer: LspOptimizeImportsCustomizer
+            get() = if (DartConfigurable.isLspCodeActionsEnabled(project)) {
+                LspOptimizeImportsSupport()
+            } else {
+                LspOptimizeImportsDisabled
+            }
         override val documentColorCustomizer = LspDocumentColorDisabled
         override val documentLinkCustomizer = LspDocumentLinkDisabled
         override val foldingRangeCustomizer = LspFoldingRangeDisabled
@@ -218,7 +259,12 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 // The default implementation only serves plain-text/TextMate files.
                 override fun shouldAskServerForDocumentHighlights(psiFile: PsiFile): Boolean = true
             }
-        override val signatureHelpCustomizer = LspSignatureHelpDisabled
+        override val signatureHelpCustomizer: LspSignatureHelpCustomizer
+            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+                LspSignatureHelpSupport()
+            } else {
+                LspSignatureHelpDisabled
+            }
         override val documentSymbolCustomizer: LspDocumentSymbolCustomizer
             get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
                 LspDocumentSymbolSupport()
@@ -226,17 +272,43 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
                 LspDocumentSymbolDisabled
             }
         override val workspaceSymbolCustomizer = LspWorkspaceSymbolDisabled
-        override val callHierarchyCustomizer: LspCallHierarchyCustomizer
-            get() = if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-                LspCallHierarchySupport()
-            } else {
-                LspCallHierarchyDisabled
-            }
+        override val callHierarchyCustomizer = LspCallHierarchySupport()
         override val typeHierarchyCustomizer = LspTypeHierarchySupport()
 
         override val selectionRangeCustomizer = LspSelectionRangeDisabled
         override val codeLensCustomizer = LspCodeLensDisabled
         override val renameCustomizer = LspRenameDisabled
+    }
+}
+
+private object DartLspFormattingSupport : LspFormattingSupport() {
+    override fun shouldFormatThisFileExclusivelyByServer(
+        file: VirtualFile,
+        ideCanFormatThisFileItself: Boolean,
+        serverExplicitlyWantsToFormatThisFile: Boolean
+    ): Boolean = file.isInLocalFileSystem && file.extension.equals("dart", ignoreCase = true)
+}
+
+object DartLspCodeActionsSupport : LspCodeActionsSupport() {
+    /**
+     * Excludes whole-file LSP `Source` code actions (`source` and `source.*`, such as
+     * `source.sortMembers`, `source.organizeImports`, and `source.fixAll`) from the `Alt+Enter`
+     * intention menu (dart-lang/sdk#64939).
+     *
+     * JetBrains' `LspIntentionActionService` requests `textDocument/codeAction` with `only = null`
+     * and only filters out `quickfix*`, so whole-file `Source` actions otherwise crowd cursor-specific
+     * assists/refactorings and consume slots in the fixed `LspIntention0..14` pool. Whole-file Organize
+     * Imports and Sort Members have dedicated IDE actions under the **Code** menu, and per-diagnostic
+     * quick fixes (including "Fix all '<lint>' in file", which uses `quickfix.*`) go through
+     * [createQuickFix] and remain untouched.
+     */
+    override fun createIntentionAction(lspServer: LspServer, codeAction: CodeAction): LspIntentionAction? {
+        if (codeAction.kind == CodeActionKind.Source ||
+            codeAction.kind?.startsWith("${CodeActionKind.Source}.") == true
+        ) {
+            return null
+        }
+        return super.createIntentionAction(lspServer, codeAction)
     }
 }
 
@@ -336,6 +408,35 @@ object DartLspSemanticTokensSupport : LspSemanticTokensSupport() {
             "source" -> DartSyntaxHighlighterColors.IDENTIFIER
             // Comments, numbers, plain strings, booleans, and operators are left to DartSyntaxHighlighter (lexer), matching legacy behavior.
             else -> null
+        }
+    }
+}
+
+/**
+ * Custom [Lsp4jClient] that intercepts standard `textDocument/publishDiagnostics` notifications
+ * to update the Dart Analysis tool window (`DartProblemsView`) identically in both Bridge mode and Full LSP
+ * (while delegating to [super.publishDiagnostics] for editor highlightings and squiggles), and handles
+ * custom `dart/textDocument/publishClosingLabels` notifications via [DartLanguageClient].
+ */
+open class DartLsp4jClient(
+    private val project: Project,
+    handler: LspServerNotificationsHandler,
+) : Lsp4jClient(handler), DartLanguageClient {
+
+    override fun publishDiagnostics(params: PublishDiagnosticsParams) {
+        if (project.isDisposed) return
+        super.publishDiagnostics(params)
+        val diagnostics = params.diagnostics ?: emptyList()
+        val errors = DartLspDiagnosticConverter.convertDiagnostics(project, params.uri, diagnostics)
+            .filter { it.type != "TODO" }
+        val fileInfo = getDartFileInfo(project, params.uri)
+        val filePath = if (fileInfo is DartLocalFileInfo) fileInfo.filePath else params.uri
+        DartProblemsView.getInstance(project).updateErrorsForFile(filePath, errors)
+    }
+
+    override fun publishClosingLabels(params: DartPublishClosingLabelsParams) {
+        if (params.uri != null) {
+            DartLspClosingLabelsService.getInstance(project).updateClosingLabels(params.uri, params.labels)
         }
     }
 }

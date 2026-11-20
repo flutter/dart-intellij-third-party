@@ -16,7 +16,6 @@ import com.google.dart.server.GetImportedElementsConsumer;
 import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
 import com.google.dart.server.GetRefactoringConsumer;
-import com.google.dart.server.GetRuntimeCompletionConsumer;
 import com.google.dart.server.GetServerPortConsumer;
 import com.google.dart.server.GetStatementCompletionConsumer;
 import com.google.dart.server.GetSuggestionDetailsConsumer;
@@ -96,9 +95,10 @@ import com.jetbrains.lang.dart.ide.actions.DartPubActionBase;
 import com.jetbrains.lang.dart.ide.completion.DartCompletionTimerExtension;
 import com.jetbrains.lang.dart.ide.errorTreeView.DartProblemsView;
 import com.jetbrains.lang.dart.ide.template.postfix.DartPostfixTemplateProvider;
-import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager;
+import com.jetbrains.lang.dart.lsp.DartLspClosingLabel;
+import com.jetbrains.lang.dart.lsp.DartLspClosingLabelsService;
 import com.jetbrains.lang.dart.lsp.DartLspConfigurationSync;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
@@ -136,14 +136,14 @@ import org.dartlang.analysis.server.protocol.RefactoringOptions;
 import org.dartlang.analysis.server.protocol.RemoveContentOverlay;
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.dartlang.analysis.server.protocol.RequestErrorCode;
-import org.dartlang.analysis.server.protocol.RuntimeCompletionExpression;
-import org.dartlang.analysis.server.protocol.RuntimeCompletionVariable;
 import org.dartlang.analysis.server.protocol.SearchResult;
 import org.dartlang.analysis.server.protocol.ServerService;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.dartlang.analysis.server.protocol.SourceFileEdit;
 import org.dartlang.analysis.server.protocol.TypeHierarchyItem;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SemanticTokensLegend;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NonNls;
@@ -273,12 +273,7 @@ public final class DartAnalysisServerService implements Disposable {
 
   private boolean myHaveShownInitialProgress;
   private boolean mySentAnalysisBusy;
-  private @Nullable String myDtdUri;
 
-  // files with red squiggles in Project View. This field is also used as a lock to access these 3 collections
-  private final @NotNull Set<String> myFilePathsWithErrors = new HashSet<>();
-  // how many files with errors are in this folder (recursively)
-  private final @NotNull Object2IntMap<String> myFolderPathsWithErrors = new Object2IntOpenHashMap<>();
   // errors hash is tracked to optimize error notification listener: do not handle equal notifications more than once
   private final @NotNull Object2IntMap<String> myFilePathToErrorsHash = new Object2IntOpenHashMap<>();
 
@@ -325,8 +320,7 @@ public final class DartAnalysisServerService implements Disposable {
 
     @Override
     public void computedClosingLabels(@NotNull String filePathOrUri, @NotNull List<ClosingLabel> labels) {
-      DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathOrUri);
-      myServerData.computedClosingLabels(fileInfo, labels);
+      DartAnalysisServerService.this.computedClosingLabels(filePathOrUri, labels);
     }
 
     @Override
@@ -363,7 +357,7 @@ public final class DartAnalysisServerService implements Disposable {
 
       for (DartFileInfo fileInfo : fileInfos) {
         if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-          onErrorsUpdated(localFileInfo, AnalysisError.EMPTY_LIST, false, 0);
+          onErrorsUpdated(localFileInfo, AnalysisError.EMPTY_LIST, 0);
         }
       }
     }
@@ -466,6 +460,41 @@ public final class DartAnalysisServerService implements Disposable {
       myServerData.textDocumentContentDidChange(fileUri);
     }
   };
+
+  @VisibleForTesting
+  public void computedClosingLabels(@NotNull String filePathOrUri, @NotNull List<ClosingLabel> labels) {
+    DartFileInfo fileInfo = DartFileInfoKt.getDartFileInfo(myProject, filePathOrUri);
+    myServerData.computedClosingLabels(fileInfo, labels);
+
+    // Backward-compatibility adapter for SDKs < 3.14.0-219.0.dev that emit legacy
+    // analysis.closingLabels instead of dart/textDocument/publishClosingLabels.
+    // Note: this method is invoked on the Analysis Server reader thread, which must never call
+    // runReadAction synchronously (otherwise it deadlocks if the EDT holds the write lock while
+    // awaiting an Analysis Server response, e.g. during MoveFileRefactoring).
+    boolean lspClosingLabelsEnabled = !mySdkVersion.isEmpty() &&
+                                      isDartSdkVersionSufficientForLspClosingLabels(mySdkVersion);
+    if (!lspClosingLabelsEnabled) {
+      VirtualFile file = fileInfo.findFile();
+      if (file == null && fileInfo instanceof DartLocalFileInfo localFileInfo) {
+        String path = FileUtil.toSystemIndependentName(localFileInfo.getFilePath());
+        file = VirtualFileManager.getInstance().findFileByUrl("temp://" + path);
+      }
+      if (file != null && file.isValid()) {
+        Document document = FileDocumentManager.getInstance().getCachedDocument(file);
+        if (document != null) {
+          List<DartServerData.DartClosingLabel> convertedLabels = myServerData.getClosingLabels(file);
+          CharSequence text = document.getImmutableCharSequence();
+          List<DartLspClosingLabel> lspLabels = convertedLabels.stream().map(label -> {
+            int endOffset = Math.min(label.getOffset() + label.getLength(), text.length());
+            int endLine = StringUtil.offsetToLineNumber(text, endOffset);
+            Position pos = new Position(endLine, 0);
+            return new DartLspClosingLabel(label.getLabel(), new Range(pos, pos));
+          }).toList();
+          DartLspClosingLabelsService.getInstance(myProject).updateClosingLabels(file, lspLabels);
+        }
+      }
+    }
+  }
 
   private static int ensureNotZero(int i) {
     return i == 0 ? Integer.MAX_VALUE : i;
@@ -765,9 +794,6 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public static boolean isLspClosingLabelsEnabled(final @NotNull Project project) {
-    if (!DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-      return false;
-    }
     final DartSdk sdk = DartSdk.getDartSdk(project);
     return sdk != null && isDartSdkVersionSufficientForLspClosingLabels(sdk.getVersion());
   }
@@ -1386,12 +1412,8 @@ public final class DartAnalysisServerService implements Disposable {
     }
 
     final List<AnalysisError> errorsWithoutTodo = errors.isEmpty() ? Collections.emptyList() : new ArrayList<>(errors.size());
-    boolean hasSevereProblems = false;
 
     for (AnalysisError error : errors) {
-      if (AnalysisErrorSeverity.ERROR.equals(error.getSeverity())) {
-        hasSevereProblems = true;
-      }
       if (!AnalysisErrorType.TODO.equals(error.getType())) {
         errorsWithoutTodo.add(error);
       }
@@ -1401,8 +1423,8 @@ public final class DartAnalysisServerService implements Disposable {
 
     if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
       int oldHash;
-      synchronized (myFilePathsWithErrors) {
-        // TObjectIntHashMap returns 0 if there's no such entry, it's equivalent to empty error set for this file
+      synchronized (myFilePathToErrorsHash) {
+        // Object2IntMap returns 0 if there's no such entry, it's equivalent to empty error set for this file
         oldHash = myFilePathToErrorsHash.getInt(localFileInfo.getFilePath());
       }
 
@@ -1417,60 +1439,29 @@ public final class DartAnalysisServerService implements Disposable {
 
     if (myServerData.computedErrors(fileInfo, errorsWithoutTodo, restartHighlighting)) {
       if (fileInfo instanceof DartLocalFileInfo localFileInfo) {
-        onErrorsUpdated(localFileInfo, errorsWithoutTodo, hasSevereProblems, newHash);
+        onErrorsUpdated(localFileInfo, errorsWithoutTodo, newHash);
       }
     }
   }
 
   private void onErrorsUpdated(@NotNull DartLocalFileInfo localFileInfo,
                                @NotNull List<? extends AnalysisError> errors,
-                               boolean hasSevereProblems,
                                int errorsHash) {
     String filePath = localFileInfo.getFilePath();
-    updateFilesWithErrorsSet(filePath, hasSevereProblems, errorsHash);
-    DartProblemsView.getInstance(myProject).updateErrorsForFile(filePath, errors);
-  }
-
-  private void updateFilesWithErrorsSet(final @NotNull String filePath, final boolean hasSevereProblems, final int errorsHash) {
-    synchronized (myFilePathsWithErrors) {
+    synchronized (myFilePathToErrorsHash) {
       if (errorsHash == 0) {
-        // no errors
         myFilePathToErrorsHash.removeInt(filePath);
       }
       else {
         myFilePathToErrorsHash.put(filePath, errorsHash);
       }
-
-      if (hasSevereProblems) {
-        if (myFilePathsWithErrors.add(filePath)) {
-          String parentPath = PathUtil.getParentPath(filePath);
-          while (!parentPath.isEmpty()) {
-            final int count = myFolderPathsWithErrors.getInt(parentPath); // returns zero if there were no path in the map
-            myFolderPathsWithErrors.put(parentPath, count + 1);
-            parentPath = PathUtil.getParentPath(parentPath);
-          }
-        }
-      }
-      else {
-        if (myFilePathsWithErrors.remove(filePath)) {
-          String parentPath = PathUtil.getParentPath(filePath);
-          while (!parentPath.isEmpty()) {
-            final int count = myFolderPathsWithErrors.removeInt(parentPath); // returns zero if there was no path in the map
-            if (count > 1) {
-              myFolderPathsWithErrors.put(parentPath, count - 1);
-            }
-            parentPath = PathUtil.getParentPath(parentPath);
-          }
-        }
-      }
     }
+    DartProblemsView.getInstance(myProject).updateErrorsForFile(filePath, errors);
   }
 
   private void clearAllErrors() {
-    synchronized (myFilePathsWithErrors) {
-      myFilePathsWithErrors.clear();
+    synchronized (myFilePathToErrorsHash) {
       myFilePathToErrorsHash.clear();
-      myFolderPathsWithErrors.clear();
     }
 
     if (myInitializationOnServerStartupDone) {
@@ -2308,48 +2299,6 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
-  public @Nullable Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>> execution_getSuggestions(@NotNull String code,
-                                                                                                                int offset,
-                                                                                                                @NotNull VirtualFile contextFile,
-                                                                                                                int contextOffset,
-                                                                                                                @NotNull List<RuntimeCompletionVariable> variables,
-                                                                                                                @NotNull List<RuntimeCompletionExpression> expressions) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return new Pair<>(new SmartList<>(), new SmartList<>());
-    }
-
-    final String contextFileUri = getFileUri(contextFile);
-    final CountDownLatch latch = new CountDownLatch(1);
-    final Ref<Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>>> refResult = Ref.create();
-    server.execution_getSuggestions(
-      code, offset,
-      contextFileUri, contextOffset,
-      variables, expressions,
-      new GetRuntimeCompletionConsumer() {
-        @Override
-        public void computedResult(List<CompletionSuggestion> suggestions, List<RuntimeCompletionExpression> expressions) {
-          refResult.set(new Pair<>(suggestions, expressions));
-          latch.countDown();
-        }
-
-        @Override
-        public void onError(RequestError error) {
-          latch.countDown();
-          if (!RequestErrorCode.UNKNOWN_REQUEST.equals(error.getCode())) {
-            logError("execution_getSuggestions()", contextFileUri, error);
-          }
-        }
-      });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_SUGGESTIONS_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("execution_getSuggestions", GET_SUGGESTIONS_TIMEOUT, contextFileUri);
-    }
-    return refResult.get();
-  }
-
   // LSP over Legacy Dart Analysis Server protocols
   public @Nullable String lspMessage_dart_textDocumentContent(@NotNull String fileUri) {
     RemoteAnalysisServerImpl server = myServer;
@@ -2462,17 +2411,12 @@ public final class DartAnalysisServerService implements Disposable {
       final RemoteAnalysisServerImpl startedServer = new DartAnalysisServerImpl(myProject, myServerSocket);
 
       try {
-        startedServer.start();
-        server_setSubscriptions(startedServer);
-
-        if (!myInitializationOnServerStartupDone) {
-          myInitializationOnServerStartupDone = true;
-
-          registerFileEditorManagerListener();
-          registerDocumentListener();
-          setDasLogger();
-        }
-
+        // Register the listeners before start(): start() launches the process and the reader thread, and notifications that
+        // arrive before a listener is added are dropped. Losing server.connected leaves myServerVersion empty for the
+        // server's lifetime, so DartServerCompletionContributor falls back to the removed completion.getSuggestions request
+        // and every completion comes back empty (UNKNOWN_REQUEST). See
+        // https://github.com/flutter/dart-intellij-third-party/issues/857.
+        myHaveShownInitialProgress = false;
         startedServer.addAnalysisServerListener(myAnalysisServerListener);
         for (AnalysisServerListener listener : myAdditionalServerListeners) {
           startedServer.addAnalysisServerListener(listener);
@@ -2484,7 +2428,17 @@ public final class DartAnalysisServerService implements Disposable {
           startedServer.addResponseListener(listener);
         }
 
-        myHaveShownInitialProgress = false;
+        startedServer.start();
+        server_setSubscriptions(startedServer);
+
+        if (!myInitializationOnServerStartupDone) {
+          myInitializationOnServerStartupDone = true;
+
+          registerFileEditorManagerListener();
+          registerDocumentListener();
+          setDasLogger();
+        }
+
         startedServer.addStatusListener(isAlive -> {
           if (!isAlive) {
             synchronized (myLock) {
@@ -2523,14 +2477,9 @@ public final class DartAnalysisServerService implements Disposable {
         // This must be done after myServer is set, and should be done each time the server starts.
         registerPostfixCompletionTemplates();
 
-        myDtdUri = null;
-        DartToolingDaemonService dtdService = myProject.getServiceIfCreated(DartToolingDaemonService.class);
-        String dtdUri = dtdService != null ? dtdService.getUri() : null;
-        if (dtdUri != null) {
-          connectToDtd(dtdUri);
-        }
-
-        // Start the LSP Bridge Server unless in unit test mode
+        // Start the LSP Bridge Server unless in unit test mode.
+        // Once initialized, DartLspServerDescriptor.lspServerListener connects the server to DTD
+        // via dart/connectToDtd if DartToolingDaemonService is already running.
         if (!ApplicationManager.getApplication().isUnitTestMode()) {
           myProject.getService(DartBridgeLspServerManager.class).startBridgeServer();
         }
@@ -2644,20 +2593,6 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
-  public void connectToDtd(@NotNull String uri) {
-    AnalysisServer server = myServer;
-    if (server == null) {
-      return;
-    }
-
-    boolean supportsWorkspaceApplyEdits = isDartSdkVersionSufficientForWorkspaceApplyEdits(mySdkVersion);
-    // Connection to DTD is used for server-initiated edits (workspace.applyEdits)
-    if (supportsWorkspaceApplyEdits && !uri.equals(myDtdUri)) {
-      myDtdUri = uri;
-      server.lsp_connectToDtd(uri);
-    }
-  }
-
   /**
    * Stops the analysis server and waits (bounded) for its process to exit, so that
    * shutdown-time side effects such as flushing analytics have happened on return.
@@ -2714,15 +2649,7 @@ public final class DartAnalysisServerService implements Disposable {
   }
 
   public boolean isFileWithErrors(final @NotNull VirtualFile file) {
-    synchronized (myFilePathsWithErrors) {
-      return file.isDirectory() ? myFolderPathsWithErrors.getInt(file.getPath()) > 0 : myFilePathsWithErrors.contains(file.getPath());
-    }
-  }
-
-  public int getFilePathsWithErrorsHash() {
-    synchronized (myFilePathsWithErrors) {
-      return myFilePathsWithErrors.hashCode();
-    }
+    return DartProblemsView.getInstance(myProject).isFileWithErrors(file);
   }
 
   private void logError(final @NonNls @NotNull String methodName, final @Nullable String filePath, final @NotNull RequestError error) {

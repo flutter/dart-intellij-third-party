@@ -1,6 +1,7 @@
 // Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.jetbrains.lang.dart.ide.errorTreeView;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.ide.CopyProvider;
@@ -60,6 +61,7 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
   public static final String JUMP_TO_SOURCE_ACTION_ID = ID_PREFIX + ".jumpToSource";
   public static final String OPEN_DOCUMENTATION_ACTION_ID = ID_PREFIX + ".openDocumentation";
   public static final String OPEN_SERVER_SETTINGS_ACTION_ID = ID_PREFIX + ".openServerSettings";
+  public static final String APPLY_FIX_ACTION_ID = ID_PREFIX + ".applyFix";
 
   private static final LayeredIcon DART_ERRORS_ICON;
   private static final LayeredIcon DART_WARNINGS_ICON;
@@ -79,8 +81,9 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
 
   private final @NotNull DartProblemsPresentationHelper myPresentationHelper;
 
-  DartProblemsViewPanel(@NotNull Project project,
-                        @NotNull DartProblemsPresentationHelper presentationHelper) {
+  @VisibleForTesting
+  public DartProblemsViewPanel(@NotNull Project project,
+                               @NotNull DartProblemsPresentationHelper presentationHelper) {
     super(false, true);
     myProject = project;
     myPresentationHelper = presentationHelper;
@@ -179,7 +182,8 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
           }
           catch (DartSourceEditException ignored) {/**/}
 
-          Analytics.report(AnalyticsData.forAction(this, event));
+          // This anonymous action isn't registered, so report it with an explicit id.
+          Analytics.report(AnalyticsData.forAction(APPLY_FIX_ACTION_ID, event));
         }
       });
     }
@@ -433,6 +437,11 @@ public class DartProblemsViewPanel extends SimpleToolWindowPanel implements Copy
   void clearAll() {
     ((DartProblemsTableModel)myTable.getModel()).removeAll();
     updateStatusDescription();
+  }
+
+  @VisibleForTesting
+  public int getRowCount() {
+    return myTable.getRowCount();
   }
 
   private class FilterProblemsAction extends DumbAwareAction implements Toggleable {

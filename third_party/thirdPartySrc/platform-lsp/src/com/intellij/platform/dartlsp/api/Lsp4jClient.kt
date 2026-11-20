@@ -51,7 +51,8 @@ open class Lsp4jClient(private val serverNotificationsHandler: LspServerNotifica
   override fun telemetryEvent(`object`: Any): Unit =
     serverNotificationsHandler.telemetryEvent(`object`)
 
-  final override fun publishDiagnostics(params: PublishDiagnosticsParams): Unit =
+  // Dart patch: make publishDiagnostics open for DartLsp4jClient (https://github.com/flutter/flutter-intellij/issues/9239)
+  override fun publishDiagnostics(params: PublishDiagnosticsParams): Unit =
     serverNotificationsHandler.publishDiagnostics(params)
 
   final override fun showMessage(params: MessageParams): Unit =

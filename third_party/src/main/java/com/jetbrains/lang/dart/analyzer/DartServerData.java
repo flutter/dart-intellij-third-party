@@ -4,11 +4,9 @@ package com.jetbrains.lang.dart.analyzer;
 import com.jetbrains.lang.dart.logging.PluginLogger;
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
-import com.intellij.codeInsight.hints.declarative.impl.DeclarativeInlayHintsPassFactory;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
-import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
@@ -108,11 +106,6 @@ public final class DartServerData {
     }
 
     myClosingLabelData.put(fileInfo, newClosingLabels);
-    if (file != null) {
-      Arrays.stream(EditorFactory.getInstance().getAllEditors())
-        .filter(editor -> file.equals(editor.getVirtualFile()))
-        .forEach(editor -> DeclarativeInlayHintsPassFactory.Companion.scheduleRecompute(editor, myService.getProject()));
-    }
   }
 
   void computedHighlights(@NotNull DartFileInfo fileInfo, @NotNull List<? extends HighlightRegion> regions) {
@@ -378,16 +371,20 @@ public final class DartServerData {
   boolean hasAllData_TESTS_ONLY(@NotNull VirtualFile file) {
     assert ApplicationManager.getApplication().isUnitTestMode();
 
-    DartLocalFileInfo fileInfo = (DartLocalFileInfo) DartFileInfoKt.getDartFileInfo(myService.getProject(), file);
+    Project project = myService.getProject();
+    DartLocalFileInfo fileInfo = (DartLocalFileInfo) DartFileInfoKt.getDartFileInfo(project, file);
 
+    // Highlights and closing labels arrive over LSP instead of as legacy notifications once the SDK
+    // supports it (no HIGHLIGHTS subscription; the server skips analysis.closingLabels when the
+    // client advertises experimental.closingLabels), so legacy data for them never shows up.
     return isErrorInfoUpToDate(fileInfo) &&
-           myHighlightData.get(fileInfo) != null &&
+           (DartAnalysisServerService.isLspHighlightingActive(project) || myHighlightData.get(fileInfo) != null) &&
            myNavigationData.get(fileInfo) != null &&
            myOverrideData.get(fileInfo) != null &&
            myImplementedClassData.get(fileInfo) != null &&
            myImplementedMemberData.get(fileInfo) != null &&
            myOutlineData.get(fileInfo) != null &&
-           myClosingLabelData.get(fileInfo) != null;
+           (DartAnalysisServerService.isLspClosingLabelsEnabled(project) || myClosingLabelData.get(fileInfo) != null);
   }
 
   @Nullable

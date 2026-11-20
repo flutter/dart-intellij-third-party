@@ -1,21 +1,36 @@
 ## Unreleased
 
 ### Added
+- Parameter info (signature help) implemented with JetBrains LSP (experimental feature) (#819)
+- Whole-document and selection formatting via JetBrains LSP (experimental feature) (#689)
 - Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
+- Optimizing imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
 
 ### Changed
+- Call Hierarchy navigation via LSP is now enabled for all users (#846)
+- Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
+- Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
+- Go to Super uses JetBrains LSP when experimental LSP features are enabled, navigating to the server's single effective target. Go to Implementation, gutter navigation and Method Hierarchy are unchanged (#821)
 
 ### Removed
 - Legacy Dart Analysis Server execution context and URI mapping during debugging (#686)
+- Legacy `execution.getSuggestions` runtime completion call in debugger expression fragments, which has returned empty results from the Dart Analysis Server since 2018 (#818)
 - Per-request `dart.legacy_assist` and `dart.legacy_fix` analytics latency events, which fired on every legacy quick assist and quick fix availability check (caret moves, edits, selection changes) rather than when one was applied. Applied assists and fixes are still reported (#793)
 
 ### Fixed
+- Avoid empty code completion for a whole session when the analysis server connected before the IDE started listening (fixes #857) (#859)
+- Avoid showing whole-file LSP source actions (Sort Members, Organize Imports, Fix All) in the Alt+Enter intention menu (#838)
+- Avoid `IllegalStateException` in `DartNamedElementImpl.getId()` on `new` constructor declarations (#815)
+- Prevent DartProblemsView from dropping diagnostics when the tool window has not been opened yet, and decouple problem tracking from DartAnalysisServerService (#785)
+- Avoid empty code completion lists when a third-party `DartCompletionExtension` throws an error (#814)
 - Support icon for typedef and type alias in Structure View and code completion (#660)
 - Avoid read-access error when invoking Type Hierarchy, Method Hierarchy, Go to Super Method, or Go to Implementation(s) in IntelliJ 2026.1+ (#780)
 - Avoid a trailing newline in the Dart SDK version, which leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
 - Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
 - Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
 - Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
+- Auto-selecting the current editor element in the Structure view when navigating across files (#800)
+- Avoid IDE internal errors from analytics delivery when the Dart Tooling Daemon connection closes or a project is closing, and bound the requests queued for a Dart Tooling Daemon that never connects (#848)
 
 ## 511.0.0
 

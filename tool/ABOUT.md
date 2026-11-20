@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-11-18' } *-->
 # Tool
 
 ## Overview
@@ -8,7 +8,7 @@ Contains repository maintenance and automated validation tooling for AI agent sk
 - `check_agent_skills.sh`: Shell script that verifies bidirectional consistency between AI agent skills defined in `.agents/skills/` and documented links in `README.md`.
 - `check_ai_config.sh`: Shell script that checks `.aiexclude` against `.gemini/config.yaml` `ignore_patterns` in both directions, flags stale `.aiexclude` entries (path missing and not gitignored), and requires a `trigger:` in the YAML frontmatter of every `.agents/rules/*.md`.
 - `validate_skills.sh`: Runs `dart pub get` and `dart run skills_lint` (extra arguments are forwarded) to lint the agent skills.
-- `provision_dart.sh`: Shell script that downloads and provisions the pinned Dart SDK (`DART_VERSION`, currently `3.13.0`) for the host OS and architecture into `../dart-sdk` relative to the current directory.
+- `provision_dart.sh`: Shell script that downloads and provisions the pinned Dart SDK (`DART_VERSION`, currently `3.14.1`) for the host OS and architecture into `../dart-sdk` relative to the current directory.
 - `pubspec.yaml` / `pubspec.lock`: Dart package `dart_intellij_tool` with the `skills_lint` dev dependency.
 - `skills_lint.yaml`: `skills_lint` configuration for `../.agents/skills`.
 

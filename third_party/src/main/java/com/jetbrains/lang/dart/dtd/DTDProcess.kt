@@ -214,6 +214,7 @@ class DTDProcess {
       webSocketReady = false
       uri = null
       logger.info("DTD process terminated, exit code: ${event.exitCode}")
+      listener?.onProcessTerminated()
     }
 
     override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
@@ -246,4 +247,5 @@ interface DTDProcessListener {
   fun onWebSocketClose() {}
   fun onWebSocketOpen() {}
   fun onProcessStarted(uri: String?) {}
+  fun onProcessTerminated() {}
 }

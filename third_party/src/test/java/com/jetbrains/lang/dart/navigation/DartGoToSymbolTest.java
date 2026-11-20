@@ -3,9 +3,12 @@ package com.jetbrains.lang.dart.navigation;
 
 import com.intellij.navigation.ChooseByNameContributor;
 import com.intellij.navigation.NavigationItem;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.psi.util.PsiTreeUtil;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.ide.DartSymbolContributor;
+import com.jetbrains.lang.dart.psi.DartComponentName;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -71,18 +74,18 @@ public class DartGoToSymbolTest extends DartCodeInsightFixtureTestCase {
   }
 
   public void testGoToSymbolPrimaryConstructors() {
-    myFixture.addFileToProject("constructors.dart",
-                               """
-                               class Foo1 {
-                                 new();
-                               }
-                               class Foo2 {
-                                 Foo2.new();
-                               }
-                               class Foo3 {
-                                 new named();
-                               }
-                               """);
+    PsiFile file = myFixture.addFileToProject("constructors.dart",
+                                              """
+                                              class Foo1 {
+                                                new();
+                                              }
+                                              class Foo2 {
+                                                Foo2.new();
+                                              }
+                                              class Foo3 {
+                                                new named();
+                                              }
+                                              """);
 
     DartSymbolContributor contributor = new DartSymbolContributor();
     List<String> names = new ArrayList<>();
@@ -90,5 +93,19 @@ public class DartGoToSymbolTest extends DartCodeInsightFixtureTestCase {
     assertTrue(names.contains("Foo1"));
     assertTrue(names.contains("Foo2"));
     assertTrue(names.contains("named"));
+
+    // Verify DartComponentName.getName() and getId() do not throw when a componentName wraps 'new' without a DartId child.
+    // See: https://github.com/flutter/dart-intellij-third-party/issues/786
+    List<String> componentNames = new ArrayList<>();
+    for (DartComponentName componentName : PsiTreeUtil.findChildrenOfType(file, DartComponentName.class)) {
+      componentNames.add(componentName.getName());
+      if ("new".equals(componentName.getText())) {
+        assertNull(componentName.getId());
+      }
+      else {
+        assertNotNull(componentName.getId());
+      }
+    }
+    assertOrderedEquals(componentNames, "Foo1", "new", "Foo2", "Foo2", "new", "Foo3", "new", "named");
   }
 }

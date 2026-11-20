@@ -14,8 +14,6 @@ import com.jetbrains.lang.dart.ide.hierarchy.method.DartMethodHierarchyTreeStruc
 import com.jetbrains.lang.dart.psi.DartClass;
 import com.jetbrains.lang.dart.psi.DartComponent;
 
-import static com.jetbrains.dart.analysisServer.DartCallHierarchyTest.findReference;
-
 public class DartMethodHierarchyTest extends DartHierarchyTestBase {
   @Override
   protected String getBasePath() {
@@ -32,10 +30,7 @@ public class DartMethodHierarchyTest extends DartHierarchyTestBase {
       new DartClassContributor().processElementsWithName(className, item -> {
         DartClass dartClass = PsiTreeUtil.getParentOfType((PsiElement)item, DartClass.class);
         if (dartClass != null && className.equals(dartClass.getName())) {
-          PsiElement member = dartClass.findMemberByName(methodName);
-          if (member == null) {
-            member = findReference(dartClass, methodName);
-          }
+          DartComponent member = dartClass.findMemberByName(methodName);
           if (member == null) {
             fail("Method not found");
           }
@@ -44,7 +39,7 @@ public class DartMethodHierarchyTest extends DartHierarchyTestBase {
             assert state != null;
             state.HIDE_CLASSES_WHERE_METHOD_NOT_IMPLEMENTED = true;
           }
-          result.set(new DartMethodHierarchyTreeStructure(project, (DartComponent)member));
+          result.set(new DartMethodHierarchyTreeStructure(project, member));
           return false;
         }
         return true;

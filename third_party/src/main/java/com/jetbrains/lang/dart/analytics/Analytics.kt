@@ -26,6 +26,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.Disposer
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
 import com.jetbrains.lang.dart.dtd.DTDProcess
 import com.jetbrains.lang.dart.dtd.DTDProcessListener
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
@@ -230,6 +232,12 @@ private object AnalyticsConfigurationManager {
             initLatch.countDown()
           }
         }
+
+        // If the DTD exits before it starts (e.g. it crashes without printing anything), onProcessStarted never runs.
+        // Release the latch so waiters don't block for the rest of the session. A second countDown is a no-op.
+        override fun onProcessTerminated() {
+          initLatch.countDown()
+        }
       }
       ApplicationManager.getApplication().executeOnPooledThread {
         try {
@@ -249,6 +257,9 @@ private object AnalyticsConfigurationManager {
 
     return data
   }
+
+  /** See [Analytics.awaitConfigurationResolved]. */
+  fun awaitResolved(timeoutMs: Long): Boolean = isInitializing && initLatch.await(timeoutMs, TimeUnit.MILLISECONDS)
 
   private fun scheduleConsentPromptNotification(project: Project, dtdProcess: DTDProcess) {
     ApplicationManager.getApplication().invokeLater {
@@ -281,6 +292,7 @@ object Analytics {
       AnalyticsConfigurationManager.safeData
     )
 
+  @Volatile
   var suppressAnalytics: Boolean = true
     internal set
 
@@ -326,6 +338,22 @@ object Analytics {
   @JvmStatic
   fun getConfiguration(sdk: DartSdk, project: Project): AnalyticsConfiguration =
     AnalyticsConfigurationManager.getConfiguration(sdk, project, logger)
+
+  /**
+   * Blocks up to [timeoutMs] until the configuration requested by [getConfiguration] resolves or fails, and returns
+   * whether it did (`false` at once if it was never requested). Until then [suppressAnalytics] is the provisional
+   * `true`, which a process launched with [updateEnvironment] keeps for its lifetime. Throws [InterruptedException]
+   * if interrupted.
+   */
+  @RequiresBackgroundThread
+  @RequiresReadLockAbsence
+  internal fun awaitConfigurationResolved(timeoutMs: Long): Boolean {
+    val resolved = AnalyticsConfigurationManager.awaitResolved(timeoutMs)
+    if (!resolved) {
+      logger.info("Analytics configuration not resolved after $timeoutMs ms; continuing with analytics suppressed")
+    }
+    return resolved
+  }
 
   private val testObserver = ThreadLocal<Consumer<AnalyticsData>>()
 
@@ -380,6 +408,60 @@ object Analytics {
   fun report(data: AnalyticsData) {
     testObserver.get()?.accept(data)
     data.reportTo(reporter)
+  }
+
+  /**
+   * Why an event, or one of its fields, was dropped, as passed to [setDropObserverForTests].
+   *
+   * Available since Dart plugin 512.0.0.
+   */
+  object DropReason {
+    /** The event has no id. */
+    const val NO_ID = "no_id"
+
+    /** The event has no project, or the default project. */
+    const val NO_PROJECT = "no_project"
+
+    /** The event's project was disposed before it was sent. */
+    const val PROJECT_DISPOSED = "project_disposed"
+
+    /** A field's value isn't a `String`, `Boolean` or `Int`. Only that field is dropped. */
+    const val UNSUPPORTED_VALUE = "unsupported_value"
+
+    /** The DTD socket closed mid-send. */
+    const val SEND_FAILED = "send_failed"
+
+    /** DTD answered `UnifiedAnalytics.send` with an error. */
+    const val DTD_ERROR = "dtd_error"
+  }
+
+  @Volatile
+  private var dropObserver: Consumer<String>? = null
+
+  /**
+   * Records that an event (or, for [DropReason.UNSUPPORTED_VALUE], a field) was dropped, and logs it at debug.
+   * [detail] goes to the log only (e.g. a field name or an error code); never pass user data.
+   */
+  internal fun recordDrop(reason: String, detail: String? = null) {
+    dropObserver?.accept(reason)
+    logger.debug("Analytics drop: $reason${detail?.let { " ($it)" } ?: ""}")
+  }
+
+  /**
+   * Observes every recorded drop reason (a [DropReason] value), on any thread, until [parentDisposable] is disposed.
+   * Global, unlike [withReportObserver], because drops also happen on the pooled thread that sends events.
+   *
+   * Available since Dart plugin 512.0.0.
+   */
+  @TestOnly
+  @JvmStatic
+  fun setDropObserverForTests(observer: Consumer<String>, parentDisposable: Disposable) {
+    check(ApplicationManager.getApplication().isUnitTestMode)
+    val previous = dropObserver
+    dropObserver = observer
+    Disposer.register(parentDisposable) {
+      if (dropObserver === observer) dropObserver = previous
+    }
   }
 
   @JvmStatic
@@ -471,7 +553,10 @@ abstract class AnalyticsData(type: String, val id: String?, val project: Project
 
   open fun reportTo(reporter: AnalyticsReporter) {
     // We only report if we have an id for the event.
-    if (id == null) return
+    if (id == null) {
+      Analytics.recordDrop(Analytics.DropReason.NO_ID)
+      return
+    }
     reporter.process(this)
   }
 
@@ -653,7 +738,16 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
   const val IDE_EVENT = "ide_event"
 
   override fun process(data: AnalyticsData) {
-    val project = data.project ?: return
+    // Skip disposed and default projects: looking up the DTD service there can create it and fail.
+    val project = data.project
+    if (project == null || project.isDefault) {
+      Analytics.recordDrop(Analytics.DropReason.NO_PROJECT)
+      return
+    }
+    if (project.isDisposed) {
+      Analytics.recordDrop(Analytics.DropReason.PROJECT_DISPOSED)
+      return
+    }
 
     ApplicationManager.getApplication().executeOnPooledThread {
       sendAnalyticsEvent(project, data.data)
@@ -673,9 +767,7 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
         is String -> evenData.addProperty(entry.key, value)
         is Boolean -> evenData.addProperty(entry.key, value)
         is Int -> evenData.addProperty(entry.key, value)
-        else -> {
-          // TODO (pq): consider logging
-        }
+        else -> Analytics.recordDrop(Analytics.DropReason.UNSUPPORTED_VALUE, entry.key)
       }
     }
     event.add(UnifiedAnalytics.Property.EVENT_DATA, evenData)
@@ -691,11 +783,27 @@ internal object UnifiedAnalyticsReporter : AnalyticsReporter() {
     // TODO (pq): temporary
     // print(params.toString())
 
-    DartToolingDaemonService.getInstance(project)
-      .sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
-        // TODO (pq): temporary
-        // print(response)
-      }
+    // The project may have started disposing since process() checked it.
+    if (project.isDisposed) {
+      Analytics.recordDrop(Analytics.DropReason.PROJECT_DISPOSED)
+      return
+    }
+    try {
+      DartToolingDaemonService.getInstance(project)
+        .sendRequest("${UnifiedAnalytics.SERVICE_NAME}.${UnifiedAnalytics.SEND}", params, true) { response: JsonObject ->
+          // Only the error code: the message can echo the event's params.
+          val error = response.get("error")
+          if (error != null && !error.isJsonNull) {
+            val code = error.takeIf { it.isJsonObject }?.asJsonObject?.get("code")?.takeIf { it.isJsonPrimitive }
+            Analytics.recordDrop(Analytics.DropReason.DTD_ERROR, code?.asString)
+          }
+        }
+    }
+    catch (e: WebSocketException) {
+      // The socket closed mid-send (e.g. while the project closes). Telemetry is best effort: don't let this
+      // reach the pooled thread's uncaught handler, which logs it as an IDE error.
+      Analytics.recordDrop(Analytics.DropReason.SEND_FAILED, e.message)
+    }
   }
 }
 
