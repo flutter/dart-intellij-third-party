@@ -59,6 +59,9 @@ jobs:
           ONLY_PR: ${{ inputs.only_pr }}
           FORCE_WRITE: ${{ inputs.write }}
         with:
+          # Retry transient GitHub API errors (e.g. 5xx). 4xx errors like 422 are not
+          # retried (the action's default exemptions).
+          retries: 3
           script: |
             const run = require('./.github/scripts/assign-reviewers.js');
             await run({github, context, core});

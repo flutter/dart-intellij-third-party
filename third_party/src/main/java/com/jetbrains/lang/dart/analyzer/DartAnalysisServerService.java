@@ -17,7 +17,6 @@ import com.google.dart.server.GetImportedElementsConsumer;
 import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
 import com.google.dart.server.GetRefactoringConsumer;
-import com.google.dart.server.GetRuntimeCompletionConsumer;
 import com.google.dart.server.GetServerPortConsumer;
 import com.google.dart.server.GetStatementCompletionConsumer;
 import com.google.dart.server.GetSuggestionDetailsConsumer;
@@ -139,8 +138,6 @@ import org.dartlang.analysis.server.protocol.RefactoringOptions;
 import org.dartlang.analysis.server.protocol.RemoveContentOverlay;
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.dartlang.analysis.server.protocol.RequestErrorCode;
-import org.dartlang.analysis.server.protocol.RuntimeCompletionExpression;
-import org.dartlang.analysis.server.protocol.RuntimeCompletionVariable;
 import org.dartlang.analysis.server.protocol.SearchResult;
 import org.dartlang.analysis.server.protocol.ServerService;
 import org.dartlang.analysis.server.protocol.SourceChange;
@@ -2347,48 +2344,6 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
-  public @Nullable Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>> execution_getSuggestions(@NotNull String code,
-                                                                                                                int offset,
-                                                                                                                @NotNull VirtualFile contextFile,
-                                                                                                                int contextOffset,
-                                                                                                                @NotNull List<RuntimeCompletionVariable> variables,
-                                                                                                                @NotNull List<RuntimeCompletionExpression> expressions) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return new Pair<>(new SmartList<>(), new SmartList<>());
-    }
-
-    final String contextFileUri = getFileUri(contextFile);
-    final CountDownLatch latch = new CountDownLatch(1);
-    final Ref<Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>>> refResult = Ref.create();
-    server.execution_getSuggestions(
-      code, offset,
-      contextFileUri, contextOffset,
-      variables, expressions,
-      new GetRuntimeCompletionConsumer() {
-        @Override
-        public void computedResult(List<CompletionSuggestion> suggestions, List<RuntimeCompletionExpression> expressions) {
-          refResult.set(new Pair<>(suggestions, expressions));
-          latch.countDown();
-        }
-
-        @Override
-        public void onError(RequestError error) {
-          latch.countDown();
-          if (!RequestErrorCode.UNKNOWN_REQUEST.equals(error.getCode())) {
-            logError("execution_getSuggestions()", contextFileUri, error);
-          }
-        }
-      });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_SUGGESTIONS_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("execution_getSuggestions", GET_SUGGESTIONS_TIMEOUT, contextFileUri);
-    }
-    return refResult.get();
-  }
-
   public @Nullable String execution_mapUri(@NotNull String _id, @NotNull VirtualFile _file) {
     return execution_mapUri(_id, getFileUri(_file), null);
   }
@@ -2566,17 +2521,12 @@ public final class DartAnalysisServerService implements Disposable {
       final RemoteAnalysisServerImpl startedServer = new DartAnalysisServerImpl(myProject, myServerSocket);
 
       try {
-        startedServer.start();
-        server_setSubscriptions(startedServer);
-
-        if (!myInitializationOnServerStartupDone) {
-          myInitializationOnServerStartupDone = true;
-
-          registerFileEditorManagerListener();
-          registerDocumentListener();
-          setDasLogger();
-        }
-
+        // Register the listeners before start(): start() launches the process and the reader thread, and notifications that
+        // arrive before a listener is added are dropped. Losing server.connected leaves myServerVersion empty for the
+        // server's lifetime, so DartServerCompletionContributor falls back to the removed completion.getSuggestions request
+        // and every completion comes back empty (UNKNOWN_REQUEST). See
+        // https://github.com/flutter/dart-intellij-third-party/issues/857.
+        myHaveShownInitialProgress = false;
         startedServer.addAnalysisServerListener(myAnalysisServerListener);
         for (AnalysisServerListener listener : myAdditionalServerListeners) {
           startedServer.addAnalysisServerListener(listener);
@@ -2588,7 +2538,17 @@ public final class DartAnalysisServerService implements Disposable {
           startedServer.addResponseListener(listener);
         }
 
-        myHaveShownInitialProgress = false;
+        startedServer.start();
+        server_setSubscriptions(startedServer);
+
+        if (!myInitializationOnServerStartupDone) {
+          myInitializationOnServerStartupDone = true;
+
+          registerFileEditorManagerListener();
+          registerDocumentListener();
+          setDasLogger();
+        }
+
         startedServer.addStatusListener(isAlive -> {
           if (!isAlive) {
             synchronized (myLock) {

@@ -7,16 +7,19 @@
 - Optimizing imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
 
 ### Changed
+- Routing "Reformat Code with 'dart format'" (`Dart.DartStyle`) through LSP formatting via `ReformatCodeProcessor` when experimental LSP features are enabled (#850)
 - Call Hierarchy navigation via LSP is now enabled for all users (#846)
 - Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
 - Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
 - Go to Super uses JetBrains LSP when experimental LSP features are enabled, navigating to the server's single effective target. Go to Implementation, gutter navigation and Method Hierarchy are unchanged (#821)
 
 ### Removed
+- Legacy `execution.getSuggestions` runtime completion call in debugger expression fragments, which has returned empty results from the Dart Analysis Server since 2018 (#818)
 - Per-request `dart.legacy_assist` and `dart.legacy_fix` analytics latency events, which fired on every legacy quick assist and quick fix availability check (caret moves, edits, selection changes) rather than when one was applied. Applied assists and fixes are still reported (#793)
 
 ### Fixed
 - Avoid `SocketException: Socket closed` IDE internal error when stopping the LSP bridge or toggling experimental LSP features (#840)
+- Avoid empty code completion for a whole session when the analysis server connected before the IDE started listening (fixes #857) (#859)
 - Avoid showing whole-file LSP source actions (Sort Members, Organize Imports, Fix All) in the Alt+Enter intention menu (#838)
 - Avoid `IllegalStateException` in `DartNamedElementImpl.getId()` on `new` constructor declarations (#815)
 - Prevent DartProblemsView from dropping diagnostics when the tool window has not been opened yet, and decouple problem tracking from DartAnalysisServerService (#785)

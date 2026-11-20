@@ -35,7 +35,9 @@ import com.jetbrains.lang.dart.analytics.SettingsData
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import org.jetbrains.annotations.VisibleForTesting
 
 /**
@@ -89,6 +91,17 @@ class DartStartupActivity : ProjectActivity {
     }
 
     if (Registry.`is`("dart.launch.dtd.and.devtools", false)) {
+      // The DTD keeps the DASH__SUPPRESS_ANALYTICS it starts with. Started before the analytics config resolves, it
+      // gets the provisional `true` and drops every IDE analytics event for the session, so wait (bounded) first.
+      // serverReadyForRequest normally requests the config, but not if it saw no usable SDK and one appeared since,
+      // so request it here too (it returns at once if already resolved).
+      val sdk = DartSdk.getDartSdk(project)
+      if (sdk != null) {
+        runInterruptible(Dispatchers.IO) {
+          Analytics.getConfiguration(sdk, project)
+          Analytics.awaitConfigurationResolved(ANALYTICS_CONFIG_WAIT_MS)
+        }
+      }
       DartToolingDaemonService.getInstance(project).startService()
     }
   }
@@ -105,6 +118,8 @@ class DartStartupActivity : ProjectActivity {
     if (!info.dartSupportEnabled || info.sdk == null) return
 
     val config = Analytics.getConfiguration(info.sdk, project)
+    // getConfiguration gives up after 700 ms; wait (bounded) for a slower resolution rather than drop the event.
+    runInterruptible(Dispatchers.IO) { Analytics.awaitConfigurationResolved(ANALYTICS_CONFIG_WAIT_MS) }
     if (config.suppressAnalytics) return
 
     Analytics.report(buildSettingsData(project, info))
@@ -230,6 +245,13 @@ fun excludeBuildAndToolCacheFolders(module: Module, pubspecYamlFile: VirtualFile
 
 private fun getExclusionUrls(rootUrl: String): Set<String> =
   setOf("$rootUrl/.dart_tool", "$rootUrl/.pub", "$rootUrl/build")
+
+/**
+ * How long the project DTD's start and the settings event wait for the analytics config to resolve. Resolution
+ * normally takes a short-lived DTD start plus two RPCs; if it takes longer, both continue with analytics suppressed,
+ * as before.
+ */
+private const val ANALYTICS_CONFIG_WAIT_MS = 3_000L
 
 private val Module.rootManager: ModuleRootManager
   get() = ModuleRootManager.getInstance(this)

@@ -6,7 +6,6 @@ import com.intellij.ide.BrowserUtil;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
-import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.DumbAwareAction;
@@ -26,6 +25,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.CompletionException;
 
 public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
+  /** The plugin.xml id. The settings link runs an unregistered instance, so report with this id explicitly. */
+  public static final String ID = "Dart.Analyzer.Diagnostics";
   private static final String MIN_LSP_DIAGNOSTIC_SERVER_SDK_VERSION = "3.13.0-106.0.dev";
 
   public AnalysisServerDiagnosticsAction() {
@@ -67,12 +68,9 @@ public class AnalysisServerDiagnosticsAction extends DumbAwareAction {
     }
 
     if (event != null) {
-      Analytics.report(AnalyticsData.forAction(this, event));
+      Analytics.report(AnalyticsData.forAction(ID, event));
     } else {
-      ActionManager actionManager = ActionManager.getInstance();
-      if (actionManager != null) {
-        Analytics.report(AnalyticsData.forAction(actionManager.getId(this), project));
-      }
+      Analytics.report(AnalyticsData.forAction(ID, project));
     }
   }
 
