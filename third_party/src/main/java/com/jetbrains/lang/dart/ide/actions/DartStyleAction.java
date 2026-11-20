@@ -4,11 +4,8 @@ package com.jetbrains.lang.dart.ide.actions;
 import com.intellij.CommonBundle;
 import com.intellij.application.options.CodeStyle;
 import com.intellij.codeInsight.actions.ReformatCodeProcessor;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.application.ApplicationManager;
 
@@ -57,31 +54,6 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
   private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartStyleAction.class);
 
   @Override
-  public void update(@NotNull AnActionEvent event) {
-    final Project project = event.getProject();
-    if (project != null && DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
-      if (event.getData(CommonDataKeys.EDITOR) != null) {
-        final AnAction reformatAction = getStandardReformatAction();
-        if (reformatAction == null) {
-          event.getPresentation().setEnabledAndVisible(false);
-          return;
-        }
-
-        super.update(event);
-        if (!event.getPresentation().isEnabled()) return;
-
-        final AnActionEvent reformatEvent = createReformatEvent(reformatAction, event);
-        ActionUtil.updateAction(reformatAction, reformatEvent);
-        if (!reformatEvent.getPresentation().isEnabled()) {
-          event.getPresentation().setEnabled(false);
-        }
-        return;
-      }
-    }
-    super.update(event);
-  }
-
-  @Override
   public void actionPerformed(@NotNull AnActionEvent event) {
     final Project project = event.getProject();
     if (project != null && DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
@@ -101,19 +73,19 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
   }
 
   /**
-   * Handles invocations when the cursor/focus is in an editor, redirecting to IntelliJ's standard
-   * Reformat Code action (which routes through LSP formatting).
+   * Handles invocations when the cursor/focus is in an editor, formatting the host Dart file (or
+   * active selection) directly via {@link ReformatCodeProcessor} (routing through LSP formatting)
+   * without inheriting sticky Reformat File dialog options or switching to injected fragments.
    */
   private void performEditorRedirect(@NotNull Project project, @NotNull Editor editor, @NotNull AnActionEvent event) {
-    final AnAction reformatAction = getStandardReformatAction();
-    if (reformatAction == null) return;
-    final PsiFile psiFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
+    final Document document = editor.getDocument();
+    final PsiFile psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document);
     if (psiFile == null || !isApplicableFile(project, psiFile.getVirtualFile())) return;
 
-    // Redirect to standard Reformat Code (which routes through LSP formatting) while preserving
-    // the Dart.DartStyle menu entry, keymap bindings, and action analytics.
     Analytics.report(AnalyticsData.forAction(this, event));
-    ActionUtil.performAction(reformatAction, createReformatEvent(reformatAction, event));
+    if (!ReadonlyStatusHandler.ensureDocumentWritable(project, document)) return;
+    PsiDocumentManager.getInstance(project).commitDocument(document);
+    runEditorReformatCodeProcessor(psiFile, editor);
   }
 
   /**
@@ -137,19 +109,11 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
   }
 
   @VisibleForTesting
-  @Nullable AnAction getStandardReformatAction() {
-    return ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_REFORMAT);
-  }
-
-  private static @NotNull AnActionEvent createReformatEvent(@NotNull AnAction reformatAction, @NotNull AnActionEvent event) {
-    return AnActionEvent.createEvent(
-      reformatAction,
-      event.getDataContext(),
-      null,
-      event.getPlace(),
-      event.getUiKind(),
-      event.getInputEvent()
-    );
+  void runEditorReformatCodeProcessor(@NotNull PsiFile psiFile, @NotNull Editor editor) {
+    final ReformatCodeProcessor processor = editor.getSelectionModel().hasSelection()
+                                            ? new ReformatCodeProcessor(psiFile, editor.getSelectionModel())
+                                            : new ReformatCodeProcessor(psiFile, false);
+    processor.run();
   }
 
   @Override

@@ -16,31 +16,31 @@ import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.ActionUiKind;
-import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.impl.source.tree.injected.InjectedLanguageEditorUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.analytics.Analytics;
 import com.jetbrains.lang.dart.analytics.AnalyticsConstants;
 import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.psi.DartFile;
 import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams;
 import org.dartlang.analysis.server.protocol.MessageAction;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
-import java.awt.Component;
-import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -135,7 +135,7 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
       ActionPlaces.KEYBOARD_SHORTCUT,
       ActionPlaces.ACTION_SEARCH
     )) {
-      final AnActionEvent event = createEvent(action, context, place, ActionUiKind.NONE, null);
+      final AnActionEvent event = createEvent(action, context, place, ActionUiKind.NONE);
       action.update(event);
       assertTrue("Expected visible in " + place, event.getPresentation().isVisible());
       assertTrue("Expected enabled in " + place, event.getPresentation().isEnabled());
@@ -161,7 +161,7 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
         .add(CommonDataKeys.PROJECT, getProject())
         .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, selection)
         .build();
-      final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+      final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP);
       action.update(event);
       assertTrue(event.getPresentation().isVisible());
       assertTrue(event.getPresentation().isEnabled());
@@ -169,92 +169,57 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
     }
   }
 
-  public void testHiddenAndNoOpWhenReformatActionUnavailable() {
+  public void testEditorActionPerformedFormatsHostDartFileViaReformatCodeProcessor() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
-    myFixture.configureByText("main.dart", INPUT);
+    myFixture.configureByText("main.dart", "void main(){final html = '<div><caret><p>hi</p></div>';}");
+    final Editor hostEditor = InjectedLanguageEditorUtil.getTopLevelEditor(myFixture.getEditor());
+    assertNotSame("Expected HTML injection at caret", hostEditor, myFixture.getEditor());
+    final PsiFile hostFile = PsiDocumentManager.getInstance(getProject()).getPsiFile(hostEditor.getDocument());
+    assertNotNull(hostFile);
+    final List<PsiFile> formattedFiles = new ArrayList<>();
+    final List<Boolean> hadSelection = new ArrayList<>();
     final DartStyleAction action = new DartStyleAction() {
       @Override
-      @Nullable AnAction getStandardReformatAction() {
-        return null;
+      void runEditorReformatCodeProcessor(@NotNull PsiFile psiFile, @NotNull Editor editor) {
+        formattedFiles.add(psiFile);
+        hadSelection.add(editor.getSelectionModel().hasSelection());
       }
     };
-    final List<AnalyticsData> reported = new ArrayList<>();
-    final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.MAIN_MENU, ActionUiKind.NONE, null);
+    assertFalse("DartStyleAction must not opt into injected context", action.isInInjectedContext());
 
+    final DataContext context = SimpleDataContext.builder()
+      .add(CommonDataKeys.PROJECT, getProject())
+      .add(CommonDataKeys.EDITOR, hostEditor)
+      .build();
+    final AnActionEvent event = createEvent(action, context, ActionPlaces.MAIN_MENU, ActionUiKind.NONE);
     action.update(event);
-    assertFalse(event.getPresentation().isVisible());
-    assertFalse(event.getPresentation().isEnabled());
-
-    Analytics.withReportObserver(reported::add, () -> action.actionPerformed(event));
-    assertTrue(reported.isEmpty());
-    assertTrue(legacyFormatRequests.isEmpty());
-  }
-
-  public void testDisabledInEditorWhenDelegateReportsDisabled() {
-    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
-    myFixture.configureByText("main.dart", INPUT);
-    final AnAction disabledDelegate = new AnAction() {
-      @Override
-      public @NotNull ActionUpdateThread getActionUpdateThread() {
-        return ActionUpdateThread.BGT;
-      }
-
-      @Override
-      public void update(@NotNull AnActionEvent e) {
-        e.getPresentation().setEnabled(false);
-      }
-
-      @Override
-      public void actionPerformed(@NotNull AnActionEvent e) {
-        fail("Disabled delegate must not be called");
-      }
-    };
-    final DartStyleAction action = new DartStyleAction() {
-      @Override
-      @Nullable AnAction getStandardReformatAction() {
-        return disabledDelegate;
-      }
-    };
-
-    final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.MAIN_MENU, ActionUiKind.NONE, null);
-    action.update(event);
-    assertTrue("Editor action should stay visible when greyed out", event.getPresentation().isVisible());
-    assertFalse(event.getPresentation().isEnabled());
-  }
-
-  public void testActionPerformedRedirectsToStandardReformatActionWhenExperimentalLspEnabled() {
-    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
-    myFixture.configureByText("main.dart", INPUT);
-    final List<AnActionEvent> delegatedEvents = new ArrayList<>();
-    final AnAction stubReformat = new AnAction() {
-      @Override
-      public @NotNull ActionUpdateThread getActionUpdateThread() {
-        return ActionUpdateThread.BGT;
-      }
-
-      @Override
-      public void actionPerformed(@NotNull AnActionEvent e) {
-        delegatedEvents.add(e);
-      }
-    };
-    final DartStyleAction action = new DartStyleAction() {
-      @Override
-      @Nullable AnAction getStandardReformatAction() {
-        return stubReformat;
-      }
-    };
-
-    final KeyEvent inputEvent = new KeyEvent(new Component() {}, KeyEvent.KEY_PRESSED, 0L, 0, KeyEvent.VK_L, 'l');
-    final DataContext context = editorContext();
-    final AnActionEvent event = createEvent(action, context, ActionPlaces.MAIN_MENU, ActionUiKind.POPUP, inputEvent);
+    assertTrue(event.getPresentation().isVisible());
+    assertTrue(event.getPresentation().isEnabled());
     action.actionPerformed(event);
 
-    assertEquals(1, delegatedEvents.size());
-    final AnActionEvent delegated = delegatedEvents.getFirst();
-    assertEquals(ActionPlaces.MAIN_MENU, delegated.getPlace());
-    assertSame(ActionUiKind.POPUP, delegated.getUiKind());
-    assertSame(inputEvent, delegated.getInputEvent());
-    assertSame(myFixture.getEditor(), delegated.getData(CommonDataKeys.EDITOR));
+    assertEquals(1, formattedFiles.size());
+    assertTrue("Expected host DartFile even when caret is inside an injected string", formattedFiles.getFirst() instanceof DartFile);
+    assertSame(hostFile.getVirtualFile(), formattedFiles.getFirst().getVirtualFile());
+    assertEquals(List.of(false), hadSelection);
+    assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
+  }
+
+  public void testEditorActionPerformedPreservesSelectionWhenFormattingViaReformatCodeProcessor() {
+    DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
+    myFixture.configureByText("main.dart", "void a(){}\n<selection>void b(){}</selection>\n");
+    final List<String> selectedTexts = new ArrayList<>();
+    final DartStyleAction action = new DartStyleAction() {
+      @Override
+      void runEditorReformatCodeProcessor(@NotNull PsiFile psiFile, @NotNull Editor editor) {
+        assertTrue(editor.getSelectionModel().hasSelection());
+        selectedTexts.add(editor.getSelectionModel().getSelectedText());
+      }
+    };
+
+    final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.EDITOR_POPUP, ActionUiKind.POPUP);
+    action.actionPerformed(event);
+
+    assertEquals(List.of("void b(){}"), selectedTexts);
     assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
   }
 
@@ -286,7 +251,7 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
       .add(CommonDataKeys.PROJECT, getProject())
       .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{mixedDir})
       .build();
-    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP);
     action.actionPerformed(event);
 
     assertEquals(List.of(2), confirmedCounts);
@@ -322,7 +287,7 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
       .add(CommonDataKeys.PROJECT, getProject())
       .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{dartA.getParent(), dartB, readme})
       .build();
-    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP);
     action.actionPerformed(event);
 
     assertEquals(1, processedBatches.size());
@@ -353,7 +318,7 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
       .add(CommonDataKeys.PROJECT, getProject())
       .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{dartFile})
       .build();
-    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP);
     action.actionPerformed(event);
 
     assertTrue(processedBatches.isEmpty());
@@ -374,7 +339,7 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
       .add(CommonDataKeys.PROJECT, getProject())
       .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, new VirtualFile[]{dartFile})
       .build();
-    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+    final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP);
     action.actionPerformed(event);
 
     assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
@@ -403,7 +368,7 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
         .add(CommonDataKeys.VIRTUAL_FILE_ARRAY, selection)
         .build();
       final List<AnalyticsData> reported = new ArrayList<>();
-      final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP, null);
+      final AnActionEvent event = createEvent(action, context, ActionPlaces.PROJECT_VIEW_POPUP, ActionUiKind.POPUP);
 
       Analytics.withReportObserver(reported::add, () -> action.actionPerformed(event));
       assertTrue(processedBatches.isEmpty());
@@ -412,59 +377,50 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
     }
   }
 
-  public void testRegisteredActionReportsAnalyticsAndDoesNotCallLegacyFormatUnderLsp() {
+  public void testRegisteredActionRunsRealEditorReformatWithAndWithoutSelection() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
-    myFixture.configureByText("main.dart", INPUT);
     final AnAction action = getRegisteredDartStyleAction();
-    final List<AnalyticsData> reported = new ArrayList<>();
-    final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.MAIN_MENU, ActionUiKind.NONE, null);
+    for (String text : List.of(INPUT, "void a(){}\n<selection>void b(){}</selection>\n")) {
+      myFixture.configureByText("main.dart", text);
+      final List<AnalyticsData> reported = new ArrayList<>();
+      final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.MAIN_MENU, ActionUiKind.NONE);
 
-    Analytics.withReportObserver(reported::add, () -> action.actionPerformed(event));
+      Analytics.withReportObserver(reported::add, () -> action.actionPerformed(event));
 
-    assertEquals(1, reported.size());
-    assertEquals("Dart.DartStyle", reported.getFirst().getId());
-    assertEquals("action", reported.getFirst().getData().get(AnalyticsConstants.TYPE.getName()));
-    assertEquals(ActionPlaces.MAIN_MENU, reported.getFirst().getData().get(AnalyticsConstants.PLACE.getName()));
-    assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
+      assertEquals(1, reported.size());
+      assertEquals("Dart.DartStyle", reported.getFirst().getId());
+      assertEquals("action", reported.getFirst().getData().get(AnalyticsConstants.TYPE.getName()));
+      assertEquals(ActionPlaces.MAIN_MENU, reported.getFirst().getData().get(AnalyticsConstants.PLACE.getName()));
+      assertTrue("Legacy edit.format must not run when experimental LSP is enabled", legacyFormatRequests.isEmpty());
+    }
   }
 
-  public void testNonDartFileIsHiddenAndDoesNotDelegateOrReportAnalytics() {
+  public void testNonDartFileIsHiddenAndDoesNotReformatOrReportAnalytics() {
     DartConfigurable.setExperimentalLspFeaturesEnabled(getProject(), true);
     myFixture.configureByText("README.md", "# hello");
-    final List<AnActionEvent> delegatedEvents = new ArrayList<>();
-    final AnAction stubReformat = new AnAction() {
-      @Override
-      public @NotNull ActionUpdateThread getActionUpdateThread() {
-        return ActionUpdateThread.BGT;
-      }
-
-      @Override
-      public void actionPerformed(@NotNull AnActionEvent e) {
-        delegatedEvents.add(e);
-      }
-    };
+    final List<PsiFile> formattedFiles = new ArrayList<>();
     final DartStyleAction action = new DartStyleAction() {
       @Override
-      @Nullable AnAction getStandardReformatAction() {
-        return stubReformat;
+      void runEditorReformatCodeProcessor(@NotNull PsiFile psiFile, @NotNull Editor editor) {
+        formattedFiles.add(psiFile);
       }
     };
     final List<AnalyticsData> reported = new ArrayList<>();
-    final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.EDITOR_POPUP, ActionUiKind.POPUP, null);
+    final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.EDITOR_POPUP, ActionUiKind.POPUP);
 
     action.update(event);
     assertFalse(event.getPresentation().isVisible());
     assertFalse(event.getPresentation().isEnabled());
 
     Analytics.withReportObserver(reported::add, () -> action.actionPerformed(event));
-    assertTrue(delegatedEvents.isEmpty());
+    assertTrue(formattedFiles.isEmpty());
     assertTrue(reported.isEmpty());
     assertTrue(legacyFormatRequests.isEmpty());
   }
 
   public void testNullProjectDisablesAndNoOps() {
     final AnAction action = getRegisteredDartStyleAction();
-    final AnActionEvent event = createEvent(action, DataContext.EMPTY_CONTEXT, ActionPlaces.MAIN_MENU, ActionUiKind.NONE, null);
+    final AnActionEvent event = createEvent(action, DataContext.EMPTY_CONTEXT, ActionPlaces.MAIN_MENU, ActionUiKind.NONE);
 
     action.update(event);
     assertFalse(event.getPresentation().isVisible());
@@ -481,7 +437,7 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
     myFixture.configureByText("legacy.dart", INPUT);
     final AnAction action = getRegisteredDartStyleAction();
     final List<AnalyticsData> reported = new ArrayList<>();
-    final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.EDITOR_POPUP, ActionUiKind.POPUP, null);
+    final AnActionEvent event = createEvent(action, editorContext(), ActionPlaces.EDITOR_POPUP, ActionUiKind.POPUP);
 
     action.update(event);
     assertTrue(event.getPresentation().isVisible());
@@ -512,9 +468,8 @@ public class DartStyleActionTest extends DartCodeInsightFixtureTestCase {
   private static @NotNull AnActionEvent createEvent(@NotNull AnAction action,
                                                     @NotNull DataContext context,
                                                     @NotNull String place,
-                                                    @NotNull ActionUiKind uiKind,
-                                                    @Nullable KeyEvent inputEvent) {
-    return AnActionEvent.createEvent(action, context, null, place, uiKind, inputEvent);
+                                                    @NotNull ActionUiKind uiKind) {
+    return AnActionEvent.createEvent(action, context, null, place, uiKind, null);
   }
 
   private static Object replaceServiceField(DartAnalysisServerService service, String name, Object value) throws Exception {

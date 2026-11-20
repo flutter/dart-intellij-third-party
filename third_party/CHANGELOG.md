@@ -7,7 +7,7 @@
 - Optimizing imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
 
 ### Changed
-- Routing "Reformat Code with 'dart format'" (`Dart.DartStyle`) to standard Reformat Code (LSP formatting) when experimental LSP features are enabled (#850)
+- Routing "Reformat Code with 'dart format'" (`Dart.DartStyle`) through LSP formatting via `ReformatCodeProcessor` when experimental LSP features are enabled (#850)
 - Call Hierarchy navigation via LSP is now enabled for all users (#846)
 - Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
 - Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
