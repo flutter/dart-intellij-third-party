@@ -133,6 +133,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         private const val LSP_NOTIFICATION_EVENT = "lsp.notification"
         private const val LSP_RESPONSE_KEY = "lspResponse"
         private const val JSONRPC_VERSION = "2.0"
+        private const val DEFAULT_LEGEND_TIMEOUT_MS = 3_000L
         
         // We use a JSON handler with default lsp4j configuration to serialize/deserialize lsp4j objects.
         private val JSON_HANDLER = MessageJsonHandler(mapOf())
@@ -389,6 +390,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     // Overridable in tests.
     internal var isLspHighlightingEnabled: () -> Boolean = { DartAnalysisServerService.isLspHighlightingEnabled(project) }
+    internal var legendTimeoutMs: Long = DEFAULT_LEGEND_TIMEOUT_MS
 
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
         logger.info("Initialize called")
@@ -398,7 +400,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val legendCompletableFuture = when {
             !isLspHighlightingEnabled() -> CompletableFuture.completedFuture(null)
             legendFuture.isDone -> CompletableFuture.completedFuture(das.semanticTokensLegend)
-            das.isServerProcessActive -> legendFuture.copy().completeOnTimeout(null, 3, TimeUnit.SECONDS)
+            das.isServerProcessActive -> legendFuture.copy().completeOnTimeout(null, legendTimeoutMs, TimeUnit.MILLISECONDS)
             else -> CompletableFuture.completedFuture(null)
         }
 

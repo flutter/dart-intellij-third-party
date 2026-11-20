@@ -31,6 +31,7 @@ import org.dartlang.analysis.server.protocol.HighlightRegionType;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import java.util.*;
 
@@ -145,6 +146,11 @@ public final class DartAnnotator implements Annotator {
                               DartSyntaxHighlighterColors.DART_UNRESOLVED_INSTANCE_MEMBER_REFERENCE);
     // handled by DartAnnotator without server
     //HIGHLIGHTING_TYPE_MAP.put(HighlightRegionType.VALID_STRING_ESCAPE, DartSyntaxHighlighterColors.DART_VALID_STRING_ESCAPE);
+  }
+
+  @VisibleForTesting
+  public static @NotNull Map<String, String> getHighlightingTypeMap() {
+    return Collections.unmodifiableMap(HIGHLIGHTING_TYPE_MAP);
   }
 
   @Contract("_, null -> false")
