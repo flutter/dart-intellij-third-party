@@ -1,9 +1,6 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.jetbrains.lang.dart.ide.hierarchy;
 
-import com.intellij.ide.hierarchy.HierarchyBrowserManager;
-import com.intellij.ide.util.treeView.AlphaComparator;
-import com.intellij.ide.util.treeView.NodeDescriptor;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.Editor;
@@ -25,7 +22,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -33,8 +29,6 @@ import java.util.Set;
 import static com.jetbrains.lang.dart.DartTokenTypes.*;
 
 public final class DartHierarchyUtil {
-  private static final Comparator<NodeDescriptor<?>> NODE_DESCRIPTOR_COMPARATOR = Comparator.comparingInt(NodeDescriptor::getIndex);
-
   private DartHierarchyUtil() {
   }
 
@@ -43,16 +37,6 @@ public final class DartHierarchyUtil {
     final Location location = classElement.getLocation();
     final DartComponent component = findDartComponent(project, location);
     return component instanceof DartClass ? (DartClass)component : null;
-  }
-
-  public static Comparator<NodeDescriptor<?>> getComparator(Project project) {
-    final HierarchyBrowserManager.State state = HierarchyBrowserManager.getInstance(project).getState();
-    if (state != null && state.SORT_ALPHABETICALLY) {
-      return AlphaComparator.getInstance();
-    }
-    else {
-      return NODE_DESCRIPTOR_COMPARATOR;
-    }
   }
 
   public static @NotNull List<TypeHierarchyItem> getTypeHierarchyItems(@NotNull DartClass dartClass) {

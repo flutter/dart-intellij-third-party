@@ -8,6 +8,13 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.ex.DocumentEx
 import com.intellij.openapi.project.Project
+import org.eclipse.lsp4j.WorkspaceEdit
+import org.eclipse.lsp4j.ExecuteCommandParams
+import org.eclipse.lsp4j.Command
+import kotlinx.coroutines.launch
+import com.intellij.util.concurrency.Semaphore
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.io.FileUtilRt
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.dartlsp.util.getDocumentFilterPattern
@@ -88,7 +95,7 @@ class LspServerImpl internal constructor(
   val requestExecutor: LspRequestExecutor = LspRequestExecutor(this, documentMapping)
   internal val globMatcher: LspGlobMatcher = LspGlobMatcher()
   internal val dynamicCapabilities: LspDynamicCapabilities = LspDynamicCapabilities()
-  internal val serverNotificationsHandler: LspServerNotificationsHandler = LspServerNotificationsHandlerImpl(this)
+  internal val serverNotificationsHandler: LspServerNotificationsHandlerImpl = LspServerNotificationsHandlerImpl(this)
 
   internal val documentSyncManager = LspDocumentSyncManager(this)
   internal val watchedFiles = LspWatchedFiles(this)
@@ -147,6 +154,48 @@ class LspServerImpl internal constructor(
 
     return descriptor.isSupportedFile(file)
       .also { if (!it) unsupportedFilePaths.add(file.path) }
+  }
+
+  /**
+   * Sends a [workspace/executeCommand](https://microsoft.github.io/language-server-protocol/specification/#workspace_executeCommand)
+   * request to the server and waits for whichever comes first:
+   *  - a `workspace/applyEdit` request from the server - in this case this function returns the corresponding [WorkspaceEdit],
+   *  and it is up to the caller to apply it;
+   *  - a response to the `executeCommand` request (any response, including an error) - in this case this function returns `null`.
+   *
+   * Waiting is cancellable, so this function is safe to call inside a cancellable read action.
+   *
+   * Backported from IJPL-235332 (commit 47bd3c0a).
+   */
+  @RequiresBackgroundThread
+  internal fun executeCommandExpectingWorkspaceEdit(command: Command): WorkspaceEdit? {
+    // Released as soon as either the server sends a `workspace/applyEdit` request or the `executeCommand` request gets a response.
+    val semaphore = Semaphore(1)
+    var workspaceEdit: WorkspaceEdit? = null
+
+    try {
+      serverNotificationsHandler.nextApplyEditHandler = { edit ->
+        workspaceEdit = edit
+        semaphore.up()
+      }
+
+      LspServerManagerImpl.getInstanceImpl(project).cs.launch {
+        try {
+          sendRequest { it.workspaceService.executeCommand(ExecuteCommandParams(command.command, command.arguments)) }
+        }
+        finally {
+          semaphore.up()
+        }
+      }
+
+      @Suppress("UsagesOfObsoleteApi")
+      ProgressIndicatorUtils.awaitWithCheckCanceled(semaphore, ProgressManager.getInstance().progressIndicator)
+    }
+    finally {
+      serverNotificationsHandler.nextApplyEditHandler = null
+    }
+
+    return workspaceEdit
   }
 
   internal fun diagnosticsReceived(params: PublishDiagnosticsParams) {

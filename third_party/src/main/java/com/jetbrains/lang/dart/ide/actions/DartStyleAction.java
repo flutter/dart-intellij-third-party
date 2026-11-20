@@ -3,6 +3,7 @@ package com.jetbrains.lang.dart.ide.actions;
 
 import com.intellij.CommonBundle;
 import com.intellij.application.options.CodeStyle;
+import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
 
 import com.intellij.openapi.command.CommandProcessor;
@@ -29,6 +30,7 @@ import com.intellij.psi.PsiFile;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartLanguage;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -41,6 +43,21 @@ import static com.intellij.openapi.util.text.StringUtil.isWhiteSpace;
 
 public class DartStyleAction extends AbstractDartFileProcessingAction {
   private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartStyleAction.class);
+
+  @Override
+  public void update(@NotNull AnActionEvent event) {
+    if (event.getProject() != null && DartConfigurable.isExperimentalLspFeaturesEnabled(event.getProject())) {
+      event.getPresentation().setEnabledAndVisible(false);
+      return;
+    }
+    super.update(event);
+  }
+
+  @Override
+  public void actionPerformed(@NotNull AnActionEvent event) {
+    if (event.getProject() != null && DartConfigurable.isExperimentalLspFeaturesEnabled(event.getProject())) return;
+    super.actionPerformed(event);
+  }
 
   @Override
   protected @NotNull String getActionTextForEditor() {

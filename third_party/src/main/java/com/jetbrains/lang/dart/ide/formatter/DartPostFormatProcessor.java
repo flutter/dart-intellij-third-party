@@ -14,6 +14,7 @@ import com.intellij.psi.impl.source.codeStyle.PostFormatProcessor;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.ide.actions.DartStyleAction;
 import com.jetbrains.lang.dart.psi.DartFile;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil;
 import org.jetbrains.annotations.NotNull;
 
@@ -27,6 +28,7 @@ final class DartPostFormatProcessor implements PostFormatProcessor {
   public @NotNull TextRange processText(final @NotNull PsiFile psiFile,
                                         final @NotNull TextRange rangeToReformat,
                                         final @NotNull CodeStyleSettings settings) {
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(psiFile.getProject())) return rangeToReformat;
     if (!isApplicable(psiFile)) return rangeToReformat;
 
     return DartStyleAction.reformatRangeAsPostFormatProcessor(psiFile, rangeToReformat);
