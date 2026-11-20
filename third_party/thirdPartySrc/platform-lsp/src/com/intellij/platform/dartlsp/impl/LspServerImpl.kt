@@ -46,6 +46,7 @@ import com.intellij.platform.dartlsp.impl.fileEvents.LspWatchedFiles
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.text.nullize
+import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.CodeLens
 import org.eclipse.lsp4j.Color
 import org.eclipse.lsp4j.FoldingRange
@@ -111,6 +112,17 @@ class LspServerImpl internal constructor(
 
   internal val lsp4jServer: Lsp4jServer
     get() = lsp4jServerConnector.lsp4jServer
+
+  /**
+   * Holds the effective [ClientCapabilities] sent to the LSP server in [org.eclipse.lsp4j.InitializeParams].
+   *
+   * Unlike [LspServerDescriptor.clientCapabilities] or [LspServerDescriptor.createInitializeParams],
+   * this property guarantees the same instance across multiple reads.
+   *
+   * The value is `null` before the server initializes.
+   */
+  internal var clientCapabilities: ClientCapabilities? = null
+    private set
 
   internal val serverCapabilities: ServerCapabilities?
     get() = if (state == Running) initializeResult?.capabilities else null
@@ -272,8 +284,9 @@ class LspServerImpl internal constructor(
       try {
         synchronized(connectorLock) {
           lsp4jServerConnector = createLsp4jServerConnector()
-          lsp4jServerConnector.connect { initializeResult ->
+          lsp4jServerConnector.connect { initializeParams, initializeResult ->
             this.initializeResult = initializeResult
+            this.clientCapabilities = initializeParams.capabilities
 
             // While waiting for the server initialization, the `state` might have already become `ShutdownNormally`
             // or `ShutdownUnexpectedly`, which means that the server is going to shut down shortly, so it must not get the Running state
