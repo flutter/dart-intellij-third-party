@@ -2786,12 +2786,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         val wasEnabled = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
 
         try {
+            // workspace.fileOperations.willRename is not gated on experimental LSP features.
             DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
-            val disabledCapabilities = descriptor.clientCapabilities
-            assertEquals(false, disabledCapabilities.workspace?.fileOperations?.willRename)
-            assertEquals(true, disabledCapabilities.workspace?.fileOperations?.dynamicRegistration)
-
-            DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
             val capabilities = descriptor.clientCapabilities
 
             assertEquals(true, capabilities.workspace?.fileOperations?.willRename)

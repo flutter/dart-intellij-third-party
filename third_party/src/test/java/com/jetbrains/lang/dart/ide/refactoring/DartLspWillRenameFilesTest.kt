@@ -35,9 +35,11 @@ import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory
 import com.intellij.testFramework.fixtures.TempDirTestFixture
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager
 import com.jetbrains.lang.dart.lsp.DartLspServerDescriptor
 import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
+import com.jetbrains.lang.dart.lsp.DartLspService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
@@ -144,7 +146,6 @@ class DartLspWillRenameFilesTest : DartCodeInsightFixtureTestCase() {
         val oldVirtualFile = oldPsiFile.virtualFile
         val mainVirtualFile = mainPsiFile.virtualFile
 
-        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
         startBridgeAndAwaitRunning()
 
         val descriptor = DartLspServerDescriptor(project)
@@ -189,7 +190,6 @@ class DartLspWillRenameFilesTest : DartCodeInsightFixtureTestCase() {
         }
         val targetPsiDir = checkNotNull(PsiManager.getInstance(project).findDirectory(targetVirtualDir))
 
-        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
         startBridgeAndAwaitRunning()
 
         val descriptor = DartLspServerDescriptor(project)
@@ -234,7 +234,6 @@ class DartLspWillRenameFilesTest : DartCodeInsightFixtureTestCase() {
         val mainPsiFile = myFixture.addFileToProject("lib/main.dart", "import 'old_dir/foo.dart';\n")
         val oldDir = checkNotNull(childPsiFile.containingDirectory)
 
-        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
         startBridgeAndAwaitRunning()
 
         val descriptor = DartLspServerDescriptor(project)
@@ -276,7 +275,6 @@ class DartLspWillRenameFilesTest : DartCodeInsightFixtureTestCase() {
         }
         val targetPsiDir = checkNotNull(PsiManager.getInstance(project).findDirectory(targetVirtualDir))
 
-        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
         startBridgeAndAwaitRunning()
 
         val descriptor = DartLspServerDescriptor(project)
@@ -311,7 +309,6 @@ class DartLspWillRenameFilesTest : DartCodeInsightFixtureTestCase() {
         myFixture.addFileToProject("lib/a.dart", "class A {}")
         val markdownFile = myFixture.addFileToProject("lib/README.md", "# Readme")
 
-        DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
         startBridgeAndAwaitRunning()
 
         RenameProcessor(project, markdownFile, "NOTES.md", false, false).run()
@@ -320,15 +317,31 @@ class DartLspWillRenameFilesTest : DartCodeInsightFixtureTestCase() {
         assertEquals("NOTES.md", markdownFile.virtualFile.name)
     }
 
-    fun testDisabledExperimentalLspDoesNotSendWillRenameFiles() {
+    fun testWillRenameFilesAndLegacyYieldRunEvenWhenExperimentalLspDisabled() {
         val dartFile = myFixture.addFileToProject("lib/a.dart", "class A {}")
+        val renameProcessor = DartLspRenamePsiElementProcessor()
+        val moveHandler = DartServerMoveDartFileHandler()
 
         DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+        assertFalse(DartLspService.isServerRunning(project))
+        assertFalse(renameProcessor.canProcessElement(dartFile))
+
         startBridgeAndAwaitRunning()
+
+        assertTrue(DartLspService.isServerRunning(project))
+        assertTrue(renameProcessor.canProcessElement(dartFile))
+        assertFalse(
+            "DartServerMoveDartFileHandler should yield to LspWillRenameFilesHandler while LSP server is running",
+            moveHandler.canProcessElement(dartFile)
+        )
 
         RenameProcessor(project, dartFile, "b.dart", false, false).run()
 
-        assertTrue("Disabled experimental LSP must not send workspace/willRenameFiles", capturedWillRenameRequests.isEmpty())
+        assertEquals(
+            "workspace/willRenameFiles should run even when experimental LSP features are disabled",
+            1,
+            capturedWillRenameRequests.size
+        )
         assertEquals("b.dart", dartFile.virtualFile.name)
     }
 

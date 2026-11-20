@@ -1,16 +1,16 @@
-<!--* freshness: { reviewed: '2026-11-05' } *-->
+<!--* freshness: { reviewed: '2026-11-20' } *-->
 
 # refactoring
 
 ## Overview
 
-Rename, extract, inline, and move-file refactorings. By default they are driven
-by the legacy analysis server (DAS) refactoring protocol. When LSP code actions
-are enabled, Extract Method, Extract Local Variable, and Inline instead run as
-LSP `textDocument/codeAction` refactorings (no options dialog). When
-experimental LSP features are enabled, file and directory renames and moves use
-the platform LSP `LspWillRenameFilesHandler` (`workspace/willRenameFiles`,
-backported from `IJPL-249183`).
+Rename, extract, inline, and move-file refactorings. By default symbol
+refactorings are driven by the legacy analysis server (DAS) refactoring
+protocol. When LSP code actions are enabled, Extract Method, Extract Local
+Variable, and Inline instead run as LSP `textDocument/codeAction` refactorings
+(no options dialog). File and directory renames and moves use the platform LSP
+`LspWillRenameFilesHandler` (`workspace/willRenameFiles`, backported from
+`IJPL-249183`) for all users whenever the Dart LSP server is running.
 
 ## Interface
 
@@ -29,7 +29,7 @@ backported from `IJPL-249183`).
   platform.
 - `DartLspRenamePsiElementProcessor`: `renamePsiElementProcessor` (`order="first"`)
   that suppresses legacy `DartFileReference` PSI rename usages when renaming
-  Dart files and directories with experimental LSP features enabled.
+  Dart files and directories while the Dart LSP server is running.
 - `DartLspRefactoringHelper`: object that turns the caret or selection into a
   `textDocument/codeAction` request (`refactor.extract` / `refactor.inline`),
   picks the matching enabled action by title, and applies it. Shows an error
@@ -38,17 +38,17 @@ backported from `IJPL-249183`).
   `introduce/DartServerExtractLocalVariableHandler`: the action handlers. Both
   delegate to `DartLspRefactoringHelper` when LSP code actions are enabled.
 - `moveFile/DartServerMoveDartFileHandler`: the legacy DAS `moveFileHandler`
-  (`MoveFileRefactoring`). Yields (`canProcessElement` returns `false`) when
-  experimental LSP features are enabled so `LspWillRenameFilesHandler` handles
-  file and directory moves.
+  (`MoveFileRefactoring`). Yields (`canProcessElement` returns `false`) while
+  the Dart LSP server is running so `LspWillRenameFilesHandler` handles file
+  and directory moves.
 - `status/`: `RefactoringStatus`, `RefactoringStatusEntry`,
   `RefactoringStatusContext`, and `RefactoringStatusSeverity`.
 
 ## Invariants
 
 - The LSP file/directory rename and move path (`LspWillRenameFilesHandler`) runs
-  when `DartConfigurable.isExperimentalLspFeaturesEnabled` is true (which
-  enables `workspace.fileOperations.willRename` on `DartLspServerDescriptor`).
+  for all users whenever the Dart LSP server is running (not gated on
+  experimental LSP features).
 - The LSP extract/inline path runs only when
   `DartConfigurable.isLspCodeActionsEnabled(project)` is true and a Dart SDK
   is configured.
