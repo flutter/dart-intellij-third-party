@@ -11,6 +11,7 @@
 - Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
 - Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
 - Go to Super uses JetBrains LSP when experimental LSP features are enabled, navigating to the server's single effective target. Go to Implementation, gutter navigation and Method Hierarchy are unchanged (#821)
+- Migrating server lifecycle actions (`Restart Dart Analysis Server`, `Reanalyze Dart Sources`, and cache invalidation) to LSP (`dart/reanalyze` requires Dart SDK 3.14.0-252.0.dev or newer) (#830)
 
 ### Removed
 - Legacy `execution.getSuggestions` runtime completion call in debugger expression fragments, which has returned empty results from the Dart Analysis Server since 2018 (#818)

@@ -44,6 +44,12 @@ interface DartLanguageServer : Lsp4jServer {
      */
     @JsonRequest("dart/connectToDtd")
     fun connectToDtd(params: ConnectToDtdParams): CompletableFuture<Any>
+	
+	/**
+     * Forces re-reading of all potentially changed files, clearing of caches, and re-analysis of everything.
+     */
+    @JsonRequest("dart/reanalyze")
+    fun reanalyze(): CompletableFuture<Any>
 }
 
 /**
@@ -76,18 +82,9 @@ object DartLspService {
 
     @JvmStatic
     fun getDiagnosticServerPort(project: Project): CompletableFuture<Int?> {
-        return CompletableFuture.supplyAsync({
-            if (project.isDisposed) return@supplyAsync null
-            val server = LspServerManager.getInstance(project)
-                .getServersForProvider(DartLspServerSupportProvider::class.java)
-                .firstOrNull() ?: return@supplyAsync null
-            var port: Int? = null
-            ProgressManager.getInstance().executeNonCancelableSection {
-                val result = server.sendRequestSync { (it as DartLanguageServer).diagnosticServer() }
-                port = result?.port
-            }
-            port
-        }, AppExecutorUtil.getAppExecutorService())
+        return sendRequestAsync(project) {
+            (it as DartLanguageServer).diagnosticServer()
+        }.thenApply { it?.port }
     }
 
     @JvmStatic
@@ -143,16 +140,32 @@ object DartLspService {
 
     @JvmStatic
     fun willRenameFiles(project: Project, params: RenameFilesParams): CompletableFuture<WorkspaceEdit?> {
-        return CompletableFuture.supplyAsync({
+        return sendRequestAsync(project) {
+            it.workspaceService.willRenameFiles(params)
+        }
+    }
+
+    @JvmStatic
+    fun reanalyze(project: Project): CompletableFuture<Boolean> {
+        return sendRequestAsync(project) {
+            (it as DartLanguageServer).reanalyze().thenApply { true }
+        }.thenApply { it == true }
+    }
+
+    private fun <T> sendRequestAsync(
+        project: Project,
+        request: (Lsp4jServer) -> CompletableFuture<T>,
+    ) : CompletableFuture<T?> {
+        return CompletableFuture.supplyAsync ({
             if (project.isDisposed) return@supplyAsync null
             val server = LspServerManager.getInstance(project)
                 .getServersForProvider(DartLspServerSupportProvider::class.java)
                 .firstOrNull() ?: return@supplyAsync null
-            var edit: WorkspaceEdit? = null
+            var result: T? = null
             ProgressManager.getInstance().executeNonCancelableSection {
-                edit = server.sendRequestSync { it.workspaceService.willRenameFiles(params) }
+                result = server.sendRequestSync(lsp4jSender = request)
             }
-            edit
+            result
         }, AppExecutorUtil.getAppExecutorService())
     }
 }
