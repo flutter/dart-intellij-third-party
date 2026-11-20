@@ -11,6 +11,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileTypes.FileTypeRegistry;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtilCore;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
@@ -130,13 +131,14 @@ public abstract class AbstractDartFileProcessingAction extends AnAction implemen
     }, ModalityState.nonModal(), o -> editor.isDisposed() || !editor.getComponent().isShowing());
   }
 
-  private static @NotNull List<VirtualFile> getApplicableVirtualFiles(final @NotNull Project project,
-                                                                      final VirtualFile @NotNull [] filesAndDirs) {
+  protected static @NotNull List<VirtualFile> getApplicableVirtualFiles(final @NotNull Project project,
+                                                                        final VirtualFile @NotNull [] filesAndDirs) {
     final List<VirtualFile> result = new SmartList<>();
 
     GlobalSearchScope dirScope = null;
 
     for (VirtualFile fileOrDir : filesAndDirs) {
+      ProgressManager.checkCanceled();
       if (fileOrDir.isDirectory()) {
         if (dirScope == null) {
           dirScope = GlobalSearchScopesCore.directoryScope(project, fileOrDir, true);
@@ -153,6 +155,7 @@ public abstract class AbstractDartFileProcessingAction extends AnAction implemen
     if (dirScope != null) {
       for (VirtualFile file : FileTypeIndex
         .getFiles(DartFileType.INSTANCE, GlobalSearchScope.projectScope(project).intersectWith(dirScope))) {
+        ProgressManager.checkCanceled();
         if (isApplicableFile(project, file)) {
           result.add(file);
         }
@@ -162,7 +165,7 @@ public abstract class AbstractDartFileProcessingAction extends AnAction implemen
     return result;
   }
 
-  private static boolean isApplicableFile(final @NotNull Project project, final @Nullable VirtualFile file) {
+  protected static boolean isApplicableFile(final @NotNull Project project, final @Nullable VirtualFile file) {
     if (file == null || !FileTypeRegistry.getInstance().isFileOfType(file, DartFileType.INSTANCE)) return false;
     if (!ProjectFileIndex.getInstance(project).isInContent(file)) return false;
 
