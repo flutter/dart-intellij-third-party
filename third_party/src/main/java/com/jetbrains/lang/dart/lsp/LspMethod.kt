@@ -32,7 +32,8 @@ enum class LspMethod(
     REFERENCES("textDocument/references", isExperimental = true, presentableName = "references"),
     DOCUMENT_SYMBOL("textDocument/documentSymbol", isExperimental = true, presentableName = "document symbols"),
     SIGNATURE_HELP("textDocument/signatureHelp", isExperimental = true, presentableName = "signature help"),
-    WILL_RENAME_FILES("workspace/willRenameFiles", isExperimental = true, presentableName = "file rename and move");
+    // Not gated by the experimental LSP flag because there is no workspace/willRenameFiles equivalent in legacy mode.
+    WILL_RENAME_FILES("workspace/willRenameFiles", isExperimental = false);
 
     companion object {
         fun fromMethod(method: String): LspMethod? = entries.find { it.method == method }

@@ -18,8 +18,8 @@ import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
 import com.jetbrains.lang.dart.assists.AssistUtils;
 import com.jetbrains.lang.dart.assists.DartSourceEditException;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
+import com.jetbrains.lang.dart.lsp.DartLspService;
 import com.jetbrains.lang.dart.psi.DartFile;
-import com.jetbrains.lang.dart.sdk.DartConfigurable;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.SourceChange;
 import org.jetbrains.annotations.NotNull;
@@ -37,7 +37,7 @@ public final class DartServerMoveDartFileHandler extends MoveFileHandler {
       return false;
     }
     final Project project = psiFile.getProject();
-    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+    if (DartLspService.isServerRunning(project)) {
       return false;
     }
     if (DartSdk.getDartSdk(project) == null) {

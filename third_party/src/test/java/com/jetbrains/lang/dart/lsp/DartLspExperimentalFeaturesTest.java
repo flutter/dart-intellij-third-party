@@ -86,22 +86,22 @@ public class DartLspExperimentalFeaturesTest extends CodeInsightFixtureTestCase 
     assertFalse(LspMethod.DOCUMENT_HIGHLIGHT.isExperimental());
     assertFalse(LspMethod.HOVER.isExperimental());
     assertFalse(LspMethod.TYPE_DEFINITION.isExperimental());
+    assertFalse(LspMethod.WILL_RENAME_FILES.isExperimental());
     assertTrue(LspMethod.CODE_ACTION.isExperimental());
     assertTrue(LspMethod.DEFINITION.isExperimental());
     assertTrue(LspMethod.PUBLISH_DIAGNOSTICS.isExperimental());
     assertTrue(LspMethod.SEMANTIC_TOKENS_FULL.isExperimental());
     assertTrue(LspMethod.DOCUMENT_SYMBOL.isExperimental());
     assertTrue(LspMethod.SIGNATURE_HELP.isExperimental());
-    assertTrue(LspMethod.WILL_RENAME_FILES.isExperimental());
 
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.CONNECT_TO_DTD));
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.DIAGNOSTIC_SERVER));
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.DOCUMENT_HIGHLIGHT));
     assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.HOVER));
+    assertFalse(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.WILL_RENAME_FILES));
     assertTrue(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.CODE_ACTION));
     assertTrue(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.PUBLISH_DIAGNOSTICS));
     assertTrue(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.SEMANTIC_TOKENS_FULL));
     assertTrue(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.SIGNATURE_HELP));
-    assertTrue(LspMethod.Companion.getExperimentalFeatures().contains(LspMethod.WILL_RENAME_FILES));
   }
 }
