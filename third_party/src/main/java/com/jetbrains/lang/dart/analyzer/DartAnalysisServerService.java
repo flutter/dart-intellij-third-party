@@ -2521,17 +2521,12 @@ public final class DartAnalysisServerService implements Disposable {
       final RemoteAnalysisServerImpl startedServer = new DartAnalysisServerImpl(myProject, myServerSocket);
 
       try {
-        startedServer.start();
-        server_setSubscriptions(startedServer);
-
-        if (!myInitializationOnServerStartupDone) {
-          myInitializationOnServerStartupDone = true;
-
-          registerFileEditorManagerListener();
-          registerDocumentListener();
-          setDasLogger();
-        }
-
+        // Register the listeners before start(): start() launches the process and the reader thread, and notifications that
+        // arrive before a listener is added are dropped. Losing server.connected leaves myServerVersion empty for the
+        // server's lifetime, so DartServerCompletionContributor falls back to the removed completion.getSuggestions request
+        // and every completion comes back empty (UNKNOWN_REQUEST). See
+        // https://github.com/flutter/dart-intellij-third-party/issues/857.
+        myHaveShownInitialProgress = false;
         startedServer.addAnalysisServerListener(myAnalysisServerListener);
         for (AnalysisServerListener listener : myAdditionalServerListeners) {
           startedServer.addAnalysisServerListener(listener);
@@ -2543,7 +2538,17 @@ public final class DartAnalysisServerService implements Disposable {
           startedServer.addResponseListener(listener);
         }
 
-        myHaveShownInitialProgress = false;
+        startedServer.start();
+        server_setSubscriptions(startedServer);
+
+        if (!myInitializationOnServerStartupDone) {
+          myInitializationOnServerStartupDone = true;
+
+          registerFileEditorManagerListener();
+          registerDocumentListener();
+          setDasLogger();
+        }
+
         startedServer.addStatusListener(isAlive -> {
           if (!isAlive) {
             synchronized (myLock) {
