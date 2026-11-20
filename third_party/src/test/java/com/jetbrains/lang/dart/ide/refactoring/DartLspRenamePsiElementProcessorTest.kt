@@ -14,37 +14,31 @@ import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 
 class DartLspRenamePsiElementProcessorTest : DartCodeInsightFixtureTestCase() {
 
-    fun testCanProcessElementRequiresRunningLspServerNotExperimentalFlag() {
+    fun testCanProcessElementDoesNotDependOnExperimentalFlag() {
+        val processor = DartLspRenamePsiElementProcessor()
         val file = myFixture.addFileToProject("lib/a.dart", "class A {}")
         val dir = file.containingDirectory
 
-        // Experimental LSP disabled by default, but processor depends only on running LSP server.
         assertFalse(DartConfigurable.isExperimentalLspFeaturesEnabled(project))
-
-        val stoppedProcessor = DartLspRenamePsiElementProcessor { false }
-        assertFalse(stoppedProcessor.canProcessElement(file))
-        assertFalse(stoppedProcessor.canProcessElement(dir))
-
-        val runningProcessor = DartLspRenamePsiElementProcessor { true }
-        assertTrue(runningProcessor.canProcessElement(file))
-        assertTrue(runningProcessor.canProcessElement(dir))
+        assertTrue(processor.canProcessElement(file))
+        assertTrue(processor.canProcessElement(dir))
     }
 
     fun testCanProcessElementNonDartFileReturnsFalse() {
-        val processor = DartLspRenamePsiElementProcessor { true }
+        val processor = DartLspRenamePsiElementProcessor()
         val textFile = myFixture.addFileToProject("lib/readme.txt", "hello")
         assertFalse(processor.canProcessElement(textFile))
     }
 
     fun testCanProcessElementOutsideContentReturnsFalse() {
-        val processor = DartLspRenamePsiElementProcessor { true }
+        val processor = DartLspRenamePsiElementProcessor()
         val lightFile = LightVirtualFile("outside.dart", "class Outside {}")
         val psiLightFile = checkNotNull(psiManager.findFile(lightFile))
         assertFalse(processor.canProcessElement(psiLightFile))
     }
 
     fun testCanProcessElementDirectoryInNonDartModuleReturnsFalse() {
-        val processor = DartLspRenamePsiElementProcessor { true }
+        val processor = DartLspRenamePsiElementProcessor()
         val file = myFixture.addFileToProject("lib/c.dart", "class C {}")
         val dir = file.containingDirectory
 
@@ -70,7 +64,7 @@ class DartLspRenamePsiElementProcessorTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testFindReferencesReturnsEmptyToPreventLegacyDoubleEdits() {
-        val processor = DartLspRenamePsiElementProcessor { true }
+        val processor = DartLspRenamePsiElementProcessor()
         val file = myFixture.addFileToProject("lib/b.dart", "class B {}")
         val references = processor.findReferences(file, file.resolveScope, true)
         assertTrue("findReferences should return empty to prevent legacy PSI string double-edits", references.isEmpty())

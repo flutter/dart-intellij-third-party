@@ -5,21 +5,19 @@
  */
 package com.jetbrains.lang.dart.ide.refactoring
 
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
 import com.intellij.psi.search.SearchScope
 import com.intellij.refactoring.rename.RenamePsiElementProcessor
-import com.jetbrains.lang.dart.lsp.DartLspService
 import com.jetbrains.lang.dart.psi.DartFile
 import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 
 /**
  * Suppresses legacy [com.jetbrains.lang.dart.psi.impl.DartFileReference] PSI usages when renaming
- * Dart files and directories while the Dart LSP server is running.
+ * Dart files and directories.
  *
  * The `workspace/willRenameFiles` request and workspace edit application are handled by the
  * platform LSP `LspWillRenameFilesHandler` (IJPL-249183) on `refactoringStarted`. Without this
@@ -29,18 +27,10 @@ import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
  *
  * Can be removed once legacy `DartFileReference` is retired.
  */
-class DartLspRenamePsiElementProcessor internal constructor(
-    private val isLspServerRunning: (Project) -> Boolean,
-) : RenamePsiElementProcessor() {
-
-    @Suppress("unused")
-    constructor() : this(DartLspService::isServerRunning)
+class DartLspRenamePsiElementProcessor : RenamePsiElementProcessor() {
 
     override fun canProcessElement(element: PsiElement): Boolean {
         val project = element.project
-        if (!isLspServerRunning(project)) {
-            return false
-        }
         if (DartSdk.getDartSdk(project) == null) {
             return false
         }

@@ -35,11 +35,9 @@ import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory
 import com.intellij.testFramework.fixtures.TempDirTestFixture
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
-import com.jetbrains.lang.dart.ide.refactoring.moveFile.DartServerMoveDartFileHandler
 import com.jetbrains.lang.dart.lsp.DartBridgeLspServerManager
 import com.jetbrains.lang.dart.lsp.DartLspServerDescriptor
 import com.jetbrains.lang.dart.lsp.DartLspServerSupportProvider
-import com.jetbrains.lang.dart.lsp.DartLspService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
 import org.dartlang.analysis.server.protocol.MessageAction
@@ -317,23 +315,55 @@ class DartLspWillRenameFilesTest : DartCodeInsightFixtureTestCase() {
         assertEquals("NOTES.md", markdownFile.virtualFile.name)
     }
 
-    fun testWillRenameFilesAndLegacyYieldRunEvenWhenExperimentalLspDisabled() {
-        val dartFile = myFixture.addFileToProject("lib/a.dart", "class A {}")
-        val renameProcessor = DartLspRenamePsiElementProcessor()
-        val moveHandler = DartServerMoveDartFileHandler()
-
-        DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
-        assertFalse(DartLspService.isServerRunning(project))
-        assertFalse(renameProcessor.canProcessElement(dartFile))
+    fun testMoveSingleFileUpdatesImportsViaPlatformLsp() {
+        val movedPsiFile = myFixture.addFileToProject("lib/src/foo.dart", "import 'bar.dart';\n")
+        myFixture.addFileToProject("lib/src/bar.dart", "class Bar {}\n")
+        val srcDir = checkNotNull(movedPsiFile.containingDirectory)
+        val libDir = checkNotNull(srcDir.parentDirectory)
 
         startBridgeAndAwaitRunning()
 
-        assertTrue(DartLspService.isServerRunning(project))
-        assertTrue(renameProcessor.canProcessElement(dartFile))
-        assertFalse(
-            "DartServerMoveDartFileHandler should yield to LspWillRenameFilesHandler while LSP server is running",
-            moveHandler.canProcessElement(dartFile)
-        )
+        val descriptor = DartLspServerDescriptor(project)
+        val expectedOldUri = descriptor.getFileUri(movedPsiFile.virtualFile)
+        val expectedNewUri = descriptor.getFileUri(libDir.virtualFile) + "/foo.dart"
+
+        willRenameHandler = {
+            buildWorkspaceEditResult(
+                uri = expectedOldUri,
+                startLine = 0,
+                startChar = 7,
+                endLine = 0,
+                endChar = 17,
+                newText = "'src/bar.dart'"
+            )
+        }
+
+        MoveFilesOrDirectoriesProcessor(
+            project,
+            arrayOf(movedPsiFile),
+            libDir,
+            false,
+            false,
+            null,
+            null
+        ).run()
+
+        assertEquals(1, capturedWillRenameRequests.size)
+        val files = capturedWillRenameRequests.single().getAsJsonObject("params").getAsJsonArray("files")
+        assertEquals(1, files.size())
+        assertEquals(expectedOldUri, files[0].asJsonObject.get("oldUri").asString)
+        assertEquals(expectedNewUri, files[0].asJsonObject.get("newUri").asString)
+        assertEquals(libDir.virtualFile, movedPsiFile.virtualFile.parent)
+
+        val movedDoc = checkNotNull(FileDocumentManager.getInstance().getDocument(movedPsiFile.virtualFile))
+        assertEquals("import 'src/bar.dart';\n", movedDoc.text)
+    }
+
+    fun testWillRenameFilesRunsWhenExperimentalLspDisabled() {
+        val dartFile = myFixture.addFileToProject("lib/a.dart", "class A {}")
+
+        DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+        startBridgeAndAwaitRunning()
 
         RenameProcessor(project, dartFile, "b.dart", false, false).run()
 

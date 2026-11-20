@@ -29,7 +29,7 @@ Variable, and Inline instead run as LSP `textDocument/codeAction` refactorings
   platform.
 - `DartLspRenamePsiElementProcessor`: `renamePsiElementProcessor` (`order="first"`)
   that suppresses legacy `DartFileReference` PSI rename usages when renaming
-  Dart files and directories while the Dart LSP server is running.
+  Dart files and directories.
 - `DartLspRefactoringHelper`: object that turns the caret or selection into a
   `textDocument/codeAction` request (`refactor.extract` / `refactor.inline`),
   picks the matching enabled action by title, and applies it. Shows an error
@@ -37,18 +37,14 @@ Variable, and Inline instead run as LSP `textDocument/codeAction` refactorings
 - `extract/DartServerExtractMethodHandler`,
   `introduce/DartServerExtractLocalVariableHandler`: the action handlers. Both
   delegate to `DartLspRefactoringHelper` when LSP code actions are enabled.
-- `moveFile/DartServerMoveDartFileHandler`: the legacy DAS `moveFileHandler`
-  (`MoveFileRefactoring`). Yields (`canProcessElement` returns `false`) while
-  the Dart LSP server is running so `LspWillRenameFilesHandler` handles file
-  and directory moves.
 - `status/`: `RefactoringStatus`, `RefactoringStatusEntry`,
   `RefactoringStatusContext`, and `RefactoringStatusSeverity`.
 
 ## Invariants
 
 - The LSP file/directory rename and move path (`LspWillRenameFilesHandler`) runs
-  for all users whenever the Dart LSP server is running (not gated on
-  experimental LSP features).
+  for all users (not gated on experimental LSP features); legacy DAS
+  `MoveFileRefactoring` / `DartServerMoveDartFileHandler` have been removed.
 - The LSP extract/inline path runs only when
   `DartConfigurable.isLspCodeActionsEnabled(project)` is true and a Dart SDK
   is configured.
