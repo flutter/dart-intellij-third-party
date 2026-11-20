@@ -24,8 +24,12 @@ import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.text.StringUtil
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
 import com.jetbrains.lang.dart.dtd.DTDProcess
@@ -37,9 +41,11 @@ import com.jetbrains.lang.dart.util.PrintingLogger
 import com.jetbrains.lang.dart.websocket.WebSocketException
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.annotations.VisibleForTesting
+import java.lang.ref.WeakReference
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -162,10 +168,53 @@ class AnalyticsConfiguration {
     get() = shouldShowMessage || !telemetryEnabled
 }
 
+/**
+ * Decides when to retry resolving the analytics configuration after a failed attempt, so a failure isn't cached for
+ * the rest of the IDE session: retry after each backoff in turn, then give up.
+ */
+@VisibleForTesting
+internal class ConfigRetryPolicy(private val backoffMs: LongArray = longArrayOf(60_000, 300_000)) {
+  private var failures = 0
+  private var failed = false
+  private var nextRetryAtMs = 0L
+
+  /** Records a failed attempt; returns the delay before the next retry, or `null` if there are no retries left. */
+  @Synchronized
+  fun onFailure(nowMs: Long): Long? {
+    failed = true
+    val delay = backoffMs.getOrNull(failures)
+    failures++
+    nextRetryAtMs = if (delay != null) nowMs + delay else Long.MAX_VALUE
+    return delay
+  }
+
+  @Synchronized
+  fun onSuccess() {
+    failed = false
+    failures = 0
+  }
+
+  /** Claims the retry if one is due (the last attempt failed and its backoff has elapsed). */
+  @Synchronized
+  fun tryClaimRetry(nowMs: Long): Boolean {
+    if (!failed || nowMs < nextRetryAtMs) return false
+    failed = false
+    return true
+  }
+}
+
 private object AnalyticsConfigurationManager {
   private const val INITIALIZATION_TIMEOUT_IN_MS: Long = 700
+
+  /** The minimum SDK version with a DTD-hosted `UnifiedAnalytics` service (matches the project DTD's minimum). */
+  private const val MIN_SDK_VERSION_FOR_RETRY = "3.4"
+
+  @Volatile
   lateinit var data: AnalyticsConfiguration
-  private val initLatch = CountDownLatch(1)
+
+  @Volatile
+  private var initLatch = CountDownLatch(1)
+  private val retryPolicy = ConfigRetryPolicy()
   
   val safeData: AnalyticsConfiguration?
     get() = if (::data.isInitialized) data else null
@@ -173,27 +222,59 @@ private object AnalyticsConfigurationManager {
   @Volatile
   private var isInitializing = false
 
+  /** A monotonic clock for retry backoffs (immune to wall-clock changes). */
+  private fun nowMs(): Long = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
+
   fun getConfiguration(sdk: DartSdk, project: Project, logger: Logger): AnalyticsConfiguration {
     logger.debug("Analytics.getConfiguration")
 
-    if (::data.isInitialized && initLatch.count == 0L) return data
-
-    // TODO (pq): capture timing info and report (if analytics are enabled)
     var shouldInitialize = false
+    val currentData: AnalyticsConfiguration
+    val currentLatch: CountDownLatch
     synchronized(this) {
       if (!isInitializing) {
         isInitializing = true
         shouldInitialize = true
       }
+      else if (initLatch.count == 0L && retryPolicy.tryClaimRetry(nowMs())) {
+        // The last attempt failed and its backoff has elapsed: try again.
+        initLatch = CountDownLatch(1)
+        shouldInitialize = true
+      }
+      if (shouldInitialize) {
+        data = AnalyticsConfiguration()
+      }
+      currentData = data
+      currentLatch = initLatch
     }
 
-    if (shouldInitialize) {
-      data = AnalyticsConfiguration()
+    if (!shouldInitialize && currentLatch.count == 0L) return currentData
 
+    // TODO (pq): capture timing info and report (if analytics are enabled)
+    if (shouldInitialize) {
       // Return a default configuration (that suppresses analytics) when running tests.
       if (ApplicationManager.getApplication().isUnitTestMode) {
-        initLatch.countDown()
-        return data
+        currentLatch.countDown()
+        return currentData
+      }
+
+      // Settles this attempt once: records the outcome for retries, then releases waiters.
+      val settled = AtomicBoolean()
+      fun settle(success: Boolean) {
+        if (!settled.compareAndSet(false, true)) return
+        if (success) {
+          retryPolicy.onSuccess()
+        }
+        else {
+          val delay = retryPolicy.onFailure(nowMs())
+          // SDKs older than the minimum have no analytics service to retry against. A later natural call (e.g. after
+          // an SDK update) can still claim the retry.
+          if (delay != null && StringUtil.compareVersionNumbers(sdk.version, MIN_SDK_VERSION_FOR_RETRY) >= 0) {
+            logger.info("Analytics configuration failed; retrying in $delay ms")
+            scheduleRetry(WeakReference(project), logger, delay)
+          }
+        }
+        currentLatch.countDown()
       }
 
       val dtdProcess = DTDProcess()
@@ -204,22 +285,25 @@ private object AnalyticsConfigurationManager {
           val params = JsonObject()
           params.addProperty(UnifiedAnalytics.Property.TOOL, getToolName())
 
+          var success = false
           try {
-            data.shouldShowMessage =
+            currentData.shouldShowMessage =
               UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.SHOULD_SHOW_MESSAGE)
-            if (data.shouldShowMessage) {
-              data.consentMessage =
+            if (currentData.shouldShowMessage) {
+              currentData.consentMessage =
                 UnifiedAnalytics.callServiceWithStringResponse(dtdProcess, UnifiedAnalytics.GET_CONSENT_MESSAGE)
-              data.telemetryEnabled = false // No need to ask
+              currentData.telemetryEnabled = false // No need to ask
             } else {
-              data.telemetryEnabled =
+              currentData.telemetryEnabled =
                 UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.TELEMETRY_ENABLED)
             }
 
             // Update global suppression state (note that the default is to suppress).
-            Analytics.suppressAnalytics = data.suppressAnalytics
+            Analytics.suppressAnalytics = currentData.suppressAnalytics
 
-            if (data.shouldShowMessage) {
+            success = true
+            settle(true)
+            if (currentData.shouldShowMessage) {
               // Process termination happens after the prompt.
               scheduleConsentPromptNotification(project, dtdProcess)
             } else {
@@ -229,14 +313,14 @@ private object AnalyticsConfigurationManager {
             logger.error(t)
             dtdProcess.terminate()
           } finally {
-            initLatch.countDown()
+            settle(success)
           }
         }
 
         // If the DTD exits before it starts (e.g. it crashes without printing anything), onProcessStarted never runs.
-        // Release the latch so waiters don't block for the rest of the session. A second countDown is a no-op.
+        // Settle as a failure so waiters don't block and a retry is scheduled. A no-op once settled.
         override fun onProcessTerminated() {
-          initLatch.countDown()
+          settle(false)
         }
       }
       ApplicationManager.getApplication().executeOnPooledThread {
@@ -244,18 +328,38 @@ private object AnalyticsConfigurationManager {
           dtdProcess.start(sdk)
         } catch (t: Throwable) {
           logger.warn("Failed to start DTD process", t)
-          initLatch.countDown()
+          settle(false)
         }
       }
     }
 
     try {
-      initLatch.await(INITIALIZATION_TIMEOUT_IN_MS, TimeUnit.MILLISECONDS)
+      currentLatch.await(INITIALIZATION_TIMEOUT_IN_MS, TimeUnit.MILLISECONDS)
     } catch (_: InterruptedException) {
       logger.debug("[DTDProcess] analytics data initialization timed out.")
     }
 
-    return data
+    return currentData
+  }
+
+  /**
+   * Retries [getConfiguration] after [delayMs], against the original project if it's still open (otherwise any open
+   * project) and its current SDK. Holds the project weakly so a pending retry doesn't leak a closed project.
+   */
+  private fun scheduleRetry(projectRef: WeakReference<Project>, logger: Logger, delayMs: Long) {
+    AppExecutorUtil.getAppScheduledExecutorService().schedule(Runnable {
+      val application = ApplicationManager.getApplication()
+      if (application == null || application.isDisposed) return@Runnable
+      application.executeOnPooledThread {
+        val target = projectRef.get()?.takeUnless { it.isDisposed }
+                     ?: ProjectManager.getInstance().openProjects.firstOrNull { !it.isDisposed }
+                     ?: return@executeOnPooledThread
+        val currentSdk = application.runReadAction(Computable<DartSdk?> {
+          if (target.isDisposed) null else DartSdk.getDartSdk(target)
+        }) ?: return@executeOnPooledThread
+        getConfiguration(currentSdk, target, logger)
+      }
+    }, delayMs, TimeUnit.MILLISECONDS)
   }
 
   /** See [Analytics.awaitConfigurationResolved]. */
