@@ -13,6 +13,7 @@ import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.project.Project
@@ -88,6 +89,7 @@ import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
 import org.eclipse.lsp4j.services.TextDocumentService
@@ -96,6 +98,7 @@ import java.lang.reflect.Type
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * DartBridgeLspServer acts as a lightweight translation bridge between the JetBrains LSP client
@@ -143,12 +146,17 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     private var client: LanguageClient? = null
     @Volatile
     private var initialized: Boolean = false
+    private val lifecycleLock = Any()
+    private val stopped = AtomicBoolean(false)
+    internal val isStopped: Boolean
+        get() = stopped.get()
     internal val isClientConnected: Boolean
         get() = client != null
     private val pendingRequests = ConcurrentHashMap<String, PendingRequest<*>>()
     @Volatile
     var isSemanticTokensAdvertised: Boolean = false
         private set
+    @Volatile
     private var dasMessageListener: ResponseListener? = null
 
     private val das: DartAnalysisServerService
@@ -244,12 +252,15 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 handleWorkspaceConfiguration(this.client, dasRequestId, msgObj)
                 return
             }
+            if (method == "workspace/applyEdit") {
+                handleApplyEdit(this.client, dasRequestId, msgObj)
+                return
+            }
             val client = this.client ?: return
             // Parse and forward notifications/requests to the LSP client proxy using lsp4j.
             when (method) {
                 "textDocument/publishDiagnostics" -> handlePublishDiagnostics(client, msgObj)
                 "dart/textDocument/publishClosingLabels" -> handlePublishClosingLabels(client, msgObj)
-                "workspace/applyEdit" -> handleApplyEdit(client, dasRequestId, msgObj)
                 else -> logger.debug("Ignored notification/request from DAS: $method")
             }
         } catch (e: Exception) {
@@ -271,11 +282,22 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
-    private fun handleApplyEdit(client: LanguageClient, dasRequestId: String?, msgObj: JsonObject) {
+    private fun handleApplyEdit(client: LanguageClient?, dasRequestId: String?, msgObj: JsonObject) {
         val paramsObj = msgObj.get("params")
         val params = GSON.fromJson(paramsObj, ApplyWorkspaceEditParams::class.java)
         val lspId = msgObj.get("id")
-        client.applyEdit(params).whenComplete { response, error ->
+
+        val future = if (!stopped.get() && client != null && params != null) {
+            try {
+                client.applyEdit(params)
+            } catch (e: Throwable) {
+                CompletableFuture.failedFuture(e)
+            }
+        } else {
+            CompletableFuture.failedFuture(IllegalStateException("LSP Client is not available"))
+        }
+
+        future.whenComplete { response, error ->
             if (dasRequestId != null) {
                 val lspResponse = JsonObject().apply {
                     addProperty("jsonrpc", JSONRPC_VERSION)
@@ -323,7 +345,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         val items = parsedParams?.items
         val itemCount = items?.size ?: rawItemsCount
         val lspId = msgObj.get("id")
-        val future = if (client != null && parsedParams != null) {
+        val future = if (!stopped.get() && client != null && parsedParams != null) {
             parsedParams.items = items ?: emptyList()
             try {
                 client.configuration(parsedParams)
@@ -367,22 +389,45 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         }
     }
 
+    private fun shuttingDownException(): ResponseErrorException =
+        ResponseErrorException(ResponseError(ResponseErrorCode.RequestCancelled, "LSP bridge is shutting down", null))
+
     fun stop() {
-        client = null
-        dasMessageListener?.let {
-            das.removeResponseListener(it)
-            dasMessageListener = null
-        }
-        pendingRequests.forEach { (_, pending) ->
-            pending.future.cancel(true)
-        }
-        pendingRequests.clear()
-        if (initialized) {
+        stop(asyncCancelOnEdt = true)
+    }
+
+    private fun stop(asyncCancelOnEdt: Boolean) {
+        val wasInitialized: Boolean
+        val wasSemanticTokensAdvertised: Boolean
+        synchronized(lifecycleLock) {
+            if (!stopped.compareAndSet(false, true)) return
+            dasMessageListener?.let {
+                das.removeResponseListener(it)
+                dasMessageListener = null
+            }
+            client = null
+            wasInitialized = initialized
             initialized = false
+            wasSemanticTokensAdvertised = isSemanticTokensAdvertised
+            isSemanticTokensAdvertised = false
+        }
+        val pendingToCancel = pendingRequests.values.toList()
+        pendingRequests.clear()
+        if (pendingToCancel.isNotEmpty()) {
+            val cancelAll = Runnable { pendingToCancel.forEach { it.future.cancel(true) } }
+            val app = ApplicationManager.getApplication()
+            if (asyncCancelOnEdt && app != null && app.isDispatchThread) {
+                app.executeOnPooledThread(cancelAll)
+            } else {
+                cancelAll.run()
+            }
+        }
+        if (wasInitialized) {
             das.updateClientCapabilities(false)
         }
-        isSemanticTokensAdvertised = false
-        das.setSemanticTokensAdvertised(false)
+        if (wasSemanticTokensAdvertised) {
+            das.setSemanticTokensAdvertised(false)
+        }
     }
 
     // --- LanguageServer Implementation ---
@@ -391,9 +436,18 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     internal var isLspHighlightingEnabled: () -> Boolean = { DartAnalysisServerService.isLspHighlightingEnabled(project) }
 
     override fun initialize(params: InitializeParams): CompletableFuture<InitializeResult> {
-        logger.info("Initialize called")
-        initialized = true
+        synchronized(lifecycleLock) {
+            if (stopped.get()) {
+                return CompletableFuture.failedFuture(shuttingDownException())
+            }
+            logger.info("Initialize called")
+            initialized = true
+        }
         das.updateClientCapabilities(true)
+        if (stopped.get()) {
+            das.updateClientCapabilities(false)
+            return CompletableFuture.failedFuture(shuttingDownException())
+        }
         val legendFuture = das.semanticTokensLegendFuture
         val legendCompletableFuture = when {
             !isLspHighlightingEnabled() -> CompletableFuture.completedFuture(null)
@@ -446,8 +500,19 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                 // Add other capabilities as we support them.
             }
             val advertised = serverLegend != null
-            isSemanticTokensAdvertised = advertised
+            synchronized(lifecycleLock) {
+                if (stopped.get()) {
+                    throw shuttingDownException()
+                }
+                isSemanticTokensAdvertised = advertised
+            }
             das.setSemanticTokensAdvertised(advertised)
+            if (stopped.get()) {
+                if (advertised) {
+                    das.setSemanticTokensAdvertised(false)
+                }
+                throw shuttingDownException()
+            }
             InitializeResult(capabilities)
         }
     }
@@ -458,7 +523,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
 
     override fun shutdown(): CompletableFuture<Any> {
         logger.info("Shutdown called")
-        stop()
+        stop(asyncCancelOnEdt = false)
         return CompletableFuture.completedFuture(null)
     }
 
@@ -684,8 +749,10 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
     }
 
     private fun <T> forwardRequest(method: String, params: Any?, responseType: Type): CompletableFuture<T> {
+        if (stopped.get()) {
+            return CompletableFuture.failedFuture(shuttingDownException())
+        }
         val future = CompletableFuture<T>()
-        
         val ready = if (das.isServerProcessActive) {
             true
         } else {
@@ -710,6 +777,11 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
         pendingRequests[legacyId] = pending
         future.whenComplete { _, _ ->
             pendingRequests.remove(legacyId, pending)
+        }
+        if (stopped.get()) {
+            pendingRequests.remove(legacyId, pending)
+            future.completeExceptionally(shuttingDownException())
+            return future
         }
 
         val lspRequest = JsonObject().apply {
@@ -754,6 +826,7 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
      * never comes.
      */
     internal fun forwardNotification(method: String, params: Any): Boolean {
+        if (stopped.get()) { return false }
         val lspNotification = JsonObject().apply {
             addProperty("jsonrpc", JSONRPC_VERSION)
             addProperty("method", method)
