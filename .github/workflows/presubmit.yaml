@@ -130,6 +130,8 @@ jobs:
 
   # Job 3: Verify Plugin
   verify-plugin:
+    # Skip on forks. `ubuntu-large` runners are only available in the flutter org.
+    if: github.repository == 'flutter/dart-intellij-third-party'
     needs: build-plugin
     strategy:
       matrix:
