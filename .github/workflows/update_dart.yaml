@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   check-and-update:
+    # Skip on forks. Needs FLUTTERACTIONSBOT_CP_TOKEN, which forks do not have.
+    if: github.repository == 'flutter/dart-intellij-third-party'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
