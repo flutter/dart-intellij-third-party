@@ -14,7 +14,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.RawCommandLineEditor;
-import com.intellij.ui.SimpleListCellRenderer;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.util.ui.UIUtil;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.ide.runner.server.ui.DartCommandLineConfigurationEditorForm;
@@ -22,6 +22,7 @@ import com.jetbrains.lang.dart.ide.runner.test.DartTestRunConfiguration;
 import com.jetbrains.lang.dart.ide.runner.test.DartTestRunnerParameters;
 import com.jetbrains.lang.dart.util.PubspecYamlUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -53,7 +54,7 @@ public class DartTestConfigurationEditorForm extends SettingsEditor<DartTestRunC
     myScopeCombo.setModel(
       new DefaultComboBoxModel<>(new DartTestRunnerParameters.Scope[]{FOLDER, FILE, GROUP_OR_TEST_BY_NAME}));
 
-    myScopeCombo.setRenderer(SimpleListCellRenderer.create("", DartTestRunnerParameters.Scope::getPresentableName));
+    myScopeCombo.setRenderer(createScopeComboRenderer());
 
     myScopeCombo.addActionListener(e -> onScopeChanged());
 
@@ -70,6 +71,11 @@ public class DartTestConfigurationEditorForm extends SettingsEditor<DartTestRunC
     myTestFileLabel.setPreferredSize(myEnvironmentVariables.getLabel().getPreferredSize());
     myDirLabel.setPreferredSize(myEnvironmentVariables.getLabel().getPreferredSize());
     myEnvironmentVariables.setAnchor(myTestFileLabel);
+  }
+
+  @VisibleForTesting
+  static @NotNull ListCellRenderer<DartTestRunnerParameters.Scope> createScopeComboRenderer() {
+    return BuilderKt.textListCellRenderer(value -> value == null ? "" : value.getPresentableName());
   }
 
   @Override
