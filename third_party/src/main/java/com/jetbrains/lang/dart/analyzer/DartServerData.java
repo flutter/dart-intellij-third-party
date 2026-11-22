@@ -170,7 +170,7 @@ public final class DartServerData {
     myExistingImports.put(filePathSD, existingImports);
   }
 
-  static @NotNull DartNavigationRegion createDartNavigationRegion(final @NotNull DartAnalysisServerService service,
+  private static @NotNull DartNavigationRegion createDartNavigationRegion(final @NotNull DartAnalysisServerService service,
                                                                   final @Nullable VirtualFile file,
                                                                   final @NotNull NavigationRegion region) {
     final int offset = service.getConvertedOffset(file, region.getOffset());
