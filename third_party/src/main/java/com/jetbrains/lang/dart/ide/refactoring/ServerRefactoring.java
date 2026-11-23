@@ -175,11 +175,16 @@ public abstract class ServerRefactoring {
 
   /**
    * Sets the received {@link RefactoringFeedback}.
+   * <p>
+   * Called on the analysis server's response reader thread while holding an internal lock, so it must only store the feedback and
+   * must not block.
    */
   protected abstract void setFeedback(@NotNull RefactoringFeedback feedback);
 
   public void setListener(@Nullable ServerRefactoringListener listener) {
-    this.listener = listener;
+    synchronized (pendingRequestIds) {
+      this.listener = listener;
+    }
   }
 
   protected void setOptions(boolean validateOnly, @Nullable ProgressIndicator indicator) {
@@ -188,9 +193,9 @@ public abstract class ServerRefactoring {
     synchronized (pendingRequestIds) {
       id = ++lastId;
       pendingRequestIds.add(id);
+      serverErrorStatus = null;
     }
     // do request
-    serverErrorStatus = null;
     final CountDownLatch latch = new CountDownLatch(1);
     RefactoringOptions options = getOptions();
     DartAnalysisServerService.getInstance(myProject).updateFilesContent();
@@ -203,16 +208,24 @@ public abstract class ServerRefactoring {
                                          RefactoringFeedback feedback,
                                          SourceChange _change,
                                          List<String> _potentialEdits) {
-          if (feedback != null) {
-            setFeedback(feedback);
-          }
-          initialStatus = toRefactoringStatus(initialProblems);
-          optionsStatus = toRefactoringStatus(optionsProblems);
-          finalStatus = toRefactoringStatus(finalProblems);
-          change = _change;
-          potentialEdits.clear();
-          if (_potentialEdits != null) {
-            potentialEdits.addAll(_potentialEdits);
+          final RefactoringStatus newInitialStatus = toRefactoringStatus(initialProblems);
+          final RefactoringStatus newOptionsStatus = toRefactoringStatus(optionsProblems);
+          final RefactoringStatus newFinalStatus = toRefactoringStatus(finalProblems);
+          synchronized (pendingRequestIds) {
+            // Only the newest request's response counts (see onError()).
+            if (id == lastId) {
+              if (feedback != null) {
+                setFeedback(feedback);
+              }
+              initialStatus = newInitialStatus;
+              optionsStatus = newOptionsStatus;
+              finalStatus = newFinalStatus;
+              change = _change;
+              potentialEdits.clear();
+              if (_potentialEdits != null) {
+                potentialEdits.addAll(_potentialEdits);
+              }
+            }
           }
           latch.countDown();
           requestDone(id);
@@ -220,8 +233,15 @@ public abstract class ServerRefactoring {
 
         @Override
         public void onError(RequestError requestError) {
-          String message = "Server error: " + requestError.getMessage();
-          serverErrorStatus = RefactoringStatus.createFatalErrorStatus(message);
+          final RefactoringStatus errorStatus = RefactoringStatus.createFatalErrorStatus("Server error: " + requestError.getMessage());
+          synchronized (pendingRequestIds) {
+            // The server cancels a pending edit.getRefactoring request (REFACTORING_REQUEST_CANCELLED) when a newer one arrives,
+            // and that error can arrive after the newer request has reset serverErrorStatus. Only the newest request's response
+            // counts. The check and the write are under the same lock as setOptions() takes to send a newer request.
+            if (id == lastId) {
+              serverErrorStatus = errorStatus;
+            }
+          }
           latch.countDown();
           requestDone(id);
         }
@@ -247,10 +267,14 @@ public abstract class ServerRefactoring {
   }
 
   private void notifyListener() {
-    if (listener != null) {
-      boolean hasPendingRequests = !pendingRequestIds.isEmpty();
-      RefactoringStatus status = optionsStatus != null ? optionsStatus : new RefactoringStatus();
-      listener.requestStateChanged(hasPendingRequests, status);
+    // Read the state and notify under the same lock that requestDone() holds, so that the state is read safely and a listener can't
+    // get a stale "pending" state after a newer "done" one.
+    synchronized (pendingRequestIds) {
+      if (listener != null) {
+        boolean hasPendingRequests = !pendingRequestIds.isEmpty();
+        RefactoringStatus status = optionsStatus != null ? optionsStatus : new RefactoringStatus();
+        listener.requestStateChanged(hasPendingRequests, status);
+      }
     }
   }
 
@@ -278,6 +302,13 @@ public abstract class ServerRefactoring {
     return status;
   }
 
+  /**
+   * Notified when a refactoring request is sent or answered.
+   * <p>
+   * {@link #requestStateChanged} is called while holding an internal lock, on the thread that called {@link ServerRefactoring#setOptions} (e.g. the EDT)
+   * or on the analysis server's response reader thread. It must return quickly and must not block: no {@code invokeAndWait}, read or
+   * write actions, or waiting on other threads. Post any UI work, e.g. with {@code invokeLater}.
+   */
   public interface ServerRefactoringListener {
     void requestStateChanged(boolean hasPendingRequests, @NotNull RefactoringStatus optionsStatus);
   }
