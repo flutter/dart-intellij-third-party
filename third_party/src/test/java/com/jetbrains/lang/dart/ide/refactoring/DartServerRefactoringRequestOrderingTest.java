@@ -14,15 +14,21 @@ import com.google.dart.server.internal.remote.RequestSink;
 import com.google.dart.server.internal.remote.ResponseStream;
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
-import com.jetbrains.lang.dart.ide.refactoring.ServerRenameRefactoring;
 import com.jetbrains.lang.dart.ide.refactoring.status.RefactoringStatus;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.*;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFixtureTestCase {
@@ -30,6 +36,7 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
   private final List<Boolean> pendingStates = new ArrayList<>();
   private Consumer<GetRefactoringConsumer> onRequest;
   private ServerRenameRefactoring refactoring;
+  private Runnable feedbackGate;
   private SourceChange latestChange;
   private SourceChange obsoleteChange;
   private Object previousSdkHome;
@@ -48,7 +55,15 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
     service.setServer(new ControlledServer());
 
     var file = myFixture.configureByText("ordering.dart", "void main() { var original = 1; print(original); }").getVirtualFile();
-    refactoring = new ServerRenameRefactoring(getProject(), file, 18, 8);
+    refactoring = new ServerRenameRefactoring(getProject(), file, 18, 8) {
+      @Override
+      protected void setFeedback(RefactoringFeedback feedback) {
+        super.setFeedback(feedback);
+        if (feedbackGate != null) {
+          feedbackGate.run();
+        }
+      }
+    };
     latestChange = change(file.getPath(), "latest");
     obsoleteChange = change(file.getPath(), "obsolete");
     onRequest = consumer -> complete(consumer, "original", latestChange, List.of());
@@ -191,6 +206,115 @@ public class DartServerRefactoringRequestOrderingTest extends DartCodeInsightFix
 
     assertLatestResult();
     assertAllRequestsCompleted();
+  }
+
+  public void testBlockedFeedbackSerializesCallbacksAndRecovers() throws Exception {
+    refactoring.setNewName("obsolete");
+    refactoring.setNewName("latest");
+    assertEquals(2, requests.size());
+    assertRequestsStillPending();
+    GetRefactoringConsumer obsolete = requests.get(0);
+    GetRefactoringConsumer latest = requests.get(1);
+
+    // Replace the ArrayList-backed UI listener before any concurrent callbacks.
+    AtomicReference<Boolean> hasPendingRequests = new AtomicReference<>(true);
+    AtomicReference<RefactoringStatus> latestStatus = new AtomicReference<>();
+    refactoring.setListener((pending, status) -> {
+      hasPendingRequests.set(pending);
+      latestStatus.set(status);
+    });
+    CountDownLatch feedbackEntered = new CountDownLatch(1);
+    CountDownLatch releaseFeedback = new CountDownLatch(1);
+    feedbackGate = () -> {
+      feedbackEntered.countDown();
+      try {
+        assertTrue("Artificial feedback gate timed out", releaseFeedback.await(30, TimeUnit.SECONDS));
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new AssertionError("Feedback worker interrupted", e);
+      }
+    };
+    ConcurrentLinkedQueue<Throwable> failures = new ConcurrentLinkedQueue<>();
+    CountDownLatch callbacksCompleted = new CountDownLatch(2);
+    Thread latestWorker = callbackThread("latest-refactoring-callback", () -> {
+      complete(latest, "latest", latestChange, List.of());
+      callbacksCompleted.countDown();
+    }, failures);
+    Thread obsoleteWorker = callbackThread("obsolete-refactoring-callback", () -> {
+      complete(obsolete, "obsolete", obsoleteChange,
+               List.of(new RefactoringProblem(RefactoringProblemSeverity.ERROR, "obsolete options", null)));
+      callbacksCompleted.countDown();
+    }, failures);
+    try {
+      latestWorker.start();
+      assertTrue("Latest callback must enter feedback", feedbackEntered.await(5, TimeUnit.SECONDS));
+      obsoleteWorker.start();
+      ThreadMXBean threads = ManagementFactory.getThreadMXBean();
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      boolean observedContention = false;
+      while (System.nanoTime() - deadline < 0) {
+        ThreadInfo info = threads.getThreadInfo(obsoleteWorker.threadId());
+        if (info != null && info.getThreadState() == Thread.State.BLOCKED &&
+            info.getLockOwnerId() == latestWorker.threadId()) {
+          observedContention = true;
+          break;
+        }
+        Thread.onSpinWait();
+      }
+      // This deliberately blocking override diagnoses serialization, not a production deadlock.
+      assertTrue("Stale callback must contend on a monitor owned by the feedback worker", observedContention);
+      assertEquals("Neither callback can finish while feedback holds the monitor", 2L, callbacksCompleted.getCount());
+    }
+    finally {
+      releaseFeedback.countDown();
+      awaitCallbackWorkers(latestWorker, obsoleteWorker, failures);
+    }
+
+    assertEquals("Both callbacks must return normally after release", 0L, callbacksCompleted.getCount());
+    assertEquals("Both pending requests must be removed", Boolean.FALSE, hasPendingRequests.get());
+    assertNotNull(latestStatus.get());
+    assertTrue("Obsolete problems must not replace latest status: " + latestStatus.get(), latestStatus.get().isOK());
+    assertLatestResult();
+  }
+
+  private static Thread callbackThread(String name, Runnable callback, ConcurrentLinkedQueue<Throwable> failures) {
+    return new Thread(() -> {
+      try {
+        callback.run();
+      }
+      catch (Throwable failure) {
+        failures.add(failure);
+      }
+    }, name);
+  }
+
+  private static void awaitCallbackWorkers(Thread latest, Thread obsolete, ConcurrentLinkedQueue<Throwable> failures) {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+    boolean interrupted = false;
+    for (Thread worker : List.of(latest, obsolete)) {
+      long remaining;
+      while (worker.isAlive() && (remaining = deadline - System.nanoTime()) > 0) {
+        try {
+          TimeUnit.NANOSECONDS.timedJoin(worker, remaining);
+        }
+        catch (InterruptedException e) {
+          interrupted = true;
+          failures.add(e);
+        }
+      }
+      if (worker.isAlive()) {
+        failures.add(new AssertionError("Callback did not terminate: " + worker.getName()));
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
+    if (!failures.isEmpty()) {
+      AssertionError error = new AssertionError("Concurrent callback failure");
+      failures.forEach(error::addSuppressed);
+      throw error;
+    }
   }
 
   private GetRefactoringConsumer startValidation() {

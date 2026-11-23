@@ -22,7 +22,7 @@
 - Avoid a session without the Dart Tooling Daemon (and so without DevTools, Widget Preview and IDE analytics) for projects just created with the new-project wizard, or whose Dart SDK is configured after they open (#870)
 - Avoid empty code completion for a whole session when the analysis server connected before the IDE started listening (fixes #857) (#859)
 - Avoid showing whole-file LSP source actions (Sort Members, Organize Imports, Fix All) in the Alt+Enter intention menu (#838)
-- Prevent obsolete validation responses from overriding the latest result in legacy Dart refactorings (#38)
+- Prevent obsolete validation responses from overriding the latest result in legacy Dart refactorings (#871)
 - Avoid `IllegalStateException` in `DartNamedElementImpl.getId()` on `new` constructor declarations (#815)
 - Prevent DartProblemsView from dropping diagnostics when the tool window has not been opened yet, and decouple problem tracking from DartAnalysisServerService (#785)
 - Avoid empty code completion lists when a third-party `DartCompletionExtension` throws an error (#814)
