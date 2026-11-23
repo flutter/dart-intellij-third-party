@@ -65,11 +65,14 @@ project-open startup activity, and the VFS/WorkspaceModel listeners that keep th
 - `DartStartupActivity` launches three jobs on the `DartAnalysisServerService` scope:
   - Excludes `.dart_tool`, `.pub`, and `build` folders through one WorkspaceModel update,
     then schedules a "Dart Packages" roots update.
-  - Starts the Analysis Server (`serverReadyForRequest`) when a Dart SDK is configured and
-    enabled, unless a new project is waiting for its first `pub get`. When the
-    `dart.launch.dtd.and.devtools` registry key is set, it also starts `DartToolingDaemonService`.
+  - When a Dart SDK is configured and enabled, starts the Dart Tooling Daemon
+    (`DartToolingDaemonService.startServiceIfNeeded`), then the Analysis Server
+    (`serverReadyForRequest`) unless a new project is waiting for its first `pub get`. The DTD
+    doesn't wait for `pub get`.
   - Reports settings analytics (`Analytics.report(SettingsData)`) unless analytics are suppressed.
 - `DartFileListener` and `DartWorkspaceModelChangeListener` update the "Dart Packages" library.
+  `DartWorkspaceModelChangeListener` also starts the DTD when Dart support is enabled, or the Dart
+  SDK library changes, after open.
 
 ## Verification
 - Tests live under `third_party/src/test/java/com/jetbrains/lang/dart` and
