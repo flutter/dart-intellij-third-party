@@ -177,6 +177,20 @@ internal class LspRenameHandler : RenameHandler, TitledHandler, DumbAware {
     )
 }
 
+// Dart patch: like IntelliJ's in-place rename (VariableInplaceRenamer.restoreSelection), keep the caret where it was
+// and select only what the user had selected, or the whole name with "Preselect old name", so that typing edits the name.
+private fun restoreCaretAndSelection(editor: Editor, textRange: TextRange, caretOffset: Int, selectedRange: TextRange?) {
+  if (!textRange.containsOffset(caretOffset)) return
+  if (selectedRange == null && editor.settings.isPreselectRename) return
+  editor.caretModel.moveToOffset(caretOffset)
+  if (selectedRange != null && textRange.contains(selectedRange)) {
+    editor.selectionModel.setSelection(selectedRange.startOffset, selectedRange.endOffset)
+  }
+  else {
+    editor.selectionModel.removeSelection()
+  }
+}
+
 // Dart patch: asks for the new name, starting with the server's placeholder. Applying the edit changes documents, which
 // must happen inside a command; the in-place rename gets one from the template. Internal for DartLspRenameHandlersTest.
 internal fun renameWithInputDialog(
@@ -258,18 +272,8 @@ internal fun startInlineRename(
     }
 
     val templateState = TemplateManager.getInstance(project).runTemplate(editor, template)
-
-    // Dart patch: like IntelliJ's in-place rename (VariableInplaceRenamer.restoreSelection), keep the caret where it was
-    // and select only what the user had selected, or the whole name with "Preselect old name", so that typing edits the name.
-    if (textRange.containsOffset(caretOffset) && (selectedRange != null || !editor.settings.isPreselectRename)) {
-      editor.caretModel.moveToOffset(caretOffset)
-      if (selectedRange != null && textRange.contains(selectedRange)) {
-        editor.selectionModel.setSelection(selectedRange.startOffset, selectedRange.endOffset)
-      }
-      else {
-        editor.selectionModel.removeSelection()
-      }
-    }
+    // Dart patch: see restoreCaretAndSelection
+    restoreCaretAndSelection(editor, textRange, caretOffset, selectedRange)
 
     templateState.addTemplateStateListener(TemplateResultListener { result ->
       try {

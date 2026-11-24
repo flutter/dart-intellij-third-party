@@ -890,19 +890,27 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             ("""    val templateState = TemplateManager.getInstance(project).runTemplate(editor, template)
 """,
              """    val templateState = TemplateManager.getInstance(project).runTemplate(editor, template)
-
-    // Dart patch: like IntelliJ's in-place rename (VariableInplaceRenamer.restoreSelection), keep the caret where it was
-    // and select only what the user had selected, or the whole name with "Preselect old name", so that typing edits the name.
-    if (textRange.containsOffset(caretOffset) && (selectedRange != null || !editor.settings.isPreselectRename)) {
-      editor.caretModel.moveToOffset(caretOffset)
-      if (selectedRange != null && textRange.contains(selectedRange)) {
-        editor.selectionModel.setSelection(selectedRange.startOffset, selectedRange.endOffset)
-      }
-      else {
-        editor.selectionModel.removeSelection()
-      }
-    }
+    // Dart patch: see restoreCaretAndSelection
+    restoreCaretAndSelection(editor, textRange, caretOffset, selectedRange)
 """),
+            # 17d. the function that restores them, before startInlineRename (marked by 17a)
+            ("// Dart patch: internal for DartLspRenameHandlersTest\ninternal fun startInlineRename(",
+             """// Dart patch: like IntelliJ's in-place rename (VariableInplaceRenamer.restoreSelection), keep the caret where it was
+// and select only what the user had selected, or the whole name with "Preselect old name", so that typing edits the name.
+private fun restoreCaretAndSelection(editor: Editor, textRange: TextRange, caretOffset: Int, selectedRange: TextRange?) {
+  if (!textRange.containsOffset(caretOffset)) return
+  if (selectedRange == null && editor.settings.isPreselectRename) return
+  editor.caretModel.moveToOffset(caretOffset)
+  if (selectedRange != null && textRange.contains(selectedRange)) {
+    editor.selectionModel.setSelection(selectedRange.startOffset, selectedRange.endOffset)
+  }
+  else {
+    editor.selectionModel.removeSelection()
+  }
+}
+
+// Dart patch: internal for DartLspRenameHandlersTest
+internal fun startInlineRename("""),
             # 18a. imports for the dialog
             ("import com.intellij.openapi.project.Project\n",
              "import com.intellij.openapi.project.Project\nimport com.intellij.openapi.ui.Messages\n"),
