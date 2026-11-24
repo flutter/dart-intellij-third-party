@@ -861,6 +861,80 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             with open(intention_action_path, "w", encoding="utf-8") as f:
                 f.write(intention_content)
 
+    # 17. LspRenameHandler: keep the caret and the selection like IntelliJ's in-place rename instead of selecting the
+    # whole name with the caret at its end, and make startInlineRename internal for DartLspRenameHandlersTest.
+    # 18. LspRenameHandler: ask for the new name in a dialog when the in-place template can't show the server's
+    # placeholder (an empty range, or a placeholder that differs from the text at the range).
+    rename_handler_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/impl/features/rename/LspRenameHandler.kt"
+    )
+    if os.path.exists(rename_handler_path):
+        with open(rename_handler_path, "r", encoding="utf-8") as f:
+            rename_content = f.read()
+        rename_replacements = [
+            # 17a. internal for tests
+            ("private fun startInlineRename(",
+             "// Dart patch: internal for DartLspRenameHandlersTest\ninternal fun startInlineRename("),
+            # 17b. remember the caret and the selection
+            ("""  val document = editor.document
+  val commandName = RefactoringBundle.message("renaming.command.name", initialName)
+""",
+             """  val document = editor.document
+  val commandName = RefactoringBundle.message("renaming.command.name", initialName)
+  // Dart patch: remember the caret and the selection, restored after the template starts
+  val caretOffset = editor.caretModel.offset
+  val selectedRange = editor.selectionModel.takeIf { it.hasSelection() }?.let { TextRange(it.selectionStart, it.selectionEnd) }
+"""),
+            # 17c. restore them after the template starts
+            ("""    val templateState = TemplateManager.getInstance(project).runTemplate(editor, template)
+""",
+             """    val templateState = TemplateManager.getInstance(project).runTemplate(editor, template)
+
+    // Dart patch: like IntelliJ's in-place rename (VariableInplaceRenamer.restoreSelection), keep the caret where it was
+    // and select only what the user had selected, or the whole name with "Preselect old name", so that typing edits the name.
+    if (textRange.containsOffset(caretOffset) && (selectedRange != null || !editor.settings.isPreselectRename)) {
+      editor.caretModel.moveToOffset(caretOffset)
+      if (selectedRange != null && textRange.contains(selectedRange)) {
+        editor.selectionModel.setSelection(selectedRange.startOffset, selectedRange.endOffset)
+      }
+      else {
+        editor.selectionModel.removeSelection()
+      }
+    }
+"""),
+            # 18a. imports for the dialog
+            ("import com.intellij.openapi.project.Project\n",
+             "import com.intellij.openapi.project.Project\nimport com.intellij.openapi.ui.Messages\n"),
+            ("import com.intellij.util.DocumentUtil\n",
+             "import com.intellij.util.DocumentUtil\nimport com.intellij.util.ui.UIUtil\n"),
+            # 18b. dialog instead of the in-place template
+            ("""    val initialName = placeholder ?: editor.document.getText(range)
+
+    startInlineRename(""",
+             """    val initialName = placeholder ?: editor.document.getText(range)
+
+    // Dart patch: the in-place template edits only the text at the range. If the range is empty or the server's placeholder
+    // isn't that text (naming an unnamed Dart constructor, adding an import prefix), ask for the new name in a dialog.
+    if (range.isEmpty || initialName != editor.document.getText(range)) {
+      val newName = Messages.showInputDialog(project, UIUtil.removeMnemonic(RefactoringBundle.message("rename.dialog.new.name.label")),
+                                             RefactoringBundle.message("rename.title"), null, initialName, null)
+      if (!newName.isNullOrBlank() && newName != initialName) {
+        performRename(editor, lspServer, RenameParams(textDocumentIdentifier, position, newName))
+      }
+      return
+    }
+
+    startInlineRename("""),
+        ]
+        if "// Dart patch: internal for DartLspRenameHandlersTest" not in rename_content:
+            for old, new in rename_replacements:
+                if old not in rename_content:
+                    raise RuntimeError(f"LspRenameHandler.kt: patch anchor not found: {old.splitlines()[0]}")
+                rename_content = rename_content.replace(old, new, 1)
+            with open(rename_handler_path, "w", encoding="utf-8") as f:
+                f.write(rename_content)
+
     print("Patch applied successfully!")
 
 if __name__ == "__main__":

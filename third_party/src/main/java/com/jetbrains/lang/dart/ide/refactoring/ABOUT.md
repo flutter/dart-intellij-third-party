@@ -11,7 +11,7 @@ LSP `textDocument/codeAction` refactorings (no options dialog). When
 experimental LSP features are enabled, file renames and moves use LSP
 `workspace/willRenameFiles`, and Dart symbols are renamed in place by the
 platform's `LspRenameHandler` (`textDocument/prepareRename` and
-`textDocument/rename`, no dialog or preview) when the SDK supports it.
+`textDocument/rename`, no preview) when the SDK supports it.
 
 ## Interface
 
@@ -27,7 +27,9 @@ platform's `LspRenameHandler` (`textDocument/prepareRename` and
   (experimental LSP features and an SDK of at least
   `DartAnalysisServerService.MIN_LSP_RENAME_SDK_VERSION`). The rename itself is
   the platform's `LspRenameHandler`, enabled by the `renameCustomizer` of
-  `DartLspServerDescriptor`.
+  `DartLspServerDescriptor`. Its copy keeps the caret like IntelliJ's in-place
+  rename and asks for the name in a dialog when the server's placeholder isn't
+  the text at the range (`patch-copied-lsp-sources`, steps 17 and 18).
 - `DartInlineHandler`: the `inlineActionHandler`. Delegates to
   `DartLspRefactoringHelper.performInline` when LSP code actions are enabled.
 - `ServerRefactoringDialog`: the shared preview and status dialog.

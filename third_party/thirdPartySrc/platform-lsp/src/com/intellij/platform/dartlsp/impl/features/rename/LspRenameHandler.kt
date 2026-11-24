@@ -18,6 +18,7 @@ import com.intellij.openapi.command.impl.StartMarkAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
@@ -34,6 +35,7 @@ import com.intellij.psi.PsiManager
 import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.rename.RenameHandler
 import com.intellij.util.DocumentUtil
+import com.intellij.util.ui.UIUtil
 import org.eclipse.lsp4j.PrepareRenameParams
 import org.eclipse.lsp4j.RenameParams
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
@@ -72,6 +74,17 @@ internal class LspRenameHandler : RenameHandler, TitledHandler, DumbAware {
     val (range, placeholder) = prepareRenameResult
 
     val initialName = placeholder ?: editor.document.getText(range)
+
+    // Dart patch: the in-place template edits only the text at the range. If the range is empty or the server's placeholder
+    // isn't that text (naming an unnamed Dart constructor, adding an import prefix), ask for the new name in a dialog.
+    if (range.isEmpty || initialName != editor.document.getText(range)) {
+      val newName = Messages.showInputDialog(project, UIUtil.removeMnemonic(RefactoringBundle.message("rename.dialog.new.name.label")),
+                                             RefactoringBundle.message("rename.title"), null, initialName, null)
+      if (!newName.isNullOrBlank() && newName != initialName) {
+        performRename(editor, lspServer, RenameParams(textDocumentIdentifier, position, newName))
+      }
+      return
+    }
 
     startInlineRename(project, editor, range, initialName) { newName ->
       val params = RenameParams(textDocumentIdentifier, position, newName)
@@ -163,7 +176,8 @@ internal class LspRenameHandler : RenameHandler, TitledHandler, DumbAware {
     )
 }
 
-private fun startInlineRename(
+// Dart patch: internal for DartLspRenameHandlersTest
+internal fun startInlineRename(
   project: Project,
   editor: Editor,
   textRange: TextRange,
@@ -172,6 +186,9 @@ private fun startInlineRename(
 ) {
   val document = editor.document
   val commandName = RefactoringBundle.message("renaming.command.name", initialName)
+  // Dart patch: remember the caret and the selection, restored after the template starts
+  val caretOffset = editor.caretModel.offset
+  val selectedRange = editor.selectionModel.takeIf { it.hasSelection() }?.let { TextRange(it.selectionStart, it.selectionEnd) }
 
   // Start a mark action to group all rename operations into a single undo unit
   // StartMarkAction.start must be called inside a command
@@ -226,6 +243,18 @@ private fun startInlineRename(
     }
 
     val templateState = TemplateManager.getInstance(project).runTemplate(editor, template)
+
+    // Dart patch: like IntelliJ's in-place rename (VariableInplaceRenamer.restoreSelection), keep the caret where it was
+    // and select only what the user had selected, or the whole name with "Preselect old name", so that typing edits the name.
+    if (textRange.containsOffset(caretOffset) && (selectedRange != null || !editor.settings.isPreselectRename)) {
+      editor.caretModel.moveToOffset(caretOffset)
+      if (selectedRange != null && textRange.contains(selectedRange)) {
+        editor.selectionModel.setSelection(selectedRange.startOffset, selectedRange.endOffset)
+      }
+      else {
+        editor.selectionModel.removeSelection()
+      }
+    }
 
     templateState.addTemplateStateListener(TemplateResultListener { result ->
       try {

@@ -6,13 +6,17 @@
 package com.jetbrains.lang.dart.ide.refactoring
 
 import com.intellij.codeInsight.TargetElementUtil
+import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.editor.ex.EditorSettingsExternalizable
 import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
 import com.intellij.platform.dartlsp.api.customization.LspRenameSupport
+import com.intellij.openapi.util.TextRange
 import com.intellij.platform.dartlsp.impl.features.rename.LspRenameHandler
+import com.intellij.platform.dartlsp.impl.features.rename.startInlineRename
 import com.intellij.psi.PsiElement
 import com.intellij.refactoring.rename.RenameHandler
 import com.intellij.refactoring.rename.inplace.VariableInplaceRenameHandler
@@ -141,6 +145,50 @@ class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
     fun testNoOtherRenameHandlerOnTheImportKeyword() {
         myFixture.configureByText("a.dart", "imp<caret>ort 'dart:math';\n")
         assertNoOtherRenameHandler()
+    }
+
+    fun testInplaceRenameEditsTheNameAtTheCaret() {
+        myFixture.configureByText("a.dart", "class Gre<caret>eter {}\n")
+        myFixture.editor.settings.isPreselectRename = false
+
+        assertEquals("Grexeter", renameGreeterInPlace("x") {
+            assertEquals(9, myFixture.editor.caretModel.offset)
+            assertFalse(myFixture.editor.selectionModel.hasSelection())
+        })
+    }
+
+    fun testInplaceRenameReplacesOnlyTheSelection() {
+        myFixture.configureByText("a.dart", "class Gr<selection>eet<caret></selection>er {}\n")
+        myFixture.editor.settings.isPreselectRename = false
+
+        assertEquals("Grxer", renameGreeterInPlace("x") {
+            assertEquals("eet", myFixture.editor.selectionModel.selectedText)
+        })
+    }
+
+    fun testInplaceRenameReplacesTheNameWithPreselectOldName() {
+        myFixture.configureByText("a.dart", "class Gre<caret>eter {}\n")
+        myFixture.editor.settings.isPreselectRename = true
+
+        assertEquals("Foo", renameGreeterInPlace("Foo") {
+            assertEquals("Greeter", myFixture.editor.selectionModel.selectedText)
+        })
+    }
+
+    /** Runs the patched `startInlineRename` of the platform's LspRenameHandler on `Greeter`, types [typed] and returns the new name. */
+    private fun renameGreeterInPlace(typed: String, checkStart: () -> Unit): String? {
+        TemplateManagerImpl.setTemplateTesting(testRootDisposable)
+        val start = myFixture.editor.document.text.indexOf("Greeter")
+        var newName: String? = null
+        startInlineRename(project, myFixture.editor, TextRange(start, start + "Greeter".length), "Greeter") { newName = it }
+        checkStart()
+        myFixture.type(typed)
+        val templateState = requireNotNull(TemplateManagerImpl.getTemplateState(myFixture.editor))
+        // Enter finishes the template inside a command.
+        CommandProcessor.getInstance().executeCommand(project, { templateState.gotoEnd(false) }, null, null)
+        // The handler restores the old text and leaves the rename to the server.
+        myFixture.checkResult("class Greeter {}\n")
+        return newName
     }
 
     private fun availableRenameHandlers(): List<RenameHandler> =
