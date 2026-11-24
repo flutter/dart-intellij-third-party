@@ -43,6 +43,7 @@ import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManager
 import com.intellij.ui.content.MessageView
 import com.jetbrains.lang.dart.DartBundle
+import com.jetbrains.lang.dart.DartSettingsAnalyticsService
 import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analytics.AnalyticsData
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
@@ -253,6 +254,7 @@ abstract class DartPubActionBase : AnAction(), DumbAware {
                     DartAnalysisServerService.getInstance(module.project).serverReadyForRequest()
                     // A project just created with the wizard skips the DTD start on open if its SDK isn't visible yet.
                     DartToolingDaemonService.getInstance(module.project).startServiceIfNeeded()
+                    DartSettingsAnalyticsService.getInstance(module.project).reportIfNeeded()
                   }
                 }
               }

@@ -418,9 +418,6 @@ class DartToolingDaemonService private constructor(val project: Project, private
     stopService()
   }
 
-  private fun isDartSdkVersionSufficient(sdk: DartSdk): Boolean =
-    StringUtil.compareVersionNumbers(sdk.version, MIN_SDK_VERSION) >= 0
-
   fun getFileUri(file: VirtualFile): String = getLocalFileUri(file.path)
 
   /**
@@ -569,6 +566,10 @@ class DartToolingDaemonService private constructor(val project: Project, private
     fun getInstance(project: Project): DartToolingDaemonService = project.service()
 
     private const val MIN_SDK_VERSION: String = "3.4"
+
+    /** Whether [sdk] can run the DTD, and so deliver IDE analytics events. */
+    internal fun isDartSdkVersionSufficient(sdk: DartSdk): Boolean =
+      StringUtil.compareVersionNumbers(sdk.version, MIN_SDK_VERSION) >= 0
 
     /**
      * How long [startServiceIfNeeded] waits for the analytics configuration to resolve before starting the DTD anyway
