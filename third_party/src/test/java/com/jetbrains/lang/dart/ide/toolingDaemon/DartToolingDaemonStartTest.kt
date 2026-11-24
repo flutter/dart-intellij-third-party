@@ -97,6 +97,17 @@ class DartToolingDaemonStartTest : BasePlatformTestCase() {
     assertEquals(2, starts.get())
   }
 
+  fun testStartsAgainAfterStopService() {
+    DartTestUtils.configureDartSdk(module, testRootDisposable, false)
+    service.startForTests = { starts.incrementAndGet(); true }
+
+    join(service.startServiceIfNeeded())
+    service.stopService()
+    join(service.startServiceIfNeeded())
+
+    assertEquals(2, starts.get())
+  }
+
   fun testDoesNothingInTestsWithoutAHook() {
     DartTestUtils.configureDartSdk(module, testRootDisposable, false)
 

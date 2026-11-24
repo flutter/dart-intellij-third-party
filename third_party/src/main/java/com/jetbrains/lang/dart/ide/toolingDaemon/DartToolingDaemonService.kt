@@ -88,7 +88,11 @@ class DartToolingDaemonService private constructor(val project: Project, private
   /** Set while a [startServiceIfNeeded] start is in flight or done, so concurrent callers start at most one DTD. */
   private val startClaimed = AtomicBoolean()
 
-  /** Replaces [startService] in [startServiceIfNeeded] for tests; returns whether the start happened. */
+  /** The [startServiceIfNeeded] start that holds [startClaimed] while it's in flight; cancelled by [stopService]. */
+  @Volatile
+  private var startJob: Job? = null
+
+  /** Replaces the DTD launch in [startServiceIfNeeded] for tests; returns whether the start happened. */
   @TestOnly
   internal var startForTests: (() -> Boolean)? = null
 
@@ -159,19 +163,23 @@ class DartToolingDaemonService private constructor(val project: Project, private
     if (startForTests == null && ApplicationManager.getApplication().isUnitTestMode) return null
 
     return cs.launch(Dispatchers.IO) {
-      val sdk = readAction { usableSdk() } ?: return@launch
+      val firstSdk = readAction { usableSdk() } ?: return@launch
       if (!startClaimed.compareAndSet(false, true)) return@launch
+      val self = coroutineContext[Job]
+      startJob = self
 
       var started = false
       try {
         // Request the config here too: serverReadyForRequest normally does, but not if it saw no usable SDK.
         runInterruptible {
-          Analytics.getConfiguration(sdk, project)
+          Analytics.getConfiguration(firstSdk, project)
           Analytics.awaitConfigurationResolved(ANALYTICS_CONFIG_WAIT_MS)
         }
-        // Don't launch for a project that closed (or a scope that was cancelled) during the wait.
+        // Don't launch for a project that closed (or a scope that was cancelled) during the wait, and re-check Dart
+        // support: it may have been disabled, or the SDK changed, meanwhile.
         ensureActive()
-        if (project.isDisposed || serviceRunning) return@launch
+        if (serviceRunning) return@launch
+        val sdk = readAction { usableSdk() } ?: return@launch
         if (startForTests != null) {
           started = startForTests()
         }
@@ -184,9 +192,12 @@ class DartToolingDaemonService private constructor(val project: Project, private
         logger.warn("Failed to start Dart Tooling Daemon", e)
       }
       finally {
-        // A failed launch leaves no DTD: let a later call retry. (A cancelled or skipped start keeps the claim only if
-        // a DTD is running.)
-        if (!started && !serviceRunning) startClaimed.set(false)
+        // A failed, cancelled or skipped start leaves no DTD: let a later call retry. Unless stopService() already
+        // released the claim (and a newer start may hold it).
+        if (startJob === self) {
+          startJob = null
+          if (!started && !serviceRunning) startClaimed.set(false)
+        }
       }
     }
   }
@@ -240,6 +251,8 @@ class DartToolingDaemonService private constructor(val project: Project, private
         }
       }
     }
+    startJob?.cancel()
+    startJob = null
     pendingShutdownTasks.forEach { it.get() }
     webSocketListener = null
     serviceRunning = false

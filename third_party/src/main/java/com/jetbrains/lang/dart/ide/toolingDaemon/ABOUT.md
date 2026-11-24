@@ -78,5 +78,7 @@ wrapper this package must use).
 
 ## Verification
 
+- `./gradlew test --tests "com.jetbrains.lang.dart.ide.toolingDaemon.*"` (includes `DartToolingDaemonStartTest`, for
+  `startServiceIfNeeded`).
 - `./gradlew test --tests "com.jetbrains.dart.dartToolingDaemon.DartToolingDaemonServiceTest"`
 - For WebSocket-related changes, also run `com.jetbrains.dart.dartToolingDaemon.DTDProcessTest` and `com.jetbrains.dart.vmService.VmServiceWebsocketTest`.
