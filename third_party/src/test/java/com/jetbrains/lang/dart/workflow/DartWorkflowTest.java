@@ -344,6 +344,14 @@ public class DartWorkflowTest extends DartCodeInsightFixtureTestCase {
     assertSameElements(debugProcess.getUrisForFile(standaloneFile), standaloneFileUri);
     assertEquals(standaloneFile, resolver.findFileByDartUrl(standaloneFileUri));
 
+    final File tempStandaloneSpaceIoFile = FileUtil.createTempFile("standalone script", ".dart", true);
+    final VirtualFile standaloneSpaceFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(tempStandaloneSpaceIoFile);
+    assertNotNull(standaloneSpaceFile);
+    final String standaloneSpaceFileUri = threeSlashFileUri(standaloneSpaceFile);
+    assertTrue(standaloneSpaceFileUri.contains("%20"));
+    assertSameElements(debugProcess.getUrisForFile(standaloneSpaceFile), standaloneSpaceFileUri);
+    assertEquals(standaloneSpaceFile, resolver.findFileByDartUrl(standaloneSpaceFileUri));
+
     // 5. SDK dart: library short-circuits to dart: URI.
     final VirtualFile sdkCollectionFile = resolver.findFileByDartUrl("dart:collection");
     assertNotNull(sdkCollectionFile);
