@@ -8,18 +8,12 @@ import com.intellij.psi.impl.source.resolve.ResolveCache;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.jetbrains.lang.dart.DartLanguage;
-import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
-import com.jetbrains.lang.dart.analyzer.DartServerData.DartNavigationRegion;
-import com.jetbrains.lang.dart.analyzer.DartServerData.DartNavigationTarget;
 import com.jetbrains.lang.dart.psi.DartFile;
 import com.jetbrains.lang.dart.psi.DartImportStatement;
 import com.jetbrains.lang.dart.psi.DartUriElement;
-import com.jetbrains.lang.dart.resolve.DartResolver;
 import com.jetbrains.lang.dart.util.DartResolveUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.List;
 
 /**
  * Reference to a file in an import, export or part directive.
@@ -105,40 +99,22 @@ public class DartFileReference implements PsiPolyVariantReference {
   private static class Resolver implements ResolveCache.PolyVariantResolver<DartFileReference> {
     @Override
     public ResolveResult @NotNull [] resolve(final @NotNull DartFileReference reference, final boolean incompleteCode) {
-      final PsiFile refPsiFile = reference.getElement().getContainingFile();
-      final int refOffset = reference.getElement().getTextRange().getStartOffset();
-      final int refLength = reference.getElement().getTextRange().getLength();
-
-      DartNavigationRegion region = DartResolver.findRegion(refPsiFile, refOffset, refLength);
-
-      if (region == null) {
-        // file might be not open in editor, so we do not have navigation information for it
-        final VirtualFile virtualFile = DartResolveUtil.getRealVirtualFile(refPsiFile);
-        final DartAnalysisServerService das = DartAnalysisServerService.getInstance(refPsiFile.getProject());
-        if (virtualFile != null &&
-            das.getNavigation(virtualFile).isEmpty() &&
-            das.getHighlight(virtualFile).isEmpty()) {
-          final PsiElement parent = reference.getElement().getParent();
-          final int parentOffset = parent.getTextRange().getStartOffset();
-          final int parentLength = parent.getTextRange().getLength();
-          final List<DartNavigationRegion> regions = das.analysis_getNavigation(virtualFile, parentOffset, parentLength);
-          if (regions != null) {
-            region = DartResolver.findRegion(regions, refOffset, refLength);
-          }
-        }
+      final String uri = reference.getCanonicalText();
+      if (uri.isEmpty()) {
+        return ResolveResult.EMPTY_ARRAY;
       }
 
-      if (region != null) {
-        final List<DartNavigationTarget> targets = region.getTargets();
-        if (!targets.isEmpty()) {
-          final DartNavigationTarget target = targets.getFirst();
-          final VirtualFile targetVirtualFile = target.findFile();
-          if (targetVirtualFile != null) {
-            final PsiFile targetFile = reference.getElement().getManager().findFile(targetVirtualFile);
-            if (targetFile != null) {
-              return new ResolveResult[]{new PsiElementResolveResult(targetFile)};
-            }
-          }
+      final PsiFile refPsiFile = reference.getElement().getContainingFile();
+      final VirtualFile virtualFile = DartResolveUtil.getRealVirtualFile(refPsiFile);
+      if (virtualFile == null) {
+        return ResolveResult.EMPTY_ARRAY;
+      }
+
+      final VirtualFile targetVirtualFile = DartResolveUtil.getImportedFile(refPsiFile.getProject(), virtualFile, uri);
+      if (targetVirtualFile != null && !targetVirtualFile.isDirectory()) {
+        final PsiFile targetFile = reference.getElement().getManager().findFile(targetVirtualFile);
+        if (targetFile != null) {
+          return new ResolveResult[]{new PsiElementResolveResult(targetFile)};
         }
       }
 

@@ -1,8 +1,8 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-11-21' } *-->
 # impl
 
 ## Overview
-Hand-written PSI implementation bases that the generated PSI implementations in `gen/com/jetbrains/lang/dart/psi/impl` extend (through the grammar's `extends`/`mixin` attributes), plus the server-backed URI file reference. Parent: [../ABOUT.md](../ABOUT.md).
+Hand-written PSI implementation bases that the generated PSI implementations in `gen/com/jetbrains/lang/dart/psi/impl` extend (through the grammar's `extends`/`mixin` attributes), plus the directive URI file reference. Parent: [../ABOUT.md](../ABOUT.md).
 
 ## Interface
 - Root and named-element bases:
@@ -24,10 +24,10 @@ Hand-written PSI implementation bases that the generated PSI implementations in 
   - `DartExpressionCodeFragmentImpl`: extends `DartFile`; expression code fragments.
   - `DartLazyParseableBlockImpl`: lazily parsed block.
   - `DartDocCommentImpl`: doc-comment element.
-- `DartFileReference`: `PsiPolyVariantReference` for directive URIs. It is resolved through `ResolveCache` from Analysis Server navigation regions.
+- `DartFileReference`: `PsiPolyVariantReference` for directive URIs. It is resolved locally through `ResolveCache` via `DartResolveUtil.getImportedFile`.
 
 ## Invariants
-- Reference resolution goes through `ResolveCache.resolveWithCaching` with `resolve.DartResolver.INSTANCE`. `DartFileReference` uses its own poly-variant resolver over `DartAnalysisServerService` navigation data.
+- Reference resolution goes through `ResolveCache.resolveWithCaching` with `resolve.DartResolver.INSTANCE`. `DartFileReference` uses its own poly-variant resolver over `DartResolveUtil.getImportedFile` (no Analysis Server RPCs).
 - Icons and presentation come from `DartComponentType` and `ItemPresentation` implementations in these bases.
 
 ## Side Effects

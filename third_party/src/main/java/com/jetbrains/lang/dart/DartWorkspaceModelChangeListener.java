@@ -3,6 +3,8 @@ package com.jetbrains.lang.dart;
 import com.intellij.openapi.project.Project;
 import com.intellij.platform.backend.workspace.WorkspaceModelChangeListener;
 import com.intellij.platform.workspace.jps.entities.ContentRootEntity;
+import com.intellij.platform.workspace.jps.entities.LibraryEntity;
+import com.intellij.platform.workspace.jps.entities.LibraryTableId;
 import com.intellij.platform.workspace.jps.entities.ModuleEntity;
 import com.intellij.platform.workspace.storage.EntityChange;
 import com.intellij.platform.workspace.storage.VersionedStorageChange;
@@ -11,6 +13,7 @@ import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService;
 import com.jetbrains.lang.dart.sdk.DartSdk;
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class DartWorkspaceModelChangeListener implements WorkspaceModelChangeListener {
 
@@ -44,6 +47,29 @@ public class DartWorkspaceModelChangeListener implements WorkspaceModelChangeLis
         return;
       }
     }
+
+    // The Dart SDK library can appear or change while modules already depend on it, which changes no module: e.g. the
+    // Flutter project wizard adds the dependency first and the library later, and fixing the SDK path in Settings.
+    for (EntityChange<LibraryEntity> change : event.getChanges(LibraryEntity.class)) {
+      if (isDartSdkLibrary(change.getOldEntity()) || isDartSdkLibrary(change.getNewEntity())) {
+        onDartSdkLibraryChanged(myProject);
+        return;
+      }
+    }
+  }
+
+  private static boolean isDartSdkLibrary(@Nullable LibraryEntity library) {
+    return library != null &&
+           library.getTableId() instanceof LibraryTableId.ProjectLibraryTableId &&
+           DartSdk.DART_SDK_LIB_NAME.equals(library.getName());
+  }
+
+  private static void onDartSdkLibraryChanged(@NotNull Project project) {
+    if (!project.isInitialized() || DartSdk.getDartSdk(project) == null) return;
+    if (DartSdkLibUtil.getModulesWithDartSdkEnabled(project).isEmpty()) return;
+
+    DartToolingDaemonService.getInstance(project).startServiceIfNeeded();
+    DartSettingsAnalyticsService.getInstance(project).reportIfNeeded();
   }
 
   private static void onDartRootsChanged(@NotNull Project project) {
@@ -51,6 +77,11 @@ public class DartWorkspaceModelChangeListener implements WorkspaceModelChangeLis
 
     DartFileListener.scheduleDartPackageRootsUpdate(project);
     DartAnalysisServerService.getInstance(project).ensureAnalysisRootsUpToDate();
-    DartToolingDaemonService.getInstance(project).ensureRootsUpToDate();
+    DartToolingDaemonService dtd = DartToolingDaemonService.getInstance(project);
+    dtd.ensureRootsUpToDate();
+    // Dart support enabled after open (e.g. the Flutter plugin configures the SDK asynchronously): the DTD start and
+    // the settings event on open found no SDK.
+    dtd.startServiceIfNeeded();
+    DartSettingsAnalyticsService.getInstance(project).reportIfNeeded();
   }
 }

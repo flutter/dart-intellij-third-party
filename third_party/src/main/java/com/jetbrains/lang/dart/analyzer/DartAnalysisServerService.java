@@ -14,7 +14,6 @@ import com.google.dart.server.FormatConsumer;
 import com.google.dart.server.GetAssistsConsumer;
 import com.google.dart.server.GetFixesConsumer;
 import com.google.dart.server.GetImportedElementsConsumer;
-import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
 import com.google.dart.server.GetRefactoringConsumer;
 import com.google.dart.server.GetServerPortConsumer;
@@ -212,7 +211,6 @@ public final class DartAnalysisServerService implements Disposable {
   private static final long EDIT_FORMAT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
   private static final long EDIT_ORGANIZE_DIRECTIVES_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(300);
   private static final long EDIT_SORT_MEMBERS_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
-  private static final long GET_NAVIGATION_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_ASSISTS_TIMEOUT_EDT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long GET_ASSISTS_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(1000);
   private static final long GET_FIXES_TIMEOUT_EDT = TimeUnit.MILLISECONDS.toMillis(100);
@@ -1471,57 +1469,6 @@ public final class DartAnalysisServerService implements Disposable {
     if (myInitializationOnServerStartupDone) {
       DartProblemsView.getInstance(myProject).clearAll();
     }
-  }
-
-  public @Nullable List<DartServerData.DartNavigationRegion> analysis_getNavigation(final @NotNull VirtualFile file,
-                                                                                    final int _offset,
-                                                                                    final int length) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return null;
-    }
-
-    final String fileUri = getFileUri(file);
-    final Ref<List<DartServerData.DartNavigationRegion>> resultRef = Ref.create();
-
-    final CountDownLatch latch = new CountDownLatch(1);
-    LOG.debug("analysis_getNavigation(" + fileUri + ")");
-
-    final int offset = getOriginalOffset(file, _offset);
-    server.analysis_getNavigation(fileUri, offset, length, new GetNavigationConsumer() {
-      @Override
-      public void computedNavigation(final List<NavigationRegion> regions) {
-        final List<DartServerData.DartNavigationRegion> dartRegions = new ArrayList<>(regions.size());
-        for (NavigationRegion region : regions) {
-          if (region.getLength() > 0) {
-            dartRegions.add(DartServerData.createDartNavigationRegion(DartAnalysisServerService.this, file, region));
-          }
-        }
-
-        resultRef.set(dartRegions);
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(final RequestError error) {
-        if (RequestErrorCode.GET_NAVIGATION_INVALID_FILE.equals(error.getCode())) {
-          LOG.info(getShortErrorMessage("analysis_getNavigation()", fileUri, error));
-        }
-        else {
-          logError("analysis_getNavigation()", fileUri, error);
-        }
-
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_NAVIGATION_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("analysis_getNavigation", GET_NAVIGATION_TIMEOUT, fileUri);
-    }
-
-    return resultRef.get();
   }
 
   public @NotNull List<SourceChange> edit_getAssists(final @NotNull VirtualFile file, final int _offset, final int _length) {

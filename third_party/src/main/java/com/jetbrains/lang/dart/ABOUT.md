@@ -22,6 +22,8 @@ project-open startup activity, and the VFS/WorkspaceModel listeners that keep th
 - `DartPluginCapabilities`: queryable list of Dart plugin capabilities.
 - `DartSearchableOptionContributor`: contributes Dart settings to Settings search.
 - `DartStartupActivity`: `ProjectActivity` run on project open (see Side Effects).
+- `DartSettingsAnalyticsService`: `@Service(PROJECT)` that reports the settings analytics event
+  once per project session, the first time Dart support is usable (`reportIfNeeded()`).
 - `DartFileListener`: `AsyncFileListener` that schedules "Dart Packages" library updates.
 - `DartWorkspaceModelChangeListener`: `WorkspaceModelChangeListener` that shares
   "Dart Packages" library upkeep with `DartFileListener`.
@@ -62,14 +64,20 @@ project-open startup activity, and the VFS/WorkspaceModel listeners that keep th
   current by `DartFileListener` and `DartWorkspaceModelChangeListener`.
 
 ## Side Effects
-- `DartStartupActivity` launches three jobs on the `DartAnalysisServerService` scope:
+- `DartStartupActivity` launches two jobs on the `DartAnalysisServerService` scope, and requests
+  the settings event:
   - Excludes `.dart_tool`, `.pub`, and `build` folders through one WorkspaceModel update,
     then schedules a "Dart Packages" roots update.
-  - Starts the Analysis Server (`serverReadyForRequest`) when a Dart SDK is configured and
-    enabled, unless a new project is waiting for its first `pub get`. When the
-    `dart.launch.dtd.and.devtools` registry key is set, it also starts `DartToolingDaemonService`.
-  - Reports settings analytics (`Analytics.report(SettingsData)`) unless analytics are suppressed.
+  - When a Dart SDK is configured and enabled, starts the Dart Tooling Daemon
+    (`DartToolingDaemonService.startServiceIfNeeded`), then the Analysis Server
+    (`serverReadyForRequest`) unless a new project is waiting for its first `pub get`. The DTD
+    doesn't wait for `pub get`.
+  - `DartSettingsAnalyticsService.reportIfNeeded()` reports settings analytics
+    (`Analytics.report(SettingsData)`) unless analytics are suppressed, once per session.
 - `DartFileListener` and `DartWorkspaceModelChangeListener` update the "Dart Packages" library.
+  `DartWorkspaceModelChangeListener` also starts the DTD, and requests the settings event, when
+  Dart support is enabled, or the Dart SDK library changes, after open. `DartPubActionBase` does
+  both when a `pub get` finishes.
 
 ## Verification
 - Tests live under `third_party/src/test/java/com/jetbrains/lang/dart` and

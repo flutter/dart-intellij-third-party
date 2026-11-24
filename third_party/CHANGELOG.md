@@ -7,6 +7,7 @@
 - Optimizing imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
 
 ### Changed
+- Resolving Dart directive file references locally instead of calling legacy `analysis.getNavigation` (#868)
 - Routing "Reformat Code with 'dart format'" (`Dart.DartStyle`) through LSP formatting via `ReformatCodeProcessor` when experimental LSP features are enabled (#850)
 - Call Hierarchy navigation via LSP is now enabled for all users (#846)
 - Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
@@ -19,6 +20,7 @@
 
 ### Fixed
 - Avoid `SocketException: Socket closed` IDE internal error when stopping the LSP bridge or toggling experimental LSP features (#840)
+- Avoid a session without the Dart Tooling Daemon (and so without DevTools, Widget Preview and IDE analytics) for projects just created with the new-project wizard, or whose Dart SDK is configured after they open (#870)
 - Avoid empty code completion for a whole session when the analysis server connected before the IDE started listening (fixes #857) (#859)
 - Avoid showing whole-file LSP source actions (Sort Members, Organize Imports, Fix All) in the Alt+Enter intention menu (#838)
 - Avoid `IllegalStateException` in `DartNamedElementImpl.getId()` on `new` constructor declarations (#815)
