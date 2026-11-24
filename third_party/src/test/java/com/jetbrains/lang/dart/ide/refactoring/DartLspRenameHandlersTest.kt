@@ -10,13 +10,17 @@ import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.editor.ex.EditorSettingsExternalizable
 import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
 import com.intellij.platform.dartlsp.api.customization.LspRenameSupport
 import com.intellij.openapi.util.TextRange
 import com.intellij.platform.dartlsp.impl.features.rename.LspRenameHandler
+import com.intellij.platform.dartlsp.impl.features.rename.renameWithInputDialog
 import com.intellij.platform.dartlsp.impl.features.rename.startInlineRename
+import com.intellij.openapi.ui.TestDialogManager
+import com.intellij.openapi.ui.TestInputDialog
 import com.intellij.psi.PsiElement
 import com.intellij.refactoring.rename.RenameHandler
 import com.intellij.refactoring.rename.inplace.VariableInplaceRenameHandler
@@ -173,6 +177,36 @@ class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
         assertEquals("Foo", renameGreeterInPlace("Foo") {
             assertEquals("Greeter", myFixture.editor.selectionModel.selectedText)
         })
+    }
+
+    fun testInputDialogRenamesInsideACommand() {
+        myFixture.configureByText("a.dart", "class Greeter {\n  Greeter();\n}\n")
+
+        // The server's edit for naming the unnamed constructor, applied like LspRenameHandler.performRename does.
+        renameWithInputDialogAnswering("named") { newName ->
+            WriteAction.run<Throwable> { myFixture.editor.document.insertString(25, ".$newName") }
+        }
+
+        myFixture.checkResult("class Greeter {\n  Greeter.named();\n}\n")
+    }
+
+    fun testInputDialogDoesNotRenameWithoutANewName() {
+        myFixture.configureByText("a.dart", "class Greeter {}\n")
+        for (answer in listOf(null, "", " ")) {
+            renameWithInputDialogAnswering(answer) { fail("renamed to '$it'") }
+        }
+    }
+
+    private fun renameWithInputDialogAnswering(answer: String?, onRename: (String) -> Unit) {
+        val old = TestDialogManager.setTestInputDialog(object : TestInputDialog {
+            override fun show(message: String): String? = answer
+        })
+        try {
+            renameWithInputDialog(project, "", onRename)
+        }
+        finally {
+            TestDialogManager.setTestInputDialog(old)
+        }
     }
 
     /** Runs the patched `startInlineRename` of the platform's LspRenameHandler on `Greeter`, types [typed] and returns the new name. */

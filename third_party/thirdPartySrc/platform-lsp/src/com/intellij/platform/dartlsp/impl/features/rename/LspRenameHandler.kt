@@ -78,9 +78,7 @@ internal class LspRenameHandler : RenameHandler, TitledHandler, DumbAware {
     // Dart patch: the in-place template edits only the text at the range. If the range is empty or the server's placeholder
     // isn't that text (naming an unnamed Dart constructor, adding an import prefix), ask for the new name in a dialog.
     if (range.isEmpty || initialName != editor.document.getText(range)) {
-      val newName = Messages.showInputDialog(project, UIUtil.removeMnemonic(RefactoringBundle.message("rename.dialog.new.name.label")),
-                                             RefactoringBundle.message("rename.title"), null, initialName, null)
-      if (!newName.isNullOrBlank() && newName != initialName) {
+      renameWithInputDialog(project, initialName) { newName ->
         performRename(editor, lspServer, RenameParams(textDocumentIdentifier, position, newName))
       }
       return
@@ -174,6 +172,15 @@ internal class LspRenameHandler : RenameHandler, TitledHandler, DumbAware {
       HintManager.HIDE_BY_ANY_KEY or HintManager.HIDE_BY_TEXT_CHANGE or HintManager.UPDATE_BY_SCROLLING,
       3000
     )
+}
+
+// Dart patch: asks for the new name, starting with the server's placeholder. Applying the edit changes documents, which
+// must happen inside a command; the in-place rename gets one from the template. Internal for DartLspRenameHandlersTest.
+internal fun renameWithInputDialog(project: Project, initialName: String, onRename: (String) -> Unit) {
+  val newName = Messages.showInputDialog(project, UIUtil.removeMnemonic(RefactoringBundle.message("rename.dialog.new.name.label")),
+                                         RefactoringBundle.message("rename.title"), null, initialName, null)
+  if (newName.isNullOrBlank() || newName == initialName) return
+  CommandProcessor.getInstance().executeCommand(project, { onRename(newName) }, RefactoringBundle.message("rename.title"), null)
 }
 
 // Dart patch: internal for DartLspRenameHandlersTest
