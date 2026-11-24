@@ -43,7 +43,7 @@ public final class DartServerRenameHandler implements RenameHandler, TitledHandl
     if (editor == null) return false;
 
     final Project project = editor.getProject();
-    // IntelliJ's standard rename UI with DartLspSymbolRenameProcessor takes over.
+    // The platform's LspRenameHandler takes over (DartLspServerDescriptor's renameCustomizer).
     if (project != null && DartLspRename.INSTANCE.isEnabled(project)) return false;
 
     final VirtualFile file = CommonDataKeys.VIRTUAL_FILE.getData(dataContext);

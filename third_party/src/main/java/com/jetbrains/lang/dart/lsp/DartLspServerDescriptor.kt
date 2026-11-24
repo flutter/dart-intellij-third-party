@@ -62,7 +62,9 @@ import com.intellij.platform.dartlsp.api.customization.LspIntentionAction
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsDisabled
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsSupport
+import com.intellij.platform.dartlsp.api.customization.LspRenameCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
+import com.intellij.platform.dartlsp.api.customization.LspRenameSupport
 import com.intellij.platform.dartlsp.api.customization.LspSelectionRangeDisabled
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensCustomizer
 import com.intellij.platform.dartlsp.api.customization.LspSemanticTokensDisabled
@@ -77,6 +79,7 @@ import com.intellij.util.io.URLUtil
 import com.jetbrains.lang.dart.DartFileType
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
+import com.jetbrains.lang.dart.ide.refactoring.DartLspRename
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import org.eclipse.lsp4j.ClientCapabilities
@@ -277,8 +280,19 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
 
         override val selectionRangeCustomizer = LspSelectionRangeDisabled
         override val codeLensCustomizer = LspCodeLensDisabled
-        override val renameCustomizer = LspRenameDisabled
+        override val renameCustomizer: LspRenameCustomizer
+            get() = if (DartLspRename.isEnabled(project)) {
+                DartLspRenameSupport
+            } else {
+                LspRenameDisabled
+            }
     }
+}
+
+private object DartLspRenameSupport : LspRenameSupport() {
+    // The default serves only files without PSI. Dart files are renamed by the server at the caret, so the rename doesn't
+    // depend on resolving PSI. Not for pubspec.yaml and analysis_options.yaml: the server has them open but doesn't rename in them.
+    override fun shouldRunRename(psiFile: PsiFile): Boolean = psiFile.fileType == DartFileType.INSTANCE
 }
 
 private object DartLspFormattingSupport : LspFormattingSupport() {

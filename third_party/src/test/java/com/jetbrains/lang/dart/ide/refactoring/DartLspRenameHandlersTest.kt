@@ -6,39 +6,24 @@
 package com.jetbrains.lang.dart.ide.refactoring
 
 import com.intellij.codeInsight.TargetElementUtil
-import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
-import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.editor.ex.EditorSettingsExternalizable
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.openapi.util.TextRange
-import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.platform.dartlsp.api.customization.LspRenameDisabled
+import com.intellij.platform.dartlsp.api.customization.LspRenameSupport
+import com.intellij.platform.dartlsp.impl.features.rename.LspRenameHandler
 import com.intellij.psi.PsiElement
-import com.intellij.refactoring.rename.PsiElementRenameHandler
-import com.intellij.refactoring.rename.RenameHandlerRegistry
-import com.intellij.testFramework.fixtures.CodeInsightTestUtil
-import com.intellij.testFramework.replaceService
+import com.intellij.refactoring.rename.RenameHandler
+import com.intellij.refactoring.rename.inplace.VariableInplaceRenameHandler
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
+import com.jetbrains.lang.dart.lsp.DartLspServerDescriptor
 
 class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
-
-    private val renameCalls = mutableListOf<String>()
 
     override fun setUp() {
         super.setUp()
         DartLspRename.enabledInTests = true
-        project.replaceService(DartLspRenameRequests::class.java, object : DartLspRenameRequests {
-            override fun prepareRename(file: VirtualFile, offset: Int): DartLspRenameResult<DartLspRenameTarget> =
-                DartLspRenameResult.Success(DartLspRenameTarget(TextRange(offset, offset), ""))
-
-            override fun rename(file: VirtualFile, offset: Int, newName: String): DartLspRenameResult<List<DartLspFileTextEdit>> {
-                renameCalls += newName
-                // Renames every occurrence of the name at the offset in this file, like the server for a local variable.
-                return DartLspRenameResult.Success(runReadAction { wordEdits(file, offset, newName) })
-            }
-        }, testRootDisposable)
     }
 
     override fun tearDown() {
@@ -62,9 +47,8 @@ class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
         .add(CommonDataKeys.PSI_ELEMENT, element)
         .build()
 
-    private fun elementAtCaret(): PsiElement = requireNotNull(
+    private fun elementAtCaret(): PsiElement? =
         TargetElementUtil.findTargetElement(myFixture.editor, TargetElementUtil.getInstance().allAccepted)
-    )
 
     fun testLegacyRenameHandlerUnavailableWhenLspRenameEnabled() {
         myFixture.configureByText("a.dart", "class A {\n  void gr<caret>eet() {}\n}\n")
@@ -79,11 +63,11 @@ class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
     fun testInplaceFlagsWhenLspRenameEnabled() {
         myFixture.configureByText("a.dart", "void f() {\n  var lo<caret>cal = 1;\n  print(local);\n}\nvoid greet() {}\n")
         val provider = DartRefactoringSupportProvider()
-        val local = elementAtCaret()
+        val local = requireNotNull(elementAtCaret())
         myFixture.editor.caretModel.moveToOffset(myFixture.file.text.indexOf("greet"))
-        val function = elementAtCaret()
+        val function = requireNotNull(elementAtCaret())
 
-        // DartLspInplaceRenameHandler renames Dart symbols in place instead of the platform's handlers.
+        // The platform's in-place handlers would rename without the server.
         assertFalse(provider.isInplaceRenameAvailable(local, null))
         assertFalse(provider.isMemberInplaceRenameAvailable(local, null))
         assertFalse(provider.isMemberInplaceRenameAvailable(function, null))
@@ -93,61 +77,77 @@ class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
         DartLspRename.enabledInTests = false
         myFixture.configureByText("a.dart", "void f() {\n  var lo<caret>cal = 1;\n  print(local);\n}\nvoid greet() {}\n")
         val provider = DartRefactoringSupportProvider()
-        val local = elementAtCaret()
+        val local = requireNotNull(elementAtCaret())
         myFixture.editor.caretModel.moveToOffset(myFixture.file.text.indexOf("greet"))
-        val function = elementAtCaret()
+        val function = requireNotNull(elementAtCaret())
 
         assertTrue(provider.isInplaceRenameAvailable(local, null))
         assertFalse(provider.isMemberInplaceRenameAvailable(local, null))
         assertFalse(provider.isMemberInplaceRenameAvailable(function, null))
     }
 
-    fun testDartInplaceRenameHandlerIsChosenForAMethod() {
-        myFixture.configureByText("a.dart", "class A {\n  void gr<caret>eet() {}\n}\n")
-
-        val handler = RenameHandlerRegistry.getInstance().getRenameHandler(dataContext(elementAtCaret()))
-
-        assertInstanceOf(handler, DartLspInplaceRenameHandler::class.java)
-    }
-
-    fun testDialogIsUsedWhenInplaceRenameIsOff() {
-        myFixture.configureByText("a.dart", "class A {\n  void gr<caret>eet() {}\n}\n")
-        withInplaceRename(false) {
-            val handler = RenameHandlerRegistry.getInstance().getRenameHandler(dataContext(elementAtCaret()))
-
-            assertInstanceOf(handler, PsiElementRenameHandler::class.java)
+    fun testRenameCustomizerFollowsTheGate() {
+        val descriptor = DartLspServerDescriptor(project)
+        for (enabled in listOf(true, false, true)) {
+            DartLspRename.enabledInTests = enabled
+            val customizer = descriptor.lspCustomization.renameCustomizer
+            if (enabled) assertInstanceOf(customizer, LspRenameSupport::class.java) else assertSame(LspRenameDisabled, customizer)
         }
     }
 
-    fun testDialogRenameGoesThroughTheServer() {
+    fun testLspRenameRunsOnlyInDartFiles() {
+        val support = DartLspServerDescriptor(project).lspCustomization.renameCustomizer as LspRenameSupport
+
+        assertTrue(support.shouldRunRename(myFixture.configureByText("a.dart", "class A {}\n")))
+        assertFalse(support.shouldRunRename(myFixture.configureByText("pubspec.yaml", "name: a\n")))
+        assertFalse(support.shouldRunRename(myFixture.configureByText("analysis_options.yaml", "linter:\n")))
+    }
+
+    fun testLspRenameHandlerIsRegistered() {
+        assertTrue(RenameHandler.EP_NAME.extensionList.any { it is LspRenameHandler })
+    }
+
+    // IntelliJ takes the platform's PSI-based rename only if no rename handler of the extension point is available, and
+    // asks the user to choose if several are. LspRenameHandler (no server in this test) must therefore be the only one.
+    fun testNoOtherRenameHandlerForAMethod() {
+        myFixture.configureByText("a.dart", "class A {\n  void gr<caret>eet() {}\n}\n")
+        assertNoOtherRenameHandler()
+        withInplaceRename(false) { assertNoOtherRenameHandler() }
+
+        DartLspRename.enabledInTests = false
+        assertTrue(availableRenameHandlers().any { it is DartServerRenameHandler })
+    }
+
+    fun testNoOtherRenameHandlerForALocalVariable() {
         myFixture.configureByText("a.dart", "void f() {\n  var lo<caret>cal = 1;\n  print(local);\n}\n")
-        withInplaceRename(false) {
-            val context = SimpleDataContext.builder()
-                .setParent(dataContext(elementAtCaret()))
-                .add(PsiElementRenameHandler.DEFAULT_NAME, "renamed")
-                .build()
+        assertNoOtherRenameHandler()
 
-            // In tests, the rename dialog renames to DEFAULT_NAME right away.
-            PsiElementRenameHandler().invoke(project, myFixture.editor, myFixture.file, context)
-        }
-
-        myFixture.checkResult("void f() {\n  var renamed = 1;\n  print(renamed);\n}\n")
-        assertEquals(listOf("renamed"), renameCalls)
+        DartLspRename.enabledInTests = false
+        assertTrue(availableRenameHandlers().any { it is VariableInplaceRenameHandler })
     }
 
-    fun testInplaceRenameShowsNoOptionsInlay() {
-        // The platform's options inlay offers "comments and strings", which the server-side rename can't honor.
-        myFixture.configureByText("a.dart", "class A {\n  void gr<caret>eet() {}\n}\n")
-        TemplateManagerImpl.setTemplateTesting(testRootDisposable)
+    fun testNoOtherRenameHandlerForANamedArgumentOfAFieldFormalParameter() {
+        // DartFieldFormalParameter has no DartComponentName, so the PSI-based rename can't rename this argument.
+        myFixture.configureByText("a.dart", """
+            class Person {
+              final String name;
+              Person({required this.name});
+            }
+            var p = Person(na<caret>me: '');
+        """.trimIndent())
+        assertNoOtherRenameHandler()
+    }
 
-        DartLspInplaceRenameHandler().doRename(elementAtCaret(), myFixture.editor, dataContext(elementAtCaret()))
-        val templateState = requireNotNull(TemplateManagerImpl.getTemplateState(myFixture.editor)) { "in-place rename should run" }
-        try {
-            assertEmpty(myFixture.editor.inlayModel.getInlineElementsInRange(0, myFixture.editor.document.textLength))
-        }
-        finally {
-            templateState.gotoEnd(true)
-        }
+    fun testNoOtherRenameHandlerOnTheImportKeyword() {
+        myFixture.configureByText("a.dart", "imp<caret>ort 'dart:math';\n")
+        assertNoOtherRenameHandler()
+    }
+
+    private fun availableRenameHandlers(): List<RenameHandler> =
+        RenameHandler.EP_NAME.extensionList.filter { it.isRenaming(dataContext(elementAtCaret())) }
+
+    private fun assertNoOtherRenameHandler() {
+        assertEmpty(availableRenameHandlers().filter { it !is LspRenameHandler })
     }
 
     private fun withInplaceRename(enabled: Boolean, action: () -> Unit) {
@@ -160,22 +160,5 @@ class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
         finally {
             settings.isVariableInplaceRenameEnabled = old
         }
-    }
-
-    fun testInplaceRenameOfLocalVariableGoesThroughTheServer() {
-        myFixture.configureByText("a.dart", "void f() {\n  var lo<caret>cal = 1;\n  print(local);\n}\n")
-
-        CodeInsightTestUtil.doInlineRename(DartLspInplaceRenameHandler(), "renamed", myFixture)
-
-        myFixture.checkResult("void f() {\n  var renamed = 1;\n  print(renamed);\n}\n")
-        assertEquals(listOf("renamed"), renameCalls)
-    }
-
-    private fun wordEdits(file: VirtualFile, offset: Int, newName: String): List<DartLspFileTextEdit> {
-        val text = requireNotNull(FileDocumentManager.getInstance().getDocument(file)).text
-        val word = Regex("\\w+").findAll(text).first { offset in it.range.first..it.range.last + 1 }.value
-        return Regex("\\b$word\\b").findAll(text).map {
-            DartLspFileTextEdit(file, TextRange(it.range.first, it.range.last + 1), newName)
-        }.toList()
     }
 }

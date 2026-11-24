@@ -9,7 +9,9 @@ by the legacy analysis server (DAS) refactoring protocol. When LSP code actions
 are enabled, Extract Method, Extract Local Variable, and Inline instead run as
 LSP `textDocument/codeAction` refactorings (no options dialog). When
 experimental LSP features are enabled, file renames and moves use LSP
-`workspace/willRenameFiles`.
+`workspace/willRenameFiles`, and Dart symbols are renamed in place by the
+platform's `LspRenameHandler` (`textDocument/prepareRename` and
+`textDocument/rename`, no dialog or preview) when the SDK supports it.
 
 ## Interface
 
@@ -20,7 +22,12 @@ experimental LSP features are enabled, file renames and moves use LSP
   `ServerExtractMethodRefactoring`, `ServerInlineLocalRefactoring`,
   `ServerInlineMethodRefactoring`: the concrete DAS refactorings.
 - `DartServerRenameHandler` + `DartRenameDialog`: the rename UI (registered
-  as `renameHandler`).
+  as `renameHandler`). Not available while `DartLspRename.isEnabled`.
+- `DartLspRename`: decides whether Dart symbols are renamed over LSP
+  (experimental LSP features and an SDK of at least
+  `DartAnalysisServerService.MIN_LSP_RENAME_SDK_VERSION`). The rename itself is
+  the platform's `LspRenameHandler`, enabled by the `renameCustomizer` of
+  `DartLspServerDescriptor`.
 - `DartInlineHandler`: the `inlineActionHandler`. Delegates to
   `DartLspRefactoringHelper.performInline` when LSP code actions are enabled.
 - `ServerRefactoringDialog`: the shared preview and status dialog.
@@ -53,6 +60,10 @@ experimental LSP features are enabled, file renames and moves use LSP
   is configured.
 - `DartLspRenamePsiElementProcessor.findReferences` returns nothing so the
   platform does not apply the same edits a second time.
+- While `DartLspRename.isEnabled`, `LspRenameHandler` must be the only
+  available `renameHandler` for Dart symbols: `DartServerRenameHandler` is off,
+  and `DartRefactoringSupportProvider` turns off the platform's variable
+  in-place rename. Otherwise IntelliJ asks the user which rename to run.
 - LSP waits are capped at 10 s and honor `ProgressManager.checkCanceled()`.
 
 ## Side Effects
@@ -65,6 +76,7 @@ experimental LSP features are enabled, file renames and moves use LSP
 ## Verification
 
 - `com.jetbrains.lang.dart.ide.refactoring.DartLspRenamePsiElementProcessorTest`
+- `com.jetbrains.lang.dart.ide.refactoring.DartLspRenameHandlersTest`
 - `com.jetbrains.lang.dart.ide.refactoring.DartLspRefactoringHelperTest`
 - `DartServerRenameTest`, `DartExtract*RefactoringTest`,
   `DartInline*RefactoringTest`, `DartRefactoringAnalyticsTest` (in
