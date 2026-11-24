@@ -18,6 +18,7 @@ import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationInfo
@@ -28,7 +29,6 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLockAbsence
@@ -56,6 +56,14 @@ private const val DEBUGGING_LOCALLY = false
 private const val DAS_NOTIFICATION_GROUP = "Dart Analysis Server"
 
 private val DEFAULT_RESPONSE_TIMEOUT = 1.seconds
+
+/**
+ * DTD can be slow to respond right after it starts (e.g. on IDE startup while
+ * indexing), so the startup configuration calls get a longer timeout. They run
+ * on a background thread, so this never blocks the UI.
+ * See https://github.com/flutter/dart-intellij-third-party/issues/704.
+ */
+private val STARTUP_RESPONSE_TIMEOUT = 3.seconds
 
 private object UnifiedAnalytics {
   object Property {
@@ -118,42 +126,48 @@ private object UnifiedAnalytics {
     val params = JsonObject()
     params.addProperty(Property.TOOL, getToolName())
     var value: JsonElement? = null
-    try {
-      val latch = CountDownLatch(1)
-      dtdProcess.sendRequest(
-        "$SERVICE_NAME.$name",
-        params,
-        true
-      ) { response ->
-        logger.debug("$SERVICE_NAME.$name.received: ")
-        val result = response[Property.RESULT]
-        if (result is JsonObject) {
-          value = result[Property.VALUE]
-        }
-        logger.debug("\t$response")
-        latch.countDown()
+    val latch = CountDownLatch(1)
+    val requestId = dtdProcess.sendRequest(
+      "$SERVICE_NAME.$name",
+      params,
+      true
+    ) { response ->
+      logger.debug("$SERVICE_NAME.$name.received: ")
+      val result = response[Property.RESULT]
+      if (result is JsonObject) {
+        value = result[Property.VALUE]
       }
-
-      val completed = latch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-      if (!completed) {
-        throw TimeoutException("Call to $SERVICE_NAME.$name timed out after $DEFAULT_RESPONSE_TIMEOUT.")
-      }
-
-    } catch (e: WebSocketException) {
-      logger.error(e)
+      logger.debug("\t$response")
+      latch.countDown()
     }
+
+    val completed = latch.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+    if (!completed) {
+      // Drop the pending consumer so it isn't retained for a response that may never come.
+      dtdProcess.cancelRequest(requestId)
+      throw TimeoutException("Call to $SERVICE_NAME.$name timed out after $timeout.")
+    }
+
     return value
   }
 
-  fun callServiceWithNoResponse(dtdProcess: DTDProcess, name: String) {
-    callServiceWithJsonResponse(dtdProcess, name)
+  fun callServiceWithNoResponse(dtdProcess: DTDProcess, name: String, timeout: Duration = DEFAULT_RESPONSE_TIMEOUT) {
+    callServiceWithJsonResponse(dtdProcess, name, timeout)
   }
 
-  fun callServiceWithStringResponse(dtdProcess: DTDProcess, name: String): String? =
-    callServiceWithJsonResponse(dtdProcess, name)?.asString
+  fun callServiceWithStringResponse(
+    dtdProcess: DTDProcess,
+    name: String,
+    timeout: Duration = DEFAULT_RESPONSE_TIMEOUT
+  ): String? =
+    callServiceWithJsonResponse(dtdProcess, name, timeout)?.asString
 
-  fun callServiceWithBoolResponse(dtdProcess: DTDProcess, name: String): Boolean =
-    callServiceWithJsonResponse(dtdProcess, name)?.asBoolean ?: false
+  fun callServiceWithBoolResponse(
+    dtdProcess: DTDProcess,
+    name: String,
+    timeout: Duration = DEFAULT_RESPONSE_TIMEOUT
+  ): Boolean =
+    callServiceWithJsonResponse(dtdProcess, name, timeout)?.asBoolean ?: false
 }
 
 class AnalyticsConfiguration {
@@ -205,9 +219,6 @@ internal class ConfigRetryPolicy(private val backoffMs: LongArray = longArrayOf(
 
 private object AnalyticsConfigurationManager {
   private const val INITIALIZATION_TIMEOUT_IN_MS: Long = 700
-
-  /** The minimum SDK version with a DTD-hosted `UnifiedAnalytics` service (matches the project DTD's minimum). */
-  private const val MIN_SDK_VERSION_FOR_RETRY = "3.4"
 
   @Volatile
   lateinit var data: AnalyticsConfiguration
@@ -269,12 +280,21 @@ private object AnalyticsConfigurationManager {
           val delay = retryPolicy.onFailure(nowMs())
           // SDKs older than the minimum have no analytics service to retry against. A later natural call (e.g. after
           // an SDK update) can still claim the retry.
-          if (delay != null && StringUtil.compareVersionNumbers(sdk.version, MIN_SDK_VERSION_FOR_RETRY) >= 0) {
+          if (delay != null && DartToolingDaemonService.isDartSdkVersionSufficient(sdk)) {
             logger.info("Analytics configuration failed; retrying in $delay ms")
             scheduleRetry(WeakReference(project), logger, delay)
           }
         }
         currentLatch.countDown()
+      }
+
+      // Older SDKs don't ship `dart tooling-daemon`; starting it would fail and every
+      // analytics call would time out. Keep the default (suppressed) configuration.
+      // See https://github.com/flutter/dart-intellij-third-party/issues/704.
+      if (!DartToolingDaemonService.isDartSdkVersionSufficient(sdk)) {
+        logger.debug("Dart SDK ${sdk.version} does not support DTD; analytics are suppressed.")
+        settle(false)
+        return currentData
       }
 
       val dtdProcess = DTDProcess()
@@ -288,14 +308,20 @@ private object AnalyticsConfigurationManager {
           var success = false
           try {
             currentData.shouldShowMessage =
-              UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.SHOULD_SHOW_MESSAGE)
+              UnifiedAnalytics.callServiceWithBoolResponse(
+                dtdProcess, UnifiedAnalytics.SHOULD_SHOW_MESSAGE, STARTUP_RESPONSE_TIMEOUT
+              )
             if (currentData.shouldShowMessage) {
               currentData.consentMessage =
-                UnifiedAnalytics.callServiceWithStringResponse(dtdProcess, UnifiedAnalytics.GET_CONSENT_MESSAGE)
+                UnifiedAnalytics.callServiceWithStringResponse(
+                  dtdProcess, UnifiedAnalytics.GET_CONSENT_MESSAGE, STARTUP_RESPONSE_TIMEOUT
+                )
               currentData.telemetryEnabled = false // No need to ask
             } else {
               currentData.telemetryEnabled =
-                UnifiedAnalytics.callServiceWithBoolResponse(dtdProcess, UnifiedAnalytics.TELEMETRY_ENABLED)
+                UnifiedAnalytics.callServiceWithBoolResponse(
+                  dtdProcess, UnifiedAnalytics.TELEMETRY_ENABLED, STARTUP_RESPONSE_TIMEOUT
+                )
             }
 
             // Update global suppression state (note that the default is to suppress).
@@ -303,14 +329,16 @@ private object AnalyticsConfigurationManager {
 
             success = true
             settle(true)
-            if (currentData.shouldShowMessage) {
+            val consentMessage = currentData.consentMessage
+            if (currentData.shouldShowMessage && !consentMessage.isNullOrBlank()) {
               // Process termination happens after the prompt.
-              scheduleConsentPromptNotification(project, dtdProcess)
+              scheduleConsentPromptNotification(project, consentMessage, dtdProcess, logger)
             } else {
               dtdProcess.terminate()
             }
           } catch (t: Throwable) {
-            logger.error(t)
+            // Fail gracefully: analytics stay suppressed (the default) and no IDE error is reported.
+            logger.warn("Failed to read unified analytics configuration; analytics are suppressed.", t)
             dtdProcess.terminate()
           } finally {
             settle(success)
@@ -365,18 +393,33 @@ private object AnalyticsConfigurationManager {
   /** See [Analytics.awaitConfigurationResolved]. */
   fun awaitResolved(timeoutMs: Long): Boolean = isInitializing && initLatch.await(timeoutMs, TimeUnit.MILLISECONDS)
 
-  private fun scheduleConsentPromptNotification(project: Project, dtdProcess: DTDProcess) {
+  private fun scheduleConsentPromptNotification(
+    project: Project,
+    consentMessage: String,
+    dtdProcess: DTDProcess,
+    logger: Logger
+  ) {
     ApplicationManager.getApplication().invokeLater {
       NotificationGroupManager.getInstance()
         .getNotificationGroup(DAS_NOTIFICATION_GROUP)
-        .createNotification(data.consentMessage!!, NotificationType.INFORMATION).also { notification ->
+        .createNotification(consentMessage, NotificationType.INFORMATION).also { notification ->
           notification.addAction(object : AnAction(CommonBundle.getOkButtonText()) {
+            override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
             override fun actionPerformed(e: AnActionEvent) {
               try {
                 notification.expire()
               } finally {
-                UnifiedAnalytics.callServiceWithNoResponse(dtdProcess, UnifiedAnalytics.CLIENT_SHOWED_MESSAGE)
-                dtdProcess.terminate()
+                // actionPerformed runs on the EDT; do the blocking DTD call in the background.
+                ApplicationManager.getApplication().executeOnPooledThread {
+                  try {
+                    UnifiedAnalytics.callServiceWithNoResponse(dtdProcess, UnifiedAnalytics.CLIENT_SHOWED_MESSAGE)
+                  } catch (t: Throwable) {
+                    logger.warn("Failed to confirm the analytics consent message was shown.", t)
+                  } finally {
+                    dtdProcess.terminate()
+                  }
+                }
               }
             }
           })
