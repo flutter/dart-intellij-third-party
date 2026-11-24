@@ -75,8 +75,14 @@ import com.intellij.platform.dartlsp.api.customization.LspSignatureHelpSupport
 import com.intellij.platform.dartlsp.api.customization.LspTypeHierarchySupport
 import com.intellij.platform.dartlsp.api.customization.LspWorkspaceSymbolDisabled
 import com.intellij.psi.PsiFile
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.refactoring.RefactoringBundle
 import com.intellij.util.io.URLUtil
+import com.jetbrains.lang.dart.DartBundle
+import com.jetbrains.lang.dart.DartComponentType
 import com.jetbrains.lang.dart.DartFileType
+import com.jetbrains.lang.dart.psi.DartComponent
+import com.jetbrains.lang.dart.psi.DartImportStatement
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.highlight.DartSyntaxHighlighterColors
 import com.jetbrains.lang.dart.ide.refactoring.DartLspRename
@@ -293,6 +299,27 @@ private object DartLspRenameSupport : LspRenameSupport() {
     // The default serves only files without PSI. Dart files are renamed by the server at the caret, so the rename doesn't
     // depend on resolving PSI. Not for pubspec.yaml and analysis_options.yaml: the server has them open but doesn't rename in them.
     override fun shouldRunRename(psiFile: PsiFile): Boolean = psiFile.fileType == DartFileType.INSTANCE
+
+    // The same texts as the legacy Dart rename dialog (DartRenameDialog), whose element kind came from the server.
+    override fun getInputDialogTitle(psiFile: PsiFile, offset: Int): String =
+        renamedKind(psiFile, offset)?.let { DartBundle.message("dialog.title.rename.0", it) } ?: super.getInputDialogTitle(psiFile, offset)
+
+    override fun getInputDialogLabel(psiFile: PsiFile, offset: Int): String =
+        renamedKind(psiFile, offset)?.let { RefactoringBundle.message("rename.0.and.its.usages.to", it) }
+            ?: super.getInputDialogLabel(psiFile, offset)
+
+    // The dialog opens where the server's new name can't be edited in place: at an import without a prefix and at an
+    // unnamed constructor.
+    private fun renamedKind(psiFile: PsiFile, offset: Int): String? {
+        val element = psiFile.findElementAt(offset) ?: return null
+        return when {
+            PsiTreeUtil.getParentOfType(element, DartImportStatement::class.java) != null ->
+                DartBundle.message("rename.lsp.kind.import.prefix")
+            DartComponentType.typeOf(PsiTreeUtil.getParentOfType(element, DartComponent::class.java)) == DartComponentType.CONSTRUCTOR ->
+                DartBundle.message("rename.lsp.kind.constructor")
+            else -> null
+        }
+    }
 }
 
 private object DartLspFormattingSupport : LspFormattingSupport() {

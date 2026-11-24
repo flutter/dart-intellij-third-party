@@ -906,9 +906,9 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             # 18a. imports for the dialog
             ("import com.intellij.openapi.project.Project\n",
              "import com.intellij.openapi.project.Project\nimport com.intellij.openapi.ui.Messages\n"),
-            ("import com.intellij.util.DocumentUtil\n",
-             "import com.intellij.util.DocumentUtil\nimport com.intellij.util.ui.UIUtil\n"),
-            # 18b. dialog instead of the in-place template
+            ("import com.intellij.openapi.util.NlsSafe\n",
+             "import com.intellij.openapi.util.NlsContexts\nimport com.intellij.openapi.util.NlsSafe\n"),
+            # 18b. dialog instead of the in-place template, with the texts of LspRenameSupport (18d)
             ("""    val initialName = placeholder ?: editor.document.getText(range)
 
     startInlineRename(""",
@@ -917,7 +917,10 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
     // Dart patch: the in-place template edits only the text at the range. If the range is empty or the server's placeholder
     // isn't that text (naming an unnamed Dart constructor, adding an import prefix), ask for the new name in a dialog.
     if (range.isEmpty || initialName != editor.document.getText(range)) {
-      renameWithInputDialog(project, initialName) { newName ->
+      val renameSupport = lspServer.descriptor.lspCustomization.renameCustomizer as LspRenameSupport
+      val offset = editor.caretModel.offset
+      renameWithInputDialog(project, renameSupport.getInputDialogTitle(file, offset), renameSupport.getInputDialogLabel(file, offset),
+                            initialName) { newName ->
         performRename(editor, lspServer, RenameParams(textDocumentIdentifier, position, newName))
       }
       return
@@ -928,11 +931,16 @@ fun getDocumentFilterPattern(filter: DocumentFilter): Either<String, Any>? {
             ("// Dart patch: internal for DartLspRenameHandlersTest\ninternal fun startInlineRename(",
              """// Dart patch: asks for the new name, starting with the server's placeholder. Applying the edit changes documents, which
 // must happen inside a command; the in-place rename gets one from the template. Internal for DartLspRenameHandlersTest.
-internal fun renameWithInputDialog(project: Project, initialName: String, onRename: (String) -> Unit) {
-  val newName = Messages.showInputDialog(project, UIUtil.removeMnemonic(RefactoringBundle.message("rename.dialog.new.name.label")),
-                                         RefactoringBundle.message("rename.title"), null, initialName, null)
+internal fun renameWithInputDialog(
+  project: Project,
+  title: @NlsContexts.DialogTitle String,
+  label: @NlsContexts.Label String,
+  initialName: String,
+  onRename: (String) -> Unit,
+) {
+  val newName = Messages.showInputDialog(project, label, title, null, initialName, null)
   if (newName.isNullOrBlank() || newName == initialName) return
-  CommandProcessor.getInstance().executeCommand(project, { onRename(newName) }, RefactoringBundle.message("rename.title"), null)
+  CommandProcessor.getInstance().executeCommand(project, { onRename(newName) }, title, null)
 }
 
 // Dart patch: internal for DartLspRenameHandlersTest
@@ -945,6 +953,40 @@ internal fun startInlineRename("""),
                 rename_content = rename_content.replace(old, new, 1)
             with open(rename_handler_path, "w", encoding="utf-8") as f:
                 f.write(rename_content)
+
+    # 18d. LspRenameSupport: title and label of that dialog, so that the plugin can name what is renamed there.
+    rename_customizer_path = os.path.join(
+        base_dir,
+        "third_party/thirdPartySrc/platform-lsp/src/com/intellij/platform/dartlsp/api/customization/LspRenameCustomizer.kt"
+    )
+    if os.path.exists(rename_customizer_path):
+        with open(rename_customizer_path, "r", encoding="utf-8") as f:
+            customizer_content = f.read()
+        customizer_replacements = [
+            ("import com.intellij.psi.PsiFile\n",
+             "import com.intellij.openapi.util.NlsContexts\nimport com.intellij.psi.PsiFile\n"
+             "import com.intellij.refactoring.RefactoringBundle\nimport com.intellij.util.ui.UIUtil\n"),
+            ("\n}\n\nobject LspRenameDisabled : LspRenameCustomizer()",
+             """
+
+  // Dart patch: title and label of the dialog that asks for a name the in-place rename can't edit
+  // (LspRenameHandler.renameWithInputDialog), at [offset] in [psiFile]. Plugins can name there what is renamed.
+  open fun getInputDialogTitle(psiFile: PsiFile, offset: Int): @NlsContexts.DialogTitle String =
+    RefactoringBundle.message("rename.title")
+
+  open fun getInputDialogLabel(psiFile: PsiFile, offset: Int): @NlsContexts.Label String =
+    UIUtil.removeMnemonic(RefactoringBundle.message("rename.dialog.new.name.label"))
+}
+
+object LspRenameDisabled : LspRenameCustomizer()"""),
+        ]
+        if "open fun getInputDialogTitle(" not in customizer_content:
+            for old, new in customizer_replacements:
+                if old not in customizer_content:
+                    raise RuntimeError(f"LspRenameCustomizer.kt: patch anchor not found: {old.strip().splitlines()[0]}")
+                customizer_content = customizer_content.replace(old, new, 1)
+            with open(rename_customizer_path, "w", encoding="utf-8") as f:
+                f.write(customizer_content)
 
     print("Patch applied successfully!")
 

@@ -197,12 +197,34 @@ class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
         }
     }
 
+    fun testInputDialogTextsAtAnUnnamedConstructor() {
+        myFixture.configureByText("a.dart", "class Greeter {\n  Gre<caret>eter();\n}\n")
+        assertInputDialogTexts("Rename constructor", "Rename constructor and its usages to:")
+    }
+
+    fun testInputDialogTextsAtAnImport() {
+        myFixture.configureByText("a.dart", "imp<caret>ort 'dart:math';\n")
+        assertInputDialogTexts("Rename import prefix", "Rename import prefix and its usages to:")
+    }
+
+    fun testInputDialogTextsElsewhere() {
+        myFixture.configureByText("a.dart", "class Gre<caret>eter {}\n")
+        assertInputDialogTexts("Rename", "New name:")
+    }
+
+    private fun assertInputDialogTexts(title: String, label: String) {
+        val support = DartLspServerDescriptor(project).lspCustomization.renameCustomizer as LspRenameSupport
+        val offset = myFixture.editor.caretModel.offset
+        assertEquals(title, support.getInputDialogTitle(myFixture.file, offset))
+        assertEquals(label, support.getInputDialogLabel(myFixture.file, offset))
+    }
+
     private fun renameWithInputDialogAnswering(answer: String?, onRename: (String) -> Unit) {
         val old = TestDialogManager.setTestInputDialog(object : TestInputDialog {
             override fun show(message: String): String? = answer
         })
         try {
-            renameWithInputDialog(project, "", onRename)
+            renameWithInputDialog(project, "Rename", "New name:", "", onRename)
         }
         finally {
             TestDialogManager.setTestInputDialog(old)

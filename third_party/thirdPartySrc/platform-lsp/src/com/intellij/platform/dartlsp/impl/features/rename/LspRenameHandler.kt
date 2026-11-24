@@ -19,6 +19,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.util.NlsSafe
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
@@ -35,7 +36,6 @@ import com.intellij.psi.PsiManager
 import com.intellij.refactoring.RefactoringBundle
 import com.intellij.refactoring.rename.RenameHandler
 import com.intellij.util.DocumentUtil
-import com.intellij.util.ui.UIUtil
 import org.eclipse.lsp4j.PrepareRenameParams
 import org.eclipse.lsp4j.RenameParams
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
@@ -78,7 +78,10 @@ internal class LspRenameHandler : RenameHandler, TitledHandler, DumbAware {
     // Dart patch: the in-place template edits only the text at the range. If the range is empty or the server's placeholder
     // isn't that text (naming an unnamed Dart constructor, adding an import prefix), ask for the new name in a dialog.
     if (range.isEmpty || initialName != editor.document.getText(range)) {
-      renameWithInputDialog(project, initialName) { newName ->
+      val renameSupport = lspServer.descriptor.lspCustomization.renameCustomizer as LspRenameSupport
+      val offset = editor.caretModel.offset
+      renameWithInputDialog(project, renameSupport.getInputDialogTitle(file, offset), renameSupport.getInputDialogLabel(file, offset),
+                            initialName) { newName ->
         performRename(editor, lspServer, RenameParams(textDocumentIdentifier, position, newName))
       }
       return
@@ -176,11 +179,16 @@ internal class LspRenameHandler : RenameHandler, TitledHandler, DumbAware {
 
 // Dart patch: asks for the new name, starting with the server's placeholder. Applying the edit changes documents, which
 // must happen inside a command; the in-place rename gets one from the template. Internal for DartLspRenameHandlersTest.
-internal fun renameWithInputDialog(project: Project, initialName: String, onRename: (String) -> Unit) {
-  val newName = Messages.showInputDialog(project, UIUtil.removeMnemonic(RefactoringBundle.message("rename.dialog.new.name.label")),
-                                         RefactoringBundle.message("rename.title"), null, initialName, null)
+internal fun renameWithInputDialog(
+  project: Project,
+  title: @NlsContexts.DialogTitle String,
+  label: @NlsContexts.Label String,
+  initialName: String,
+  onRename: (String) -> Unit,
+) {
+  val newName = Messages.showInputDialog(project, label, title, null, initialName, null)
   if (newName.isNullOrBlank() || newName == initialName) return
-  CommandProcessor.getInstance().executeCommand(project, { onRename(newName) }, RefactoringBundle.message("rename.title"), null)
+  CommandProcessor.getInstance().executeCommand(project, { onRename(newName) }, title, null)
 }
 
 // Dart patch: internal for DartLspRenameHandlersTest
