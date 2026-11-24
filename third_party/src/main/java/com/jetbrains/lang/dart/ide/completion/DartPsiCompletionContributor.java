@@ -10,7 +10,6 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiErrorElement;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.impl.source.resolve.reference.impl.PsiMultiReference;
-import com.jetbrains.lang.dart.psi.DartArrayAccessExpression;
 import com.jetbrains.lang.dart.psi.DartListLiteralExpression;
 import com.jetbrains.lang.dart.psi.DartNewExpression;
 import com.jetbrains.lang.dart.psi.DartParenthesizedExpression;
@@ -64,9 +63,7 @@ public final class DartPsiCompletionContributor extends CompletionContributor im
       }
       else if (reference instanceof DartParenthesizedExpression ||
                reference instanceof DartListLiteralExpression ||
-               reference instanceof DartSetOrMapLiteralExpression ||
-               reference instanceof DartArrayAccessExpression ||
-               reference instanceof DartStringLiteralExpression) {
+               reference instanceof DartSetOrMapLiteralExpression) {
         context.setReplacementOffset(context.getStartOffset());
       }
       if (reference instanceof DartReferenceExpression) {
