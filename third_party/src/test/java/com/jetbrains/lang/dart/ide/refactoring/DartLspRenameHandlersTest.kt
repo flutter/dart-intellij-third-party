@@ -146,6 +146,11 @@ class DartLspRenameHandlersTest : DartCodeInsightFixtureTestCase() {
         assertNoOtherRenameHandler()
     }
 
+    fun testNoOtherRenameHandlerInADocCommentReference() {
+        myFixture.configureByText("a.dart", "/// See [Greeter.gr<caret>eet].\nclass Greeter {\n  String greet() => 'hi';\n}\n")
+        assertNoOtherRenameHandler()
+    }
+
     fun testNoOtherRenameHandlerOnTheImportKeyword() {
         myFixture.configureByText("a.dart", "imp<caret>ort 'dart:math';\n")
         assertNoOtherRenameHandler()
