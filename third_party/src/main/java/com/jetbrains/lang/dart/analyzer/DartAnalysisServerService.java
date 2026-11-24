@@ -14,10 +14,8 @@ import com.google.dart.server.FormatConsumer;
 import com.google.dart.server.GetAssistsConsumer;
 import com.google.dart.server.GetFixesConsumer;
 import com.google.dart.server.GetImportedElementsConsumer;
-import com.google.dart.server.GetNavigationConsumer;
 import com.google.dart.server.GetPostfixCompletionConsumer;
 import com.google.dart.server.GetRefactoringConsumer;
-import com.google.dart.server.GetRuntimeCompletionConsumer;
 import com.google.dart.server.GetServerPortConsumer;
 import com.google.dart.server.GetStatementCompletionConsumer;
 import com.google.dart.server.GetSuggestionDetailsConsumer;
@@ -139,8 +137,6 @@ import org.dartlang.analysis.server.protocol.RefactoringOptions;
 import org.dartlang.analysis.server.protocol.RemoveContentOverlay;
 import org.dartlang.analysis.server.protocol.RequestError;
 import org.dartlang.analysis.server.protocol.RequestErrorCode;
-import org.dartlang.analysis.server.protocol.RuntimeCompletionExpression;
-import org.dartlang.analysis.server.protocol.RuntimeCompletionVariable;
 import org.dartlang.analysis.server.protocol.SearchResult;
 import org.dartlang.analysis.server.protocol.ServerService;
 import org.dartlang.analysis.server.protocol.SourceChange;
@@ -218,7 +214,6 @@ public final class DartAnalysisServerService implements Disposable {
   private static final long EDIT_FORMAT_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
   private static final long EDIT_ORGANIZE_DIRECTIVES_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(300);
   private static final long EDIT_SORT_MEMBERS_TIMEOUT = TimeUnit.SECONDS.toMillis(3);
-  private static final long GET_NAVIGATION_TIMEOUT = TimeUnit.SECONDS.toMillis(1);
   private static final long GET_ASSISTS_TIMEOUT_EDT = TimeUnit.MILLISECONDS.toMillis(100);
   private static final long GET_ASSISTS_TIMEOUT = TimeUnit.MILLISECONDS.toMillis(1000);
   private static final long GET_FIXES_TIMEOUT_EDT = TimeUnit.MILLISECONDS.toMillis(100);
@@ -1497,57 +1492,6 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
-  public @Nullable List<DartServerData.DartNavigationRegion> analysis_getNavigation(final @NotNull VirtualFile file,
-                                                                                    final int _offset,
-                                                                                    final int length) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return null;
-    }
-
-    final String fileUri = getFileUri(file);
-    final Ref<List<DartServerData.DartNavigationRegion>> resultRef = Ref.create();
-
-    final CountDownLatch latch = new CountDownLatch(1);
-    LOG.debug("analysis_getNavigation(" + fileUri + ")");
-
-    final int offset = getOriginalOffset(file, _offset);
-    server.analysis_getNavigation(fileUri, offset, length, new GetNavigationConsumer() {
-      @Override
-      public void computedNavigation(final List<NavigationRegion> regions) {
-        final List<DartServerData.DartNavigationRegion> dartRegions = new ArrayList<>(regions.size());
-        for (NavigationRegion region : regions) {
-          if (region.getLength() > 0) {
-            dartRegions.add(DartServerData.createDartNavigationRegion(DartAnalysisServerService.this, file, region));
-          }
-        }
-
-        resultRef.set(dartRegions);
-        latch.countDown();
-      }
-
-      @Override
-      public void onError(final RequestError error) {
-        if (RequestErrorCode.GET_NAVIGATION_INVALID_FILE.equals(error.getCode())) {
-          LOG.info(getShortErrorMessage("analysis_getNavigation()", fileUri, error));
-        }
-        else {
-          logError("analysis_getNavigation()", fileUri, error);
-        }
-
-        latch.countDown();
-      }
-    });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_NAVIGATION_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("analysis_getNavigation", GET_NAVIGATION_TIMEOUT, fileUri);
-    }
-
-    return resultRef.get();
-  }
-
   public @NotNull List<SourceChange> edit_getAssists(final @NotNull VirtualFile file, final int _offset, final int _length) {
     if (!file.isInLocalFileSystem()) return Collections.emptyList();
 
@@ -2368,48 +2312,6 @@ public final class DartAnalysisServerService implements Disposable {
     }
   }
 
-  public @Nullable Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>> execution_getSuggestions(@NotNull String code,
-                                                                                                                int offset,
-                                                                                                                @NotNull VirtualFile contextFile,
-                                                                                                                int contextOffset,
-                                                                                                                @NotNull List<RuntimeCompletionVariable> variables,
-                                                                                                                @NotNull List<RuntimeCompletionExpression> expressions) {
-    final AnalysisServer server = myServer;
-    if (server == null) {
-      return new Pair<>(new SmartList<>(), new SmartList<>());
-    }
-
-    final String contextFileUri = getFileUri(contextFile);
-    final CountDownLatch latch = new CountDownLatch(1);
-    final Ref<Pair<List<CompletionSuggestion>, List<RuntimeCompletionExpression>>> refResult = Ref.create();
-    server.execution_getSuggestions(
-      code, offset,
-      contextFileUri, contextOffset,
-      variables, expressions,
-      new GetRuntimeCompletionConsumer() {
-        @Override
-        public void computedResult(List<CompletionSuggestion> suggestions, List<RuntimeCompletionExpression> expressions) {
-          refResult.set(new Pair<>(suggestions, expressions));
-          latch.countDown();
-        }
-
-        @Override
-        public void onError(RequestError error) {
-          latch.countDown();
-          if (!RequestErrorCode.UNKNOWN_REQUEST.equals(error.getCode())) {
-            logError("execution_getSuggestions()", contextFileUri, error);
-          }
-        }
-      });
-
-    awaitForLatchCheckingCanceled(server, latch, GET_SUGGESTIONS_TIMEOUT);
-
-    if (latch.getCount() > 0) {
-      logTookTooLongMessage("execution_getSuggestions", GET_SUGGESTIONS_TIMEOUT, contextFileUri);
-    }
-    return refResult.get();
-  }
-
   public @Nullable String execution_mapUri(@NotNull String _id, @NotNull VirtualFile _file) {
     return execution_mapUri(_id, getFileUri(_file), null);
   }
@@ -2587,17 +2489,12 @@ public final class DartAnalysisServerService implements Disposable {
       final RemoteAnalysisServerImpl startedServer = new DartAnalysisServerImpl(myProject, myServerSocket);
 
       try {
-        startedServer.start();
-        server_setSubscriptions(startedServer);
-
-        if (!myInitializationOnServerStartupDone) {
-          myInitializationOnServerStartupDone = true;
-
-          registerFileEditorManagerListener();
-          registerDocumentListener();
-          setDasLogger();
-        }
-
+        // Register the listeners before start(): start() launches the process and the reader thread, and notifications that
+        // arrive before a listener is added are dropped. Losing server.connected leaves myServerVersion empty for the
+        // server's lifetime, so DartServerCompletionContributor falls back to the removed completion.getSuggestions request
+        // and every completion comes back empty (UNKNOWN_REQUEST). See
+        // https://github.com/flutter/dart-intellij-third-party/issues/857.
+        myHaveShownInitialProgress = false;
         startedServer.addAnalysisServerListener(myAnalysisServerListener);
         for (AnalysisServerListener listener : myAdditionalServerListeners) {
           startedServer.addAnalysisServerListener(listener);
@@ -2609,7 +2506,17 @@ public final class DartAnalysisServerService implements Disposable {
           startedServer.addResponseListener(listener);
         }
 
-        myHaveShownInitialProgress = false;
+        startedServer.start();
+        server_setSubscriptions(startedServer);
+
+        if (!myInitializationOnServerStartupDone) {
+          myInitializationOnServerStartupDone = true;
+
+          registerFileEditorManagerListener();
+          registerDocumentListener();
+          setDasLogger();
+        }
+
         startedServer.addStatusListener(isAlive -> {
           if (!isAlive) {
             synchronized (myLock) {

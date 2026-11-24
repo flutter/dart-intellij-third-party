@@ -12,12 +12,15 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.module.ModuleManager
 import com.jetbrains.lang.dart.logging.PluginLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.*
 import com.intellij.util.EventDispatcher
@@ -27,6 +30,7 @@ import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 import com.intellij.util.io.BaseOutputReader
 import com.intellij.util.io.URLUtil
+import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
 import com.jetbrains.lang.dart.ide.devtools.DartDevToolsService
 import com.jetbrains.lang.dart.lsp.DartLspService
@@ -37,10 +41,17 @@ import com.jetbrains.lang.dart.websocket.WebSocketEventHandler
 import com.jetbrains.lang.dart.websocket.WebSocketException
 import com.jetbrains.lang.dart.websocket.WebSocketMessage
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
+import org.jetbrains.annotations.TestOnly
 import java.net.URI
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 private data class PendingRequest(
@@ -51,9 +62,10 @@ private data class PendingRequest(
 )
 
 @Service(Service.Level.PROJECT)
-class DartToolingDaemonService private constructor(val project: Project, cs: CoroutineScope) : Disposable {
+class DartToolingDaemonService private constructor(val project: Project, private val cs: CoroutineScope) : Disposable {
 
   private lateinit var dtdProcessHandler: KillableProcessHandler
+  @Volatile
   private var serviceRunning = false
 
   @Volatile
@@ -71,6 +83,22 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   private var lastSentRootUris: List<String> = emptyList()
 
   private val pendingRequests = ConcurrentLinkedQueue<PendingRequest>()
+  private val droppedRequestCount = AtomicInteger()
+
+  /** Set while a [startServiceIfNeeded] start is in flight or done, so concurrent callers start at most one DTD. */
+  private val startClaimed = AtomicBoolean()
+
+  /** The [startServiceIfNeeded] start that holds [startClaimed] while it's in flight; cancelled by [stopService]. */
+  @Volatile
+  private var startJob: Job? = null
+
+  /** Replaces the DTD launch in [startServiceIfNeeded] for tests; returns whether the start happened. */
+  @TestOnly
+  internal var startForTests: (() -> Boolean)? = null
+
+  @get:TestOnly
+  internal val pendingRequestCount: Int
+    get() = pendingRequests.size
 
   private val nextRequestId = AtomicInteger()
   private val consumerMap: MutableMap<Int, DartToolingDaemonConsumer> = mutableMapOf()
@@ -92,7 +120,19 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     }
 
     val sdk = DartSdk.getDartSdk(project)?.takeIf { isDartSdkVersionSufficient(it) } ?: return
+    // So that a later startServiceIfNeeded() doesn't start a second one.
+    startClaimed.set(true)
+    try {
+      launchService(sdk)
+    }
+    catch (e: ExecutionException) {
+      startClaimed.set(false)
+      throw e
+    }
+  }
 
+  @Throws(ExecutionException::class)
+  private fun launchService(sdk: DartSdk) {
     activeLocationChangeEventSupported = DartAnalysisServerService.isDartSdkVersionSufficientForWorkspaceApplyEdits(sdk.version)
 
     val commandLine = createDtdCommandLine(sdk)
@@ -103,6 +143,71 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     }
     dtdProcessHandler.addProcessListener(DtdProcessListener())
     dtdProcessHandler.startNotify()
+  }
+
+  /**
+   * Starts the DTD unless it's already started (or starting) in this session. IDE analytics events are delivered
+   * through the DTD, so this is called wherever Dart support may first become usable: on project open, when a
+   * `pub get` finishes (a project just created with the wizard can open before its SDK is visible), and when Dart
+   * support is enabled or the Dart SDK library changes after open. Safe to call repeatedly, from any thread: it returns
+   * at once and starts in the background.
+   *
+   * The DTD keeps the `DASH__SUPPRESS_ANALYTICS` it starts with, so the start first waits (bounded) for the analytics
+   * configuration; started with the provisional `true`, it would drop every IDE analytics event for the session.
+   */
+  fun startServiceIfNeeded(): Job? {
+    if (startClaimed.get() || serviceRunning || project.isDisposed) return null
+    if (!Registry.`is`("dart.launch.dtd.and.devtools", false)) return null
+    val startForTests = startForTests
+    // Don't launch real DTD processes from the many tests that configure a Dart SDK.
+    if (startForTests == null && ApplicationManager.getApplication().isUnitTestMode) return null
+
+    return cs.launch(Dispatchers.IO) {
+      val firstSdk = readAction { usableSdk() } ?: return@launch
+      if (!startClaimed.compareAndSet(false, true)) return@launch
+      val self = coroutineContext[Job]
+      startJob = self
+
+      var started = false
+      try {
+        // Request the config here too: serverReadyForRequest normally does, but not if it saw no usable SDK.
+        runInterruptible {
+          Analytics.getConfiguration(firstSdk, project)
+          Analytics.awaitConfigurationResolved(ANALYTICS_CONFIG_WAIT_MS)
+        }
+        // Don't launch for a project that closed (or a scope that was cancelled) during the wait, and re-check Dart
+        // support: it may have been disabled, or the SDK changed, meanwhile.
+        ensureActive()
+        if (serviceRunning) return@launch
+        val sdk = readAction { usableSdk() } ?: return@launch
+        if (startForTests != null) {
+          started = startForTests()
+        }
+        else {
+          launchService(sdk)
+          started = true
+        }
+      }
+      catch (e: ExecutionException) {
+        logger.warn("Failed to start Dart Tooling Daemon", e)
+      }
+      finally {
+        // A failed, cancelled or skipped start leaves no DTD: let a later call retry. Unless stopService() already
+        // released the claim (and a newer start may hold it).
+        if (startJob === self) {
+          startJob = null
+          if (!started && !serviceRunning) startClaimed.set(false)
+        }
+      }
+    }
+  }
+
+  /** The project's Dart SDK if a module has Dart support enabled and the SDK is new enough to run the DTD. */
+  @RequiresReadLock
+  private fun usableSdk(): DartSdk? {
+    if (project.isDisposed) return null
+    val dartEnabled = ModuleManager.getInstance(project).modules.any { DartSdkLibUtil.isDartSdkEnabled(it) }
+    return DartSdk.getDartSdk(project)?.takeIf { dartEnabled && isDartSdkVersionSufficient(it) }
   }
 
   private fun onServiceStarted(uri: String?, secret: String?) {
@@ -146,6 +251,8 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
         }
       }
     }
+    startJob?.cancel()
+    startJob = null
     pendingShutdownTasks.forEach { it.get() }
     webSocketListener = null
     serviceRunning = false
@@ -156,6 +263,7 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     pendingRequests.clear()
     consumerMap.clear()
     servicesMap.clear()
+    startClaimed.set(false)
   }
 
   @Suppress("unused") // for the Flutter plugin
@@ -184,6 +292,16 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
   @Throws(WebSocketException::class)
   fun sendRequest(method: String, params: JsonObject, includeSecret: Boolean, consumer: DartToolingDaemonConsumer) {
     if (!webSocketReady || !pendingRequests.isEmpty()) {
+      // Bound the queue: a DTD that never connects, or that dies mid-session, never drains it. Drop new requests
+      // rather than old ones, so the early settings event survives, and never drop service registrations
+      // (DtdEditorService registers before onOpen). size() is O(n), but n stays near the cap.
+      if (!webSocketReady && method != "registerService" && pendingRequests.size >= MAX_PENDING_REQUESTS) {
+        val dropped = droppedRequestCount.incrementAndGet()
+        if (dropped == 1 || dropped % MAX_PENDING_REQUESTS == 0) {
+          logger.debug("sendRequest(\"$method\") dropped because the queue is full ($dropped dropped so far)")
+        }
+        return
+      }
       logger.debug("sendRequest(\"$method\") queued because the socket is not ready or there are pending requests")
       pendingRequests.add(PendingRequest(method, params, includeSecret, consumer))
       if (webSocketReady) {
@@ -451,6 +569,18 @@ class DartToolingDaemonService private constructor(val project: Project, cs: Cor
     fun getInstance(project: Project): DartToolingDaemonService = project.service()
 
     private const val MIN_SDK_VERSION: String = "3.4"
+
+    /**
+     * How long [startServiceIfNeeded] waits for the analytics configuration to resolve before starting the DTD anyway
+     * (on top of up to 700 ms in `Analytics.getConfiguration`).
+     */
+    private const val ANALYTICS_CONFIG_WAIT_MS = 3_000L
+
+    /**
+     * About how many requests are queued while the socket isn't ready; more are dropped (except service
+     * registrations). Keep it well above (at least 2x) any buffer that flushes into a starting DTD's queue.
+     */
+    internal const val MAX_PENDING_REQUESTS: Int = 100
     private val logger = PluginLogger.createLogger(DartToolingDaemonService::class.java)
   }
 }

@@ -12,7 +12,6 @@ import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.startup.ProjectActivity
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.backend.workspace.WorkspaceModel
 import com.intellij.platform.workspace.jps.CustomModuleEntitySource
@@ -35,7 +34,9 @@ import com.jetbrains.lang.dart.analytics.SettingsData
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import org.jetbrains.annotations.VisibleForTesting
 
 /**
@@ -76,20 +77,22 @@ class DartStartupActivity : ProjectActivity {
   }
 
   private suspend fun startAnalysisServerIfNeeded(project: Project) {
+    val dartSupportEnabled = readAction {
+      DartSdk.getDartSdk(project) != null && project.moduleManager.modules.any { DartSdkLibUtil.isDartSdkEnabled(it) }
+    }
+    // If Dart support isn't usable yet, DartPubActionBase or DartWorkspaceModelChangeListener starts the DTD later.
+    if (!dartSupportEnabled) return
+
+    // The DTD doesn't need the project's packages, so it doesn't wait for a new project's initial 'pub get'.
+    DartToolingDaemonService.getInstance(project).startServiceIfNeeded()
+
     if (DartModuleBuilder.isPubGetScheduledForNewlyCreatedProject(project)) {
       // We want to start Analysis Server after the initial 'pub get' is finished, this will be done in DartPubActionBase
       return
     }
 
-    if (DartSdk.getDartSdk(project) == null) return
-    if (project.moduleManager.modules.find { DartSdkLibUtil.isDartSdkEnabled(it) } == null) return
-
     readActionBlocking {
       DartAnalysisServerService.getInstance(project).serverReadyForRequest()
-    }
-
-    if (Registry.`is`("dart.launch.dtd.and.devtools", false)) {
-      DartToolingDaemonService.getInstance(project).startService()
     }
   }
 
@@ -105,6 +108,8 @@ class DartStartupActivity : ProjectActivity {
     if (!info.dartSupportEnabled || info.sdk == null) return
 
     val config = Analytics.getConfiguration(info.sdk, project)
+    // getConfiguration gives up after 700 ms; wait (bounded) for a slower resolution rather than drop the event.
+    runInterruptible(Dispatchers.IO) { Analytics.awaitConfigurationResolved(ANALYTICS_CONFIG_WAIT_MS) }
     if (config.suppressAnalytics) return
 
     Analytics.report(buildSettingsData(project, info))
@@ -230,6 +235,13 @@ fun excludeBuildAndToolCacheFolders(module: Module, pubspecYamlFile: VirtualFile
 
 private fun getExclusionUrls(rootUrl: String): Set<String> =
   setOf("$rootUrl/.dart_tool", "$rootUrl/.pub", "$rootUrl/build")
+
+/**
+ * How long the settings event waits for the analytics config to resolve. Resolution normally takes a short-lived DTD
+ * start plus two RPCs; if it takes longer, the event is dropped (analytics stay suppressed). The project DTD's start
+ * waits the same way, in [DartToolingDaemonService.startServiceIfNeeded].
+ */
+private const val ANALYTICS_CONFIG_WAIT_MS = 3_000L
 
 private val Module.rootManager: ModuleRootManager
   get() = ModuleRootManager.getInstance(this)

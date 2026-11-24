@@ -3,6 +3,10 @@ package com.jetbrains.lang.dart.ide.actions;
 
 import com.intellij.CommonBundle;
 import com.intellij.application.options.CodeStyle;
+import com.intellij.codeInsight.actions.ReformatCodeProcessor;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.ex.ActionUtil;
 import com.intellij.openapi.application.ApplicationManager;
 
 import com.intellij.openapi.command.CommandProcessor;
@@ -26,13 +30,20 @@ import com.intellij.openapi.vfs.ReadonlyStatusHandler;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.jetbrains.lang.dart.DartBundle;
 import com.jetbrains.lang.dart.DartLanguage;
+import com.jetbrains.lang.dart.analytics.Analytics;
+import com.jetbrains.lang.dart.analytics.AnalyticsData;
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService;
+import com.jetbrains.lang.dart.sdk.DartConfigurable;
+import com.jetbrains.lang.dart.sdk.DartSdk;
 import org.dartlang.analysis.server.protocol.SourceEdit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +52,69 @@ import static com.intellij.openapi.util.text.StringUtil.isWhiteSpace;
 
 public class DartStyleAction extends AbstractDartFileProcessingAction {
   private static final Logger LOG = PluginLogger.INSTANCE.createLogger(DartStyleAction.class);
+
+  @Override
+  public void actionPerformed(@NotNull AnActionEvent event) {
+    final Project project = event.getProject();
+    if (project != null && DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      final DartSdk sdk = DartSdk.getDartSdk(project);
+      if (sdk == null || !DartAnalysisServerService.isDartSdkVersionSufficient(sdk)) return;
+
+      final Editor editor = event.getData(CommonDataKeys.EDITOR);
+      if (editor != null) {
+        performEditorRedirect(project, editor, event);
+      }
+      else {
+        performFilesRedirect(project, event);
+      }
+      return;
+    }
+    super.actionPerformed(event);
+  }
+
+  /**
+   * Handles invocations when the cursor/focus is in an editor, formatting the host Dart file (or
+   * active selection) directly via {@link ReformatCodeProcessor} (routing through LSP formatting)
+   * without inheriting sticky Reformat File dialog options or switching to injected fragments.
+   */
+  private void performEditorRedirect(@NotNull Project project, @NotNull Editor editor, @NotNull AnActionEvent event) {
+    final Document document = editor.getDocument();
+    final PsiFile psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document);
+    if (psiFile == null || !isApplicableFile(project, psiFile.getVirtualFile())) return;
+
+    Analytics.report(AnalyticsData.forAction(this, event));
+    if (!ReadonlyStatusHandler.ensureDocumentWritable(project, document)) return;
+    PsiDocumentManager.getInstance(project).commitDocument(document);
+    runEditorReformatCodeProcessor(psiFile, editor);
+  }
+
+  /**
+   * Handles invocations when the cursor/focus is outside an editor (e.g. Project View file or
+   * directory selection), filtering strictly to applicable Dart files before reformatting via LSP.
+   */
+  private void performFilesRedirect(@NotNull Project project, @NotNull AnActionEvent event) {
+    final VirtualFile[] filesAndDirs = event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY);
+    if (filesAndDirs == null || filesAndDirs.length == 0) return;
+
+    PsiDocumentManager.getInstance(project).commitAllDocuments();
+    final List<VirtualFile> dartFiles = ActionUtil.underModalProgress(
+      project,
+      DartBundle.message("action.Dart.DartStyle.progress.title"),
+      () -> getApplicableVirtualFiles(project, filesAndDirs)
+    );
+    if (dartFiles.isEmpty()) return;
+
+    Analytics.report(AnalyticsData.forAction(this, event));
+    runOverFiles(project, dartFiles);
+  }
+
+  @VisibleForTesting
+  void runEditorReformatCodeProcessor(@NotNull PsiFile psiFile, @NotNull Editor editor) {
+    final ReformatCodeProcessor processor = editor.getSelectionModel().hasSelection()
+                                            ? new ReformatCodeProcessor(psiFile, editor.getSelectionModel())
+                                            : new ReformatCodeProcessor(psiFile, false);
+    processor.run();
+  }
 
   @Override
   protected @NotNull String getActionTextForEditor() {
@@ -159,13 +233,52 @@ public class DartStyleAction extends AbstractDartFileProcessingAction {
       return;
     }
 
-    if (Messages.showOkCancelDialog(project, DartBundle.message("dart.style.files.dialog.question", dartFiles.size()),
-                                    DartBundle.message("action.Dart.DartStyle.text"),
-                                    CommonBundle.getYesButtonText(), CommonBundle.getNoButtonText(), null) != Messages.OK) {
+    if (!confirmRunOverFiles(project, dartFiles.size())) {
       return;
     }
 
-    runDartfmt(project, dartFiles);
+    if (DartConfigurable.isExperimentalLspFeaturesEnabled(project)) {
+      reformatFilesWithLsp(project, dartFiles);
+    }
+    else {
+      runDartfmt(project, dartFiles);
+    }
+  }
+
+  @VisibleForTesting
+  boolean confirmRunOverFiles(@NotNull Project project, int fileCount) {
+    return Messages.showOkCancelDialog(project, DartBundle.message("dart.style.files.dialog.question", fileCount),
+                                       DartBundle.message("action.Dart.DartStyle.text"),
+                                       CommonBundle.getYesButtonText(), CommonBundle.getNoButtonText(), null) == Messages.OK;
+  }
+
+  private void reformatFilesWithLsp(@NotNull Project project, @NotNull List<VirtualFile> dartFiles) {
+    if (ReadonlyStatusHandler.getInstance(project).ensureFilesWritable(dartFiles).hasReadonlyFiles()) return;
+
+    final PsiFile[] psiFiles = ActionUtil.underModalProgress(
+      project,
+      DartBundle.message("action.Dart.DartStyle.progress.title"),
+      () -> {
+        final PsiManager psiManager = PsiManager.getInstance(project);
+        final List<PsiFile> files = new ArrayList<>(dartFiles.size());
+        for (VirtualFile file : dartFiles) {
+          ProgressManager.checkCanceled();
+          final PsiFile psiFile = psiManager.findFile(file);
+          if (psiFile != null) {
+            files.add(psiFile);
+          }
+        }
+        return files.toArray(PsiFile.EMPTY_ARRAY);
+      }
+    );
+    if (psiFiles.length > 0) {
+      runReformatCodeProcessor(project, psiFiles);
+    }
+  }
+
+  @VisibleForTesting
+  void runReformatCodeProcessor(@NotNull Project project, @NotNull PsiFile[] psiFiles) {
+    new ReformatCodeProcessor(project, psiFiles, null, false).run();
   }
 
   // keep public to be accessible in 3rd party plugins

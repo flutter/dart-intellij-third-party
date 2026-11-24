@@ -19,7 +19,7 @@ if [ ! -d "../dart-sdk" ]; then
 
   # Pinned Dart SDK version. This constant is automatically checked and updated weekly
   # by the .github/workflows/update_dart.yaml GitHub Actions workflow.
-  DART_VERSION="3.13.0"
+  DART_VERSION="3.14.1"
   
   echo "Provisioning Dart SDK version ${DART_VERSION} for ${OS_NAME}-${ARCH}..."
   

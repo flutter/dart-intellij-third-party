@@ -170,7 +170,7 @@ public final class DartServerData {
     myExistingImports.put(filePathSD, existingImports);
   }
 
-  static @NotNull DartNavigationRegion createDartNavigationRegion(final @NotNull DartAnalysisServerService service,
+  private static @NotNull DartNavigationRegion createDartNavigationRegion(final @NotNull DartAnalysisServerService service,
                                                                   final @Nullable VirtualFile file,
                                                                   final @NotNull NavigationRegion region) {
     final int offset = service.getConvertedOffset(file, region.getOffset());
@@ -371,16 +371,20 @@ public final class DartServerData {
   boolean hasAllData_TESTS_ONLY(@NotNull VirtualFile file) {
     assert ApplicationManager.getApplication().isUnitTestMode();
 
-    DartLocalFileInfo fileInfo = (DartLocalFileInfo) DartFileInfoKt.getDartFileInfo(myService.getProject(), file);
+    Project project = myService.getProject();
+    DartLocalFileInfo fileInfo = (DartLocalFileInfo) DartFileInfoKt.getDartFileInfo(project, file);
 
+    // Highlights and closing labels arrive over LSP instead of as legacy notifications once the SDK
+    // supports it (no HIGHLIGHTS subscription; the server skips analysis.closingLabels when the
+    // client advertises experimental.closingLabels), so legacy data for them never shows up.
     return isErrorInfoUpToDate(fileInfo) &&
-           myHighlightData.get(fileInfo) != null &&
+           (DartAnalysisServerService.isLspHighlightingActive(project) || myHighlightData.get(fileInfo) != null) &&
            myNavigationData.get(fileInfo) != null &&
            myOverrideData.get(fileInfo) != null &&
            myImplementedClassData.get(fileInfo) != null &&
            myImplementedMemberData.get(fileInfo) != null &&
            myOutlineData.get(fileInfo) != null &&
-           myClosingLabelData.get(fileInfo) != null;
+           (DartAnalysisServerService.isLspClosingLabelsEnabled(project) || myClosingLabelData.get(fileInfo) != null);
   }
 
   @Nullable

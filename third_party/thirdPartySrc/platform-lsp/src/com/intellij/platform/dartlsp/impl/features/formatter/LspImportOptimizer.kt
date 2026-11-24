@@ -11,6 +11,10 @@ import com.intellij.platform.dartlsp.api.customization.LspIntentionAction
 import com.intellij.platform.dartlsp.api.customization.LspOptimizeImportsSupport
 import com.intellij.platform.dartlsp.impl.LspServerManagerImpl
 import com.intellij.platform.dartlsp.impl.documentMapping
+import com.intellij.platform.dartlsp.impl.LspServerImpl
+import com.intellij.platform.dartlsp.impl.features.intention.toCodeAction
+import com.intellij.platform.dartlsp.impl.util.LspWorkspaceEditApplier
+import org.eclipse.lsp4j.WorkspaceEdit
 import com.intellij.psi.PsiFile
 import org.eclipse.lsp4j.CodeAction
 import org.eclipse.lsp4j.CodeActionContext
@@ -41,8 +45,19 @@ internal class LspImportOptimizer : ImportOptimizer {
     val virtualFile = psiFile.virtualFile?.takeIf { it.isInLocalFileSystem && it !is VirtualFileWindow } ?: return noResult
     val lspServer = findServerToOptimizeImports(psiFile) ?: return noResult
     val codeAction = requestCodeAction(lspServer, virtualFile) ?: return noResult
+
     val intentionAction = LspIntentionAction(lspServer, codeAction)
-    if (!intentionAction.isAvailable { isReasonableOrganizeImportsAction(lspServer, virtualFile, it) }) return noResult
+    if (!intentionAction.isAvailable()) return noResult
+
+    val command = codeAction.command
+    // If codeAction.edit is null or effectively a no-op, handle Command in a synchronous way (see IJPL-235332)
+    if ((codeAction.edit == null || codeAction.edit == WorkspaceEdit()) && command != null) {
+      val edit = (lspServer as LspServerImpl).executeCommandExpectingWorkspaceEdit(command) ?: return noResult
+      val applier = LspWorkspaceEditApplier.create(lspServer, edit) ?: return noResult
+      return Runnable {
+        applier.applyWorkspaceEdit()
+      }
+    }
 
     return Runnable {
       intentionAction.invoke(virtualFile)
@@ -66,23 +81,10 @@ internal class LspImportOptimizer : ImportOptimizer {
 
       // Only one code action supported as UI does not suppose selection of the one import
       // option from the list (like it is processed in VS Code)
-      lspServer.sendRequestSync { it.textDocumentService.codeAction(params) }?.singleOrNull()?.right
+      lspServer.sendRequestSync { it.textDocumentService.codeAction(params) }?.singleOrNull()?.toCodeAction()
     }
 
     return results.firstOrNull()
-  }
-
-  private fun isReasonableOrganizeImportsAction(lspServer: LspServer, virtualFile: VirtualFile, codeAction: CodeAction): Boolean {
-    val currentFileUri = lspServer.descriptor.getFileUri(virtualFile)
-    if (codeAction.kind != SourceOrganizeImports) return false
-    if (codeAction.command != null) return false // not expected for the Optimize Imports action
-    val edit = codeAction.edit ?: return false
-    if (edit.changes != null && edit.documentChanges != null) return false
-    if (edit.changes.isNullOrEmpty() && edit.documentChanges.isNullOrEmpty()) return false
-    if (edit.changes?.any { it.key != currentFileUri } == true) return false // other files editing is not expected
-    if (edit.documentChanges?.any { it.isRight } == true) return false // ResourceOperation is not expected
-    if (edit.documentChanges?.any { it.left?.textDocument?.uri != currentFileUri } == true) return false // other files editing is not expected
-    return true
   }
 }
 

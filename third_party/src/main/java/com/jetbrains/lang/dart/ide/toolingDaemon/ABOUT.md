@@ -17,7 +17,7 @@ wrapper this package must use).
 ## Interface
 
 - `DartToolingDaemonService`: `@Service(PROJECT)`. Provides
-  `startService()`/`stopService()`, `sendRequest(method, params,
+  `startServiceIfNeeded()`, `startService()`/`stopService()`, `sendRequest(method, params,
   includeSecret, consumer)`, `registerServiceMethod(...)` and
   `addToolingDaemonListener(...)` (both used by the Flutter plugin),
   `ensureRootsUpToDate()` (`FileSystem.setIDEWorkspaceRoots`), and
@@ -42,12 +42,28 @@ wrapper this package must use).
 ## Invariants
 
 - The minimum SDK is 3.4. Older SDKs never start DTD.
+- `startServiceIfNeeded()` is the production entry point: it starts at most one
+  DTD per session (until `stopService()`), and only when the
+  `dart.launch.dtd.and.devtools` registry key is set and a module has Dart
+  support enabled and an SDK of at least 3.4. It's called on project open
+  (`DartStartupActivity`, for projects with Dart support), when a `pub get`
+  finishes (`DartPubActionBase`; a project just created with the wizard can open
+  before its SDK is visible), and when Dart support is enabled or the Dart SDK
+  library changes after open (`DartWorkspaceModelChangeListener`). It returns at
+  once; in the background, it waits up to about 3.7 s for the analytics
+  configuration first, because the DTD keeps the `DASH__SUPPRESS_ANALYTICS` it
+  starts with. In unit-test mode it does nothing unless a test sets
+  `startForTests`.
 - All socket I/O goes through `com.jetbrains.lang.dart.websocket.WebSocket`.
   Never use the JDK `java.net.http.WebSocket` directly (see
   `.agents/design-docs/websocket-design.md`).
 - This package owns JSON-RPC, request IDs, the trusted-client secret, and
   readiness (`webSocketReady`). The wrapper only handles transport.
-- Requests queue until `onOpen`. The queue is drained in FIFO order.
+- Requests queue until `onOpen`. The queue is drained in FIFO order. While the
+  socket isn't ready, about `MAX_PENDING_REQUESTS` (100) are queued; later
+  requests are dropped (service registrations never are), so a DTD that never
+  connects or has died can't grow the queue without bound. The first drop and
+  every 100th after it are logged at debug.
 - `onPing`/`onPong` are no-ops. The JDK sends the reply Pong automatically.
 - The trusted secret is added only when `includeSecret == true`.
 
@@ -62,5 +78,7 @@ wrapper this package must use).
 
 ## Verification
 
+- `./gradlew test --tests "com.jetbrains.lang.dart.ide.toolingDaemon.*"` (includes `DartToolingDaemonStartTest`, for
+  `startServiceIfNeeded`).
 - `./gradlew test --tests "com.jetbrains.dart.dartToolingDaemon.DartToolingDaemonServiceTest"`
 - For WebSocket-related changes, also run `com.jetbrains.dart.dartToolingDaemon.DTDProcessTest` and `com.jetbrains.dart.vmService.VmServiceWebsocketTest`.

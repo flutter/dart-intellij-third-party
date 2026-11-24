@@ -39,11 +39,35 @@ from a short-lived [`DTDProcess`](../dtd/ABOUT.md).
   telemetry is enabled and no consent prompt is pending.
 - In unit-test mode, `getConfiguration` returns a default, suppressed configuration without
   starting DTD.
+- A failed resolution (the DTD fails to start, exits before it starts, or an RPC throws or times
+  out) isn't cached for the session. `ConfigRetryPolicy` schedules a retry after 1 min, then 5 min,
+  then gives up. Until a retry succeeds, analytics stay suppressed. A late success helps later
+  process starts (new projects, analysis-server restarts, later DTD and child-process starts) and a
+  pending consent prompt. Processes that already started (the analysis server, the project DTD)
+  keep the suppressed environment they started with.
 - Events are delivered with `DartToolingDaemonService.sendRequest("UnifiedAnalytics.send")`.
+  If the socket closes mid-send, the `WebSocketException` is caught and the event is dropped
+  (never an IDE error).
+- Silent drops go through `Analytics.recordDrop(reason)`, which logs each one at debug under the
+  `com.jetbrains.lang.dart.analytics.Analytics` category (enable it in Help | Diagnostic Tools |
+  Debug Log Settings). The `Analytics.DropReason` values are: an event without an id (`no_id`),
+  without a project or with the default project (`no_project`), whose project was disposed
+  (`project_disposed`), a failed send (`send_failed`), a DTD error response (`dtd_error`, logged
+  with the error code only), and a field whose value isn't a `String`, `Boolean` or `Int`
+  (`unsupported_value`; the rest of the event is still sent). Tests observe them with
+  `setDropObserverForTests` (reasons only, never details). The DTD queue cap logs its own drops (see
+  [toolingDaemon](../ide/toolingDaemon/ABOUT.md)).
 
 ## Side Effects
 - On first `getConfiguration`, starts a `DTDProcess` on a pooled thread and blocks the caller
   for up to 700 ms while consent and telemetry state are queried.
+- `DartToolingDaemonService.startServiceIfNeeded` (before starting the project DTD) and
+  `DartStartupActivity` (before deciding whether to send the settings event) wait off the read
+  lock, up to 3 s, for that configuration to resolve or fail, via the internal
+  `awaitConfigurationResolved`. A DTD started earlier would keep the provisional
+  `DASH__SUPPRESS_ANALYTICS=true` and drop every IDE event for the session.
+  Resolution slower than that still starts the DTD suppressed (logged at info). The consent DTD
+  exiting early also releases the wait.
 - When DTD says a consent message must be shown, posts a notification in the
   "Dart Analysis Server" group. Its OK action confirms with `clientShowedMessage` and then
   terminates the DTD process.

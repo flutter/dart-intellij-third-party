@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-11-17' } *-->
 # ide
 
 ## Overview
@@ -17,7 +17,7 @@ Root of the Dart plugin's IDE integration. Direct sources provide brace matching
 - `findUsages`: [./findUsages/ABOUT.md](./findUsages/ABOUT.md) - server-backed Find Usages and usage grouping.
 - `formatter`: [./formatter/ABOUT.md](./formatter/ABOUT.md) - IntelliJ formatting model and code style settings.
 - `generation`: [./generation/ABOUT.md](./generation/ABOUT.md) - Generate actions (constructors, accessors, equals/hashCode, toString, override/implement).
-- `hierarchy`: [./hierarchy/ABOUT.md](./hierarchy/ABOUT.md) - method and call hierarchies, plus shared type-hierarchy helpers.
+- `hierarchy`: [./hierarchy/ABOUT.md](./hierarchy/ABOUT.md) - method hierarchy and shared hierarchy helpers.
 - `imports`: [./imports/ABOUT.md](./imports/ABOUT.md) - Optimize Imports via the Analysis Server.
 - `index`: [./index/ABOUT.md](./index/ABOUT.md) - file-based indexes (components, classes, symbols, libraries, imports/exports, parts).
 - `info`: [./info/ABOUT.md](./info/ABOUT.md) - parameter info popup (`DartParameterInfoHandler`).

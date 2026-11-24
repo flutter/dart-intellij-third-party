@@ -48,6 +48,7 @@ import org.eclipse.lsp4j.WorkDoneProgressCancelParams
 import org.eclipse.lsp4j.WorkDoneProgressCreateParams
 import org.eclipse.lsp4j.WorkDoneProgressEnd
 import org.eclipse.lsp4j.WorkDoneProgressReport
+import org.eclipse.lsp4j.WorkspaceEdit
 import org.eclipse.lsp4j.WorkspaceFolder
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
@@ -67,7 +68,23 @@ internal class LspServerNotificationsHandlerImpl(private val lspServer: LspServe
   private val progressJobs = ConcurrentHashMap<String, Job>()
   private val ansiDecoder = AnsiEscapeDecoder()
 
+  /**
+   * When set (by [LspServerImpl.executeCommandExpectingWorkspaceEdit]), incoming `workspace/applyEdit` requests are handled by
+   * this handler instead of being applied in the usual way. Written and read on different threads, hence `@Volatile`.
+   *
+   * Backported from IJPL-235332 (commit 47bd3c0a).
+   */
+  @Volatile
+  internal var nextApplyEditHandler: ((WorkspaceEdit) -> Unit)? = null
+
   override fun applyEdit(params: ApplyWorkspaceEditParams): CompletableFuture<ApplyWorkspaceEditResponse> {
+    nextApplyEditHandler?.let { handler ->
+      nextApplyEditHandler = null
+      handler(params.edit)
+      // a bit of cheating here: at this moment the edit is not yet applied; there are no known issues because of that
+      return completedFuture(ApplyWorkspaceEditResponse(true))
+    }
+
     val future = CompletableFuture<ApplyWorkspaceEditResponse>()
 
     LspServerManagerImpl.getInstanceImpl(lspServer.project).cs.launch {
