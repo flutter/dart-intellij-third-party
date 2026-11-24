@@ -31,12 +31,9 @@ import com.jetbrains.lang.dart.sdk.DartSdk
 import com.jetbrains.lang.dart.analytics.Analytics
 import com.jetbrains.lang.dart.analytics.AnalyticsConstants
 import com.jetbrains.lang.dart.analytics.SettingsData
-import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.sdk.DartSdkLibUtil
 import com.jetbrains.lang.dart.util.PubspecYamlUtil
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runInterruptible
 import org.jetbrains.annotations.VisibleForTesting
 
 /**
@@ -70,21 +67,19 @@ class DartStartupActivity : ProjectActivity {
     serviceScope.launch {
       startAnalysisServerIfNeeded(project)
     }
-
-    serviceScope.launch {
-      reportSettingsAnalytics(project)
-    }
   }
 
   private suspend fun startAnalysisServerIfNeeded(project: Project) {
     val dartSupportEnabled = readAction {
       DartSdk.getDartSdk(project) != null && project.moduleManager.modules.any { DartSdkLibUtil.isDartSdkEnabled(it) }
     }
-    // If Dart support isn't usable yet, DartPubActionBase or DartWorkspaceModelChangeListener starts the DTD later.
+    // If Dart support isn't usable yet, DartPubActionBase or DartWorkspaceModelChangeListener starts the DTD, and
+    // reports the settings event, later.
     if (!dartSupportEnabled) return
 
     // The DTD doesn't need the project's packages, so it doesn't wait for a new project's initial 'pub get'.
     DartToolingDaemonService.getInstance(project).startServiceIfNeeded()
+    DartSettingsAnalyticsService.getInstance(project).reportIfNeeded()
 
     if (DartModuleBuilder.isPubGetScheduledForNewlyCreatedProject(project)) {
       // We want to start Analysis Server after the initial 'pub get' is finished, this will be done in DartPubActionBase
@@ -95,32 +90,13 @@ class DartStartupActivity : ProjectActivity {
       DartAnalysisServerService.getInstance(project).serverReadyForRequest()
     }
   }
-
-  private suspend fun reportSettingsAnalytics(project: Project) {
-    val info = readAction {
-      val sdk = DartSdk.getDartSdk(project)
-      val enabled = sdk != null && project.moduleManager.modules.any { DartSdkLibUtil.isDartSdkEnabled(it) }
-      val version = sdk?.version ?: "unknown"
-      val experimentalEnabled = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
-      SettingsReportInfo(sdk, enabled, version, experimentalEnabled)
-    }
-
-    if (!info.dartSupportEnabled || info.sdk == null) return
-
-    val config = Analytics.getConfiguration(info.sdk, project)
-    // getConfiguration gives up after 700 ms; wait (bounded) for a slower resolution rather than drop the event.
-    runInterruptible(Dispatchers.IO) { Analytics.awaitConfigurationResolved(ANALYTICS_CONFIG_WAIT_MS) }
-    if (config.suppressAnalytics) return
-
-    Analytics.report(buildSettingsData(project, info))
-  }
 }
 
 /**
- * Builds the once-per-project-open settings event. Besides settings state, it carries
- * attribution that the Flutter plugin's events (which go through the Dart reporter) otherwise
- * lack: the Dart plugin version, the Flutter plugin version (only when io.flutter is enabled),
- * and the raw IDE product code.
+ * Builds the settings event, reported once per project session (see [DartSettingsAnalyticsService]).
+ * Besides settings state, it carries attribution that the Flutter plugin's events (which go
+ * through the Dart reporter) otherwise lack: the Dart plugin version, the Flutter plugin version
+ * (only when io.flutter is enabled), and the raw IDE product code.
  *
  * [productCode] and [pluginVersion] default to the live IDE values; tests pass fakes.
  */
@@ -235,13 +211,6 @@ fun excludeBuildAndToolCacheFolders(module: Module, pubspecYamlFile: VirtualFile
 
 private fun getExclusionUrls(rootUrl: String): Set<String> =
   setOf("$rootUrl/.dart_tool", "$rootUrl/.pub", "$rootUrl/build")
-
-/**
- * How long the settings event waits for the analytics config to resolve. Resolution normally takes a short-lived DTD
- * start plus two RPCs; if it takes longer, the event is dropped (analytics stay suppressed). The project DTD's start
- * waits the same way, in [DartToolingDaemonService.startServiceIfNeeded].
- */
-private const val ANALYTICS_CONFIG_WAIT_MS = 3_000L
 
 private val Module.rootManager: ModuleRootManager
   get() = ModuleRootManager.getInstance(this)

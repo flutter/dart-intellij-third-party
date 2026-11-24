@@ -624,7 +624,7 @@ class SettingsData(project: Project?) :
 /**
  * Reports a user-initiated change to a setting, identified by [setting].
  *
- * Unlike [SettingsData], which reports the state of settings once per project open, this
+ * Unlike [SettingsData], which reports the state of settings once per project session, this
  * reports a single transition (for example, toggling experimental LSP features).
  */
 class SettingsChangeData(setting: String, project: Project?) :
@@ -743,13 +743,13 @@ object AnalyticsConstants {
   val ENABLED = BooleanValue("enabled")
 
   /**
-   * The Dart SDK version (same key as the per-project-open [SettingsData] event).
+   * The Dart SDK version (same key as the once-per-project-session [SettingsData] event).
    */
   @JvmField
   val SDK_VERSION = StringValue("sdkVersion")
 
   /**
-   * The version of the Dart plugin (reported once per project open by [SettingsData]).
+   * The version of the Dart plugin (reported once per project session by [SettingsData]).
    *
    * Dev builds report `<version>-dev.<date>-<commit>`, so bucket by prefix in dashboards.
    */
@@ -757,7 +757,7 @@ object AnalyticsConstants {
   val DART_PLUGIN_VERSION = StringValue("dartPluginVersion")
 
   /**
-   * The version of the Flutter plugin, when it is enabled (reported once per project open by
+   * The version of the Flutter plugin, when it is enabled (reported once per project session by
    * [SettingsData]). Dev builds carry a similar suffix to [DART_PLUGIN_VERSION].
    */
   @JvmField

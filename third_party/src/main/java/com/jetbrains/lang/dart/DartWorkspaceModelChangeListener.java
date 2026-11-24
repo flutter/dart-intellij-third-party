@@ -69,6 +69,7 @@ public class DartWorkspaceModelChangeListener implements WorkspaceModelChangeLis
     if (DartSdkLibUtil.getModulesWithDartSdkEnabled(project).isEmpty()) return;
 
     DartToolingDaemonService.getInstance(project).startServiceIfNeeded();
+    DartSettingsAnalyticsService.getInstance(project).reportIfNeeded();
   }
 
   private static void onDartRootsChanged(@NotNull Project project) {
@@ -78,8 +79,9 @@ public class DartWorkspaceModelChangeListener implements WorkspaceModelChangeLis
     DartAnalysisServerService.getInstance(project).ensureAnalysisRootsUpToDate();
     DartToolingDaemonService dtd = DartToolingDaemonService.getInstance(project);
     dtd.ensureRootsUpToDate();
-    // Dart support enabled after open (e.g. the Flutter plugin configures the SDK asynchronously): the DTD start on
-    // open found no SDK.
+    // Dart support enabled after open (e.g. the Flutter plugin configures the SDK asynchronously): the DTD start and
+    // the settings event on open found no SDK.
     dtd.startServiceIfNeeded();
+    DartSettingsAnalyticsService.getInstance(project).reportIfNeeded();
   }
 }
