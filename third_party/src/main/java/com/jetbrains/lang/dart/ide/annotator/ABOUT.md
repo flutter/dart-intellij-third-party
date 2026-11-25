@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-11-24' } *-->
 # annotator
 
 ## Overview
@@ -15,4 +15,4 @@ Turns Analysis Server diagnostics and semantic highlighting into editor annotati
 - Adds editor annotations and highlighting; reads cached server results only.
 
 ## Verification
-- No dedicated unit tests; verify by opening a Dart file with errors and checking highlights and quick fixes.
+- Unit tests in `third_party/src/test/java/com/jetbrains/lang/dart/ide/annotator/DartAnnotatorTest.kt` cover legacy highlight suppression when LSP semantic tokens highlighting is active; also verify errors and quick fixes by opening a Dart file in the IDE.

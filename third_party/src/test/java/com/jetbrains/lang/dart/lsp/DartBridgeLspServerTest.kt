@@ -31,6 +31,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.project.Project
 import com.intellij.platform.dartlsp.api.Lsp4jServer
 import com.intellij.platform.dartlsp.api.LspServer
@@ -46,12 +47,15 @@ import com.jetbrains.lang.dart.psi.DartClass
 import com.jetbrains.lang.dart.sdk.DartConfigurable
 import com.jetbrains.lang.dart.DartCodeInsightFixtureTestCase
 import com.jetbrains.lang.dart.analyzer.DartAnalysisServerService
+import com.jetbrains.lang.dart.ide.annotator.DartAnnotator
 import com.jetbrains.lang.dart.ide.toolingDaemon.DartToolingDaemonService
 import com.jetbrains.lang.dart.ide.actions.DartStyleAction
 import com.jetbrains.lang.dart.sdk.DartSdk
 import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
+import org.dartlang.analysis.server.protocol.AnalysisService
 import org.dartlang.analysis.server.protocol.DartLspApplyWorkspaceEditParams
+import org.dartlang.analysis.server.protocol.HighlightRegionType
 import org.dartlang.analysis.server.protocol.MessageAction
 import org.dartlang.analysis.server.protocol.RequestError
 import org.eclipse.lsp4j.ApplyWorkspaceEditParams
@@ -234,6 +238,9 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             capturedNotifications.clear()
             capturedResponses.clear()
             capturedConsumer = null
+            requestObserver = null
+        } catch (e: Throwable) {
+            addSuppressedException(e)
         } finally {
             super.tearDown()
         }
@@ -247,6 +254,25 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             override fun isOpen(): Boolean = true
             override fun start() {}
             override fun stop() {}
+        }
+    }
+
+    private fun withPinnedSdkVersion(version: String, block: () -> Unit) {
+        val sdk = requireNotNull(DartSdk.getDartSdk(project)) { "Dart SDK not found" }
+        val das = DartAnalysisServerService.getInstance(project)
+        val sdkVersionField = DartSdk::class.java.getDeclaredField("myVersion").apply { isAccessible = true }
+        val dasSdkVersionField = DartAnalysisServerService::class.java.getDeclaredField("mySdkVersion").apply {
+            isAccessible = true
+        }
+        val originalSdkVersion = sdk.version
+        val originalDasVersion = dasSdkVersionField.get(das)
+        try {
+            sdkVersionField.set(sdk, version)
+            dasSdkVersionField.set(das, version)
+            block()
+        } finally {
+            sdkVersionField.set(sdk, originalSdkVersion)
+            dasSdkVersionField.set(das, originalDasVersion)
         }
     }
 
@@ -1372,14 +1398,195 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testInitialize_semanticTokensProvider_notAdvertisedWhenLegendNotProvided() {
+        val das = DartAnalysisServerService.getInstance(project)
+        bridgeServer.isLspHighlightingEnabled = { true }
+        bridgeServer.legendTimeoutMs = 10_000L
+
+        // 1. Enabled, server active, DAS responds to server.setClientCapabilities with no legend:
         val future = bridgeServer.initialize(InitializeParams())
-        val result = future.get(5, TimeUnit.SECONDS)
+        assertFalse(
+            "initialize() should await DAS capabilities response when highlighting is enabled and legend is pending",
+            future.isDone,
+        )
+        val jsonConsumer = requireNotNull(capturedConsumer as? JsonConsumer) {
+            "server.setClientCapabilities consumer should be captured"
+        }
+        jsonConsumer.onResponse(JsonObject(), null)
+        assertTrue("DAS legend future should complete immediately on empty capabilities response", das.semanticTokensLegendFuture.isDone)
+        assertTrue("initialize() future should complete immediately after DAS response", future.isDone)
+
+        val result = future.get(1, TimeUnit.SECONDS)
         assertNotNull(result)
         val capabilities = result.capabilities
         assertNotNull(capabilities)
         assertNull("Semantic tokens provider should not be advertised if DAS did not provide a legend", capabilities.semanticTokensProvider)
         assertFalse(bridgeServer.isSemanticTokensAdvertised)
-        assertFalse(DartAnalysisServerService.getInstance(project).isSemanticTokensAdvertised)
+        assertFalse(das.isSemanticTokensAdvertised)
+
+        // 2. Enabled, legendFuture already completed with null (legendFuture.isDone branch):
+        assertTrue(das.semanticTokensLegendFuture.isDone)
+        val cachedNullFuture = bridgeServer.initialize(InitializeParams())
+        assertTrue("initialize() should complete immediately when legendFuture is already done", cachedNullFuture.isDone)
+        val cachedNullResult = cachedNullFuture.get(1, TimeUnit.SECONDS)
+        assertNull(cachedNullResult.capabilities?.semanticTokensProvider)
+        assertFalse(bridgeServer.isSemanticTokensAdvertised)
+        assertFalse(das.isSemanticTokensAdvertised)
+
+        // 3. Enabled, server inactive (!das.isServerProcessActive fallback branch):
+        das.setServer(null)
+        assertFalse(das.isServerProcessActive)
+        assertFalse(das.semanticTokensLegendFuture.isDone)
+        val inactiveFuture = bridgeServer.initialize(InitializeParams())
+        assertTrue("initialize() should complete immediately when DAS process is inactive", inactiveFuture.isDone)
+        val inactiveResult = inactiveFuture.get(1, TimeUnit.SECONDS)
+        assertNull(inactiveResult.capabilities?.semanticTokensProvider)
+        assertFalse(bridgeServer.isSemanticTokensAdvertised)
+        assertFalse(das.isSemanticTokensAdvertised)
+    }
+
+    fun testInitialize_semanticTokensProvider_notAdvertisedWhenHighlightingDisabled() {
+        val das = DartAnalysisServerService.getInstance(project)
+        das.semanticTokensLegend = SemanticTokensLegend(listOf("class", "method"), listOf("declaration", "static"))
+        bridgeServer.isLspHighlightingEnabled = { false }
+
+        // Even when DAS already populated a valid legend, disabled highlighting must not advertise it.
+        val result = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+        assertNull(
+            "Semantic tokens provider must not be advertised when LSP highlighting is disabled",
+            result.capabilities?.semanticTokensProvider,
+        )
+        assertFalse(bridgeServer.isSemanticTokensAdvertised)
+        assertFalse(das.isSemanticTokensAdvertised)
+
+        // When disabled and legendFuture is still pending, initialize() must short-circuit without waiting.
+        das.semanticTokensLegend = null
+        assertFalse(das.semanticTokensLegendFuture.isDone)
+        bridgeServer.legendTimeoutMs = 5_000L
+        val pendingDisabledFuture = bridgeServer.initialize(InitializeParams())
+        assertTrue("initialize() should complete immediately when LSP highlighting is disabled", pendingDisabledFuture.isDone)
+        assertNull(pendingDisabledFuture.get(1, TimeUnit.SECONDS).capabilities?.semanticTokensProvider)
+        assertFalse(das.semanticTokensLegendFuture.isDone)
+        assertFalse(bridgeServer.isSemanticTokensAdvertised)
+        assertFalse(das.isSemanticTokensAdvertised)
+    }
+
+    fun testInitialize_semanticTokensProvider_endToEndTimeoutAndLateLegend() {
+        val das = DartAnalysisServerService.getInstance(project)
+        bridgeServer.isLspHighlightingEnabled = { true }
+        bridgeServer.legendTimeoutMs = 50L
+        assertTrue("DAS process must be active to exercise the legend timeout branch", das.isServerProcessActive)
+        assertFalse(das.semanticTokensLegendFuture.isDone)
+
+        // Leave server.setClientCapabilities unanswered so initialize() hits the timeout branch end-to-end.
+        // Wait timeout (2s) is well above 50ms (flake-free) yet below DEFAULT_LEGEND_TIMEOUT_MS (3s).
+        val timedOutResult = bridgeServer.initialize(InitializeParams()).get(2, TimeUnit.SECONDS)
+        assertNotNull(timedOutResult.capabilities)
+        assertNull(
+            "Semantic tokens provider should not be advertised when legend wait times out",
+            timedOutResult.capabilities.semanticTokensProvider,
+        )
+        assertTrue(
+            "Other capabilities (e.g. hoverProvider) must still be advertised after legend timeout",
+            timedOutResult.capabilities.hoverProvider?.left == true,
+        )
+        assertFalse(bridgeServer.isSemanticTokensAdvertised)
+        assertFalse(das.isSemanticTokensAdvertised)
+        assertFalse(
+            "Shared DAS legend future must remain uncompleted after initialize() times out",
+            das.semanticTokensLegendFuture.isDone,
+        )
+
+        // Deliver the delayed DAS capabilities response and verify a subsequent initialize() picks it up.
+        val delayedConsumer = requireNotNull(capturedConsumer as? JsonConsumer) {
+            "server.setClientCapabilities consumer should be captured"
+        }
+        val lateLegendJson = JsonParser.parseString(
+            """
+            {
+              "lspCapabilities": {
+                "semanticTokensProvider": {
+                  "legend": {
+                    "tokenTypes": ["class", "method"],
+                    "tokenModifiers": ["declaration", "static"]
+                  }
+                }
+              }
+            }
+            """.trimIndent(),
+        ).asJsonObject
+        delayedConsumer.onResponse(lateLegendJson, null)
+
+        assertTrue(das.semanticTokensLegendFuture.isDone)
+        val retryResult = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+        val advertisedLegend = retryResult.capabilities?.semanticTokensProvider?.legend
+        assertNotNull("Subsequent initialize() should advertise the delayed DAS legend", advertisedLegend)
+        assertEquals(listOf("class", "method"), advertisedLegend?.tokenTypes)
+        assertEquals(listOf("declaration", "static"), advertisedLegend?.tokenModifiers)
+        assertTrue(bridgeServer.isSemanticTokensAdvertised)
+        assertTrue(das.isSemanticTokensAdvertised)
+    }
+
+    fun testInitialize_semanticTokensProvider_endToEndMalformedAndErrorResponses() {
+        val das = DartAnalysisServerService.getInstance(project)
+        bridgeServer.isLspHighlightingEnabled = { true }
+        bridgeServer.legendTimeoutMs = 10_000L
+
+        val badResponses: List<Pair<String, (JsonConsumer) -> Unit>> = listOf(
+            "non-object legend" to { consumer ->
+                consumer.onResponse(
+                    JsonParser.parseString("""{"lspCapabilities":{"semanticTokensProvider":{"legend":"invalid"}}}""").asJsonObject,
+                    null,
+                )
+            },
+            "empty tokenTypes array" to { consumer ->
+                consumer.onResponse(
+                    JsonParser.parseString(
+                        """{"lspCapabilities":{"semanticTokensProvider":{"legend":{"tokenTypes":[],"tokenModifiers":["static"]}}}}""",
+                    ).asJsonObject,
+                    null,
+                )
+            },
+            "non-string elements inside tokenTypes" to { consumer ->
+                consumer.onResponse(
+                    JsonParser.parseString(
+                        """{"lspCapabilities":{"semanticTokensProvider":{"legend":{"tokenTypes":[null,{"bad":1}]}}}}""",
+                    ).asJsonObject,
+                    null,
+                )
+            },
+            "DAS request error" to { consumer ->
+                consumer.onResponse(null, RequestError("SERVER_ERROR", "Capabilities failed", null))
+            },
+        )
+
+        for ((label, deliverResponse) in badResponses) {
+            // Pre-advertise a valid legend and re-mark DAS advertised after clearing the legend so we
+            // prove initialize() itself resets both bridge and DAS advertised flags to false.
+            das.semanticTokensLegend = SemanticTokensLegend(listOf("class"), listOf("declaration"))
+            val advertisedInit = bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+            assertNotNull("Precondition failed for '$label'", advertisedInit.capabilities?.semanticTokensProvider)
+
+            das.semanticTokensLegend = null
+            das.setSemanticTokensAdvertised(true)
+            assertTrue("Precondition failed for '$label'", bridgeServer.isSemanticTokensAdvertised)
+            assertTrue("Precondition failed for '$label'", das.isSemanticTokensAdvertised)
+            capturedConsumer = null
+            val future = bridgeServer.initialize(InitializeParams())
+            assertFalse("initialize() should wait for DAS response in '$label'", future.isDone)
+
+            val consumer = requireNotNull(capturedConsumer as? JsonConsumer) {
+                "server.setClientCapabilities consumer should be captured for '$label'"
+            }
+            deliverResponse(consumer)
+            assertTrue("DAS legend future must complete immediately for '$label'", das.semanticTokensLegendFuture.isDone)
+            assertTrue("initialize() future must complete immediately for '$label'", future.isDone)
+
+            val result = future.get(1, TimeUnit.SECONDS)
+            assertNull("Semantic tokens should not be advertised for '$label'", result.capabilities?.semanticTokensProvider)
+            assertNull("Legend should remain null for '$label'", das.semanticTokensLegend)
+            assertFalse("bridgeServer.isSemanticTokensAdvertised should reset for '$label'", bridgeServer.isSemanticTokensAdvertised)
+            assertFalse("das.isSemanticTokensAdvertised should reset for '$label'", das.isSemanticTokensAdvertised)
+        }
     }
 
     fun testInitialize_semanticTokensDynamicLegendFromDas() {
@@ -1573,6 +1780,7 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             // Types & Classes
             Triple(SemanticTokenTypes.Class, emptyList<String>(), DartSyntaxHighlighterColors.CLASS),
             Triple(SemanticTokenTypes.Class, listOf("constructor"), DartSyntaxHighlighterColors.CONSTRUCTOR),
+            Triple(SemanticTokenTypes.Class, listOf("constructor", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.CONSTRUCTOR),
             Triple(SemanticTokenTypes.Class, listOf("annotation"), DartSyntaxHighlighterColors.ANNOTATION),
             Triple(SemanticTokenTypes.Enum, emptyList(), DartSyntaxHighlighterColors.ENUM),
             Triple(SemanticTokenTypes.EnumMember, emptyList(), DartSyntaxHighlighterColors.ENUM_CONSTANT),
@@ -1586,6 +1794,8 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
             // Methods & Constructors
             Triple(SemanticTokenTypes.Method, listOf("constructor"), DartSyntaxHighlighterColors.CONSTRUCTOR),
+            Triple(SemanticTokenTypes.Method, listOf("constructor", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.CONSTRUCTOR),
+            Triple(SemanticTokenTypes.Method, listOf("constructor", "annotation"), DartSyntaxHighlighterColors.ANNOTATION),
             Triple(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static, SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.STATIC_METHOD_DECLARATION),
             Triple(SemanticTokenTypes.Method, listOf(SemanticTokenModifiers.Static), DartSyntaxHighlighterColors.STATIC_METHOD_REFERENCE),
             Triple(SemanticTokenTypes.Method, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_METHOD_DECLARATION),
@@ -1617,15 +1827,20 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
             Triple(SemanticTokenTypes.Variable, listOf("instance", SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.INSTANCE_FIELD_DECLARATION),
             Triple(SemanticTokenTypes.Variable, listOf("instance"), DartSyntaxHighlighterColors.INSTANCE_FIELD_REFERENCE),
             Triple(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION),
+            Triple(SemanticTokenTypes.Variable, listOf(SemanticTokenModifiers.Declaration, "wildcard"), DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION),
             Triple(SemanticTokenTypes.Variable, emptyList(), DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE),
 
             // Parameters, Annotations, Labels, Namespaces, Keywords, Identifiers
             Triple(SemanticTokenTypes.Parameter, listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.PARAMETER_DECLARATION),
             Triple(SemanticTokenTypes.Parameter, emptyList(), DartSyntaxHighlighterColors.PARAMETER_REFERENCE),
+            Triple(SemanticTokenTypes.Parameter, listOf("label"), DartSyntaxHighlighterColors.PARAMETER_REFERENCE),
             Triple("annotation", emptyList(), DartSyntaxHighlighterColors.ANNOTATION),
             Triple("label", emptyList(), DartSyntaxHighlighterColors.LABEL),
+            Triple("label", listOf(SemanticTokenModifiers.Declaration), DartSyntaxHighlighterColors.LABEL),
             Triple(SemanticTokenTypes.Namespace, emptyList(), DartSyntaxHighlighterColors.LIBRARY_NAME),
             Triple(SemanticTokenTypes.Keyword, emptyList(), DartSyntaxHighlighterColors.KEYWORD),
+            Triple(SemanticTokenTypes.Keyword, listOf("control"), DartSyntaxHighlighterColors.KEYWORD),
+            Triple(SemanticTokenTypes.Keyword, listOf("void"), DartSyntaxHighlighterColors.KEYWORD),
             Triple("source", emptyList(), DartSyntaxHighlighterColors.IDENTIFIER),
 
             // Strings & Escapes
@@ -1642,6 +1857,179 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
         for ((type, modifiers, expected) in cases) {
             assertEquals("Failed for type=$type, modifiers=$modifiers", expected, DartLspSemanticTokensSupport.getTextAttributesKey(type, modifiers))
+        }
+    }
+
+    /**
+     * Drives [DartLspSemanticTokensSupport.getTextAttributesKey] from DAS's `mapping.dart`
+     * (`HighlightRegionType` -> semantic token type + modifiers) and `computer_highlights.dart`
+     * constructor overrides, asserting parity with legacy [DartAnnotator.HIGHLIGHTING_TYPE_MAP]
+     * except for documented wire-format collisions.
+     *
+     * Kept separate from [testDartLspSemanticTokensSupport_getTextAttributesKey] so this parity
+     * test can be deleted cleanly when [DartAnnotator] and [HighlightRegionType] are removed.
+     */
+    fun testDartLspSemanticTokensSupport_parityWithLegacyHighlightingTypeMap() {
+        val decl = SemanticTokenModifiers.Declaration
+        val stat = SemanticTokenModifiers.Static
+
+        // Mirrors pkg/analysis_server/lib/src/lsp/semantic_tokens/mapping.dart
+        // (highlightRegionTokenTypes + highlightRegionTokenModifiers), excluding
+        // VALID_STRING_ESCAPE (handled locally by DartAnnotator.highlightEscapeSequences and
+        // covered in testDartLspSemanticTokensSupport_getTextAttributesKey) and deprecated v1
+        // TOP_LEVEL_VARIABLE.
+        val dasMapping: Map<String, Pair<String, List<String>>> = mapOf(
+            HighlightRegionType.ANNOTATION to ("annotation" to emptyList()),
+            HighlightRegionType.CLASS to (SemanticTokenTypes.Class to emptyList()),
+            HighlightRegionType.COMMENT_BLOCK to (SemanticTokenTypes.Comment to emptyList()),
+            HighlightRegionType.COMMENT_DOCUMENTATION to (SemanticTokenTypes.Comment to listOf(SemanticTokenModifiers.Documentation)),
+            HighlightRegionType.COMMENT_END_OF_LINE to (SemanticTokenTypes.Comment to emptyList()),
+            HighlightRegionType.CONSTRUCTOR_TEAR_OFF to (SemanticTokenTypes.Method to listOf("constructor", "tearOff")),
+            HighlightRegionType.DYNAMIC_LOCAL_VARIABLE_DECLARATION to (SemanticTokenTypes.Variable to listOf(decl)),
+            HighlightRegionType.DYNAMIC_LOCAL_VARIABLE_REFERENCE to (SemanticTokenTypes.Variable to emptyList()),
+            HighlightRegionType.DYNAMIC_PARAMETER_DECLARATION to (SemanticTokenTypes.Parameter to listOf(decl)),
+            HighlightRegionType.DYNAMIC_PARAMETER_REFERENCE to (SemanticTokenTypes.Parameter to emptyList()),
+            HighlightRegionType.ENUM to (SemanticTokenTypes.Enum to emptyList()),
+            HighlightRegionType.ENUM_CONSTANT to (SemanticTokenTypes.EnumMember to emptyList()),
+            HighlightRegionType.EXTENSION to (SemanticTokenTypes.Class to listOf("extension")),
+            HighlightRegionType.EXTENSION_TYPE to (SemanticTokenTypes.Class to listOf("extensionType")),
+            HighlightRegionType.FUNCTION_TYPE_ALIAS to (SemanticTokenTypes.Type to listOf("functionTypeAlias")),
+            HighlightRegionType.IDENTIFIER_DEFAULT to ("source" to emptyList()),
+            HighlightRegionType.IMPORT_PREFIX to (SemanticTokenTypes.Variable to listOf("importPrefix")),
+            HighlightRegionType.INSTANCE_FIELD_DECLARATION to (SemanticTokenTypes.Variable to listOf(decl, "instance")),
+            HighlightRegionType.INSTANCE_FIELD_REFERENCE to (SemanticTokenTypes.Variable to listOf("instance")),
+            HighlightRegionType.INSTANCE_GETTER_DECLARATION to (SemanticTokenTypes.Property to listOf(decl, "instance")),
+            HighlightRegionType.INSTANCE_GETTER_REFERENCE to (SemanticTokenTypes.Property to listOf("instance")),
+            HighlightRegionType.INSTANCE_METHOD_DECLARATION to (SemanticTokenTypes.Method to listOf(decl, "instance")),
+            HighlightRegionType.INSTANCE_METHOD_REFERENCE to (SemanticTokenTypes.Method to listOf("instance")),
+            HighlightRegionType.INSTANCE_METHOD_TEAR_OFF to (SemanticTokenTypes.Method to listOf("instance", "tearOff")),
+            HighlightRegionType.INSTANCE_SETTER_DECLARATION to (SemanticTokenTypes.Property to listOf(decl, "instance")),
+            HighlightRegionType.INSTANCE_SETTER_REFERENCE to (SemanticTokenTypes.Property to listOf("instance")),
+            HighlightRegionType.KEYWORD to (SemanticTokenTypes.Keyword to emptyList()),
+            HighlightRegionType.LABEL to ("label" to emptyList()),
+            HighlightRegionType.LIBRARY_NAME to (SemanticTokenTypes.Namespace to emptyList()),
+            HighlightRegionType.LITERAL_BOOLEAN to ("boolean" to emptyList()),
+            HighlightRegionType.LITERAL_DOUBLE to (SemanticTokenTypes.Number to emptyList()),
+            HighlightRegionType.LITERAL_INTEGER to (SemanticTokenTypes.Number to emptyList()),
+            HighlightRegionType.LITERAL_STRING to (SemanticTokenTypes.String to emptyList()),
+            HighlightRegionType.LOCAL_FUNCTION_DECLARATION to (SemanticTokenTypes.Function to listOf(decl)),
+            HighlightRegionType.LOCAL_FUNCTION_REFERENCE to (SemanticTokenTypes.Function to emptyList()),
+            HighlightRegionType.LOCAL_FUNCTION_TEAR_OFF to (SemanticTokenTypes.Function to listOf("tearOff")),
+            HighlightRegionType.LOCAL_VARIABLE_DECLARATION to (SemanticTokenTypes.Variable to listOf(decl)),
+            HighlightRegionType.LOCAL_VARIABLE_REFERENCE to (SemanticTokenTypes.Variable to emptyList()),
+            HighlightRegionType.MIXIN to (SemanticTokenTypes.Class to listOf("mixin")),
+            HighlightRegionType.PARAMETER_DECLARATION to (SemanticTokenTypes.Parameter to listOf(decl)),
+            HighlightRegionType.PARAMETER_REFERENCE to (SemanticTokenTypes.Parameter to emptyList()),
+            HighlightRegionType.STATIC_FIELD_DECLARATION to (SemanticTokenTypes.Variable to listOf(decl, stat)),
+            HighlightRegionType.STATIC_GETTER_DECLARATION to (SemanticTokenTypes.Property to listOf(decl, stat)),
+            HighlightRegionType.STATIC_GETTER_REFERENCE to (SemanticTokenTypes.Property to listOf(stat)),
+            HighlightRegionType.STATIC_METHOD_DECLARATION to (SemanticTokenTypes.Method to listOf(decl, stat)),
+            HighlightRegionType.STATIC_METHOD_REFERENCE to (SemanticTokenTypes.Method to listOf(stat)),
+            HighlightRegionType.STATIC_METHOD_TEAR_OFF to (SemanticTokenTypes.Method to listOf(stat, "tearOff")),
+            HighlightRegionType.STATIC_SETTER_DECLARATION to (SemanticTokenTypes.Property to listOf(decl, stat)),
+            HighlightRegionType.STATIC_SETTER_REFERENCE to (SemanticTokenTypes.Property to listOf(stat)),
+            HighlightRegionType.TOP_LEVEL_FUNCTION_DECLARATION to (SemanticTokenTypes.Function to listOf(decl, stat)),
+            HighlightRegionType.TOP_LEVEL_FUNCTION_REFERENCE to (SemanticTokenTypes.Function to listOf(stat)),
+            HighlightRegionType.TOP_LEVEL_FUNCTION_TEAR_OFF to (SemanticTokenTypes.Function to listOf(stat, "tearOff")),
+            HighlightRegionType.TOP_LEVEL_GETTER_DECLARATION to (SemanticTokenTypes.Property to listOf(decl)),
+            HighlightRegionType.TOP_LEVEL_GETTER_REFERENCE to (SemanticTokenTypes.Property to emptyList()),
+            HighlightRegionType.TOP_LEVEL_SETTER_DECLARATION to (SemanticTokenTypes.Property to listOf(decl)),
+            HighlightRegionType.TOP_LEVEL_SETTER_REFERENCE to (SemanticTokenTypes.Property to emptyList()),
+            HighlightRegionType.TOP_LEVEL_VARIABLE_DECLARATION to (SemanticTokenTypes.Variable to listOf(decl, stat)),
+            HighlightRegionType.TYPE_ALIAS to (SemanticTokenTypes.Type to listOf("typeAlias")),
+            HighlightRegionType.TYPE_NAME_DYNAMIC to (SemanticTokenTypes.Type to emptyList()),
+            HighlightRegionType.TYPE_PARAMETER to (SemanticTokenTypes.TypeParameter to emptyList()),
+            HighlightRegionType.UNRESOLVED_INSTANCE_MEMBER_REFERENCE to ("source" to emptyList()),
+        )
+
+        // Regions in DartAnnotator.HIGHLIGHTING_TYPE_MAP that are not in mapping.dart directly:
+        // - CONSTRUCTOR: emitted directly in computer_highlights.dart as (class, [constructor]),
+        //   (method, [constructor]), or (method, [constructor, declaration]).
+        // - BUILT_IN: superseded in computer_highlights.dart by KEYWORD.
+        val directComputerHighlightsMappings: Map<String, List<Pair<String, List<String>>>> = mapOf(
+            HighlightRegionType.CONSTRUCTOR to listOf(
+                SemanticTokenTypes.Class to listOf("constructor"),
+                SemanticTokenTypes.Method to listOf("constructor"),
+                SemanticTokenTypes.Method to listOf("constructor", decl),
+            ),
+            HighlightRegionType.BUILT_IN to listOf(
+                SemanticTokenTypes.Keyword to emptyList(),
+            ),
+        )
+
+        // Documented wire-format collisions where DAS emits identical (type, modifiers) to another region
+        // (see DartLspSemanticTokensSupport comments in DartLspServerDescriptor.kt).
+        val documentedWireFormatGaps: Map<String, TextAttributesKey> = mapOf(
+            HighlightRegionType.INSTANCE_SETTER_DECLARATION to DartSyntaxHighlighterColors.INSTANCE_GETTER_DECLARATION,
+            HighlightRegionType.INSTANCE_SETTER_REFERENCE to DartSyntaxHighlighterColors.INSTANCE_GETTER_REFERENCE,
+            HighlightRegionType.STATIC_SETTER_DECLARATION to DartSyntaxHighlighterColors.STATIC_GETTER_DECLARATION,
+            HighlightRegionType.STATIC_SETTER_REFERENCE to DartSyntaxHighlighterColors.STATIC_GETTER_REFERENCE,
+            HighlightRegionType.TOP_LEVEL_SETTER_DECLARATION to DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_DECLARATION,
+            HighlightRegionType.TOP_LEVEL_SETTER_REFERENCE to DartSyntaxHighlighterColors.TOP_LEVEL_GETTER_REFERENCE,
+            HighlightRegionType.DYNAMIC_LOCAL_VARIABLE_DECLARATION to DartSyntaxHighlighterColors.LOCAL_VARIABLE_DECLARATION,
+            HighlightRegionType.DYNAMIC_LOCAL_VARIABLE_REFERENCE to DartSyntaxHighlighterColors.LOCAL_VARIABLE_REFERENCE,
+            HighlightRegionType.DYNAMIC_PARAMETER_DECLARATION to DartSyntaxHighlighterColors.PARAMETER_DECLARATION,
+            HighlightRegionType.DYNAMIC_PARAMETER_REFERENCE to DartSyntaxHighlighterColors.PARAMETER_REFERENCE,
+            HighlightRegionType.TOP_LEVEL_VARIABLE_DECLARATION to DartSyntaxHighlighterColors.STATIC_FIELD_DECLARATION,
+            HighlightRegionType.UNRESOLVED_INSTANCE_MEMBER_REFERENCE to DartSyntaxHighlighterColors.IDENTIFIER,
+        )
+
+        val legacyMap = DartAnnotator.getHighlightingTypeMap()
+
+        // Every entry in DartAnnotator.HIGHLIGHTING_TYPE_MAP must be accounted for above, and the
+        // mapping tables themselves must stay consistent and non-overlapping.
+        assertEmpty(
+            "dasMapping and directComputerHighlightsMappings must be disjoint",
+            dasMapping.keys intersect directComputerHighlightsMappings.keys,
+        )
+        assertEmpty(
+            "All documentedWireFormatGaps entries must exist in dasMapping",
+            documentedWireFormatGaps.keys - dasMapping.keys,
+        )
+        val unaccounted = legacyMap.keys - dasMapping.keys - directComputerHighlightsMappings.keys
+        assertEmpty(
+            "All DartAnnotator.HIGHLIGHTING_TYPE_MAP entries must be covered by the DAS mapping parity table",
+            unaccounted,
+        )
+
+        // Verify parity for all mapping.dart regions (including null lexer-delegated comment/literal regions).
+        for ((regionType, tokenTuple) in dasMapping) {
+            val (tokenType, modifiers) = tokenTuple
+            val lspKey = DartLspSemanticTokensSupport.getTextAttributesKey(tokenType, modifiers)
+            val legacyKey = legacyMap[regionType]?.let { TextAttributesKey.find(it) }
+            val expectedGapKey = documentedWireFormatGaps[regionType]
+            if (expectedGapKey != null) {
+                assertNotNull("Documented gap $regionType should exist in legacy HIGHLIGHTING_TYPE_MAP", legacyKey)
+                assertFalse(
+                    "Documented wire-format gap $regionType now matches legacy key $legacyKey; remove it from documentedWireFormatGaps",
+                    legacyKey == lspKey,
+                )
+                assertEquals(
+                    "Unexpected fallback key for wire-format gap $regionType ($tokenType, $modifiers)",
+                    expectedGapKey,
+                    lspKey,
+                )
+            } else {
+                assertEquals(
+                    "LSP semantic token mapping for $regionType ($tokenType, $modifiers) drifted from DartAnnotator.HIGHLIGHTING_TYPE_MAP",
+                    legacyKey,
+                    lspKey,
+                )
+            }
+        }
+
+        // Verify parity for computer_highlights.dart direct overrides (CONSTRUCTOR, BUILT_IN).
+        for ((regionType, tuples) in directComputerHighlightsMappings) {
+            val legacyKey = requireNotNull(legacyMap[regionType]?.let { TextAttributesKey.find(it) }) {
+                "$regionType should be present in DartAnnotator.HIGHLIGHTING_TYPE_MAP"
+            }
+            for ((tokenType, modifiers) in tuples) {
+                assertEquals(
+                    "Direct computer_highlights.dart mapping for $regionType ($tokenType, $modifiers) drifted from legacy",
+                    legacyKey,
+                    DartLspSemanticTokensSupport.getTextAttributesKey(tokenType, modifiers),
+                )
+            }
         }
     }
 
@@ -2852,54 +3240,150 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
     }
 
     fun testIsLspHighlightingEnabled() {
-        val properties = PropertiesComponent.getInstance(project)
-        val sdk = DartSdk.getDartSdk(project)
-        assertNotNull(sdk)
-        val versionField = DartSdk::class.java.getDeclaredField("myVersion").apply { isAccessible = true }
-        val originalVersion = sdk!!.version
+        val previousExperimental = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
         try {
-            properties.setValue("dart.lsp.experimental.enabled", true, true)
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+            withPinnedSdkVersion("3.15.0") {
+                assertTrue("Expected highlighting enabled on SDK 3.15.0", DartAnalysisServerService.isLspHighlightingEnabled(project))
+            }
+            withPinnedSdkVersion("3.13.0") {
+                assertFalse("Expected highlighting disabled on SDK 3.13.0", DartAnalysisServerService.isLspHighlightingEnabled(project))
+            }
 
-            versionField.set(sdk, "3.15.0")
-            assertTrue("Expected highlighting enabled on SDK 3.15.0", DartAnalysisServerService.isLspHighlightingEnabled(project))
-
-            versionField.set(sdk, "3.13.0")
-            assertFalse("Expected highlighting disabled on SDK 3.13.0", DartAnalysisServerService.isLspHighlightingEnabled(project))
-
-            properties.setValue("dart.lsp.experimental.enabled", false, true)
-            versionField.set(sdk, "3.15.0")
-            assertFalse("Expected highlighting disabled when experimental setting is false", DartAnalysisServerService.isLspHighlightingEnabled(project))
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+            withPinnedSdkVersion("3.15.0") {
+                assertFalse(
+                    "Expected highlighting disabled when experimental setting is false",
+                    DartAnalysisServerService.isLspHighlightingEnabled(project),
+                )
+            }
         } finally {
-            properties.unsetValue("dart.lsp.experimental.enabled")
-            versionField.set(sdk, originalVersion)
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, previousExperimental)
         }
     }
 
     fun testIsLspHighlightingActive() {
-        val properties = PropertiesComponent.getInstance(project)
+        val previousExperimental = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
         val das = DartAnalysisServerService.getInstance(project)
         try {
-            properties.setValue("dart.lsp.experimental.enabled", true, true)
-            // Initially before bridge initialization or legend advertisement:
-            assertFalse(das.isSemanticTokensAdvertised)
-            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
 
-            // Simulate advertisement:
-            das.setSemanticTokensAdvertised(true)
-            val sdk = DartSdk.getDartSdk(project)
-            assertNotNull(sdk)
-            val isSufficient = DartAnalysisServerService.isDartSdkVersionSufficientForLspHighlighting(sdk!!.version)
-            assertEquals(isSufficient, DartAnalysisServerService.isLspHighlightingActive(project))
+            withPinnedSdkVersion("3.15.0") {
+                // Before semantic tokens advertisement: inactive even with sufficient SDK and flag on.
+                assertFalse(das.isSemanticTokensAdvertised)
+                assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
 
-            // When experimental LSP is disabled, highlighting is not active even if advertised:
-            properties.setValue("dart.lsp.experimental.enabled", false, true)
-            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+                // After advertisement with sufficient SDK and experimental flag on: active.
+                das.setSemanticTokensAdvertised(true)
+                assertTrue(DartAnalysisServerService.isLspHighlightingActive(project))
 
-            // Reset back:
-            das.setSemanticTokensAdvertised(false)
-            assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+                // Experimental flag off: inactive even when advertised on sufficient SDK.
+                DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+                assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+                DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+                assertTrue(DartAnalysisServerService.isLspHighlightingActive(project))
+            }
+
+            // Exact minimum SDK boundary vs. one dev version below minimum while still advertised:
+            withPinnedSdkVersion("3.15.0-67.0.dev") {
+                assertTrue(DartAnalysisServerService.isLspHighlightingActive(project))
+            }
+            withPinnedSdkVersion("3.15.0-66.0.dev") {
+                assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+            }
+
+            // Resetting advertisement on sufficient SDK deactivates highlighting:
+            withPinnedSdkVersion("3.15.0") {
+                das.setSemanticTokensAdvertised(false)
+                assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+            }
         } finally {
-            properties.unsetValue("dart.lsp.experimental.enabled")
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, previousExperimental)
+            das.setSemanticTokensAdvertised(false)
+        }
+    }
+
+    fun testAnalysisSetSubscriptions_omitsHighlightsOnlyWhenLspHighlightingActive() {
+        val previousExperimental = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
+        val das = DartAnalysisServerService.getInstance(project)
+        val expectedAlwaysSubscribed = listOf(
+            AnalysisService.NAVIGATION,
+            AnalysisService.OVERRIDES,
+            AnalysisService.OUTLINE,
+            AnalysisService.IMPLEMENTED,
+            AnalysisService.CLOSING_LABELS,
+        )
+
+        fun lastSubscriptionsObject(): JsonObject {
+            val req = requireNotNull(
+                capturedRequests.lastOrNull { it.get("method")?.asString == "analysis.setSubscriptions" },
+            ) { "Expected an analysis.setSubscriptions request to be sent to DAS" }
+            return req.getAsJsonObject("params").getAsJsonObject("subscriptions")
+        }
+
+        try {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+
+            withPinnedSdkVersion("3.15.0") {
+                // 1. Before semantic tokens are advertised (inactive): HIGHLIGHTS must be included.
+                assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+                capturedRequests.clear()
+                das.updateSubscriptions()
+                val inactiveSubs = lastSubscriptionsObject()
+                assertTrue("HIGHLIGHTS should be subscribed when LSP highlighting is inactive", inactiveSubs.has(AnalysisService.HIGHLIGHTS))
+                for (service in expectedAlwaysSubscribed) {
+                    assertTrue("$service should remain subscribed", inactiveSubs.has(service))
+                }
+
+                // 2. Initialize bridge with a valid legend on SDK 3.15.0 (uses real isLspHighlightingEnabled):
+                //    setSemanticTokensAdvertised(true) automatically re-syncs subscriptions without HIGHLIGHTS.
+                das.semanticTokensLegend = SemanticTokensLegend(listOf("class", "method"), listOf("declaration"))
+                capturedRequests.clear()
+                bridgeServer.initialize(InitializeParams()).get(5, TimeUnit.SECONDS)
+                assertTrue(DartAnalysisServerService.isLspHighlightingActive(project))
+                val activeSubs = lastSubscriptionsObject()
+                assertFalse("HIGHLIGHTS must be omitted when LSP highlighting is active", activeSubs.has(AnalysisService.HIGHLIGHTS))
+                for (service in expectedAlwaysSubscribed) {
+                    assertTrue("$service should remain subscribed while LSP highlighting is active", activeSubs.has(service))
+                }
+
+                // 3. Disabling experimental LSP re-includes HIGHLIGHTS on updateSubscriptions().
+                DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+                assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+                capturedRequests.clear()
+                das.updateSubscriptions()
+                val disabledSubs = lastSubscriptionsObject()
+                assertTrue(
+                    "HIGHLIGHTS should be restored when experimental LSP is disabled",
+                    disabledSubs.has(AnalysisService.HIGHLIGHTS),
+                )
+
+                // 4. Re-enabling experimental LSP and stopping the bridge automatically restores HIGHLIGHTS.
+                DartConfigurable.setExperimentalLspFeaturesEnabled(project, true)
+                assertTrue(DartAnalysisServerService.isLspHighlightingActive(project))
+                capturedRequests.clear()
+                bridgeServer.stop()
+                assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+                val stoppedSubs = lastSubscriptionsObject()
+                assertTrue(
+                    "HIGHLIGHTS should be restored automatically when bridgeServer.stop() clears advertisement",
+                    stoppedSubs.has(AnalysisService.HIGHLIGHTS),
+                )
+            }
+
+            // 5. Insufficient SDK version still includes HIGHLIGHTS even if advertised is toggled true.
+            withPinnedSdkVersion("3.15.0-66.0.dev") {
+                capturedRequests.clear()
+                das.setSemanticTokensAdvertised(true)
+                assertFalse(DartAnalysisServerService.isLspHighlightingActive(project))
+                val oldSdkSubs = lastSubscriptionsObject()
+                assertTrue(
+                    "HIGHLIGHTS should stay subscribed when SDK version is below minimum",
+                    oldSdkSubs.has(AnalysisService.HIGHLIGHTS),
+                )
+            }
+        } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, previousExperimental)
             das.setSemanticTokensAdvertised(false)
         }
     }
