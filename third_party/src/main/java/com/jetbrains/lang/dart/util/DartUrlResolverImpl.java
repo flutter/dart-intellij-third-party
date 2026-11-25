@@ -17,6 +17,7 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.PairConsumer;
+import com.intellij.util.io.URLUtil;
 import com.jetbrains.lang.dart.ide.index.DartLibraryIndex;
 import com.jetbrains.lang.dart.sdk.DartPackagesLibraryProperties;
 import com.jetbrains.lang.dart.sdk.DartPackagesLibraryType;
@@ -125,7 +126,8 @@ public final class DartUrlResolverImpl extends DartUrlResolver {
     }
 
     if (url.startsWith(FILE_PREFIX)) {
-      final String path = StringUtil.trimLeading(url.substring(FILE_PREFIX.length()), '/');
+      final String path = StringUtil.trimLeading(
+              URLUtil.unescapePercentSequences(url.substring(FILE_PREFIX.length())), '/');
       return LocalFileSystem.getInstance().findFileByPath(SystemInfo.isWindows ? path : ("/" + path));
     }
 
