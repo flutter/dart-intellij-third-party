@@ -42,4 +42,5 @@ debugging, and `webdev` web apps.
 
 ## Verification
 
+- `com.jetbrains.lang.dart.ide.runner.server.ui.DartRemoteDebugComboRendererTest`
 - `com.jetbrains.lang.dart.ide.runner.server.webdev.DartWebdevConfigurationTest`
