@@ -85,14 +85,12 @@ import org.eclipse.lsp4j.CodeActionKind
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
 import org.eclipse.lsp4j.ConfigurationItem
-import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.PublishDiagnosticsCapabilities
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.SemanticTokenModifiers
 import org.eclipse.lsp4j.SemanticTokenTypes
 import org.eclipse.lsp4j.TextDocumentClientCapabilities
-import org.eclipse.lsp4j.WorkspaceClientCapabilities
 import javax.swing.Icon
 
 private const val DART_CONFIGURATION_SECTION = "dart"
@@ -126,10 +124,6 @@ class DartLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor
 
     override val clientCapabilities: ClientCapabilities
         get() = super.clientCapabilities.apply {
-            val ws = workspace ?: WorkspaceClientCapabilities().also { workspace = it }
-            ws.fileOperations = FileOperationsWorkspaceCapabilities().apply {
-                willRename = true
-            }
             val td = textDocument ?: TextDocumentClientCapabilities().also { textDocument = it }
             val pd = td.publishDiagnostics ?: PublishDiagnosticsCapabilities().also { td.publishDiagnostics = it }
             pd.relatedInformation = true

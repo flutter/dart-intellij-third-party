@@ -53,6 +53,7 @@ import org.eclipse.lsp4j.ExecuteCommandParams
 import org.eclipse.lsp4j.FileOperationFilter
 import org.eclipse.lsp4j.FileOperationOptions
 import org.eclipse.lsp4j.FileOperationPattern
+import org.eclipse.lsp4j.FileOperationPatternKind
 import org.eclipse.lsp4j.FileOperationsServerCapabilities
 import org.eclipse.lsp4j.Hover
 import org.eclipse.lsp4j.HoverParams
@@ -424,7 +425,18 @@ class DartBridgeLspServer(private val project: Project) : DartLanguageServer, Te
                     })
                 }
                 val fileOperationsCaps = FileOperationsServerCapabilities().apply {
-                    willRename = FileOperationOptions(listOf(FileOperationFilter(FileOperationPattern("**/*"))))
+                    willRename = FileOperationOptions(
+                        listOf(
+                            FileOperationFilter(
+                                FileOperationPattern("**/*.dart").apply { matches = FileOperationPatternKind.File },
+                                "file"
+                            ),
+                            FileOperationFilter(
+                                FileOperationPattern("**/*").apply { matches = FileOperationPatternKind.Folder },
+                                "file"
+                            )
+                        )
+                    )
                 }
                 workspace = WorkspaceServerCapabilities().apply {
                     fileOperations = fileOperationsCaps

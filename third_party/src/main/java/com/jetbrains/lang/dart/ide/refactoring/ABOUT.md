@@ -1,15 +1,16 @@
-<!--* freshness: { reviewed: '2026-10-26' } *-->
+<!--* freshness: { reviewed: '2026-11-23' } *-->
 
 # refactoring
 
 ## Overview
 
-Rename, extract, inline, and move-file refactorings. By default they are driven
-by the legacy analysis server (DAS) refactoring protocol. When LSP code actions
-are enabled, Extract Method, Extract Local Variable, and Inline instead run as
-LSP `textDocument/codeAction` refactorings (no options dialog). When
-experimental LSP features are enabled, file renames and moves use LSP
-`workspace/willRenameFiles`.
+Rename, extract, inline, and move-file refactorings. By default symbol
+refactorings are driven by the legacy analysis server (DAS) refactoring
+protocol. When LSP code actions are enabled, Extract Method, Extract Local
+Variable, and Inline instead run as LSP `textDocument/codeAction` refactorings
+(no options dialog). File and directory renames and moves use the platform LSP
+`LspWillRenameFilesHandler` (`workspace/willRenameFiles`, backported from
+`IJPL-249183`) for all users whenever the Dart LSP server is running.
 
 ## Interface
 
@@ -26,9 +27,9 @@ experimental LSP features are enabled, file renames and moves use LSP
 - `ServerRefactoringDialog`: the shared preview and status dialog.
 - `DartRefactoringSupportProvider`: connects the extract handlers to the
   platform.
-- `DartLspRenamePsiElementProcessor`: renames Dart files and directories
-  through LSP (`order="first"`). It also hosts the shared `getFileUri`,
-  `applyWorkspaceEdit`, and `awaitFutureCheckingCanceled` helpers.
+- `DartLspRenamePsiElementProcessor`: `renamePsiElementProcessor` (`order="first"`)
+  that suppresses `DartFileReference` PSI rename usages when renaming
+  Dart files and directories.
 - `DartLspRefactoringHelper`: object that turns the caret or selection into a
   `textDocument/codeAction` request (`refactor.extract` / `refactor.inline`),
   picks the matching enabled action by title, and applies it. Shows an error
@@ -36,34 +37,32 @@ experimental LSP features are enabled, file renames and moves use LSP
 - `extract/DartServerExtractMethodHandler`,
   `introduce/DartServerExtractLocalVariableHandler`: the action handlers. Both
   delegate to `DartLspRefactoringHelper` when LSP code actions are enabled.
-- `moveFile/DartServerMoveDartFileHandler`: the `moveFileHandler`. It uses
-  LSP when experimental features are on and `MoveFileRefactoring` (DAS)
-  otherwise.
 - `status/`: `RefactoringStatus`, `RefactoringStatusEntry`,
   `RefactoringStatusContext`, and `RefactoringStatusSeverity`.
 
 ## Invariants
 
-- The LSP rename/move path runs only when
-  `DartConfigurable.isExperimentalLspFeaturesEnabled` is true, the Dart SDK is
-  configured, and the file is in the project content (or for directories,
-  within a Dart-enabled module).
+- The LSP file/directory rename and move path (`LspWillRenameFilesHandler`) runs
+  for all users (not gated on experimental LSP features); legacy DAS
+  `MoveFileRefactoring` / `DartServerMoveDartFileHandler` have been removed.
 - The LSP extract/inline path runs only when
   `DartConfigurable.isLspCodeActionsEnabled(project)` is true and a Dart SDK
   is configured.
-- `DartLspRenamePsiElementProcessor.findReferences` returns nothing so the
-  platform does not apply the same edits a second time.
-- LSP waits are capped at 10 s and honor `ProgressManager.checkCanceled()`.
+- `DartLspRenamePsiElementProcessor.findReferences` returns nothing so
+  `DartFileReference` does not duplicate or corrupt edits applied by
+  `LspWillRenameFilesHandler`.
 
 ## Side Effects
 
-- Applies workspace edits and saves documents inside a
+- Applies workspace edits inside the refactoring write action or a
   `WriteCommandAction`.
 - Sends `analysis_*` / `edit_getRefactoring` requests to DAS, or
-  `willRenameFiles` / `textDocument/codeAction` to LSP.
+  `textDocument/codeAction` to LSP (`workspace/willRenameFiles` is sent by
+  `LspWillRenameFilesHandler` in `platform-lsp`).
 
 ## Verification
 
+- `com.jetbrains.lang.dart.ide.refactoring.DartLspWillRenameFilesTest`
 - `com.jetbrains.lang.dart.ide.refactoring.DartLspRenamePsiElementProcessorTest`
 - `com.jetbrains.lang.dart.ide.refactoring.DartLspRefactoringHelperTest`
 - `DartServerRenameTest`, `DartExtract*RefactoringTest`,

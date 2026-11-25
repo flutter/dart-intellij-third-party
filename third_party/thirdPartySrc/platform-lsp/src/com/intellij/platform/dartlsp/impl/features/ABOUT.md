@@ -1,4 +1,4 @@
-<!--* freshness: { reviewed: '2026-10-25' } *-->
+<!--* freshness: { reviewed: '2026-11-05' } *-->
 # features
 
 ## Overview
@@ -22,6 +22,7 @@ IDE feature implementations backed by LSP requests. Each subdirectory wires one 
 - `rename/` - Rename handler.
 - `selectWord/` - Extend selection via selection ranges.
 - `usages/` - Find usages.
+- `workspaceFileOperations/` - Pre-refactoring `workspace/willRenameFiles` handler (`LspWillRenameFilesHandler`, backported by `patch.py`).
 - `workspaceSymbol/` - Go to Class/Symbol contributors via `workspace/symbol`.
 
 ## Invariants

@@ -65,6 +65,7 @@ import org.eclipse.lsp4j.DocumentLinkCapabilities
 import org.eclipse.lsp4j.DocumentSymbolCapabilities
 import org.eclipse.lsp4j.ExecuteCommandCapabilities
 import org.eclipse.lsp4j.FailureHandlingKind
+import org.eclipse.lsp4j.FileOperationsWorkspaceCapabilities
 import org.eclipse.lsp4j.FoldingRangeCapabilities
 import org.eclipse.lsp4j.FoldingRangeKind
 import org.eclipse.lsp4j.FoldingRangeKindSupportCapabilities
@@ -252,7 +253,8 @@ abstract class LspServerDescriptor protected constructor(
   /**
    * @see getFileUri
    */
-  protected open fun getFilePath(file: VirtualFile): String = file.path
+  @ApiStatus.Internal
+  open fun getFilePath(file: VirtualFile): String = file.path
 
   /**
    * Extracts a file path from [fileUri] and calls [findLocalFileByPath]. Respects only `file://...` URIs.
@@ -355,6 +357,10 @@ abstract class LspServerDescriptor protected constructor(
           symbolKind = SymbolKindCapabilities().apply {
             valueSet = lspCustomization.symbolKindCustomizer.supportedKinds
           }
+        }
+        fileOperations = FileOperationsWorkspaceCapabilities().apply {
+          dynamicRegistration = true
+          willRename = true
         }
       }
 

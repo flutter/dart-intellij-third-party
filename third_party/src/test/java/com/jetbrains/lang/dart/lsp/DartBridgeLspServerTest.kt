@@ -77,6 +77,7 @@ import org.eclipse.lsp4j.DocumentHighlightKind
 import org.eclipse.lsp4j.DocumentHighlightParams
 import org.eclipse.lsp4j.DocumentSymbolParams
 import org.eclipse.lsp4j.ExecuteCommandParams
+import org.eclipse.lsp4j.FileOperationPatternKind
 import org.eclipse.lsp4j.FileRename
 import org.eclipse.lsp4j.HoverParams
 import org.eclipse.lsp4j.InitializeParams
@@ -2479,7 +2480,23 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
         assertNotNull("InitializeResult should not be null", initResult)
         val fileOperations = initResult.capabilities.workspace?.fileOperations
         assertNotNull("Workspace fileOperations should be advertised", fileOperations)
-        assertNotNull("willRename file operations should be advertised", fileOperations?.willRename)
+        val willRename = checkNotNull(fileOperations?.willRename) {
+            "willRename file operations should be advertised"
+        }
+        val filters = checkNotNull(willRename.filters) {
+            "willRename filters should not be null"
+        }
+        assertEquals(2, filters.size)
+
+        val dartFileFilter = filters[0]
+        assertEquals("file", dartFileFilter.scheme)
+        assertEquals("**/*.dart", dartFileFilter.pattern?.glob)
+        assertEquals(FileOperationPatternKind.File, dartFileFilter.pattern?.matches)
+
+        val folderFilter = filters[1]
+        assertEquals("file", folderFilter.scheme)
+        assertEquals("**/*", folderFilter.pattern?.glob)
+        assertEquals(FileOperationPatternKind.Folder, folderFilter.pattern?.matches)
     }
 
     fun testWillRenameFilesRequest() {
@@ -2766,19 +2783,30 @@ class DartBridgeLspServerTest : DartCodeInsightFixtureTestCase() {
 
     fun testDescriptorClientCapabilitiesAndInitializationOptions() {
         val descriptor = DartLspServerDescriptor(project)
-        val capabilities = descriptor.clientCapabilities
+        val wasEnabled = DartConfigurable.isExperimentalLspFeaturesEnabled(project)
 
-        assertEquals(true, capabilities.workspace?.fileOperations?.willRename)
-        assertEquals(true, capabilities.textDocument?.publishDiagnostics?.relatedInformation)
-        assertEquals(true, capabilities.textDocument?.publishDiagnostics?.codeDescriptionSupport)
+        try {
+            // workspace.fileOperations.willRename is not gated on experimental LSP features.
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, false)
+            val capabilities = descriptor.clientCapabilities
 
-        val experimental = capabilities.experimental as? Map<*, *>
-        assertNotNull("experimental capabilities should be a Map", experimental)
-        assertTrue("experimental capabilities should include closingLabels", experimental!!.containsKey("closingLabels"))
+            assertEquals(true, capabilities.workspace?.fileOperations?.willRename)
+            assertEquals(true, capabilities.workspace?.fileOperations?.dynamicRegistration)
+            assertEquals(true, capabilities.textDocument?.publishDiagnostics?.relatedInformation)
+            assertEquals(true, capabilities.textDocument?.publishDiagnostics?.codeDescriptionSupport)
 
-        val initOptions = descriptor.createInitializationOptions() as? Map<*, *>
-        assertNotNull("initializationOptions should be a Map", initOptions)
-        assertEquals(true, initOptions!!["closingLabels"])
+            val experimental = checkNotNull(capabilities.experimental as? Map<*, *>) {
+                "experimental capabilities should be a Map"
+            }
+            assertTrue("experimental capabilities should include closingLabels", experimental.containsKey("closingLabels"))
+
+            val initOptions = checkNotNull(descriptor.createInitializationOptions() as? Map<*, *>) {
+                "initializationOptions should be a Map"
+            }
+            assertEquals(true, initOptions["closingLabels"])
+        } finally {
+            DartConfigurable.setExperimentalLspFeaturesEnabled(project, wasEnabled)
+        }
     }
 
     fun testDescriptorGetWorkspaceConfiguration() {
