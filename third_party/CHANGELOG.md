@@ -1,9 +1,19 @@
 ## Unreleased
 
 ### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
+## 512.0.0
+
+### Added
 - Parameter info (signature help) implemented with JetBrains LSP (experimental feature) (#819)
 - Whole-document and selection formatting via JetBrains LSP (experimental feature) (#689)
-- Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#401)
+- Syntax highlighting implemented with JetBrains LSP semantic tokens (experimental feature; requires Dart SDK 3.15.0-67.0.dev or newer) (#640)
 - Optimizing imports via LSP, also on save, before commit and in Reformat Code (experimental feature; requires Dart SDK 3.14.0-137.0.dev or newer) (#719)
 
 ### Changed
@@ -11,7 +21,7 @@
 - Routing "Reformat Code with 'dart format'" (`Dart.DartStyle`) through LSP formatting via `ReformatCodeProcessor` when experimental LSP features are enabled (#850)
 - Call Hierarchy navigation via LSP is now enabled for all users (#846)
 - Decoupling Analyzer Diagnostics action from legacy DartAnalysisServerService (#805)
-- Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#748)
+- Routing `dart/textDocument/publishClosingLabels` notifications through custom `Lsp4jClient` (#804)
 - Go to Super uses JetBrains LSP when experimental LSP features are enabled, navigating to the server's single effective target. Go to Implementation, gutter navigation and Method Hierarchy are unchanged (#821)
 
 ### Removed
@@ -27,10 +37,10 @@
 - Avoid `IllegalStateException` in `DartNamedElementImpl.getId()` on `new` constructor declarations (#815)
 - Prevent DartProblemsView from dropping diagnostics when the tool window has not been opened yet, and decouple problem tracking from DartAnalysisServerService (#785)
 - Avoid empty code completion lists when a third-party `DartCompletionExtension` throws an error (#814)
-- Support icon for typedef and type alias in Structure View and code completion (#660)
+- Support icon for typedef and type alias in Structure View and code completion (#787)
 - Avoid read-access error when invoking Type Hierarchy, Method Hierarchy, Go to Super Method, or Go to Implementation(s) in IntelliJ 2026.1+ (#780)
 - Avoid a trailing newline in the Dart SDK version, which leaked into analytics (`sdkVersion`), Settings, editor notifications, crash reports, and logs (#790)
-- Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#734)
+- Avoid sticky lines error on incomplete declarations when experimental LSP is enabled (#783)
 - Preserving the `///` prefix on every line when pasting multi-line text into a Dart doc comment (#762)
 - Avoid IDE internal errors from read-access threading assertions in Dart console links and when starting the Dart web server (#771)
 - Auto-selecting the current editor element in the Structure view when navigating across files (#800)
