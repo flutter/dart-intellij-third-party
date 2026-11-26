@@ -14,6 +14,9 @@ import org.jetbrains.annotations.Nullable;
 public final class DartRefactoringSupportProvider extends RefactoringSupportProvider {
   @Override
   public boolean isInplaceRenameAvailable(@NotNull PsiElement element, PsiElement context) {
+    // VariableInplaceRenameHandler renames without the server and, next to the platform's LspRenameHandler, would make
+    // IntelliJ ask which rename to run.
+    if (DartLspRename.INSTANCE.isEnabled(element.getProject())) return false;
     return element instanceof DartNamedElement &&
            element.getUseScope() instanceof LocalSearchScope;
   }

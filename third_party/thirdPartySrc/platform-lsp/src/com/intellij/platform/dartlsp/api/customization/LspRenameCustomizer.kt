@@ -3,7 +3,10 @@ package com.intellij.platform.dartlsp.api.customization
 
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.util.NlsContexts
 import com.intellij.psi.PsiFile
+import com.intellij.refactoring.RefactoringBundle
+import com.intellij.util.ui.UIUtil
 import com.intellij.util.concurrency.annotations.RequiresReadLock
 
 sealed class LspRenameCustomizer
@@ -55,6 +58,14 @@ open class LspRenameSupport : LspRenameCustomizer() {
 
     return TextRange(start, end)
   }
+
+  // Dart patch: title and label of the dialog that asks for a name the in-place rename can't edit
+  // (LspRenameHandler.renameWithInputDialog), at [offset] in [psiFile]. Plugins can name there what is renamed.
+  open fun getInputDialogTitle(psiFile: PsiFile, offset: Int): @NlsContexts.DialogTitle String =
+    RefactoringBundle.message("rename.title")
+
+  open fun getInputDialogLabel(psiFile: PsiFile, offset: Int): @NlsContexts.Label String =
+    UIUtil.removeMnemonic(RefactoringBundle.message("rename.dialog.new.name.label"))
 }
 
 object LspRenameDisabled : LspRenameCustomizer()
