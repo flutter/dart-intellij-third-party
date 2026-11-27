@@ -5,6 +5,7 @@
 Code completion for Dart backed by the Analysis Server, plus statement completion (Smart Enter), completion char filtering, and goto-declaration.
 
 ## Interface
+- `DartPsiCompletionContributor` - `CompletionContributor` (`order="first"`) adjusting `replacementOffset` in `beforeCompletion` so accepting completion with `Tab` preserves closing delimiters in both legacy DAS and LSP modes.
 - `DartServerCompletionContributor` - `CompletionContributor` using `completion_getSuggestions2` (or legacy `completion_getSuggestions`) and suggestion-details requests for auto-import.
 - `DartServerStatementCompletionProcessor` - `SmartEnterProcessor` applying `edit_getStatementCompletion`.
 - `DartLookupObject` - lookup element payload that resolves back to PSI for documentation.

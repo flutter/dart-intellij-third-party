@@ -222,6 +222,7 @@
     <gotoClassContributor implementation="com.jetbrains.lang.dart.ide.DartClassContributor"/>
     <gotoSymbolContributor implementation="com.jetbrains.lang.dart.ide.DartSymbolContributor"/>
 
+    <completion.contributor language="Dart" implementationClass="com.jetbrains.lang.dart.ide.completion.DartPsiCompletionContributor" order="first"/>
     <completion.contributor language="Dart" implementationClass="com.jetbrains.lang.dart.ide.completion.DartServerCompletionContributor"/>
     <gotoDeclarationHandler implementation="com.jetbrains.lang.dart.ide.completion.DartGotoDeclarationHandler"/>
     <lookup.charFilter implementation="com.jetbrains.lang.dart.ide.completion.DartCharFilter"/>
