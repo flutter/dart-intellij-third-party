@@ -36,7 +36,9 @@ public final class DartPsiCompletionContributor extends CompletionContributor im
       final PsiElement parentParent = parent.getParent();
       if (parentParent instanceof DartUriElement) {
         final Pair<String, TextRange> uriAndRange = ((DartUriElement)parentParent).getUriStringAndItsRange();
-        context.setReplacementOffset(parentParent.getTextRange().getStartOffset() + uriAndRange.second.getEndOffset());
+        if (uriAndRange != null && uriAndRange.second != null) {
+          context.setReplacementOffset(parentParent.getTextRange().getStartOffset() + uriAndRange.second.getEndOffset());
+        }
       }
       else {
         // If replacement context is not set explicitly then com.intellij.codeInsight.completion.CompletionProgressIndicator#duringCompletion
